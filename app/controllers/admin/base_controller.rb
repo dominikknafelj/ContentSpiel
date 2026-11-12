@@ -38,6 +38,8 @@ module Admin
 
     layout "admin"
     before_action { Current.channel = :admin }
+    # A person the passkey policy covered at sign-in adds a passkey first.
+    include PasskeyEnrolment
     before_action { Current.editing_tab = request.headers["X-Notes-Tab"].to_s[Live::Signals::TAB] }
 
     # Every time CS Studio shows or parses -- schedule inputs, "Saved

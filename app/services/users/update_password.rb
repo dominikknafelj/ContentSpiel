@@ -42,12 +42,21 @@ module Users
   # The password itself never reaches the log (Review Focus 5): the event
   # is `user.updated` with a `"credentials"` marker (`OwnerProtection#
   # user_field_changes`).
+  #
+  # `remove_passkeys: true` is the way back for a person who lost every
+  # passkey and every code: in the password's transaction it deletes the
+  # account's passkeys and recovery codes and records one `passkey.removed`
+  # (`reason: "console"`, the counts, no actor), and the sessions end as for
+  # any change. Only the trusted nil actor may ask it (the console's
+  # command): from anyone signed in it is refused whole, an owner included,
+  # since a second factor that someone else could clear protects nothing.
   class UpdatePassword < ApplicationService
     include OwnerProtection
     include LeakedPasswordRule
 
-    def initialize(user, password:, password_confirmation:, current_password: nil, keep_acting_session: true, actor: Current.actor)
+    def initialize(user, password:, password_confirmation:, current_password: nil, keep_acting_session: true, remove_passkeys: false, actor: Current.actor)
       @user = user
+      @remove_passkeys = remove_passkeys
       @password = password.to_s
       @password_confirmation = password_confirmation.to_s
       @current_password = current_password
@@ -56,6 +65,8 @@ module Users
     end
 
     def call
+      return denied("users.manage", @user) if @remove_passkeys && !AccessControl.trusted?(actor, Current.channel)
+
       unless own_password?
         return denied("users.manage", @user) unless authorize!("users.manage", @user)
         return owner_only_denial if owner_protected?
@@ -71,6 +82,7 @@ module Users
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)
         end_sessions_after_password_change(keep_acting_session: @keep_acting_session)
+        remove_passkeys if @remove_passkeys
 
         record_event("user.updated", subject: @user, field_changes: user_field_changes(@user))
         true
@@ -84,6 +96,14 @@ module Users
     private
 
     def own_password? = actor.is_a?(User) && actor == @user
+
+    def remove_passkeys
+      passkeys = Passkey.where(user_id: @user.id).delete_all # version: none (passkeys are on no public page)
+      codes = RecoveryCode.where(user_id: @user.id).delete_all # version: none (recovery codes are on no public page)
+      return if passkeys.zero? && codes.zero?
+
+      record_event("passkey.removed", subject: @user, metadata: { "count" => passkeys, "recovery_codes_removed" => codes, "reason" => "console" }, snapshot: nil)
+    end
 
     # A whole sentence for the field and for the summary alike
     # (config/locales/en.yml drops the attribute prefix for it). Wording

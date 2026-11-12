@@ -25,7 +25,13 @@ module SignIn
   # 4. A right password gives the attempt's counts back
   #    (`Throttle#record_success`) and is `:ok`; a wrong one is `:refused`
   #    with the buckets its reservation closed, and is counted no further:
-  #    the reservation was its count.
+  #    the reservation was its count. A right password for an account that
+  #    holds a second factor (`User#second_factor?`) is
+  #    `:second_factor_required` (`Throttle#await_second_proof`): the
+  #    address's counts are given back, and so is a lock its own
+  #    reservation wrote, but the account's (or the device's) count stands
+  #    until the second proof (`SignIn::Proof`) succeeds, so the password
+  #    alone never clears a run nor signs anyone in.
   #
   # The email and the password reach `authenticate_by` as Strings, a list or
   # a hash as "", so a junk parameter is refused as any wrong address is and
@@ -40,9 +46,10 @@ module SignIn
   # One `auth.sign_in` span holds the attempt: `auth.outcome` at the end,
   # `auth.bot_check.required` when the site has a check, and
   # `auth.account_exists` once a password was checked (`authenticate_by`
-  # checks none for an empty one). That last one is asked with one more
-  # query on a refusal, for a known and an unknown address alike, and never
-  # reaches the answer.
+  # checks none for an empty one), and `auth.second_factor.required` when
+  # a right password still owes a second proof. `auth.account_exists` is
+  # asked with one more query on a refusal, for a known and an unknown
+  # address alike, and never reaches the answer.
   class PasswordAttempt
     attr_reader :address
 
@@ -96,6 +103,12 @@ module SignIn
       account = @accounts.authenticate_by(email_address: email, password: password)
       Telemetry.record(span, "auth.account_exists" => account.present? || @accounts.exists?(email_address: email)) unless password.empty?
       return outcome(:refused, trips: reservation.closes) unless account
+
+      if account.second_factor?
+        @throttle.await_second_proof(reservation, identifier: identifier, address: address, device: known_device_id)
+        Telemetry.record(span, "auth.second_factor.required" => true)
+        return outcome(:second_factor_required, account: account)
+      end
 
       @throttle.record_success(identifier: identifier, address: address, device: known_device_id)
       outcome(:ok, account: account)

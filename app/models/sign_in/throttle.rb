@@ -51,6 +51,30 @@ module SignIn
   # anyone who proved the account) opens the account's bucket and every
   # device's at once.
   #
+  # A SECOND PROOF counts where its password did. A right password for an
+  # account that holds a second factor (a passkey or an unused recovery
+  # code) is not a success (`await_second_proof`): its count in the
+  # account's bucket (or the known device's) stands, and only the address's
+  # counts are taken back, so a whole sign-in costs the address what one
+  # did before. A lock its own reservation wrote (it was the fifth count of
+  # a run, or later) is taken back with it, and only that one: the right
+  # password had a right to go on, and a lock left standing would refuse
+  # its own second proof, so that anyone who sent five wrong passwords
+  # could keep a covered person out of every browser it does not know for
+  # the whole run. The count stands, so the second proof's reservation
+  # writes the next lock itself and leaves it standing if it fails: one
+  # guess of the proof per lock, the password's own rate. A lock written
+  # by earlier failures still refuses the right password, as any attempt.
+  # The second proof (a recovery code or a passkey of the account's
+  # own) and Confirm it's you's proof reserve in that same bucket again
+  # before they check anything, so their failures close the account as
+  # wrong passwords do, and a stolen password earns no fresh guesses; only
+  # the proof's success forgets the run. A passkey sign-in, which names no
+  # account until it is verified, reserves in the wide bucket alone
+  # (`reserve_address`) and is never refused by an account's lock: a
+  # passkey cannot be guessed, and a bot naming a credential must not lock
+  # out its owner.
+  #
   # THE WIDE BUCKET counts every attempt from one address (`VisitorAddress`,
   # an IPv6 one by its /64), whatever accounts it tried: WIDE_LIMIT go on in
   # an hour from the first, and the address is then closed until that hour
@@ -143,6 +167,42 @@ module SignIn
       Reservation.new(refused_by: nil, closes: [ account_closes, wide_closes ].compact)
     end
 
+    # The wide bucket's half of `reserve`, for an attempt that names no
+    # account (a passkey sign-in): no account's or device's run is counted,
+    # none refuses it, and no bot check is counted.
+    def reserve_address(address:)
+      refusal, closes = reserve_wide(address_digest(address))
+      Reservation.new(refused_by: refusal, closes: [ closes ].compact)
+    end
+
+    # A verified passkey after `reserve_address`: takes back the wide count
+    # that reservation made, and only that. It takes back no bot-check
+    # count, since `reserve_address` made none: one taken here would be an
+    # earlier attempt's, and a person who signs in by passkey again and
+    # again would bank the address guesses the bot check never sees.
+    def release_address(address:)
+      take_back(key(:wide, address_digest(address)), WIDE_WINDOW)
+      nil
+    end
+
+    # A right password for an account that still owes a second proof
+    # (`reservation` is the one `reserve` made for it): the address's counts
+    # are taken back as a success's are, the run's count stands, and the
+    # account's or device's lock this reservation wrote, if it wrote one, is
+    # taken back ("A SECOND PROOF"), under the key its trip names, never one
+    # read from `device` alone. Whatever the reservation closed is
+    # open again (the wide bucket by its count taken back), so none of its
+    # trips is a closure to audit or mail.
+    def await_second_proof(reservation, identifier:, address:, device: nil)
+      written = reservation.closes.find { |trip| %i[account device].include?(trip.bucket) }
+      if written
+        digest = written.bucket == :device ? device_digest(identifier, device) : identifier_digest(identifier)
+        store.delete(key(:"#{written.bucket}_lock", digest))
+      end
+      release_attempt_address(address)
+      nil
+    end
+
     # The attempt's password was right: the bucket it was counted in
     # forgets its run and its lock (the account's with its bot-check count,
     # or for a known device the device's alone: the account's run may be a
@@ -155,9 +215,7 @@ module SignIn
       else
         clear(identifier: identifier)
       end
-      address = address_digest(address)
-      take_back(key(:wide, address), WIDE_WINDOW)
-      take_back(key(:bot_address, address), BOT_CHECK_WINDOW)
+      release_attempt_address(address)
       nil
     end
 
@@ -247,10 +305,25 @@ module SignIn
         Trip.new(bucket: :address_wide, level: nil, seconds: seconds_until(store.read(key(:wide_ends, address))) || WIDE_WINDOW.to_i)
       end
 
+      # The wide and the bot-check counts a `reserve` made for the address.
+      def release_attempt_address(address)
+        address = address_digest(address)
+        take_back(key(:wide, address), WIDE_WINDOW)
+        take_back(key(:bot_address, address), BOT_CHECK_WINDOW)
+      end
+
       # Takes one count back, only while its window stands: a decrement of a
-      # key that expired meanwhile would open the next window at -1.
+      # key that expired meanwhile would open the next window at -1. No
+      # count is left below 0, whoever takes back more than was counted: a
+      # negative count would be guesses banked against the next window's
+      # limit. A decrement that went below 0 adds back its own 1 and no
+      # more, so take-backs at once settle at 0: one adding back the whole
+      # shortfall would add back the others' too.
       def take_back(count_key, window)
-        store.decrement(count_key, 1, expires_in: window) if store.exist?(count_key)
+        return unless store.exist?(count_key)
+
+        left = store.decrement(count_key, 1, expires_in: window)
+        store.increment(count_key, 1, expires_in: window) if left&.negative?
       end
 
       # The block's [refusal, closes], inside one `auth.throttle` span that

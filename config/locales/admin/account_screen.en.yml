@@ -39,3 +39,58 @@ en:
             one: "Your other session ends, and that browser must sign in again. You stay signed in here."
             other: "Your %{count} other sessions end, and those browsers must sign in again. You stay signed in here."
           end_others_confirm: "Sign out everywhere else"
+        # The Passkeys card: a row per passkey, its Rename and Remove…, and
+        # the foot with "Add a passkey…". `last_required` stands in the row
+        # of a covered person's last passkey, whose Remove is disabled.
+        passkeys_card:
+          title: "Passkeys"
+          intro: "Sign in with your device's unlock instead of your password. Add one for each device or password manager you use."
+          added: "Added %{date}"
+          last_used_html: "Last used %{time}"
+          never_used: "Never used"
+          rename: "Rename"
+          rename_label: "Rename the passkey %{name}"
+          remove: "Remove…"
+          remove_label: "Remove the passkey %{name}"
+          last_required: "This site asks you to sign in with a passkey. Add another before removing this one."
+          count:
+            one: "1 passkey"
+            other: "%{count} passkeys"
+          none: "You have no passkeys. You sign in with your password."
+          add: "Add a passkey…"
+        # The card's three dialogs: Add (the Name, then the browser's
+        # prompt), Rename and Remove. `name_blank` and `failed` are said by
+        # `admin--passkeys--register` too, from `data-messages`.
+        passkey_dialog:
+          add_title: "Add a passkey"
+          name: "Name"
+          name_help: "A name to tell your passkeys apart, like \"1Password\" or \"MacBook\"."
+          name_blank: "Give the passkey a name."
+          continue: "Continue"
+          failed: "The passkey wasn't added. Try again."
+          rename_title: "Rename passkey"
+          save_name: "Save name"
+          remove_title: "Remove the passkey \"%{name}\"?"
+          remove_body: "You can't sign in with it any more. Delete it from the device or password manager too."
+          remove_last: "It's your last passkey: you'll sign in with your password again."
+          remove_confirm: "Remove passkey"
+          cancel: "Cancel"
+        # The Recovery codes card: how many are left and when they were made,
+        # and Generate… or Regenerate….
+        recovery_card:
+          title: "Recovery codes"
+          intro: "Sign in with one when your passkeys aren't at hand. Each code works once."
+          left: "%{left} of 10 codes left · made %{date}"
+          none: "You have no recovery codes."
+          passkey_first: "Recovery codes come with your first passkey."
+          low:
+            one: "1 code left. Regenerate them before you run out."
+            other: "%{count} codes left. Regenerate them before you run out."
+          out: "No codes left. Regenerate them now."
+          generate: "Generate recovery codes…"
+          regenerate: "Regenerate…"
+          regenerate_title: "Regenerate recovery codes?"
+          regenerate_body:
+            one: "Your 1 unused code stops working, and you get ten new ones to save."
+            other: "Your %{count} unused codes stop working, and you get ten new ones to save."
+          regenerate_confirm: "Regenerate"

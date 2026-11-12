@@ -71,6 +71,9 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/accounts
       app/controllers/admin/accounts_controller.rb
       app/controllers/admin/account_sessions_controller.rb
+      app/controllers/admin/passkeys_controller.rb
+      app/controllers/admin/recovery_codes_controller.rb
+      app/controllers/concerns/admin/account_recovery_codes.rb
     ],
     "audit_screen" => %w[
       app/views/admin/audit_events
@@ -182,13 +185,18 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/concerns/admin/users_list.rb
     ],
     shared: %w[
+      app/views/admin/enrolments
       app/views/admin/errors
       app/views/admin/jump
       app/views/admin/passwords
+      app/views/admin/second_factors
       app/views/admin/sessions
       app/views/admin/system_status
+      app/controllers/admin/confirmations_controller.rb
+      app/controllers/admin/enrolments_controller.rb
       app/controllers/admin/jump_controller.rb
       app/controllers/admin/passwords_controller.rb
+      app/controllers/admin/second_factors_controller.rb
       app/controllers/admin/sessions_controller.rb
       app/controllers/admin/system_status_controller.rb
       app/controllers/admin/media_assets_controller.rb
@@ -201,8 +209,12 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/concerns/admin/field_params.rb
       app/controllers/concerns/admin/file_params.rb
       app/controllers/concerns/admin/mail_link_origin.rb
+      app/controllers/concerns/admin/passkey_enrolment.rb
+      app/controllers/concerns/admin/recent_confirmation.rb
       app/controllers/concerns/admin/record_of_kind.rb
       app/controllers/concerns/admin/refusal_status.rb
+      app/controllers/concerns/admin/sign_in_completion.rb
+      app/controllers/concerns/admin/sign_in_locks.rb
       app/controllers/concerns/admin/stale_form.rb
       app/controllers/concerns/admin/toast_stream.rb
       app/controllers/concerns/admin/translatable_record_loading.rb

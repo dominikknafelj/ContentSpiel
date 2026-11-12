@@ -1,7 +1,7 @@
 <%# The sign-in form, on the product layout's panel: the site name above the
     heading, an alert or a notice from the last answer, the two fields, the
     bot check when one is due, and the full-width Sign in, the panel's one
-    primary. The labels are real
+    primary; below the form, the passkey button where there can be one. The labels are real
     <label>s. Field names (email_address, password) are what the controller
     and every test post. %>
 <% mail_ready = MailSettings.current.ready? %>
@@ -28,7 +28,7 @@
   <%= form_with url: admin_sign_in_path, class: "flex flex-col gap-[18px]" do |form| %>
     <div class="admin-field">
       <%= form.label :email_address, t(".email"), class: setup_label_class %>
-      <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", value: params[:email_address], class: setup_input_class %>
+      <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username webauthn", value: params[:email_address], class: setup_input_class %>
     </div>
 
     <%# "Forgot your password?" rides the Password label row, right-aligned
@@ -68,5 +68,28 @@
         answer is a whole load; the form's links stay Turbo's. %>
     <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full",
           aria: (@bot_check ? { describedby: "turnstile-hint" } : {}), data: (@bot_check_configured ? { turbo: false } : {})) %>
+  <% end %>
+
+  <%# "Sign in with a passkey", under the form and outside it: a secondary,
+      so Sign in stays the panel's one primary, and never behind the bot
+      check. Drawn only where the site has a relying party (none at an IP
+      address), and `hidden` until `passkey-sign-in` finds the browser can
+      use a passkey, so a browser that can't keeps the panel as it was; it
+      stands below everything else, so nothing above moves when it shows. %>
+  <% if passkey_relying_party %>
+    <div class="contents" data-controller="passkey-sign-in"
+         data-passkey-sign-in-options-url-value="<%= admin_sign_in_passkey_options_path %>"
+         data-passkey-sign-in-verify-url-value="<%= admin_sign_in_passkey_path %>">
+      <div class="flex items-center gap-3 text-small text-meta" hidden data-passkey-sign-in-target="divider">
+        <span class="h-px flex-1 bg-line" aria-hidden="true"></span>
+        <span><%= t(".or") %></span>
+        <span class="h-px flex-1 bg-line" aria-hidden="true"></span>
+      </div>
+      <button type="button" class="w-full <%= Admin::Ui::ButtonComponent.classes(:secondary) %>" hidden
+              data-passkey-sign-in-target="button" data-action="passkey-sign-in#signIn">
+        <%= render "admin/shared/icon", name: :fingerprint, size: "size-4" %>
+        <%= t(".passkey") %>
+      </button>
+    </div>
   <% end %>
 </div>

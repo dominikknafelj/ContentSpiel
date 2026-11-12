@@ -1,8 +1,8 @@
-<%# "Your account": the h1, then four cards in the settings card frame
+<%# "Your account": the h1, then six cards in the settings card frame
     (`Admin::Ui::SettingsCardComponent`), 560px wide -- Profile and Notes in
     one form with one footer, Password, a form of its own with its own
     "Change password" footer and the promise about sessions as its card's
-    intro, and Sessions, in no form (see it below). Every signed-in user changes their own password here, behind their
+    intro, then Passkeys, Recovery codes and Sessions, in no form (see them below). Every signed-in user changes their own password here, behind their
     current one, and the one profile field, their name. A deliberate submit,
     never autosave, like the Users module's own forms.
 
@@ -163,6 +163,21 @@
       <% end %>
     <% end %>
   <% end %>
+
+  <%# Passkeys and Recovery codes: after both forms and in neither, like
+      Sessions. Their answers redraw each card by its id, and a new set of
+      codes is drawn into the slot after them, shown once
+      (`Admin::AccountRecoveryCodes`). Adding or removing a passkey and
+      making codes ask Confirm it's you first when the session has not
+      proved its person lately: its one dialog stands after the cards, and
+      a passkey is offered in it once the person holds one. The cards are
+      the controller's (`load_passkeys`). %>
+  <div class="mt-8 flex flex-col gap-4">
+    <%= render @passkeys_card %>
+    <%= render @recovery_card %>
+  </div>
+  <div id="<%= Admin::AccountRecoveryCodes::SLOT_ID %>"></div>
+  <%= render Admin::Ui::ConfirmIdentityDialogComponent.new(passkey: @confirm_with_passkey, url_options: admin_url_options) %>
 
   <%# Sessions: after both forms and in neither, so nothing in it is a
       change a save bar counts or "Leave without saving?" asks about. Its

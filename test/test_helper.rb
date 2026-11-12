@@ -67,6 +67,7 @@ require_relative "support/sanitizer_parses"
 require_relative "support/contrast_measure"
 require_relative "support/theme_test_helper"
 require_relative "support/sign_in_helper"
+require_relative "support/passkey_helper"
 
 # What tests themselves print -- the statements a migration test runs
 # ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise
@@ -151,6 +152,12 @@ module ActiveSupport
     # the sign-in checks' outside calls, never the network -- see
     # test/support/sign_in_helper.rb.
     include SignInHelper
+
+    # `fake_authenticator`, `add_passkey(user, client:)` and
+    # `passkey_assertion(client, challenge:)`: a passkey through the webauthn
+    # gem's fake authenticator, never a browser -- see
+    # test/support/passkey_helper.rb.
+    include PasskeyHelper
 
     # Setup.required? memoizes "setup is done" per process, reset by
     # SiteSetting after every commit -- but a test that clears the table with

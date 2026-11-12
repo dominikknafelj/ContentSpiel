@@ -1,0 +1,46 @@
+<%= render Admin::Ui::SettingsCardComponent.new(heading_id: HEADING_ID, heading: t(".title"), icon: :fingerprint, family: :neutral,
+      intro: t(".intro"), id: ID, class: "scroll-mt-6", data: controller_data) do %>
+  <% unless recovery_left.nil? %>
+    <div class="px-4 pt-4">
+      <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact) do %><%= recovery_notice %><% end %>
+    </div>
+  <% end %>
+  <% if passkeys.any? %>
+    <ul class="divide-y divide-line">
+      <% passkeys.each do |passkey| %>
+        <%# Narrow, the details wrap under the name; the two buttons keep the row's end. %>
+        <%= tag.li id: row_id(passkey), class: "flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3" do %>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-ink [overflow-wrap:anywhere]" data-passkey-name><%= passkey.name %></p>
+            <p class="mt-0.5 text-small text-dim" data-passkey-details><%= details(passkey) %></p>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".rename"), variant: :tertiary, size: :small, type: "button",
+                  autofocus: autofocus?(passkey), aria: { label: t(".rename_label", name: passkey.name) },
+                  data: dialog_trigger(Admin::AccountScreen::PasskeyDialogComponent.dialog_id(:rename, passkey))) %>
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".remove"), variant: :danger_text, size: :small, type: "button",
+                  disabled: required?, aria: { label: t(".remove_label", name: passkey.name), describedby: (required? ? "#{row_id(passkey)}-required" : nil) },
+                  data: (required? ? {} : dialog_trigger(Admin::AccountScreen::PasskeyDialogComponent.dialog_id(:remove, passkey)))) %>
+          </div>
+          <% if required? %>
+            <p id="<%= row_id(passkey) %>-required" class="basis-full text-small text-meta"><%= t(".last_required") %></p>
+          <% end %>
+          <%= render Admin::AccountScreen::PasskeyDialogComponent.new(kind: :rename, passkey: passkey, url_options: url_options) %>
+          <% unless required? %>
+            <%= render Admin::AccountScreen::PasskeyDialogComponent.new(kind: :remove, passkey: passkey, last: last?, url_options: url_options) %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </ul>
+  <% end %>
+  <div class="flex flex-wrap items-center justify-between gap-3 rounded-b-card border-t border-line px-4 py-3" data-passkeys-foot>
+    <p class="text-small text-dim"><%= passkeys.any? ? t(".count", count: passkeys.size) : t(".none") %></p>
+    <% if addable? %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".add"), variant: :secondary, size: :small, type: "button",
+            data: { action: "admin--passkeys--register#add", "admin--passkeys--register-target": "add" }) %>
+    <% end %>
+  </div>
+  <% if addable? %>
+    <%= render Admin::AccountScreen::PasskeyDialogComponent.new(kind: :add, url_options: url_options) %>
+  <% end %>
+<% end %>

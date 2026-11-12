@@ -444,4 +444,73 @@ class Settings::SaveTest < ActiveSupport::TestCase
     end
     assert_not Audit::Event.exists?(action: "settings.updated")
   end
+
+  test "an owner saves the policy and settings.updated records it" do
+    result = as_owner { Settings::Save.call(Current.site, attributes: { passkey_policy: "everyone" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal "everyone", Current.site.reload.passkey_policy
+    event = Audit::Event.find_by!(action: "settings.updated")
+    assert_equal [ nil, "everyone" ], event.field_changes["passkey_policy"]
+  end
+
+  test "an owner's save that posts the environment's default leaves the policy unset" do
+    default = Current.site.effective_passkey_policy
+
+    result = as_owner { Settings::Save.call(Current.site, attributes: { passkey_policy: default, time_zone: "Europe/Berlin" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_nil Current.site.reload.passkey_policy, "an untouched choice is no owner's decision"
+    assert_not Audit::Event.find_by!(action: "settings.updated").field_changes.key?("passkey_policy")
+  end
+
+  # The command `docs/reference/hosting.md` gives an operator held at
+  # enrolment, run as written: with no actor, on a production site that never
+  # chose (unset is owners and admins there).
+  test "the console command in hosting.md sets the policy to nobody, with no actor, and records it" do
+    command = File.read(Rails.root.join("docs/reference/hosting.md"))[/`(bin\/rails runner 'p Settings::Save\.call[^`]*)`/, 1]
+    assert command, "hosting.md gives the command"
+    ruby = command[/\Abin\/rails runner '(.*)'\z/, 1]
+    assert_nil Current.actor
+    assert_nil Current.site.passkey_policy
+
+    with_singleton_override(Rails.env, :production?, -> { true }) do
+      output, = capture_io { assert_equal true, eval(ruby) }
+      assert_equal "true\n", output
+    end
+
+    assert_equal "nobody", Current.site.reload.passkey_policy
+    event = Audit::Event.find_by!(action: "settings.updated")
+    assert_nil event.actor_id
+    assert_equal [ nil, "nobody" ], event.field_changes["passkey_policy"]
+  end
+
+  test "an unknown policy is refused" do
+    result = as_owner { Settings::Save.call(Current.site, attributes: { passkey_policy: "some" }) }
+
+    assert_not result.ok?
+    assert_nil Current.site.reload.passkey_policy
+  end
+
+  test "a non-owner's save carrying passkey_policy is refused whole and records access.denied" do
+    admin = users(:two)
+    assert AccessControl.holds?(admin, "settings.manage", channel: :admin), "the premise: the admin may manage settings"
+
+    result = as(admin) { Settings::Save.call(Current.site, attributes: { passkey_policy: "everyone", time_zone: "Europe/Berlin" }) }
+
+    assert result.denied?
+    assert_equal [ I18n.t("admin.settings.save.owner_only") ], result.errors
+    site = Current.site.reload
+    assert_nil site.passkey_policy
+    assert_not_equal "Europe/Berlin", site.time_zone
+    assert_equal 1, Audit::Event.where(action: "access.denied").count
+    assert_not Audit::Event.exists?(action: "settings.updated")
+  end
+
+  test "a trusted nil actor may set the policy" do
+    result = as(nil, channel: :console) { Settings::Save.call(Current.site, attributes: { passkey_policy: "everyone" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal "everyone", Current.site.reload.passkey_policy
+  end
 end

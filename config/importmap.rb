@@ -106,6 +106,14 @@ pin_all_from "app/javascript/media", under: "media", preload: "admin"
 # imported: it is started as a module Worker from its asset URL.
 pin_all_from "app/javascript/mind_graph", under: "mind_graph", preload: false
 
+# The passkey ceremonies' modules: `passkeys/ceremony`, the browser's
+# WebAuthn calls, with no library, and `passkeys/held_options`, which keeps
+# the options a script holds from lapsing. Imported with `import()` by the passkey
+# controllers when they connect (sign-in's `passkey_sign_in_controller.js`
+# is a site controller, registered on public pages too), so no page
+# preloads it and a public page never fetches it.
+pin_all_from "app/javascript/passkeys", under: "passkeys", preload: false
+
 pin "sortablejs", preload: false # @1.15.7
 # Vendored for the mind graph's layout WORKER, which imports the file by its
 # asset URL (an import map does not apply inside a worker). Nothing in a page

@@ -4,6 +4,8 @@
 # under /preview.
 class PreviewController < ApplicationController
   include PublicPageRendering
+  # A person the passkey policy covered at sign-in adds a passkey first.
+  include Admin::PasskeyEnrolment
 
   # Same reason as PublicController's own before_action: an Accept header
   # naming another format would otherwise reach a missing template and a 500.

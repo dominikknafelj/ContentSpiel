@@ -15,6 +15,15 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     Audit::Event.where(action: "session.ended").order(:id)
   end
 
+  test "it deletes the spent passkey challenges past their expiry and keeps the others" do
+    SignIn::SpentChallenge.spend!("expired", expires_at: @now - 1.second)
+    SignIn::SpentChallenge.spend!("current", expires_at: @now + 1.minute)
+
+    Sessions::SweepJob.perform_now(at: @now)
+
+    assert_equal [ "current" ], SignIn::SpentChallenge.pluck(:digest)
+  end
+
   test "it ends the idle and the absolute session, keeps the live one and records one event per reason" do
     live = start(seen: @now)
     start(seen: @now - 13.hours, signed_in: @now - 1.day)

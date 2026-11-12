@@ -51,4 +51,5 @@ en:
       save:
         avif_unavailable: "AVIF can't be chosen: this server cannot write it."
         no_encryption_keys: "This site has no encryption keys, so a password can't be stored. See Hosting: encryption keys."
+        owner_only: "Only an owner can change who must sign in with a passkey."
         set_by_host: "%{field} is set by the host and can't be changed here."

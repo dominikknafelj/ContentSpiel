@@ -87,6 +87,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/shell/top_bar_component.rb
     app/components/admin/shell/top_bar_component.html.erb
     app/components/admin/ui/tree_hide_component.rb
+    app/components/admin/ui/recovery_codes_component.rb
+    app/components/admin/ui/recovery_codes_component.html.erb
+    app/components/admin/ui/confirm_identity_dialog_component.rb
+    app/components/admin/ui/confirm_identity_dialog_component.html.erb
     app/components/admin/ui/audit_sentence_component.rb
     app/components/admin/ui/reference_card_component.rb
     app/components/admin/ui/reference_card_component.html.erb
@@ -244,6 +248,21 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/account_screen/sessions_foot_component.rb
     app/components/admin/account_screen/sessions_foot_component.html.erb
     app/controllers/admin/account_sessions_controller.rb
+    app/components/admin/account_screen/passkeys_card_component.rb
+    app/components/admin/account_screen/passkeys_card_component.html.erb
+    app/components/admin/account_screen/passkey_dialog_component.rb
+    app/components/admin/account_screen/passkey_dialog_component.html.erb
+    app/components/admin/account_screen/passkey_rename_fields_component.rb
+    app/components/admin/account_screen/passkey_rename_fields_component.html.erb
+    app/components/admin/account_screen/recovery_card_component.rb
+    app/components/admin/account_screen/recovery_card_component.html.erb
+    app/controllers/admin/passkeys_controller.rb
+    app/controllers/admin/recovery_codes_controller.rb
+    app/components/admin/settings_screen/sign_in_card_component.rb
+    app/components/admin/settings_screen/sign_in_card_component.html.erb
+    app/controllers/admin/enrolments_controller.rb
+    app/controllers/concerns/admin/passkey_enrolment.rb
+    app/views/admin/enrolments/show.html.erb
     app/controllers/admin/api_tokens_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
