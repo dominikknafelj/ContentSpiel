@@ -11,6 +11,12 @@ class BackendRoutesTest < ActionDispatch::IntegrationTest
     assert_not defined?(ActionMailbox::Engine)
   end
 
+  test "a CS Studio page names the cable's address for turbo-rails' consumer" do
+    sign_in_as(users(:one))
+    get "/cs-studio"
+    assert_select "meta[name='action-cable-url'][content='/cs-studio/cable']"
+  end
+
   test "Turbo's historical-location routes are not drawn" do
     assert_empty Rails.application.routes.routes.map { |route| route.path.spec.to_s }.grep(/historical_location/)
   end

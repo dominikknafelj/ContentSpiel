@@ -530,6 +530,11 @@ Rails.application.routes.draw do
     # under the admin path with the rest of the backend: the public site's
     # catch-all below never sees it, and `/mcp` is a public page path like any other.
     post "mcp", to: "mcp#create"
+
+    # The socket of notes, presence and live editing. `internal` keeps it out
+    # of `bin/rails routes`; the routes guard reads it anyway. Rails' own
+    # mount at `/cable` is off (`config.action_cable.mount_path = nil`).
+    mount ActionCable.server => "cable", internal: true, anchor: true
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

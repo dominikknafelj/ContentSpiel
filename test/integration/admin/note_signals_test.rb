@@ -51,24 +51,23 @@ class Admin::NoteSignalsTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  # `/cable` is Action Cable's own mount (`config.action_cable.mount_path`),
-  # drawn ahead of every route of the app: the public catch-all never sees
-  # it, so it is neither a page's address nor a 404 from the theme, and the
-  # setup redirect does not catch it either. A plain request is refused by
-  # Action Cable itself; a WebSocket is refused by the connection without a
-  # CS Studio session (`test/channels/application_cable/connection_test.rb`).
-  test "the cable's address is Action Cable's own, not the public site's" do
+  # Action Cable is mounted under the admin path (`config/routes.rb`), and
+  # `/cable` is a public page's address like any other. A plain request to
+  # the socket is refused by Action Cable itself; a WebSocket is refused by
+  # the connection without a CS Studio session
+  # (`test/channels/application_cable/connection_test.rb`).
+  test "the cable's address is under the admin path, and /cable is a public page path" do
     create_page(title: "cable", published: true)
 
-    get "/cable"
+    get "/cs-studio/cable"
     assert_response :not_found
-    assert_equal "Page not found", response.body
     assert_nil response.headers["Set-Cookie"]
 
-    post "/cable", params: { command: "subscribe" }
-    assert_equal "Page not found", response.body
+    get "/cable"
+    assert_response :success
 
-    assert_includes ContentSpiel::RESERVED_PATHS, "cable"
+    assert_equal "/cs-studio/cable", ActionCable.server.config.url
+    assert_nil ActionCable.server.config.mount_path
   end
 
   test "a public page loads and names nothing of the cable" do

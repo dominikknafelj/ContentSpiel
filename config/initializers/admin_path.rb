@@ -40,3 +40,9 @@ module ContentSpiel
     raise ArgumentError, "ADMIN_PATH can't be #{path.inspect} -- that's already reserved" if RESERVED_PATHS.include?(path)
   end
 end
+
+# The address of Action Cable's socket, which `config/routes.rb` mounts under
+# the admin path. turbo-rails' consumer reads it from `action_cable_meta_tag`
+# (it asks `/cable` otherwise), and `live/connection.js` goes through that
+# consumer. `ADMIN_PATH` stays read in this file alone.
+Rails.application.config.action_cable.url = "/#{ContentSpiel::ADMIN_PATH}/cable"
