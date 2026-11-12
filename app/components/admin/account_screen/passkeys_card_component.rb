@@ -16,6 +16,9 @@ module Admin
     #   options first (through Confirm it's you, `#confirm-identity`, when the
     #   server asks for it), then the Name dialog, whose Continue opens the
     #   browser's prompt at once.
+    # - `addable: false` (no relying party: a site reached at an IP address,
+    #   where no passkey endpoint answers) draws no Add and no Name dialog;
+    #   the passkeys the person holds are still listed, renamed and removed.
     # - After a sign-in with a recovery code (`recovery_left`, how many are
     #   left) the card opens on a warn notice.
     #
@@ -27,14 +30,15 @@ module Admin
 
       # The card for `user` as stored: their passkeys, oldest first, and
       # whether the policy covers them.
-      def self.for(user, recovery_left: nil, url_options: {}, autofocus: nil)
-        new(passkeys: user.passkeys.order(:created_at, :id).to_a, covered: Passkeys::Policy.current.covers?(user),
+      def self.for(user, addable:, recovery_left: nil, url_options: {}, autofocus: nil)
+        new(passkeys: user.passkeys.order(:created_at, :id).to_a, covered: Passkeys::Policy.current.covers?(user), addable: addable,
           recovery_left: recovery_left, url_options: url_options, autofocus: autofocus)
       end
 
-      def initialize(passkeys:, covered:, recovery_left: nil, url_options: {}, autofocus: nil)
+      def initialize(passkeys:, covered:, addable: true, recovery_left: nil, url_options: {}, autofocus: nil)
         @passkeys = passkeys
         @covered = covered
+        @addable = addable
         @recovery_left = recovery_left
         @url_options = url_options
         @autofocus = autofocus
@@ -46,6 +50,8 @@ module Admin
 
       # The only passkey left, of a person the policy holds to one.
       def required? = @covered && last?
+
+      def addable? = @addable
 
       # The person's one passkey: removing it leaves the password alone.
       def last? = passkeys.size == 1

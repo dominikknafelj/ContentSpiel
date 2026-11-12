@@ -2,6 +2,8 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import { messages } from "i18n/messages"
 
+const CONFIRM_HEADER = "X-Confirm-Identity"
+
 // Adding a passkey (Your account's Passkeys card, the enrolment page, the
 // wizard's step), in the order WebKit allows (`passkeys/ceremony`, "THE
 // PROMPT OPENS IN THE PRESS"):
@@ -21,6 +23,14 @@ import { messages } from "i18n/messages"
 //    server's own sentence from a 422 `{ "error" }`. A closed prompt says
 //    nothing, and its options are kept for the next press, since nothing was
 //    sent; after an answer they are spent and fetched afresh.
+// 4. A Continue with no options held, or a send the gate refused (403 with
+//    CONFIRM_HEADER: the window lapsed while the Name dialog stood open),
+//    goes back through `ensure()` when the server asks for it, fetches
+//    fresh options (the confirmation's own ceremony took the session's one
+//    challenge slot) and prompts again with the same name. That prompt comes
+//    after awaits, so WebKit may refuse it as outside a gesture; it is then
+//    a closed prompt, which says nothing, and Continue works with the
+//    options held.
 //
 // Without an outlet (the wizard, which no confirmation gates) a 403 says
 // `failed`. Where the browser can make no passkey, the add button is
@@ -83,12 +93,12 @@ export default class extends Controller {
       return
     }
     const options = this.options
-    if (!options) {
-      this.errorTarget.textContent = this.say("failed")
-      this.refresh()
-      return
-    }
+    if (!options) return this.confirmAgain(name)
 
+    this.prompt(options, name)
+  }
+
+  prompt(options, name) {
     this.errorTarget.textContent = ""
     this.ceremony
       .create(options)
@@ -121,12 +131,23 @@ export default class extends Controller {
       return this.refused()
     }
 
+    if (response.status === 403 && response.headers.get(CONFIRM_HEADER)) return this.confirmAgain(name)
+
     const type = response.headers.get("Content-Type") || ""
     if (response.redirected) return Turbo.visit(response.url)
     if (response.ok && type.includes("turbo-stream")) return Turbo.renderStreamMessage(await response.text())
 
     const answer = type.includes("application/json") ? await response.json().catch(() => ({})) : {}
     this.refused(response.status === 422 && typeof answer.error === "string" ? answer.error : null)
+  }
+
+  async confirmAgain(name) {
+    const options = await this.fetchOptions()
+    if (options === undefined || !this.element.isConnected) return
+    if (!options) return this.refused()
+
+    this.options = options
+    this.prompt(options, name)
   }
 
   refused(sentence = null) {
@@ -136,8 +157,8 @@ export default class extends Controller {
   }
 
   // Fresh options for the next Continue, while the dialog is open: the last
-  // set's challenge went with its answer. A refusal by the gate here leaves
-  // none, and Continue then says `failed`.
+  // set's challenge went with its answer. A refusal by the gate leaves none,
+  // and the next Continue asks for them through `ensure()`.
   async refresh() {
     const answer = await this.request()
     if (this.dialog.open && answer?.status === 200 && answer.options) this.options = answer.options

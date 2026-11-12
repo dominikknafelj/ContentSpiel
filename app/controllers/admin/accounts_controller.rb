@@ -15,6 +15,7 @@ module Admin
   # (`Users::OwnerProtection#end_sessions_after_password_change`).
   class AccountsController < BaseController
     include AutosaveResponses
+    include PasskeyChallenges
 
     # The current-password check is a password oracle; throttled like
     # sign-in and the reset flow.
@@ -132,9 +133,11 @@ module Admin
     # The Passkeys and Recovery codes cards, and whether Confirm it's you
     # offers a passkey, for every answer that draws the screen. After a
     # sign-in with a recovery code (`SecondFactorsController#code`) the
-    # Passkeys card says how many codes are left.
+    # Passkeys card says how many codes are left. "Add a passkey…" is drawn
+    # only where a passkey can be made: not at an IP address
+    # (`PasskeyChallenges#passkey_relying_party`).
     def load_passkeys
-      @passkeys_card = AccountScreen::PasskeysCardComponent.for(Current.user, recovery_left: flash[:recovery_code_left]&.to_i, url_options: admin_url_options)
+      @passkeys_card = AccountScreen::PasskeysCardComponent.for(Current.user, addable: passkey_relying_party.present?, recovery_left: flash[:recovery_code_left]&.to_i, url_options: admin_url_options)
       @recovery_card = AccountScreen::RecoveryCardComponent.for(Current.user, url_options: admin_url_options)
       @confirm_with_passkey = Current.user.passkeys.exists?
     end

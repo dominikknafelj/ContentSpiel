@@ -35,8 +35,12 @@
   <% end %>
   <div class="flex flex-wrap items-center justify-between gap-3 rounded-b-card border-t border-line px-4 py-3" data-passkeys-foot>
     <p class="text-small text-dim"><%= passkeys.any? ? t(".count", count: passkeys.size) : t(".none") %></p>
-    <%= render Admin::Ui::ButtonComponent.new(label: t(".add"), variant: :secondary, size: :small, type: "button",
-          data: { action: "admin--passkeys--register#add", "admin--passkeys--register-target": "add" }) %>
+    <% if addable? %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".add"), variant: :secondary, size: :small, type: "button",
+            data: { action: "admin--passkeys--register#add", "admin--passkeys--register-target": "add" }) %>
+    <% end %>
   </div>
-  <%= render Admin::AccountScreen::PasskeyDialogComponent.new(kind: :add, url_options: url_options) %>
+  <% if addable? %>
+    <%= render Admin::AccountScreen::PasskeyDialogComponent.new(kind: :add, url_options: url_options) %>
+  <% end %>
 <% end %>

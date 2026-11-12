@@ -108,6 +108,23 @@ class Admin::AccountPasskeysSystemTest < ApplicationSystemTestCase
     end
   end
 
+  test "when the ten minutes run out with the Name dialog open, Continue asks Confirm it's you and then adds the passkey" do
+    with_virtual_authenticator do
+      sign_in_via_form(@user)
+      account
+      press "Add a passkey…"
+      assert_selector "#{NAME}[open]"
+      outside_the_window
+
+      within(NAME) { fill_in "Name", with: "This browser" }
+      press "Continue"
+      confirm_with_password
+
+      assert_equal RecoveryCode::COUNT, codes_shown.size
+      assert_equal [ "This browser" ], @user.passkeys.reload.map(&:name)
+    end
+  end
+
   test "Cancel in Confirm it's you adds nothing, and no Name dialog opens" do
     with_virtual_authenticator do
       sign_in_via_form(@user)

@@ -54,11 +54,13 @@ class Admin::PasskeysControllerTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=append][target=toasts] template", text: /Passkey added\./
     assert_select "turbo-stream[action=update][target=account-recovery-codes] template dialog[data-admin--ui--dialog-open-on-load]"
     assert_select "turbo-stream[action=append][targets=head] template meta[name=turbo-cache-control][content=no-cache]"
+    streams = css_select("turbo-stream").map { |stream| stream["targets"] || stream["target"] }
+    assert_operator streams.index("head"), :<, streams.index("account-recovery-codes"), "the page is uncacheable before it holds the codes"
     codes = css_select("turbo-stream[target=account-recovery-codes] template pre").text.split
     assert_equal RecoveryCode::COUNT, codes.size
-    assert_equal RecoveryCode::COUNT, @user.recovery_codes.unused.count
-    assert_includes codes, codes.first
-    assert_equal 1, RecoveryCode.where(user: @user, digest: RecoveryCode.digest(codes.first)).count
+    assert codes.all? { |code| code.match?(/\A[0-9A-Z]{4}-[0-9A-Z]{4}\z/) }
+    assert_equal codes.map { |code| RecoveryCode.digest(code) }.sort, @user.recovery_codes.unused.pluck(:digest).sort,
+      "the codes shown are the codes stored"
 
     second = fake_authenticator
     again = registration_options

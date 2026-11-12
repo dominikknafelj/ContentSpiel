@@ -48,8 +48,9 @@ module Admin
       return render(json: { error: result.errors.first }, status: :unprocessable_entity) unless result.ok?
 
       _passkey, codes = result.record
+      # `addable: true`: this action answers only where a relying party is.
       streams = [
-        turbo_stream.replace(AccountScreen::PasskeysCardComponent::ID, AccountScreen::PasskeysCardComponent.for(Current.user, url_options: admin_url_options)),
+        turbo_stream.replace(AccountScreen::PasskeysCardComponent::ID, AccountScreen::PasskeysCardComponent.for(Current.user, addable: true, url_options: admin_url_options)),
         turbo_stream.replace(AccountScreen::RecoveryCardComponent::ID, AccountScreen::RecoveryCardComponent.for(Current.user, url_options: admin_url_options)),
         turbo_stream.replace(Ui::ConfirmIdentityDialogComponent::ID, Ui::ConfirmIdentityDialogComponent.new(passkey: true, url_options: admin_url_options)),
         Admin::ToastStream.for(turbo_stream, t("admin.accounts.passkeys.added"))
@@ -68,7 +69,7 @@ module Admin
           format.turbo_stream do
             render turbo_stream: [
               turbo_stream.replace(AccountScreen::PasskeysCardComponent::ID,
-                AccountScreen::PasskeysCardComponent.for(Current.user, url_options: admin_url_options, autofocus: @passkey.id)),
+                AccountScreen::PasskeysCardComponent.for(Current.user, addable: passkey_relying_party.present?, url_options: admin_url_options, autofocus: @passkey.id)),
               Admin::ToastStream.for(turbo_stream, t("admin.accounts.passkeys.renamed"))
             ]
           end
@@ -84,14 +85,15 @@ module Admin
     # Back to the card, the whole screen drawn again: the passkey's row, the
     # count and, after the last one, the recovery codes all change. The last
     # passkey of a person the policy covers is refused whole
-    # (`Passkeys::Remove`), whatever asked, and said in a toast.
+    # (`Passkeys::Remove`), whatever asked, and said in a toast in the
+    # card's own words; any other refusal says its own sentence.
     def destroy
       result = Passkeys::Remove.call(@passkey)
       return redirect_to(passkeys_card_path, status: :see_other, notice: t("admin.accounts.passkeys.removed")) if result.ok?
 
-      message = t("admin.components.account_screen.passkeys_card.last_required")
+      message = removal_refusal(result)
       respond_to do |format|
-        format.turbo_stream { render turbo_stream: Admin::ToastStream.for(turbo_stream, message, kind: :error), status: :unprocessable_entity }
+        format.turbo_stream { render turbo_stream: Admin::ToastStream.for(turbo_stream, message, kind: :error), status: Admin::RefusalStatus.for(result) }
         format.html { redirect_to passkeys_card_path, status: :see_other, alert: message }
       end
     end
@@ -100,6 +102,12 @@ module Admin
 
     def set_passkey
       @passkey = Current.user.passkeys.find(params[:id])
+    end
+
+    def removal_refusal(result)
+      return t("admin.components.account_screen.passkeys_card.last_required") if result.errors == [ Passkeys::Remove.last_required ]
+
+      result.errors.first
     end
 
     def registration = SignIn::PasskeyRegistration.new(relying_party: passkey_relying_party)

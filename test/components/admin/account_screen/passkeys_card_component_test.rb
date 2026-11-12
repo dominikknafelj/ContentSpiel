@@ -19,9 +19,9 @@ class Admin::AccountScreen::PasskeysCardComponentTest < ViewComponent::TestCase
     @user.passkeys.create!(name: name, external_id: SecureRandom.base64(16), public_key: "key", created_at: created_at, last_used_at: last_used_at)
   end
 
-  def card(passkeys = @user.passkeys.order(:created_at).to_a, covered: false, recovery_left: nil)
+  def card(passkeys = @user.passkeys.order(:created_at).to_a, covered: false, recovery_left: nil, addable: true)
     with_request_url("/cs-studio/account") do
-      render_inline Admin::AccountScreen::PasskeysCardComponent.new(passkeys: passkeys, covered: covered, recovery_left: recovery_left)
+      render_inline Admin::AccountScreen::PasskeysCardComponent.new(passkeys: passkeys, covered: covered, recovery_left: recovery_left, addable: addable)
     end
   end
 
@@ -83,6 +83,18 @@ class Admin::AccountScreen::PasskeysCardComponentTest < ViewComponent::TestCase
     assert_selector "[data-passkeys-foot]", text: I18n.t("#{WORDS}.none")
     assert_selector "[data-passkeys-foot] button", text: "Add a passkey…"
     assert_selector "dialog#passkey-add input[name=name][maxlength='#{Passkey::NAME_LIMIT}']", visible: :all
+  end
+
+  test "where no passkey can be made (no relying party) Add and its dialog are not drawn, and the passkeys held stay listed" do
+    held = passkey("MacBook")
+
+    card(addable: false)
+
+    assert_no_button "Add a passkey…"
+    assert_no_selector "dialog#passkey-add", visible: :all
+    assert_selector "#passkey-#{held.id}", text: "MacBook"
+    assert_selector "#passkey-#{held.id} button[aria-label='Rename the passkey MacBook']"
+    assert_selector "[data-passkeys-foot]", text: "1 passkey"
   end
 
   test "after a sign-in with a recovery code the card opens on the warn notice, by how many are left" do
