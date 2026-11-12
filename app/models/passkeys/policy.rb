@@ -21,6 +21,11 @@ module Passkeys
       @name = name
     end
 
+    # Asks `AccessControl.holds?` of the SUBJECT, never the actor: whether
+    # this person counts as an admin (admin-area keys, which no record
+    # narrows). That is the one use of `holds?` outside navigation, and it
+    # gates no write by itself: who may write is each service's own rule,
+    # and the policy only says who must keep a passkey.
     def covers?(user)
       case name
       when "everyone" then true

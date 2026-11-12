@@ -78,7 +78,7 @@ This file keeps the commands, the reference index, the conventions and the rules
 
 A rule a test holds is in the reference file for its area, under this same heading, with the test that names it; a failing guard's message is where it is learned. Here is what no test holds: the rules with no guard, whole, then, file by file, the part with no guard of a rule that stands whole in that file.
 
-- A record outside the viewer's scope is not found, not forbidden: look it up through `AccessControl.scope` and answer 404, and use `AccessControl.holds?` for navigation only, never to gate a write.
+- A record outside the viewer's scope is not found, not forbidden: look it up through `AccessControl.scope` and answer 404, and use `AccessControl.holds?` for navigation only, never to gate a write. The one exception is `Passkeys::Policy#covers?`, which asks it of the person a passkey belongs to (is this subject an admin), not of the actor: it decides who must hold a passkey, not who may write (`docs/reference/access-control-and-audit.md`).
 - A permission or content type removed from its registry is dormant, not gone: a grant naming it matches nothing but is carried through every save until someone presses Remove, and a group is judged on its grants as stored (`LiveGrants#as_stored`).
 - The owner flag changes only through `PATCH users/:id/owner`; the ordinary user form does not permit `owner`.
 - `Audit.record` is the one write path of the append-only audit log, and no secret reaches a snapshot, a log line or a page: a password digest, a token's `lookup_digest`, an API key (`Audit::Snapshot::NEVER_STORED`, `filter_parameters`).
