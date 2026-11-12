@@ -1,0 +1,67 @@
+<%# The passkey step: "Add a passkey", the lead, the Name field with its help
+    line and "Add passkey" (the step's one primary), and "Skip for now" only
+    where the policy does not cover the founding owner
+    (`SetupController#show`); while it does, every later step sends back
+    here.
+
+    The form is `admin--passkeys--register`'s, as on the enrolment page: the
+    script holds the registration options from connect
+    (`setup_passkey_options_path`), so the press of "Add passkey" opens the
+    browser's prompt at once (WebKit opens it only in a press), and sends
+    the credential to this step with PATCH. No Confirm it's you stands
+    beside it: the session was made by the password just set, so a 403 is
+    said as `failed`. Its words for a blank name and a refusal are Your
+    account's Name dialog's, served here in `data-messages`. Add passkey
+    stays hidden where the browser can make no passkey.
+
+    At an IP address no passkey can be made (no relying party): the step
+    says so and Continue goes on.
+
+    The page loads CS Studio's scripts (`entry_point`), and Turbo keeps no
+    snapshot of it: the recovery codes are drawn into `#setup-passkey` in
+    place. %>
+<% content_for :title, t(".title") %>
+<% content_for :entry_point, "admin" %>
+<% content_for :head do %><meta name="turbo-cache-control" content="no-cache"><% end %>
+<% field_id = "setup-passkey-name" %>
+
+<div id="<%= SetupController::PASSKEY_STEP_ID %>">
+  <h1 class="text-h1 font-semibold">
+    <%= t(".title") %>
+    <% if optional_step?("passkey") %><span class="text-label text-meta"><%= t("setup.layout.optional") %></span><% end %>
+  </h1>
+  <p class="mt-2 text-dim"><%= t(".lead") %></p>
+
+  <% if @passkey_possible %>
+    <%= tag.form class: "mt-6 max-w-[420px]", novalidate: true, data: {
+          controller: "admin--passkeys--register",
+          action: "admin--passkeys--register#continue",
+          messages: messages_data("components.account_screen.passkey_dialog.name_blank", "components.account_screen.passkey_dialog.failed"),
+          "admin--passkeys--register-options-url-value": setup_passkey_options_path,
+          "admin--passkeys--register-create-url-value": setup_step_path("passkey"),
+          "admin--passkeys--register-method-value": "patch"
+        } do %>
+      <%= label_tag field_id, t(".name"), class: setup_label_class %>
+      <%= text_field_tag "name", nil, id: field_id, maxlength: Passkey::NAME_LIMIT, autocomplete: "off", required: true, autofocus: true,
+            aria: { describedby: "#{field_id}-help #{field_id}-error" }, class: setup_input_class,
+            data: { "admin--passkeys--register-target": "name" } %>
+      <p id="<%= field_id %>-help" class="mt-1 text-sm text-meta"><%= t(".name_help") %></p>
+      <p id="<%= field_id %>-error" role="alert" class="mt-1 text-sm text-danger-ink empty:hidden" data-admin--passkeys--register-target="error"></p>
+
+      <div class="mt-6 flex items-center justify-end gap-3">
+        <% if @passkey_skippable %>
+          <%= link_to t(".skip"), setup_step_path("site"), class: setup_tertiary_link_class %>
+        <% end %>
+        <button type="submit" class="<%= setup_primary_button_class %>" data-admin--passkeys--register-target="add">
+          <%= render "admin/shared/icon", name: :fingerprint, size: "size-4" %>
+          <%= t(".add") %>
+        </button>
+      </div>
+    <% end %>
+  <% else %>
+    <p class="mt-6 text-dim"><%= t(".unavailable") %></p>
+    <div class="mt-6 flex items-center justify-end gap-3">
+      <%= link_to t(".continue"), setup_step_path("site"), class: setup_primary_button_class %>
+    </div>
+  <% end %>
+</div>

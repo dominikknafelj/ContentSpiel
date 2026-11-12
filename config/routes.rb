@@ -504,6 +504,9 @@ Rails.application.routes.draw do
   # First-run setup wizard. SetupController
   # itself 404s once setup is complete.
   get "setup", to: "setup#index", as: :setup
+  # The passkey step's registration options (`SetupController#passkey_
+  # options`): under /setup, which the redirect constraint leaves open.
+  post "setup/passkey/options", to: "setup#passkey_options", as: :setup_passkey_options
   get "setup/:step", to: "setup#show", as: :setup_step
   patch "setup/:step", to: "setup#update"
 

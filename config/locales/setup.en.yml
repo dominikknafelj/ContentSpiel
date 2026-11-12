@@ -19,6 +19,7 @@ en:
       token: "Setup token"
       system_check: "System check"
       admin: "Admin account"
+      passkey: "Passkey"
       site: "Site identity"
       mail: "Mail"
       languages: "Languages"
@@ -60,6 +61,20 @@ en:
       email: "Email address"
       password: "Password"
       password_confirmation: "Confirm password"
+      continue: "Continue"
+    # `name`, `name_help` and `failed` are the enrolment page's words
+    # (`admin.enrolment.show`). `unavailable` and `continue` stand where no
+    # passkey can be made: a page reached at an IP address has no relying
+    # party (`SignIn::RelyingParty`).
+    passkey:
+      title: "Add a passkey"
+      lead: "Sign in with your device's unlock instead of your password. A passkey can't be phished or guessed."
+      name: "Name"
+      name_help: "A name to tell your passkeys apart, like \"1Password\" or \"MacBook\"."
+      add: "Add passkey"
+      skip: "Skip for now"
+      failed: "The passkey wasn't added. Try again."
+      unavailable: "A passkey belongs to the site's address, and this page was reached at an IP address, so none can be made here. Once the site has its address, add one in Your account."
       continue: "Continue"
     site:
       heading: "Site identity"

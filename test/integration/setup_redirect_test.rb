@@ -31,6 +31,20 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
+  # A browser asks for /favicon.ico beside a page. Redirected into the
+  # wizard, that request loaded the session and wrote its cookie back as it
+  # read it, over a passkey challenge a parallel request had just kept, so
+  # the passkey step's first Add was refused.
+  test "the favicon is not sent into the wizard, and its answer writes no session cookie" do
+    start_fresh_install
+    verify_setup_token
+
+    get "/favicon.ico"
+
+    assert_response :not_found
+    assert_nil response.headers["Set-Cookie"], "the favicon's answer leaves the session cookie alone"
+  end
+
   test "nothing is redirected once setup is complete" do
     get admin_sign_in_path
     assert_response :success

@@ -3,8 +3,12 @@
 # covers CS Studio itself. Exempt: the wizard itself, CS Studio's sign-in,
 # sign-out and password reset (an admin resuming setup -- cs-studio spec §3),
 # the health check, the MCP endpoint (own bearer auth; no tokens exist yet
-# anyway) and Active Storage (the logo preview while setup runs). The
-# exemption check runs first so those paths never cost a database query.
+# anyway), Active Storage (the logo preview while setup runs) and
+# /favicon.ico, which a browser asks for beside every page: sent into the
+# wizard, it loads the session and writes the cookie back as it read it,
+# over what a parallel request just kept there (the passkey step's
+# challenge). Left alone, it reaches the public site's cookieless answer.
+# The exemption check runs first so those paths never cost a database query.
 #
 # Deliberately narrower than the whole `/#{ContentSpiel::ADMIN_PATH}` scope:
 # CS Studio's own root and every other admin screen still redirect to /setup
@@ -19,7 +23,8 @@ module Setup
       "/#{ContentSpiel::ADMIN_PATH}/password",
       "/up",
       "/mcp",
-      "/rails/active_storage"
+      "/rails/active_storage",
+      "/favicon.ico"
     ].freeze
 
     module_function
