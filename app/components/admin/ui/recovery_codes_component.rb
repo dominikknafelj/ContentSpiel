@@ -8,7 +8,8 @@ module Admin
     #   attribute, no URL and no script value: "Download" builds its file in
     #   the browser from the box's text, and Copy is `admin--ui--clipboard`'s
     #   (`Admin::Ui::CopyValueComponent`).
-    # - `frame: :dialog` draws the block in a dialog that opens on load, and
+    # - `frame: :dialog` draws the block in a dialog that opens on load or,
+    #   drawn by a Turbo Stream, when its script connects, and
     #   Done is a `<form method="dialog">` that closes it; `frame: :page`
     #   draws a heading and Done as a link to `done_href` (the page that
     #   shows the codes has nowhere else to go).
@@ -32,10 +33,15 @@ module Admin
           "The page that draws it is never cached: its response carries turbo-cache-control no-cache."
         ],
         states: %i[dialog page],
-        script_states: {},
+        script_states: {
+          ready: [ "test/system/admin/account_passkeys_test.rb", "Done waits for the box, Download saves the codes, Copy copies them" ],
+          restored: [ "test/system/admin/account_passkeys_test.rb", "a box the browser restored as ticked lets Done go at once" ],
+          forgotten: [ "test/system/admin/account_passkeys_test.rb", "after Done and a visit back, the page holds no code" ]
+        },
         keys: %w[title body list_label copy download saved done],
         slots: [],
-        controller: "admin--ui--recovery-codes"
+        controller: "admin--ui--recovery-codes",
+        keyboard: [ "test/system/admin/account_passkeys_test.rb", "the codes dialog: Tab reaches Copy codes, Download and the box, Space ticks it, and Enter on Done closes it" ]
       )
 
       FRAMES = %i[dialog page].freeze

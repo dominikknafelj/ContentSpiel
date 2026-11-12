@@ -26,6 +26,7 @@ module Admin
 
     def edit
       load_sessions
+      load_passkeys
     end
 
     # The page's first address, `account/password` (the handoff's decision
@@ -59,6 +60,7 @@ module Admin
         @field_errors = result.record.errors.to_hash(true)
         @password_answer = "refused"
         load_sessions
+        load_passkeys
         render :edit, status: :unprocessable_entity
       end
     end
@@ -114,6 +116,7 @@ module Admin
         @profile_values = Current.user.slice(:name, :notes_sound, :notes_desktop).symbolize_keys
         Current.user.restore_attributes
         load_sessions
+        load_passkeys
         render :edit, status: :unprocessable_entity
       end
     end
@@ -124,6 +127,16 @@ module Admin
     # view runs no query of its own.
     def load_sessions
       @sessions = Current.user.open_sessions.to_a
+    end
+
+    # The Passkeys and Recovery codes cards, and whether Confirm it's you
+    # offers a passkey, for every answer that draws the screen. After a
+    # sign-in with a recovery code (`SecondFactorsController#code`) the
+    # Passkeys card says how many codes are left.
+    def load_passkeys
+      @passkeys_card = AccountScreen::PasskeysCardComponent.for(Current.user, recovery_left: flash[:recovery_code_left]&.to_i, url_options: admin_url_options)
+      @recovery_card = AccountScreen::RecoveryCardComponent.for(Current.user, url_options: admin_url_options)
+      @confirm_with_passkey = Current.user.passkeys.exists?
     end
 
     # A switch as the form sends it: "1" on, anything else off, absent nil.

@@ -71,6 +71,9 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/accounts
       app/controllers/admin/accounts_controller.rb
       app/controllers/admin/account_sessions_controller.rb
+      app/controllers/admin/passkeys_controller.rb
+      app/controllers/admin/recovery_codes_controller.rb
+      app/controllers/concerns/admin/account_recovery_codes.rb
     ],
     "audit_screen" => %w[
       app/views/admin/audit_events

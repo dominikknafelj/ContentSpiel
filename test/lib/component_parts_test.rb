@@ -32,7 +32,7 @@ class ComponentPartsTest < ActiveSupport::TestCase
   # The most each list may hold, so a name added to one to skip a rule fails
   # here. The keyboard not-yet list's figure is 0 on main: a component names
   # its keyboard test, or says it takes no focus, when it is made.
-  LIST_LIMITS = { "UiContract::KEYBOARD_NOT_YET" => 2 }.freeze
+  LIST_LIMITS = { "UiContract::KEYBOARD_NOT_YET" => 0 }.freeze
 
   # What a list holds over its limit, as a sentence, or nil.
   def self.over_limit(name, listed, limit)

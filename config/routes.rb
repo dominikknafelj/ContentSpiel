@@ -346,6 +346,14 @@ Rails.application.routes.draw do
     post "account/confirmation", to: "confirmations#create", as: :account_confirmation
     post "account/confirmation/options", to: "confirmations#options", as: :account_confirmation_options
     post "account/confirmation/passkey", to: "confirmations#passkey", as: :account_confirmation_passkey
+    # The Passkeys and Recovery codes cards, on the signed-in user's own
+    # account only: a passkey's id is looked up among theirs. The options
+    # are a registration's, fetched before the browser's prompt.
+    post "account/passkeys/options", to: "passkeys#options", as: :account_passkey_options
+    post "account/passkeys", to: "passkeys#create", as: :account_passkeys
+    patch "account/passkeys/:id", to: "passkeys#update", as: :account_passkey, constraints: { id: /\d+/ }
+    delete "account/passkeys/:id", to: "passkeys#destroy", constraints: { id: /\d+/ }
+    post "account/recovery-codes", to: "recovery_codes#create", as: :account_recovery_codes
 
     # "Connect an AI assistant": the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list

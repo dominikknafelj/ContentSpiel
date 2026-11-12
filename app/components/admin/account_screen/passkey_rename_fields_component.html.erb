@@ -1,0 +1,8 @@
+<%= tag.div id: self.class.id(passkey) do %>
+  <%= form_with url: helpers.admin_account_passkey_path(passkey, **url_options), method: :patch, id: self.class.form_id(passkey), html: { novalidate: true } do %>
+    <%= label_tag input_id, t("admin.components.account_screen.passkey_dialog.name"), class: setup_label_class %>
+    <%= text_field_tag "name", passkey.name, id: input_id, maxlength: Passkey::NAME_LIMIT, autocomplete: "off", required: true,
+          aria: { describedby: errors_id, invalid: (errors.any? ? "true" : nil) }, class: setup_input_class %>
+    <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
+  <% end %>
+<% end %>

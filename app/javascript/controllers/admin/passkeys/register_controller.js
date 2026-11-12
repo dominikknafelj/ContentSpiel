@@ -1,0 +1,149 @@
+import { Controller } from "@hotwired/stimulus"
+import { Turbo } from "@hotwired/turbo-rails"
+import { messages } from "i18n/messages"
+
+// Adding a passkey (Your account's Passkeys card, the enrolment page, the
+// wizard's step), in the order WebKit allows (`passkeys/ceremony`, "THE
+// PROMPT OPENS IN THE PRESS"):
+//
+// 1. `add` (the "Add a passkey…" press) fetches the registration options.
+//    Refused by Confirm it's you's gate (403 `{ "confirm": true }`), it awaits
+//    the outlet's `ensure()` and fetches them again only once confirmed: the
+//    server keeps one challenge, so options are never asked for before the
+//    confirmation that would spend the slot's. Then the Name dialog opens.
+//    A cancelled confirmation does nothing more.
+// 2. `continue` (the Name dialog's Continue) refuses a blank name
+//    (`name_blank`) and otherwise calls the browser's prompt at once, in the
+//    press, with the options held, then posts `credential` and `name` (and
+//    `from`) with `methodValue`.
+// 3. The answer: a redirect is followed (`Turbo.visit`), a Turbo Stream is
+//    rendered (the card, the codes), and anything else says `failed`, or the
+//    server's own sentence from a 422 `{ "error" }`. A closed prompt says
+//    nothing, and its options are kept for the next press, since nothing was
+//    sent; after an answer they are spent and fetched afresh.
+//
+// Without an outlet (the wizard, which no confirmation gates) a 403 says
+// `failed`. Where the browser can make no passkey, the add button is
+// hidden. The words are the element's `data-messages`. Nothing here keeps
+// a credential beyond its one send.
+export default class extends Controller {
+  static targets = ["name", "error", "dialog", "add"]
+  static outlets = ["admin--passkeys--confirm"]
+  static values = { optionsUrl: String, createUrl: String, from: String, method: { type: String, default: "post" } }
+
+  async connect() {
+    this.options = null
+    this.ceremony = await import("passkeys/ceremony")
+    if (!this.ceremony.supported()) this.addTargets.forEach((button) => { button.hidden = true })
+  }
+
+  get dialog() {
+    return this.dialogTarget.querySelector("dialog")
+  }
+
+  async add(event) {
+    event?.preventDefault()
+    this.ceremony ||= await import("passkeys/ceremony")
+    const options = await this.fetchOptions()
+    if (options === undefined) return
+
+    this.options = options
+    this.errorTarget.textContent = options ? "" : this.say("failed")
+    if (this.hasNameTarget) this.nameTarget.value = ""
+    if (!this.dialog.open) this.dialog.showModal()
+    if (this.hasNameTarget) this.nameTarget.focus()
+  }
+
+  // The options, null when they could not be had, undefined when the person
+  // cancelled the confirmation they waited on.
+  async fetchOptions() {
+    let answer = await this.request()
+    if (answer?.status === 403 && answer.options?.confirm === true) {
+      if (!this.hasAdminPasskeysConfirmOutlet) return null
+      if (!(await this.adminPasskeysConfirmOutlet.ensure())) return undefined
+      answer = await this.request()
+    }
+    return answer?.status === 200 && answer.options ? answer.options : null
+  }
+
+  async request() {
+    try {
+      return await this.ceremony.fetchOptions(this.optionsUrlValue)
+    } catch {
+      return null
+    }
+  }
+
+  continue(event) {
+    event.preventDefault()
+    const name = this.hasNameTarget ? this.nameTarget.value.trim() : ""
+    if (this.hasNameTarget && name === "") {
+      this.errorTarget.textContent = this.say("name_blank")
+      this.nameTarget.focus()
+      return
+    }
+    const options = this.options
+    if (!options) {
+      this.errorTarget.textContent = this.say("failed")
+      this.refresh()
+      return
+    }
+
+    this.errorTarget.textContent = ""
+    this.ceremony
+      .create(options)
+      .then((credential) => {
+        this.options = null
+        return this.send(this.ceremony.toJSON(credential), name)
+      })
+      .catch((error) => {
+        if (this.ceremony.cancelled(error)) return
+        this.options = null
+        this.errorTarget.textContent = this.say("failed")
+        this.refresh()
+      })
+  }
+
+  async send(credential, name) {
+    let response
+    try {
+      response = await fetch(this.createUrlValue, {
+        method: this.methodValue.toUpperCase(),
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/vnd.turbo-stream.html, application/json",
+          "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? "",
+        },
+        body: JSON.stringify({ credential, name, from: this.fromValue }),
+      })
+    } catch {
+      return this.refused()
+    }
+
+    const type = response.headers.get("Content-Type") || ""
+    if (response.redirected) return Turbo.visit(response.url)
+    if (response.ok && type.includes("turbo-stream")) return Turbo.renderStreamMessage(await response.text())
+
+    const answer = type.includes("application/json") ? await response.json().catch(() => ({})) : {}
+    this.refused(response.status === 422 && typeof answer.error === "string" ? answer.error : null)
+  }
+
+  refused(sentence = null) {
+    if (!this.element.isConnected) return
+    this.errorTarget.textContent = sentence || this.say("failed")
+    this.refresh()
+  }
+
+  // Fresh options for the next Continue, while the dialog is open: the last
+  // set's challenge went with its answer. A refusal by the gate here leaves
+  // none, and Continue then says `failed`.
+  async refresh() {
+    const answer = await this.request()
+    if (this.dialog.open && answer?.status === 200 && answer.options) this.options = answer.options
+  }
+
+  say(key) {
+    return messages(this.element).t(`components.account_screen.passkey_dialog.${key}`)
+  }
+}

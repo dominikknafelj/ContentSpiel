@@ -35,10 +35,15 @@ module Admin
           "The script empties the password field when the dialog closes and before Turbo caches the page."
         ],
         states: %i[passkey password],
-        script_states: {},
+        script_states: {
+          failed: [ "test/system/admin/account_passkeys_test.rb", "a wrong password in Confirm it's you says so, and a right one carries the action on" ],
+          confirmed: [ "test/system/admin/account_passkeys_test.rb", "Confirm it's you with the passkey carries the remove on" ],
+          cancelled: [ "test/system/admin/account_passkeys_test.rb", "a cancelled confirmation is not re-sent later" ]
+        },
         keys: %w[title lead_passkey lead_password use_passkey or password confirm_password confirm cancel passkey_failed wrong_password limited],
         slots: [],
-        controller: "admin--passkeys--confirm"
+        controller: "admin--passkeys--confirm",
+        keyboard: [ "test/system/admin/account_passkeys_test.rb", "Confirm it's you starts on the password, Enter sends it, and Escape backs out" ]
       )
 
       ID = "confirm-identity".freeze

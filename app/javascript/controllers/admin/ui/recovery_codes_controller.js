@@ -15,6 +15,10 @@ import { Controller } from "@hotwired/stimulus"
 //   Escape; the event does not bubble, so it is heard in the capture phase)
 //   forgets them the same way, as the page stays open after it.
 // - A checkbox the browser restored as ticked enables Done on connect.
+// - In the dialog frame the dialog opens on connect: a Turbo Stream draws
+//   it (Your account's new codes), and the shared `admin--ui--dialog` opens
+//   a dialog marked open-on-load only at a page's load. The mark is taken
+//   off as it opens, as there.
 export default class extends Controller {
   static targets = ["list", "saved", "done", "block"]
 
@@ -27,6 +31,7 @@ export default class extends Controller {
     document.addEventListener("turbo:before-cache", this.forget)
     window.addEventListener("pagehide", this.forget)
     this.toggle()
+    this.openRequested()
   }
 
   disconnect() {
@@ -42,6 +47,14 @@ export default class extends Controller {
     } else {
       this.doneTarget.disabled = !ready
     }
+  }
+
+  openRequested() {
+    const dialog = this.element.querySelector("dialog[data-admin--ui--dialog-open-on-load]")
+    if (!dialog) return
+
+    dialog.removeAttribute("data-admin--ui--dialog-open-on-load")
+    if (!dialog.open) dialog.showModal()
   }
 
   refuse(event) {
