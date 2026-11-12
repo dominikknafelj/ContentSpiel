@@ -18,7 +18,7 @@ if ENV["COVERAGE"].present? && ENV["COVERAGE"] != "0"
 end
 
 # THE SUITE DOES NOT DEPEND ON THE SHELL'S SITE ADDRESS. Someone who has
-# `PUBLIC_HOST` exported, as the hosting documents tell a person to try
+# `PUBLIC_HOST` (or `ADMIN_HOST`) exported, as the hosting documents tell a person to try
 # locally, would otherwise run every test under that address:
 # head tags, the sitemap and MCP's URLs carry it, and five tests that expect
 # "no address configured" failed that way. Removed here, once, before the
@@ -34,7 +34,7 @@ end
 # `with_bot_check` and a leaked-password check only inside
 # `with_leaked_password_check`, neither of which asks the network
 # (test/support/sign_in_helper.rb).
-%w[PUBLIC_HOST THEME_PATH
+%w[PUBLIC_HOST ADMIN_HOST THEME_PATH
    MAIL_SMTP_SERVER MAIL_SMTP_PORT MAIL_SMTP_SECURITY MAIL_SMTP_USERNAME MAIL_SMTP_PASSWORD
    MAIL_SENDER_NAME MAIL_SENDER_ADDRESS
    TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY LEAKED_PASSWORD_CHECK].each { |name| ENV.delete(name) }
