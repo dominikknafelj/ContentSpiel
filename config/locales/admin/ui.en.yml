@@ -20,6 +20,16 @@ en:
         confirm_dialog:
           cancel: "Cancel"
 
+        # The recovery codes block, shown once (enrolment, the wizard, new codes).
+        recovery_codes:
+          title: "Save your recovery codes"
+          body: "Each code signs you in once when your passkeys aren't at hand. This is the only time they're shown: keep them somewhere safe, apart from your devices."
+          list_label: "Recovery codes"
+          copy: "Copy codes"
+          download: "Download"
+          saved: "I have saved these codes"
+          done: "Done"
+
         # The "+N" circle's letters: `many` past nine, where three characters
         # would not stand in the circle.
         avatar:

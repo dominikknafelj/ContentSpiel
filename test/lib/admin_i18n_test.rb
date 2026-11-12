@@ -87,6 +87,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/shell/top_bar_component.rb
     app/components/admin/shell/top_bar_component.html.erb
     app/components/admin/ui/tree_hide_component.rb
+    app/components/admin/ui/recovery_codes_component.rb
+    app/components/admin/ui/recovery_codes_component.html.erb
     app/components/admin/ui/audit_sentence_component.rb
     app/components/admin/ui/reference_card_component.rb
     app/components/admin/ui/reference_card_component.html.erb
