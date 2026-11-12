@@ -165,14 +165,20 @@ class AdminHostTest < ActionDispatch::IntegrationTest
     assert_nil Rails.application.config.action_cable.allowed_request_origins
   end
 
+  # A cookie's options often span lines, so the check is not per statement:
+  # a `domain:` key (or `:domain` symbol) anywhere in the app's code is refused.
+  # None exists today, in a cookie or elsewhere, so there is no allow-list.
+  COOKIE_DOMAIN = /\bdomain:|:domain\b|["']domain["']\s*=>/
+
   test "no cookie is given a domain" do
-    pattern = /\b(?:cookies|session_store|cookie_store)\b.*\bdomain:/
-    offenders = %w[app config lib].flat_map { |root| Rails.root.glob("#{root}/**/*.{rb,erb}") }.flat_map do |path|
-      SourceCode.code_of(path.to_s).lines.each_with_index.filter_map do |line, index|
-        "#{path.relative_path_from(Rails.root)}:#{index + 1}" if line.match?(pattern)
-      end
+    offenders = %w[app config lib].flat_map { |root| Rails.root.glob("#{root}/**/*.{rb,erb,rake}") }.select do |path|
+      SourceCode.code_of(path.to_s).match?(COOKIE_DOMAIN)
     end
-    assert_empty offenders, "a cookie with a domain would reach the other host"
+    assert_empty offenders.map { |path| path.relative_path_from(Rails.root).to_s }, "a cookie with a domain would reach the other host"
+
+    assert_match COOKIE_DOMAIN, SourceCode.code_of("x.rb", "cookies.encrypted[:x] = {\n  value: 1,\n  domain: \".x\" }")
+    assert_match COOKIE_DOMAIN, SourceCode.code_of("x.rb", "config.session_store :cookie_store,\n  domain: :all")
+    assert_no_match COOKIE_DOMAIN, SourceCode.code_of("x.rb", "# domain: :all\ncookies[:x] = 1")
   end
 
   test "without ADMIN_HOST one host answers both" do

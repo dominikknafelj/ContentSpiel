@@ -150,6 +150,7 @@ class MailGuardsTest < ActiveSupport::TestCase
     Rails.application.routes.named_routes.names.map { |name| "#{name}_url" }
   end
 
+  # Line-based: a helper call split over lines is not read.
   # Offences in `source`'s code: a call of an `admin_…_url(` without
   # `**@url_options`, or of any other route's `_url` helper.
   def mailer_link_offences(source)
