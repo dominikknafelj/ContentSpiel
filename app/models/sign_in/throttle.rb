@@ -189,13 +189,14 @@ module SignIn
     # (`reservation` is the one `reserve` made for it): the address's counts
     # are taken back as a success's are, the run's count stands, and the
     # account's or device's lock this reservation wrote, if it wrote one, is
-    # taken back ("A SECOND PROOF"). Whatever the reservation closed is
+    # taken back ("A SECOND PROOF"), under the key its trip names, never one
+    # read from `device` alone. Whatever the reservation closed is
     # open again (the wide bucket by its count taken back), so none of its
     # trips is a closure to audit or mail.
     def await_second_proof(reservation, identifier:, address:, device: nil)
       written = reservation.closes.find { |trip| %i[account device].include?(trip.bucket) }
       if written
-        digest = device ? device_digest(identifier, device) : identifier_digest(identifier)
+        digest = written.bucket == :device ? device_digest(identifier, device) : identifier_digest(identifier)
         store.delete(key(:"#{written.bucket}_lock", digest))
       end
       release_attempt_address(address)
@@ -315,12 +316,14 @@ module SignIn
       # key that expired meanwhile would open the next window at -1. No
       # count is left below 0, whoever takes back more than was counted: a
       # negative count would be guesses banked against the next window's
-      # limit. A decrement that met a 0 is added back.
+      # limit. A decrement that went below 0 adds back its own 1 and no
+      # more, so take-backs at once settle at 0: one adding back the whole
+      # shortfall would add back the others' too.
       def take_back(count_key, window)
         return unless store.exist?(count_key)
 
         left = store.decrement(count_key, 1, expires_in: window)
-        store.increment(count_key, -left, expires_in: window) if left&.negative?
+        store.increment(count_key, 1, expires_in: window) if left&.negative?
       end
 
       # The block's [refusal, closes], inside one `auth.throttle` span that

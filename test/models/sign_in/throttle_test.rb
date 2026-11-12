@@ -252,6 +252,24 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     assert_equal 1, count_of(:wide)
   end
 
+  test "take-backs at once of more than was counted leave the count at 0" do
+    store = Interleaving.new
+    throttle = SignIn::Throttle.new(store: store)
+    throttle.reserve_address(address: ADDRESS)
+
+    Array.new(6) { Thread.new { throttle.release_address(address: ADDRESS) } }.each(&:join)
+
+    assert_equal 0, count_of(:wide, store)
+  end
+
+  test "await_second_proof takes back the lock its reservation's trip names, whatever device it is handed" do
+    attempts(4)
+    reservation = attempt
+    @throttle.await_second_proof(reservation, identifier: EMAIL, address: ADDRESS, device: "d" * 32)
+
+    assert attempt.ok?, "the account's lock the reservation wrote is gone"
+  end
+
   test "await_second_proof takes back the lock its own reservation wrote and keeps the count; a lock written before it stands" do
     attempts(4)
     reservation = attempt
