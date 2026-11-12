@@ -24,11 +24,11 @@ module Setup
   module RedirectConstraint
     EXEMPT_PREFIXES = [
       "/#{ContentSpiel::ADMIN_PATH}/setup",
+      "/#{ContentSpiel::ADMIN_PATH}/mcp",
       "/#{ContentSpiel::ADMIN_PATH}/sign-in",
       "/#{ContentSpiel::ADMIN_PATH}/sign-out",
       "/#{ContentSpiel::ADMIN_PATH}/password",
       "/up",
-      "/mcp",
       "/rails/active_storage"
     ].freeze
     PREFETCH_HEADERS = %w[X-Sec-Purpose Sec-Purpose].freeze

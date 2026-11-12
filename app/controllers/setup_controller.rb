@@ -116,7 +116,7 @@ class SetupController < ApplicationController
 
   # The passkey step's registration options, as Your account's
   # (`Admin::PasskeysController#options`), with a challenge of the purpose
-  # "register" kept for `#update_passkey`. Under /setup, since the redirect
+  # "register" kept for `#update_passkey`. Under /<ADMIN_PATH>/setup, since the redirect
   # constraint sends CS Studio's own paths to the wizard until it ends; not
   # behind Confirm it's you, since the session was made by the password the
   # founding owner has just set. That holds for a first passkey alone: an

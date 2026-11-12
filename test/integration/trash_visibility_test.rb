@@ -1358,7 +1358,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   private
 
   def call_tool(raw_token, name, arguments = {})
-    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: name, arguments: arguments } }.to_json,
+    post "/cs-studio/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: name, arguments: arguments } }.to_json,
       headers: { "Content-Type" => "application/json", "Accept" => "application/json, text/event-stream",
         "Authorization" => "Bearer #{raw_token}" }
     assert_response :success

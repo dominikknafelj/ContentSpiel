@@ -36,6 +36,12 @@ class BackendRoutesTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "POST /mcp is no endpoint any more" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }.to_json,
+      headers: { "Content-Type" => "application/json", "Authorization" => "Bearer anything" }
+    assert_response :not_found
+  end
+
   test "a top-level page slugged preview is served at /preview" do
     create_page(title: "Preview", published: true)
     get "/preview"

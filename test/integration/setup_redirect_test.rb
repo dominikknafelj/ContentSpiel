@@ -58,15 +58,17 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
     get admin_sign_in_path
     assert_response :success
 
-    post "/mcp"
+    post "/cs-studio/mcp"
     assert_response :unauthorized
   end
 
   test "the wizard itself is not redirected, and the preview is" do
     start_fresh_install
 
-    get "/cs-studio/setup"
-    assert_not_equal "/cs-studio/setup", URI.parse(response.location.to_s).path if response.redirect?
+    get "/cs-studio/setup", headers: { "Accept" => "text/html" }
+    # The wizard's index sends on to its first step, never back to itself or out of the wizard.
+    assert_response :redirect
+    assert_equal "/cs-studio/setup/token", URI.parse(response.location).path
 
     get "/cs-studio/preview", headers: { "Accept" => "text/html" }
     assert_redirected_to "/cs-studio/setup"

@@ -525,20 +525,20 @@ Rails.application.routes.draw do
     post "setup/passkey/options", to: "setup#passkey_options", as: :setup_passkey_options
     get "setup/:step", to: "setup#show", as: :setup_step
     patch "setup/:step", to: "setup#update"
+
+    # The MCP server, bearer-token authenticated (McpController#authenticate),
+    # under the admin path with the rest of the backend: the public site's
+    # catch-all below never sees it, and `/mcp` is a public page path like any other.
+    post "mcp", to: "mcp#create"
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
-
-  # The MCP server, bearer-token authenticated
-  # (McpController#authenticate) -- declared here, before the public-site
-  # catch-all below, or "/mcp" would be swallowed as a page path instead.
-  post "mcp", to: "mcp#create"
 
   # A visitor's send of a form: the form
   # posts to its own endpoint, never to the page, so a public page stays a
   # GET that is the same for everyone. POST only: a GET of this address is
   # the public catch-all's below, a page path like any other (and a 404
   # unless a page is called "forms"). Declared before the catch-alls, which
-  # are GETs and could not take it anyway, as `mcp` is. `format: false`, as
+  # are GETs and could not take it anyway. `format: false`, as
   # the public routes have it: JSON or a plain page is chosen by the
   # `Accept` header (`FormSendsController#json?`), never by a suffix.
   post "forms/:form_id", to: "form_sends#create", as: :form_send, constraints: { form_id: /\d+/ }, format: false
