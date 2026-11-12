@@ -141,8 +141,8 @@ env:
   secret:
     # Signs sessions and tokens. Without it production does not start.
     - SECRET_KEY_BASE
-    # The one-time code /setup asks for on the first visit. Set here, so it
-    # is never printed to the log.
+    # The one-time code /cs-studio/setup (cs-studio is the default ADMIN_PATH) asks for on the
+    # first visit. Set here, so it is never printed to the log.
     - SETUP_TOKEN
     # The password of the Postgres role `content_spiel` (all four databases).
     - CONTENT_SPIEL_DATABASE_PASSWORD

@@ -1,7 +1,7 @@
 require "test_helper"
 
 class SetupAccessTest < ActionDispatch::IntegrationTest
-  test "/setup is a 404 once setup is complete, even for a signed-in admin" do
+  test "/cs-studio/setup is a 404 once setup is complete, even for a signed-in admin" do
     sign_in_as(users(:one))
 
     get setup_path

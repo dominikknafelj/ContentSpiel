@@ -4,8 +4,8 @@ Rails.application.routes.draw do
   # CS Studio and the public page routes. A lambda, so the constant is only
   # resolved per request (never while routes load during boot).
   constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
-    match "/", to: redirect("/setup", status: 302), via: :all, as: :setup_required_root
-    match "*path", to: redirect("/setup", status: 302), via: :all, format: false, as: :setup_required
+    match "/", to: redirect("/#{ContentSpiel::ADMIN_PATH}/setup", status: 302), via: :all, as: :setup_required_root
+    match "*path", to: redirect("/#{ContentSpiel::ADMIN_PATH}/setup", status: 302), via: :all, format: false, as: :setup_required
   end
   # What is not a page load is refused by a bare Rack answer, which loads
   # no session (the constraint's comment says why).
@@ -517,17 +517,16 @@ Rails.application.routes.draw do
     get "preview/:locale(/*path)", to: "preview#show", constraints: LocaleRouteConstraint,
       defaults: { path: "" }, format: false, as: :localized_preview
     get "preview(/*path)", to: "preview#show", defaults: { path: "" }, format: false, as: :preview
+
+    # First-run setup wizard. SetupController itself 404s once setup is
+    # complete. Under the admin path, which the redirect constraint leaves open.
+    get "setup", to: "setup#index", as: :setup
+    # The passkey step's registration options (`SetupController#passkey_options`).
+    post "setup/passkey/options", to: "setup#passkey_options", as: :setup_passkey_options
+    get "setup/:step", to: "setup#show", as: :setup_step
+    patch "setup/:step", to: "setup#update"
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
-
-  # First-run setup wizard. SetupController
-  # itself 404s once setup is complete.
-  get "setup", to: "setup#index", as: :setup
-  # The passkey step's registration options (`SetupController#passkey_
-  # options`): under /setup, which the redirect constraint leaves open.
-  post "setup/passkey/options", to: "setup#passkey_options", as: :setup_passkey_options
-  get "setup/:step", to: "setup#show", as: :setup_step
-  patch "setup/:step", to: "setup#update"
 
   # The MCP server, bearer-token authenticated
   # (McpController#authenticate) -- declared here, before the public-site

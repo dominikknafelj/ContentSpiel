@@ -27,7 +27,7 @@ class ThemeToggleTest < ApplicationSystemTestCase
   end
 
   test "the public site's toggle flips the theme and survives a reload" do
-    # Must not be sent through Setup::RedirectConstraint's /setup redirect.
+    # Must not be sent through Setup::RedirectConstraint's /cs-studio/setup redirect.
     site_settings(:default).update!(setup_completed_at: Time.current)
     Page.create!(title: "Home", slug: "", published_at: Time.current)
     visit "/"

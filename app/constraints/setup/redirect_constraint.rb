@@ -1,4 +1,4 @@
-# Sends every request to /setup while setup is required (design spec
+# Sends every request to /<ADMIN_PATH>/setup while setup is required (design spec
 # 2026-09-26 §3). A route constraint rather than a before_action so it also
 # covers CS Studio itself. Exempt: the wizard itself, CS Studio's sign-in,
 # sign-out and password reset (an admin resuming setup -- cs-studio spec §3),
@@ -17,13 +17,13 @@
 # a parallel request had just kept there.
 #
 # Deliberately narrower than the whole `/#{ContentSpiel::ADMIN_PATH}` scope:
-# CS Studio's own root and every other admin screen still redirect to /setup
+# CS Studio's own root and every other admin screen still redirect to /<ADMIN_PATH>/setup
 # while setup is pending -- only the three paths an admin needs to *resume*
 # setup by signing back in are carved out.
 module Setup
   module RedirectConstraint
     EXEMPT_PREFIXES = [
-      "/setup",
+      "/#{ContentSpiel::ADMIN_PATH}/setup",
       "/#{ContentSpiel::ADMIN_PATH}/sign-in",
       "/#{ContentSpiel::ADMIN_PATH}/sign-out",
       "/#{ContentSpiel::ADMIN_PATH}/password",
@@ -36,7 +36,7 @@ module Setup
 
     module_function
 
-    # A page load while setup is pending: redirected to /setup.
+    # A page load while setup is pending: redirected to /<ADMIN_PATH>/setup.
     def matches?(request)
       !exempt?(request.path) && page_load?(request) && Setup.required?
     end

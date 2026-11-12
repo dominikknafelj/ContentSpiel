@@ -27,6 +27,15 @@ class BackendRoutesTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Page not found"
   end
 
+  test "the wizard is not at /setup, and answers 404 under the admin path once setup is complete" do
+    get "/setup"
+    assert_response :not_found
+    assert_includes response.body, "Page not found"
+
+    get "/cs-studio/setup"
+    assert_response :not_found
+  end
+
   test "a top-level page slugged preview is served at /preview" do
     create_page(title: "Preview", published: true)
     get "/preview"
