@@ -120,11 +120,18 @@ class SignInMailerTest < ActionMailer::TestCase
     exporter.reset
 
     with_mail_state(:not_set_up) do
-      queued = Telemetry.in_span("auth.session", kind: :server) do
-        SignInMailer.queue_alert(:passkey_added, @user, name: "Work laptop", added_at: Time.current, origin: SITE)
+      queued = nil
+      log = capture_log do
+        queued = Telemetry.in_span("auth.session", kind: :server) do
+          SignInMailer.queue_alert(:passkey_added, @user, name: "Work laptop", added_at: Time.current, origin: SITE)
+        end
       end
       assert_equal false, queued
       assert_no_enqueued_jobs
+      assert_equal [ "[ContentSpiel] A sign-in account mail (passkey_added) was not queued: mail is not ready." ],
+        log.lines.map(&:strip).grep(/ContentSpiel/), "one line, naming nobody"
+      assert_not_includes log, "Work laptop"
+      assert_not_includes log, @user.email_address
     end
 
     span = exporter.finished_spans.find { |s| s.name == "auth.account_mail" }
@@ -152,8 +159,7 @@ class SignInMailerTest < ActionMailer::TestCase
         end
 
         lines = log.lines.map(&:strip).grep(/ContentSpiel/)
-        assert_equal 2, lines.size
-        assert_includes lines.first, "no site address is known. Set PUBLIC_HOST."
+        assert_equal [ "[ContentSpiel] A sign-in account mail was not sent: no site address is known. Set PUBLIC_HOST." ] * 2, lines
         assert_not_includes log, "Work laptop"
         assert_not_includes log, "203.0.113.7"
         assert_not_includes log, @user.email_address

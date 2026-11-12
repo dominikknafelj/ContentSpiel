@@ -21,15 +21,20 @@
 # in their own account) and when, or the address a code was used from, when,
 # and how many codes are left. Neither carries a code, a key, a credential id
 # or a digest, and neither names anyone but the account's own person. Their
-# one button is Your account's passkeys (`admin_account_url`, a link with no
-# token), under the same origin rule as the pause mail. They are queued by
-# `queue_alert` only, which is one `auth.account_mail` span and sends nothing
-# when mail is not ready: a person is never blocked by a mail that cannot go.
+# one button is "Open Your account", to Your account's passkeys
+# (`admin_account_url`, a link with no token), under the same origin rule
+# as the pause mail. They are queued by `queue_alert` only, which is one
+# `auth.account_mail` span and, when mail is not ready, sends nothing and
+# logs one line naming the mail's kind and nobody: a person is never
+# blocked by a mail that cannot go.
 class SignInMailer < ApplicationMailer
   helper_method :reset_request_url, :locked_time, :account_url, :account_mail_time
 
   ACCOUNT_MAILS = %i[passkey_added recovery_code_used].freeze
-  NOT_SENT = "[ContentSpiel] A sign-in account mail was not sent: no site address is known. Set PUBLIC_HOST.".freeze
+  # The line a mail with no known origin logs, with the mail's word
+  # ("pause", "account"): it names nobody and nothing of the mail.
+  NOT_SENT = "[ContentSpiel] A sign-in %s mail was not sent: no site address is known. Set PUBLIC_HOST.".freeze
+  NOT_READY = "[ContentSpiel] A sign-in account mail (%s) was not queued: mail is not ready.".freeze
 
   # Queues the account mail `kind` for `user` when mail is ready; answers
   # whether it queued. The span's two attributes are a fixed word and a
@@ -39,7 +44,11 @@ class SignInMailer < ApplicationMailer
 
     Telemetry.in_span("auth.account_mail", attributes: { "auth.mail.kind" => kind.to_s }) do |span|
       queued = MailSettings.current.ready?
-      ApplicationMailer.queue(self, kind, user, **arguments) if queued
+      if queued
+        ApplicationMailer.queue(self, kind, user, **arguments)
+      else
+        Rails.logger.warn format(NOT_READY, kind)
+      end
       Telemetry.record(span, "auth.mail.queued" => queued)
       queued
     end
@@ -69,7 +78,7 @@ class SignInMailer < ApplicationMailer
     @url_options = link_origin(origin)
 
     if @url_options.empty?
-      Rails.logger.warn "[ContentSpiel] A sign-in pause mail was not sent: no site address is known. Set PUBLIC_HOST."
+      Rails.logger.warn format(NOT_SENT, "pause")
       return
     end
 
@@ -84,7 +93,7 @@ class SignInMailer < ApplicationMailer
     @url_options = link_origin(origin)
     return true unless @url_options.empty?
 
-    Rails.logger.warn NOT_SENT
+    Rails.logger.warn format(NOT_SENT, "account")
     false
   end
 
