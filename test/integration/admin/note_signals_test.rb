@@ -61,6 +61,10 @@ class Admin::NoteSignalsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/cable"
     assert_response :not_found
+    # Action Cable's own refusal is a bare text/plain body; the public site's
+    # 404 is the themed HTML page.
+    assert_equal "Page not found", response.body
+    assert_match %r{\Atext/plain}, response.media_type
     assert_nil response.headers["Set-Cookie"]
 
     get "/cable"
