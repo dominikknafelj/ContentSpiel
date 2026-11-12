@@ -53,7 +53,7 @@ class Admin::PasskeysControllerTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=replace][target=confirm-identity] template", text: /Use your passkey/
     assert_select "turbo-stream[action=append][target=toasts] template", text: /Passkey added\./
     assert_select "turbo-stream[action=update][target=account-recovery-codes] template dialog[data-admin--ui--dialog-open-on-load]"
-    assert_select "turbo-stream[action=append][targets=head] template meta[name=turbo-cache-control][content=no-cache]"
+    assert_select "turbo-stream[action=append][targets=head] template meta#recovery-codes-no-cache[name=turbo-cache-control][content=no-cache]"
     streams = css_select("turbo-stream").map { |stream| stream["targets"] || stream["target"] }
     assert_operator streams.index("head"), :<, streams.index("account-recovery-codes"), "the page is uncacheable before it holds the codes"
     codes = css_select("turbo-stream[target=account-recovery-codes] template pre").text.split

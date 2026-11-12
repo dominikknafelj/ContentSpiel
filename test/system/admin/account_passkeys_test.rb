@@ -298,12 +298,25 @@ class Admin::AccountPasskeysSystemTest < ApplicationSystemTestCase
     assert_selector "#account-recovery [data-recovery-status]", text: "9 of 10 codes left"
   end
 
+  # Turbo keeps no snapshot of the page once it has held codes: the answer
+  # marks it `turbo-cache-control: no-cache`, with one mark of its own
+  # however many sets it shows.
   test "after Done and a visit back, the page holds no code" do
     sign_in_via_form(@user)
     account
+    no_cache = "head meta#recovery-codes-no-cache[name=turbo-cache-control][content=no-cache]"
 
     press "Generate recovery codes…"
+    codes_shown
+    assert_selector no_cache, visible: :all, count: 1
+    within(CODES) do
+      check "I have saved these codes"
+      press "Done"
+    end
+    press "Regenerate…"
+    within("dialog#regenerate-recovery-codes") { press "Regenerate" }
     shown = codes_shown
+    assert_selector no_cache, visible: :all, count: 1
     within(CODES) do
       check "I have saved these codes"
       press "Done"

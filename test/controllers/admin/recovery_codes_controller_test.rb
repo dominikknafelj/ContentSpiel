@@ -28,7 +28,7 @@ class Admin::RecoveryCodesControllerTest < ActionDispatch::IntegrationTest
     assert shown.all? { |code| code.match?(/\A[0-9A-Z]{4}-[0-9A-Z]{4}\z/) }
     assert_select "turbo-stream[action=replace][target=account-recovery] template", text: /10 of 10 codes left/
     assert_select "turbo-stream[action=update][target=account-recovery-codes] template dialog[data-admin--ui--dialog-open-on-load]"
-    assert_select "turbo-stream[action=append][targets=head] template meta[name=turbo-cache-control][content=no-cache]"
+    assert_select "turbo-stream[action=append][targets=head] template meta#recovery-codes-no-cache[name=turbo-cache-control][content=no-cache]"
     assert_equal({ "count" => 10, "replaced" => 0 }, Audit::Event.where(action: "recovery_codes.generated").sole.metadata)
     assert_no_match(/#{shown.first}/, Audit::Event.last.to_json, "no code reaches the log")
   end
