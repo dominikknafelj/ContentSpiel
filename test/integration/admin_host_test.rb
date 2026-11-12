@@ -1,4 +1,5 @@
 require "test_helper"
+require_relative "../support/source_code"
 
 # With ADMIN_HOST set, the backend (every route under /<ADMIN_PATH>/) answers
 # on the admin host alone and the public site's pages and form sends on every
@@ -107,6 +108,71 @@ class AdminHostTest < ActionDispatch::IntegrationTest
       follow_redirect!
       assert_response :success
     end
+  end
+
+  test "a reset mail's link names the admin host" do
+    put_mail_state(:working)
+    ActionMailer::Base.deliveries.clear
+    both_hosts do
+      host! "studio.example.internal"
+      post "/cs-studio/password", params: { email_address: users(:one).email_address }
+      perform_enqueued_jobs while enqueued_jobs.any?
+
+      mail = ActionMailer::Base.deliveries.last
+      assert_equal [ users(:one).email_address ], mail.to
+      assert_equal "studio.example.internal", URI.parse(mail.text_part.body.to_s[%r{https?://\S+}]).host
+    end
+  end
+
+  test "the session cookie has no Domain attribute" do
+    both_hosts do
+      host! "studio.example.internal"
+      post "/cs-studio/sign-in", params: { email_address: users(:one).email_address, password: "password" }
+
+      cookie = Array(response.headers["Set-Cookie"]).join("\n")
+      assert_match(/session_id=/, cookie)
+      assert_no_match(/;\s*domain=/i, cookie)
+    end
+  end
+
+  test "the editor's copy link to a published page names the public host" do
+    both_hosts do
+      host! "studio.example.internal"
+      sign_in_as(users(:one))
+      get "/cs-studio/pages/#{@about.id}"
+      assert_response :success
+      assert_select "[data-admin--ui--clipboard-url-value^='https://docs.example.org/']"
+    end
+  end
+
+  # R5: the policy sets neither directive, so it restricts no socket.
+  test "the content security policy restricts neither connect-src nor default-src" do
+    both_hosts do
+      host! "studio.example.internal"
+      sign_in_as(users(:one))
+      get "/cs-studio"
+      policy = response.headers["Content-Security-Policy"].to_s
+      assert_not_empty policy
+      assert_no_match(/(?:^|;)\s*(?:connect-src|default-src)\b/, policy)
+    end
+  end
+
+  # R5: Action Cable's same-origin rule (on by default) is what lets the admin
+  # host's socket in and every other origin out; a list of origins, or the rule
+  # switched off, would change who the socket accepts.
+  test "the cable accepts its own origin and no other" do
+    assert ActionCable.server.config.allow_same_origin_as_host
+    assert_nil Rails.application.config.action_cable.allowed_request_origins
+  end
+
+  test "no cookie is given a domain" do
+    pattern = /\b(?:cookies|session_store|cookie_store)\b.*\bdomain:/
+    offenders = %w[app config lib].flat_map { |root| Rails.root.glob("#{root}/**/*.{rb,erb}") }.flat_map do |path|
+      SourceCode.code_of(path.to_s).lines.each_with_index.filter_map do |line, index|
+        "#{path.relative_path_from(Rails.root)}:#{index + 1}" if line.match?(pattern)
+      end
+    end
+    assert_empty offenders, "a cookie with a domain would reach the other host"
   end
 
   test "without ADMIN_HOST one host answers both" do

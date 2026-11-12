@@ -42,6 +42,19 @@ class PasswordsMailerTest < ActionMailer::TestCase
     end
   end
 
+  test "with an admin host the link names it, and without one it names the public host" do
+    with_site_address(SITE) do
+      with_admin_address("https://studio.example.internal") do
+        links_of(PasswordsMailer.reset(@user, origin: "http://evil.example")).each do |link|
+          assert_equal "studio.example.internal", URI.parse(link).host
+        end
+      end
+      links_of(PasswordsMailer.reset(@user, origin: "http://evil.example")).each do |link|
+        assert_equal "docs.example.org", URI.parse(link).host
+      end
+    end
+  end
+
   # WHERE THE REQUEST'S ORIGIN IS NOT USED (production, and every
   # environment that is not development or test: `in_production` below). It
   # is whatever Host the request named, and a site with no address

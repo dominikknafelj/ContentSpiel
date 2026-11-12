@@ -140,6 +140,10 @@ class ApplicationMailer < ActionMailer::Base
   # environment's `default_url_options` is not it: in production that is the
   # site's address only when one is configured, and elsewhere a literal.
   #
+  # - The admin host (`ADMIN_HOST`) when one is set: every link a mail
+  #   builds is into CS Studio, which answers on that host alone (the
+  #   public host's 404 for it), so a link naming the public host would
+  #   open nothing. It wins over `PUBLIC_HOST` and over `origin`.
   # - The site's configured address (`PUBLIC_HOST`) whenever there is one,
   #   whatever `origin` says.
   # - Otherwise, IN DEVELOPMENT AND TEST ONLY (`request_origin_used?`), `origin`:
@@ -203,6 +207,8 @@ class ApplicationMailer < ActionMailer::Base
   # Shared by the mails that carry a link (PasswordsMailer, InvitesMailer),
   # so the origin rules above are written once.
   def link_origin(origin)
+    return SiteAddress.admin.url_options if SiteAddress.admin.configured?
+
     configured = SiteAddress.current
     return configured.url_options if configured.configured?
 
