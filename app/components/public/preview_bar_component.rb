@@ -19,9 +19,10 @@ module Public
   # - Exit preview (plan D26, amended): the record's public URL in the previewed
   #   language when it is live, since that is then where a visitor would see
   #   it (a path, or the public URL when CS Studio, and so the preview, has a
-  #   host of its own: `PublicSite::Urls.studio_link`); otherwise there is no public page to leave for and Edit already is
-  #   the editor, so it goes to CS Studio's list instead: the pages landing for
-  #   a page, the posts list for a post (the language kept).
+  #   host of its own: `PublicSite::Urls.studio_link`); otherwise there is no
+  #   public page to leave for and Edit already is the editor, so it goes to
+  #   CS Studio's list instead: the pages landing for a page, the posts list
+  #   for a post (the language kept).
   #
   # The response is never cached (`Cache-Control: private, no-store`), and the
   # bar must not become part of any cached render: nothing here is memoised or
