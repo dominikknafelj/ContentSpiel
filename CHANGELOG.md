@@ -18,6 +18,7 @@
 - A per-address rate limit on the passkey options (sign-in, the second step and Confirm it's you), counted apart from the proofs: 30 a minute, past which the options answer a bare 429 and no passkey is offered until the minute ends.
 - Signing out deletes every passkey challenge's cookie (`cs_passkey_<purpose>`), so none is left for the next person on the browser.
 - Spans `auth.passkey`, `auth.recovery_code`, `auth.second_factor`, `auth.confirmation` and `auth.account_mail`, and the attributes `auth.passkey.ceremony`, `auth.policy`, `auth.second_factor.required` and `auth.mail.kind` (`docs/reference/hosting.md`, "Telemetry", with a Honeycomb query for the second step's failures).
+- `ADMIN_HOST`: CS Studio on a host of its own. The reset mail, the lock-out mail's reset request link, the invitation, and the account link of the passkey-added and recovery-code-used mails link to it, the API tokens screen names the MCP address on it, and System status shows a "CS Studio address" row.
 
 ### Changed
 
@@ -35,6 +36,7 @@
 - `ADMIN_PATH` may now be `preview`, `setup`, `mcp` or `cable`, and a top-level page with one of those slugs is now reachable.
 - `ADMIN_PATH` may no longer be `forms`, the first segment of the public form send.
 - The new top-level names `Passkey`, `RecoveryCode`, `Passkeys`, `RecoveryCodes` and `PasskeyChallenges` refuse a gem's `ContentSpiel::Plugins` hook owner of the same name (`passkey`, `recovery_code`, `passkeys`, `recovery_codes`, `passkey_challenges`) at boot. A gem with such an owner renames it.
+- A new top-level name, `HostRouteConstraint` (`app/constraints/host_route_constraint.rb`): a gem whose hook owner has that name is refused at boot.
 
 ### Removed
 
@@ -42,6 +44,10 @@
 - Active Storage's direct uploads: `POST /rails/active_storage/direct_uploads` and `PUT /rails/active_storage/disk/:encoded_token` answer 404 to everyone, signed in or not. Every upload goes through CS Studio.
 - Turbo's native-app historical-location routes, which the public catch-all already shadowed.
 - The concern `ActiveStorageWriteAuthentication`, replaced by `ActiveStorageWriteRefusal`, which answers 404 to everyone.
+
+### Environment
+
+- `ADMIN_HOST` (optional): the address, with its scheme, of a host that serves CS Studio alone, for a backend behind a DMZ. With it, every address under `/<ADMIN_PATH>/` answers only on that host and the public site does not answer on it; `/up` and images answer on both. It needs `PUBLIC_HOST`, another host name and the same scheme, or production does not start (`docs/reference/hosting.md`, "Behind a DMZ").
 
 ### Migrations
 

@@ -80,6 +80,9 @@ env:
     # (an exact match: no www. if the host has none), HTTPS is forced, and
     # pages and mails carry it.
     PUBLIC_HOST: https://<%%= host %>
+    # Only for a backend behind a DMZ: CS Studio's own address, served on
+    # that host alone (docs/reference/hosting.md, "Behind a DMZ").
+    # ADMIN_HOST: https://studio.example.internal
 
     # The theme folder in the image. The Dockerfile sets the same value and
     # copies theme/ there; change both or neither.

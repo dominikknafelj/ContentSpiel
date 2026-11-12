@@ -287,8 +287,9 @@ The owner's own sites come first this way (2026-11-01): one server with a deploy
 
 | Item | Priority | Notes |
 |---|---|---|
-| Security basics: 2FA, session list and revoke, login history | Should | Login history is already in the audit log |
-| Single sign-on and passkeys | Should | A separate project (the owner, mail spec decision 8). "Forgot your password?" and the reset mail apply only to accounts that have a password: an account that signs in by single sign-on or a passkey alone needs its own way back, and an invite's "Set a password" page its own first step |
+| Security basics: 2FA, session list and revoke, login history | Should | **Built**: the session list and revoke (#241), a second step with passkeys and recovery codes (#248). Login history is the audit log |
+| Single sign-on (OIDC) | Should | A separate project (the owner, mail spec decision 8). Passkeys are built (#248); single sign-on is still to come. "Forgot your password?" and the reset mail apply only to accounts that have a password: an account that signs in by single sign-on or a passkey alone needs its own way back, and an invite's "Set a password" page its own first step |
+| A public-only deployment role behind a DMZ: a process in which the backend's routes, the cable, MCP and setup are not drawn, the database user only reads, pages come from the published copies, and jobs and sweeps run on the admin side alone | Could, later | Named in `docs/superpowers/specs/2026-11-12-backend-under-admin-path-design.md` ("Behind a DMZ", part 3) and not built. Built so far: the whole backend under `ADMIN_PATH` (part 1, #249) and `ADMIN_HOST`, CS Studio on a host of its own (`docs/reference/hosting.md`, "Behind a DMZ"). The form send would need another way to deliver |
 | Script CSP with nonces | Should | S20 |
 | Audit log export and retention (the log grows without limit); partition `audit_events` by month when retention is built | Should | D5 |
 | Sign-in's counters share `Rails.cache` (Solid Cache, `max_size` in `config/cache.yml`) with the public render cache, so an eviction can end an account's run or a lock early (`SignIn.store`'s comment). A table of their own, with an `INSERT … ON CONFLICT DO UPDATE`, if eviction of throttle rows is seen | Could | Sign-in PR 1, final review |

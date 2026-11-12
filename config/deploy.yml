@@ -58,6 +58,9 @@ env:
     # The site's address with its scheme. Required on a public address: only this host name is then
     # answered, HTTPS is forced, and pages and the password reset mail carry it (docs/reference/hosting.md).
     # PUBLIC_HOST: https://www.example.org
+    # Only for a backend behind a DMZ: CS Studio's own address, served on that host alone
+    # (docs/reference/hosting.md, "Behind a DMZ").
+    # ADMIN_HOST: https://studio.example.internal
 
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
