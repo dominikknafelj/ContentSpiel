@@ -17,7 +17,7 @@ class Admin::Ui::RecoveryCodesComponentTest < ViewComponent::TestCase
     pre = page.find("pre#recovery-codes-copy", visible: :all)
     assert_equal CODES.join("\n"), pre.text(:all)
     assert_includes pre[:class].split, "font-cs-mono"
-    assert_selector "[aria-label='Recovery codes'] pre, pre[aria-label='Recovery codes'], [aria-label='Recovery codes']", visible: :all
+    assert_selector "div[role=group][aria-label='Recovery codes'] > pre#recovery-codes-copy", visible: :all
     assert_selector "button[aria-label='Copy codes']", visible: :all
     assert_selector "button", text: "Download", visible: :all
     assert_selector "input[type=checkbox]#recovery-codes-saved", visible: :all
@@ -33,6 +33,14 @@ class Admin::Ui::RecoveryCodesComponentTest < ViewComponent::TestCase
     assert_no_selector "dialog", visible: :all
     assert_selector "a[href='/cs-studio/account'][aria-disabled=true]", text: "Done"
     CODES.each { |code| assert_empty attribute_values.grep(/#{Regexp.escape(code)}/) }
+  end
+
+  test "the script forgets the codes on the dialog's close, before the cache and at pagehide, and checks the box on connect" do
+    script = Rails.root.join("app/javascript/controllers/admin/ui/recovery_codes_controller.js").read
+    assert_includes script, %(addEventListener("close", this.forget, true))
+    assert_includes script, %(addEventListener("turbo:before-cache", this.forget))
+    assert_includes script, %(addEventListener("pagehide", this.forget))
+    assert_match(/pagehide", this\.forget\)\n\s+this\.toggle\(\)/, script)
   end
 
   test "an unknown frame, or a page with nowhere to go, is refused" do

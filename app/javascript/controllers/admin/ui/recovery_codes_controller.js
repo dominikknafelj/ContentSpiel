@@ -11,7 +11,10 @@ import { Controller } from "@hotwired/stimulus"
 //   in the browser: no address of the server carries the codes.
 // - At `turbo:before-cache` and `pagehide` the box's text is emptied and the
 //   block removed, so neither Turbo's snapshot nor the back/forward cache
-//   keeps the codes.
+//   keeps the codes. In the dialog frame the dialog's `close` (Done or
+//   Escape; the event does not bubble, so it is heard in the capture phase)
+//   forgets them the same way, as the page stays open after it.
+// - A checkbox the browser restored as ticked enables Done on connect.
 export default class extends Controller {
   static targets = ["list", "saved", "done", "block"]
 
@@ -20,11 +23,14 @@ export default class extends Controller {
       this.listTargets.forEach((element) => { element.textContent = "" })
       this.blockTargets.forEach((element) => element.remove())
     }
+    this.element.addEventListener("close", this.forget, true)
     document.addEventListener("turbo:before-cache", this.forget)
     window.addEventListener("pagehide", this.forget)
+    this.toggle()
   }
 
   disconnect() {
+    this.element.removeEventListener("close", this.forget, true)
     document.removeEventListener("turbo:before-cache", this.forget)
     window.removeEventListener("pagehide", this.forget)
   }
