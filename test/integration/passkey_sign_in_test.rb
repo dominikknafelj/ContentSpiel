@@ -172,6 +172,22 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     assert_equal 0, Session.count
   end
 
+  test "the options are limited per address on a count of their own: the eleventh in three minutes is a bare 429 that keeps no challenge" do
+    10.times { options }
+    cookies.delete(CHALLENGE_COOKIE)
+
+    post admin_sign_in_passkey_options_path, as: :json
+
+    assert_response :too_many_requests
+    assert_empty response.body
+    assert saved_challenge_cookie.blank?, "no challenge is kept"
+    post admin_sign_in_path, params: { email_address: EMAIL, password: PASSWORD }
+    assert_not_equal I18n.t("admin.sessions.limited"), flash[:alert], "a password is not counted with the options"
+
+    travel 3.minutes + 1.second
+    options
+  end
+
   test "under a policy that covers everyone a passkey sign-in owes no enrolment, a password sign-in without a passkey does, and auth.policy is on the request's span" do
     site_settings(:default).update!(passkey_policy: "everyone")
     exporter = Rails.application.config.x.otel_test_exporter

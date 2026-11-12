@@ -111,6 +111,11 @@ module Admin
     # within it is one visitor.
     rate_limit to: 10, within: 3.minutes, only: %i[ create passkey ], store: SignIn.store,
       by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { answer_address_limited }
+    # The passkey's options, at the same figures on a count of their own
+    # (`name:`), so a page's fetch costs no proof: a bare 429, which the
+    # script takes as no passkey to offer, and no challenge kept.
+    rate_limit to: 10, within: 3.minutes, only: :passkey_options, name: "options", store: SignIn.store,
+      by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { head :too_many_requests }
 
     def new
       bot_check = SignIn::BotCheck.current

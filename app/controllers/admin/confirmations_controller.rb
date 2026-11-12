@@ -50,6 +50,9 @@ module Admin
     # in the throttle's store, as sign-in's limit counts (`SessionsController`).
     rate_limit to: 10, within: 3.minutes, only: %i[ create passkey ], store: SignIn.store,
       by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { answer_limited }
+    # The options, as sign-in's are (`SessionsController`): a count of their own, a bare 429.
+    rate_limit to: 10, within: 3.minutes, only: :options, name: "options", store: SignIn.store,
+      by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { head :too_many_requests }
 
     def create
       answer(proof.password(params[:password]), method: "password", failed: :wrong_password)
