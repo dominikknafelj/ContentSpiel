@@ -38,7 +38,7 @@ class PasskeyEnrolmentTest < ActionDispatch::IntegrationTest
     sign_in_with_password
     assert Session.find_by!(user: @user).enrolment_due?
 
-    [ admin_root_path, admin_settings_path, admin_account_path, admin_pages_path, "/preview/draft" ].each do |path|
+    [ admin_root_path, admin_settings_path, admin_account_path, admin_pages_path, "/cs-studio/preview/draft" ].each do |path|
       get path
       assert_redirected_to admin_enrolment_path, "#{path} is closed until a passkey is added"
     end

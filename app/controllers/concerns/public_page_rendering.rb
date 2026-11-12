@@ -199,7 +199,7 @@ module PublicPageRendering
   end
 
   # The route param when the URL was explicitly prefixed (e.g. /de/about, or
-  # /preview/de/about); otherwise the site's current default. On the public
+  # /<ADMIN_PATH>/preview/de/about); otherwise the site's current default. On the public
   # site, PagesController#redirect_default_locale_prefix sends an explicit
   # but redundant default-locale prefix away before this is ever read, so an
   # absent params[:locale] and the default locale always mean the same thing

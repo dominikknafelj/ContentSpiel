@@ -209,16 +209,16 @@ class PublicHeadAddressTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a preview keeps the request's origin and its /preview addresses, and has no canonical link" do
+  test "a preview keeps the request's origin and its /cs-studio/preview addresses, and has no canonical link" do
     sign_in_as(users(:one))
 
     with_site_address(SITE) do
-      get "/preview/about"
+      get "/cs-studio/preview/about"
 
       assert_response :success
       assert_select "link[rel=canonical]", count: 0
-      assert_equal "http://www.example.com/preview/about", og_url
-      assert_equal "http://www.example.com/preview/de/uber", alternates["de"]
+      assert_equal "http://www.example.com/cs-studio/preview/about", og_url
+      assert_equal "http://www.example.com/cs-studio/preview/de/uber", alternates["de"]
       assert_not_includes response.body, "docs.example.org"
     end
   end

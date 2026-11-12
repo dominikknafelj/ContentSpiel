@@ -109,7 +109,7 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
 
     assert_equal %w[Guide Start Install Write], titles(branch.under(@guide)), "an unpublished title reached the tree"
     assert_equal [ "Guide", "Start CHANGED", "Install", "Write" ], titles(branch(preview: true).under(@guide))
-    assert_equal "/preview/guide/start", branch(preview: true).under(@guide).children.first.path
+    assert_equal "/cs-studio/preview/guide/start", branch(preview: true).under(@guide).children.first.path
 
     publish_changes(@start)
     assert_equal [ "Guide", "Start CHANGED", "Install", "Write" ], titles(branch.under(@guide))
@@ -142,7 +142,7 @@ class PublicSite::BranchTest < ActiveSupport::TestCase
     assert Pages::Save.call(@guide, translations: { "en" => { title: "Guide CHANGED" } }).ok?
     assert_equal "Guide", branch.around(@install).above[1].title
     assert_equal "Guide CHANGED", branch(preview: true).around(@install).above[1].title
-    assert_equal "/preview/guide", branch(preview: true).around(@install).above[1].path
+    assert_equal "/cs-studio/preview/guide", branch(preview: true).around(@install).above[1].path
   end
 
   test "the section around a page is its tree with the page marked, and the pages above are that tree's nodes" do

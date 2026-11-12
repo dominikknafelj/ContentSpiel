@@ -298,7 +298,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       sign_in_as users(:one)
 
       with_forgery_protection do
-        Theme.with(Theme.new(path: dir)) { get "/preview/about" }
+        Theme.with(Theme.new(path: dir)) { get "/cs-studio/preview/about" }
       end
 
       assert_response :success
@@ -347,7 +347,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
           assert_includes error.message, "views/pages/shwo.html.erb is not part of the theme contract"
         end
         sign_in_as users(:one)
-        assert_includes assert_raises(ThemeFolder::Invalid) { get "/preview/about" }.message, "shwo"
+        assert_includes assert_raises(ThemeFolder::Invalid) { get "/cs-studio/preview/about" }.message, "shwo"
         get "/cs-studio"
         assert_response :success
 
@@ -886,7 +886,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     section = @about.content_blocks.create!(block_type: "section", position: 1, settings: { "layout" => "one" })
     ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one", "anchor" => "contact" } }, actor: nil)
 
-    with_plain_theme { get "/preview/about" }
+    with_plain_theme { get "/cs-studio/preview/about" }
     assert_select "article.plain-page h2#contact-2", text: "Contact"
 
     with_plain_theme { get "/about" }
@@ -896,7 +896,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   test "the preview is drawn by the theme too, with the CMS's preview bar" do
     sign_in_as users(:one)
 
-    with_plain_theme { get "/preview/about" }
+    with_plain_theme { get "/cs-studio/preview/about" }
 
     assert_response :success
     assert_equal "noindex", response.headers["X-Robots-Tag"]
@@ -923,7 +923,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_select "[role=region][aria-label=Preview]", count: 0
 
     sign_in_as users(:one)
-    with_plain_theme { get "/preview/about" }
+    with_plain_theme { get "/cs-studio/preview/about" }
 
     assert_select "article.plain-page"
     assert_select "head meta[property='og:title'][content='About']", count: 1
@@ -946,7 +946,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
 
     sign_in_as users(:one)
-    get "/preview/blog/hello"
+    get "/cs-studio/preview/blog/hello"
 
     assert_response :not_found
     assert_includes response.body, "<title>Dana&#39;s Notes</title>"
@@ -994,7 +994,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
 
     assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
     sign_in_as users(:one)
-    get "/preview/blog/hello"
+    get "/cs-studio/preview/blog/hello"
 
     assert_response :not_found
     assert_select "head link[rel=canonical], head link[rel=alternate]", count: 0
@@ -1303,7 +1303,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
 
     assert ContentBlocks::Destroy.call(blog.content_blocks.sole).ok?
     sign_in_as users(:one)
-    with_plain_theme { get "/preview/blog/hello" }
+    with_plain_theme { get "/cs-studio/preview/blog/hello" }
 
     assert_response :not_found
     assert_select "div.plain-frame"
@@ -1363,9 +1363,9 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "UNPUBLISHED"
 
     sign_in_as users(:one)
-    with_plain_theme { get "/preview/guide/start" }
-    assert_select "nav.plain-tree a[href='/preview/guide/start'][aria-current=page]", text: "Start UNPUBLISHED"
-    assert_select "p.plain-crumb a[href='/preview/guide']", text: "Guide"
+    with_plain_theme { get "/cs-studio/preview/guide/start" }
+    assert_select "nav.plain-tree a[href='/cs-studio/preview/guide/start'][aria-current=page]", text: "Start UNPUBLISHED"
+    assert_select "p.plain-crumb a[href='/cs-studio/preview/guide']", text: "Guide"
   end
 
   # WHY `Theme::Check` REFUSES `cache` IN A THEME'S TEMPLATE. The public page
@@ -1400,7 +1400,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       with_caching do
         Theme.with(Theme.new(path: dir)) do
           sign_in_as users(:one)
-          get "/preview/about"
+          get "/cs-studio/preview/about"
           assert_select "p.cached", text: "About UNPUBLISHED"
 
           delete admin_sign_out_path

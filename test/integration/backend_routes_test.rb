@@ -14,4 +14,22 @@ class BackendRoutesTest < ActionDispatch::IntegrationTest
   test "Turbo's historical-location routes are not drawn" do
     assert_empty Rails.application.routes.routes.map { |route| route.path.spec.to_s }.grep(/historical_location/)
   end
+
+  test "the preview answers under the admin path, and /preview is a public page path" do
+    create_page(title: "Draft", published: false)
+    sign_in_as(users(:one))
+
+    get "/cs-studio/preview/draft"
+    assert_response :success
+
+    get "/preview/draft"
+    assert_response :not_found
+    assert_includes response.body, "Page not found"
+  end
+
+  test "a top-level page slugged preview is served at /preview" do
+    create_page(title: "Preview", published: true)
+    get "/preview"
+    assert_response :success
+  end
 end

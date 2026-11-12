@@ -8,13 +8,13 @@ class PreviewTest < ActionDispatch::IntegrationTest
   end
 
   test "preview requires sign-in" do
-    get "/preview/draft"
+    get "/cs-studio/preview/draft"
     assert_redirected_to admin_sign_in_path
   end
 
   test "signed-in editors preview drafts with a banner, no-store and noindex" do
     sign_in_as(users(:one))
-    get "/preview/draft"
+    get "/cs-studio/preview/draft"
     assert_response :success
     assert_select "[role=region][aria-label=Preview]", /Draft/
     assert_equal "private, no-store", response.headers["Cache-Control"]
@@ -27,7 +27,7 @@ class PreviewTest < ActionDispatch::IntegrationTest
       Mobility.with_locale(:de) { @draft.update!(title: "Entwurf <b>", slug: "entwurf") }
       sign_in_as(users(:one))
 
-      get "/preview/de/entwurf"
+      get "/cs-studio/preview/de/entwurf"
 
       assert_response :success
       assert_select "[role=region][aria-label=Preview]" do
@@ -44,10 +44,10 @@ class PreviewTest < ActionDispatch::IntegrationTest
     live = Page.create!(parent: @root, title: "Live", published_at: 1.day.ago)
     sign_in_as(users(:one))
 
-    get "/preview/live"
+    get "/cs-studio/preview/live"
     assert_select "[role=region] a[href=?]", "/live", text: "Exit preview"
 
-    get "/preview/draft"
+    get "/cs-studio/preview/draft"
     assert_select "[role=region] a[href=?]", "/cs-studio/pages", text: "Exit preview"
     assert_select "[role=region] a[href=?]", "/cs-studio/pages/#{@draft.id}", text: "Edit"
   end
@@ -58,10 +58,10 @@ class PreviewTest < ActionDispatch::IntegrationTest
       Mobility.with_locale(:de) { live.update!(title: "Lebendig", slug: "lebendig") }
       sign_in_as(users(:one))
 
-      get "/preview/de/lebendig"
+      get "/cs-studio/preview/de/lebendig"
       assert_select "[role=region] a[href=?]", "/de/lebendig", text: "Exit preview"
 
-      get "/preview/de/draft"
+      get "/cs-studio/preview/de/draft"
       assert_select "[role=region] a[href=?]", "/cs-studio/pages?locale=de", text: "Exit preview"
     end
   end
@@ -75,12 +75,12 @@ class PreviewTest < ActionDispatch::IntegrationTest
       Mobility.with_locale(:de) { post.update!(title: "Hallo", slug: "hallo") }
       sign_in_as(users(:one))
 
-      get "/preview/de/blog/hallo"
+      get "/cs-studio/preview/de/blog/hallo"
       assert_response :success
       assert_select "[role=region] a[href=?]", "/de/blog/hallo", text: "Exit preview"
 
       post.update!(published_at: nil)
-      get "/preview/de/blog/hallo"
+      get "/cs-studio/preview/de/blog/hallo"
       assert_select "[role=region] a[href=?]", "/cs-studio/posts?locale=de", text: "Exit preview"
     end
   end
@@ -91,7 +91,7 @@ class PreviewTest < ActionDispatch::IntegrationTest
     post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
 
     sign_in_as(users(:one))
-    get "/preview/blog/hello"
+    get "/cs-studio/preview/blog/hello"
 
     assert_response :success
     assert_select "[role=region] a[href=?]", "/cs-studio/posts/#{post.id}", text: "Edit"
@@ -100,7 +100,7 @@ class PreviewTest < ActionDispatch::IntegrationTest
 
   test "the bar is the first thing in the body, outside the content column, and the body is padded for it" do
     sign_in_as(users(:one))
-    get "/preview/draft"
+    get "/cs-studio/preview/draft"
 
     assert_select "body.pt-9 > [role=region][aria-label=Preview]:first-child"
     assert_select "html.scroll-pt-9"
@@ -119,9 +119,9 @@ class PreviewTest < ActionDispatch::IntegrationTest
 
   test "links inside a preview stay in preview" do
     sign_in_as(users(:one))
-    get "/preview/de/draft"
+    get "/cs-studio/preview/de/draft"
     assert_response :success
-    assert_select "header a[href^='/preview']"
+    assert_select "header a[href^='/cs-studio/preview']"
   end
 
   # Sections spec §5.7: the preview draws a section as the public page does.
@@ -130,7 +130,7 @@ class PreviewTest < ActionDispatch::IntegrationTest
     @draft.content_blocks.create!(block_type: :rich_text, section: section, section_column: 2, position: 0, body: rich_doc("In the middle"))
     sign_in_as(users(:one))
 
-    get "/preview/draft"
+    get "/cs-studio/preview/draft"
 
     assert_response :success
     assert_select "section.content-section.content-section--tinted.content-section--content .content-section__grid--three" do
@@ -153,16 +153,16 @@ class PreviewTest < ActionDispatch::IntegrationTest
   # pinned so a listing rendered inside preview can never leak a public-site
   # link for one of its items, the same guarantee "links inside a preview
   # stay in preview" already pins for nav/hreflang links.
-  test "post-list item links inside a preview stay under /preview" do
+  test "post-list item links inside a preview stay under /cs-studio/preview" do
     blog = Page.create!(parent: @root, title: "Blog", published_at: 1.day.ago)
     blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
 
     sign_in_as(users(:one))
-    get "/preview/blog"
+    get "/cs-studio/preview/blog"
 
     assert_response :success
-    assert_select "a[href^='/preview/']", /Hello/
+    assert_select "a[href^='/cs-studio/preview/']", /Hello/
   end
 
   test "a post whose listing page is gone 404s in preview instead of raising" do
@@ -172,7 +172,7 @@ class PreviewTest < ActionDispatch::IntegrationTest
     ContentBlock.where(id: block.id).delete_all
 
     sign_in_as(users(:one))
-    get "/preview/blog/hello"
+    get "/cs-studio/preview/blog/hello"
     assert_response :not_found
   end
 end

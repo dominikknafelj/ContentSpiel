@@ -1,5 +1,5 @@
 module Public
-  # The bar a signed-in editor sees across the top of a preview (`/preview...`,
+  # The bar a signed-in editor sees across the top of a preview (`/<ADMIN_PATH>/preview...`,
   # `PreviewController`; design pass round 3, handoff C40, plan D26):
   # "PREVIEW · <title> · <Draft|Scheduled|Live> · <the language's own name>",
   # then Edit and Exit preview. It is the public site's own chrome: it renders

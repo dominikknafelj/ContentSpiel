@@ -1,6 +1,6 @@
 # Base for the public site (spec §6.4): no Authentication, no session, no
 # CSRF token, no cookies -- the same response for everyone, so a browser or
-# CDN may cache it. Preview (signed-in drafts) lives on /preview in its own
+# CDN may cache it. Preview (signed-in drafts) lives on /<ADMIN_PATH>/preview in its own
 # controller for exactly this reason. Everything that varies per visitor
 # (the theme toggle) stays in the browser.
 class PublicController < ActionController::Base

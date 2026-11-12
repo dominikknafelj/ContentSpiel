@@ -27,7 +27,7 @@ Rails.application.routes.draw do
 
   # CS Studio, the admin. Its path is configurable
   # (ContentSpiel::ADMIN_PATH) and sign-in lives under it, so the public site
-  # advertises no login page. Declared before /preview and the public
+  # advertises no login page. Declared before /<ADMIN_PATH>/preview and the public
   # catch-alls, which would otherwise swallow it as a page path.
   scope ContentSpiel::ADMIN_PATH, module: :admin, as: :admin do
     get "sign-in", to: "sessions#new", as: :sign_in
@@ -505,6 +505,19 @@ Rails.application.routes.draw do
         constraints: { thread_id: /\d+/, message_id: /\d+/, id: /\d+/ }
     end
   end
+
+  # The backend's plain routes, under the admin path (no `module:`, no `as:`).
+  scope ContentSpiel::ADMIN_PATH do
+    # Signed-in preview of unpublished pages and posts -- its own
+    # URL space, so the public routes below can stay session-free and cacheable,
+    # and under the admin path, so a top-level page slugged "preview" is a public
+    # page like any other. Two routes for the same reason the public site has two:
+    # an optional `(/:locale)` would leave "about" in /<ADMIN_PATH>/preview/about
+    # to be read as a locale.
+    get "preview/:locale(/*path)", to: "preview#show", constraints: LocaleRouteConstraint,
+      defaults: { path: "" }, format: false, as: :localized_preview
+    get "preview(/*path)", to: "preview#show", defaults: { path: "" }, format: false, as: :preview
+  end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # First-run setup wizard. SetupController
@@ -538,14 +551,6 @@ Rails.application.routes.draw do
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
-
-  # Signed-in preview of unpublished pages and posts -- its own
-  # URL space, so the public routes below can stay session-free and cacheable.
-  # Two routes for the same reason the public site has two: an optional
-  # `(/:locale)` would leave "about" in /preview/about to be read as a locale.
-  get "preview/:locale(/*path)", to: "preview#show", constraints: LocaleRouteConstraint,
-    defaults: { path: "" }, format: false, as: :localized_preview
-  get "preview(/*path)", to: "preview#show", defaults: { path: "" }, format: false, as: :preview
 
   # Every locale is reachable under its own prefix (e.g. /de/about), including
   # whichever one is currently the site's default -- but a default-locale

@@ -71,7 +71,7 @@
 # does, since they run before the action and key on the id as sent. A probe
 # of the sequential ids therefore learns nothing it could not learn from the
 # public pages, and every submission is made with its page (`page_id` goes
-# nil later only when that page is purged). Its cost: a send from `/preview`
+# nil later only when that page is purged). Its cost: a send from `/<ADMIN_PATH>/preview`
 # of a draft page, or of a form not yet published on its page, is refused.
 class FormSendsController < ActionController::Base
   include Cookieless

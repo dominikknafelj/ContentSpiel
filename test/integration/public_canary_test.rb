@@ -259,7 +259,7 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
 
     # The preview is the opposite: it shows the rows.
     sign_in_as users(:one)
-    get "/preview#{PublicSite::Urls.new.path_for(@alpha, 'en')}"
+    get "/cs-studio/preview#{PublicSite::Urls.new.path_for(@alpha, 'en')}"
     assert_includes response.body, CANARY
     reset! # the rest asks as a visitor
 

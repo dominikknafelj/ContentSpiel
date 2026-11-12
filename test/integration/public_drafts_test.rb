@@ -184,7 +184,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "As typed"
 
     sign_in_as users(:one)
-    get "/preview#{path_of(page)}"
+    get "/cs-studio/preview#{path_of(page)}"
     assert_includes response.body, "As typed"
     assert_not_includes response.body, "As published"
   end
@@ -433,7 +433,7 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert Pages::Save.call(page, translations: { "en" => { title: "Typed page" } }).ok?
     sign_in_as users(:one)
 
-    get "/preview#{path_of(page)}"
+    get "/cs-studio/preview#{path_of(page)}"
 
     assert_select "nav[aria-label=Main] a", text: "Typed page"
     assert_select ".content-block--post-list a", text: "Typed post"
@@ -1162,10 +1162,10 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_nil path_of(post), "no published copy lists it"
     sign_in_as users(:one)
 
-    get "/preview/blog"
+    get "/cs-studio/preview/blog"
 
-    assert_equal [ "/preview/blog/hello" ], list_hrefs
-    get "/preview/blog/hello"
+    assert_equal [ "/cs-studio/preview/blog/hello" ], list_hrefs
+    get "/cs-studio/preview/blog/hello"
     assert_response :success
     assert_select "h1", text: "Hello"
 
@@ -1184,9 +1184,9 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     create_post(title: "Hello")
     sign_in_as users(:one)
 
-    get "/preview/teaser"
+    get "/cs-studio/preview/teaser"
 
-    assert_equal [ "/preview/blog/hello" ], list_hrefs
+    assert_equal [ "/cs-studio/preview/blog/hello" ], list_hrefs
   end
 
   # The check that can refuse runs when a change is scheduled; the refresh
