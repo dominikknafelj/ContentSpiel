@@ -32,6 +32,11 @@ const CONFIRM_HEADER = "X-Confirm-Identity"
 //    a closed prompt, which says nothing, and Continue works with the
 //    options held.
 //
+// A page with no Name dialog (enrolment: the name is a field of the page,
+// and "Add passkey" is the press that opens the prompt) holds options from
+// connect, asked without the confirmation: a sign-in is one, so they come at
+// once within its window, and otherwise the press goes the way of 4.
+//
 // Without an outlet (the wizard, which no confirmation gates) a 403 says
 // `failed`. Where the browser can make no passkey, the add button is
 // hidden. The words are the element's `data-messages`. Nothing here keeps
@@ -44,7 +49,11 @@ export default class extends Controller {
   async connect() {
     this.options = null
     this.ceremony = await import("passkeys/ceremony")
-    if (!this.ceremony.supported()) this.addTargets.forEach((button) => { button.hidden = true })
+    if (!this.ceremony.supported()) {
+      this.addTargets.forEach((button) => { button.hidden = true })
+      return
+    }
+    if (!this.hasDialogTarget) this.refresh()
   }
 
   get dialog() {
@@ -156,12 +165,14 @@ export default class extends Controller {
     this.refresh()
   }
 
-  // Fresh options for the next Continue, while the dialog is open: the last
-  // set's challenge went with its answer. A refusal by the gate leaves none,
-  // and the next Continue asks for them through `ensure()`.
+  // Fresh options for the next Continue, while the dialog is open (always,
+  // on a page with no dialog): the last set's challenge went with its
+  // answer. A refusal by the gate leaves none, and the next Continue asks
+  // for them through `ensure()`.
   async refresh() {
     const answer = await this.request()
-    if (this.dialog.open && answer?.status === 200 && answer.options) this.options = answer.options
+    const waiting = !this.hasDialogTarget || this.dialog.open
+    if (waiting && answer?.status === 200 && answer.options) this.options = answer.options
   }
 
   say(key) {

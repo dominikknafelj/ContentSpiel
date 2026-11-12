@@ -19,6 +19,14 @@ module Admin
   #   them once on a page Turbo keeps no snapshot of. A refusal is 422
   #   `{ "error" }`, the sentence the dialog shows.
   #
+  # FROM THE ENROLMENT PAGE (`from: "enrolment"`), the answer goes on to
+  # where the person was going (`after_authentication_url`): with codes, a
+  # stream that replaces the page's `#enrolment` with them, Done leading
+  # there (the page carries `turbo-cache-control: no-cache` itself); with
+  # none (the person still held unused ones), a 303 there, which the script
+  # follows. The codes are drawn in this answer alone, never kept in the
+  # flash or the session.
+  #
   # Nothing of the ceremony reaches a page, a span or the log: the challenge
   # is in the session cookie, the credential is filtered from the log
   # (`filter_parameters`), and the answer holds neither.
@@ -27,6 +35,8 @@ module Admin
     include PasskeyChallenges
     include RecentConfirmation
 
+    # Enrolment's own add (`Admin::PasskeyEnrolment`).
+    skip_before_action :require_passkey_enrolment, only: %i[ options create ]
     require_recent_confirmation only: %i[ options create destroy ]
     before_action :require_passkey_relying_party, only: %i[ options create ]
     before_action :set_passkey, only: %i[ update destroy ]
@@ -48,6 +58,8 @@ module Admin
       return render(json: { error: result.errors.first }, status: :unprocessable_entity) unless result.ok?
 
       _passkey, codes = result.record
+      return enrolment_answer(codes) if params[:from] == "enrolment"
+
       # `addable: true`: this action answers only where a relying party is.
       streams = [
         turbo_stream.replace(AccountScreen::PasskeysCardComponent::ID, AccountScreen::PasskeysCardComponent.for(Current.user, addable: true, url_options: admin_url_options)),
@@ -99,6 +111,13 @@ module Admin
     end
 
     private
+
+    def enrolment_answer(codes)
+      return redirect_to(after_authentication_url, status: :see_other) unless codes
+
+      render turbo_stream: turbo_stream.replace(EnrolmentsController::ID,
+        Ui::RecoveryCodesComponent.new(codes: codes, frame: :page, done_href: after_authentication_url, id: EnrolmentsController::ID))
+    end
 
     def set_passkey
       @passkey = Current.user.passkeys.find(params[:id])

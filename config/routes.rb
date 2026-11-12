@@ -353,6 +353,11 @@ Rails.application.routes.draw do
     post "account/passkeys", to: "passkeys#create", as: :account_passkeys
     patch "account/passkeys/:id", to: "passkeys#update", as: :account_passkey, constraints: { id: /\d+/ }
     delete "account/passkeys/:id", to: "passkeys#destroy", constraints: { id: /\d+/ }
+    # Enrolment: where a person the passkey policy covered at sign-in, who
+    # holds no passkey, is sent from every CS Studio page until they add one
+    # (`Admin::PasskeyEnrolment`). The add itself is the Passkeys card's
+    # endpoints above, with `from: "enrolment"`.
+    get "enrolment", to: "enrolments#show", as: :enrolment
     post "account/recovery-codes", to: "recovery_codes#create", as: :account_recovery_codes
 
     # "Connect an AI assistant": the MCP bearer

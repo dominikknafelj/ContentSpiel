@@ -39,6 +39,9 @@ module Admin
     include PasskeyChallenges
     include SignInLocks
 
+    # Enrolment's add asks for it too (`Admin::PasskeyEnrolment`).
+    skip_before_action :require_passkey_enrolment
+
     RATE_LIMIT_PURPOSE = "content_spiel confirmation rate limit".freeze
     WORDS = "admin.components.ui.confirm_identity_dialog".freeze
 

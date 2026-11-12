@@ -1,0 +1,53 @@
+<%# Enrolment, on the product layout's panel: the site's name and "Add a
+    passkey", the lead by the policy, the Name field with its help line,
+    "Add passkey" (the panel's one primary) and Sign out. The words are read
+    by full key: they are `admin.enrolment.show.*`, where a lazy lookup would
+    read the controller's plural name.
+
+    The form is `admin--passkeys--register`'s, with no Name dialog: the
+    script holds the registration options from connect, so the press of
+    "Add passkey" opens the browser's prompt at once (WebKit opens it only in
+    a press), and its own words (a blank name, a refusal) are Your account's
+    Name dialog's, served here in `data-messages`. Add passkey stays hidden
+    where the browser can make no passkey. Confirm it's you stands beside it,
+    for a sign-in older than its window.
+
+    The page loads CS Studio's scripts (`entry_point`), and Turbo keeps no
+    snapshot of it: the codes are drawn into it in place. %>
+<% content_for :title, t("admin.enrolment.show.title") %>
+<% content_for :entry_point, "admin" %>
+<% content_for :head do %><meta name="turbo-cache-control" content="no-cache"><% end %>
+<% field_id = "enrolment-name" %>
+
+<div id="<%= Admin::EnrolmentsController::ID %>" class="flex flex-col gap-[18px]">
+  <%= render "admin/shared/auth_heading", title: t("admin.enrolment.show.title") %>
+  <p class="text-sm leading-relaxed text-dim"><%= t("admin.enrolment.show.lead.#{@lead}") %></p>
+
+  <%= tag.form class: "flex flex-col gap-[18px]", novalidate: true, data: {
+        controller: "admin--passkeys--register",
+        action: "admin--passkeys--register#continue",
+        messages: messages_data("components.account_screen.passkey_dialog.name_blank", "components.account_screen.passkey_dialog.failed"),
+        "admin--passkeys--register-options-url-value": admin_account_passkey_options_path(**admin_url_options),
+        "admin--passkeys--register-create-url-value": admin_account_passkeys_path(**admin_url_options),
+        "admin--passkeys--register-from-value": "enrolment",
+        "admin--passkeys--register-admin--passkeys--confirm-outlet": "##{Admin::Ui::ConfirmIdentityDialogComponent::ID}"
+      } do %>
+    <div class="admin-field">
+      <%= label_tag field_id, t("admin.enrolment.show.name"), class: setup_label_class %>
+      <%= text_field_tag "name", nil, id: field_id, maxlength: Passkey::NAME_LIMIT, autocomplete: "off", required: true, autofocus: true,
+            aria: { describedby: "#{field_id}-help #{field_id}-error" }, class: setup_input_class,
+            data: { "admin--passkeys--register-target": "name" } %>
+      <p id="<%= field_id %>-help" class="mt-1 text-small text-meta"><%= t("admin.enrolment.show.name_help") %></p>
+      <p id="<%= field_id %>-error" role="alert" class="mt-1 text-sm text-danger-ink empty:hidden" data-admin--passkeys--register-target="error"></p>
+    </div>
+    <button type="submit" class="w-full <%= Admin::Ui::ButtonComponent.classes(:primary) %>" data-admin--passkeys--register-target="add">
+      <%= render "admin/shared/icon", name: :fingerprint, size: "size-4" %>
+      <%= t("admin.enrolment.show.add") %>
+    </button>
+  <% end %>
+
+  <%= button_to t("admin.enrolment.show.sign_out"), admin_sign_out_path, method: :delete,
+        class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
+</div>
+
+<%= render Admin::Ui::ConfirmIdentityDialogComponent.new(passkey: false, url_options: admin_url_options) %>

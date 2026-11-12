@@ -65,7 +65,7 @@ module Admin
       posted = params[:site_setting]
       posted = ActionController::Parameters.new unless posted.is_a?(ActionController::Parameters)
       permitted = posted.permit(
-        :logo, :remove_logo, :social_links_present, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, :language_order,
+        :logo, :remove_logo, :social_links_present, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, :language_order, :passkey_policy,
         *Admin::Ui::MailFieldsComponent::FIELDS, *Admin::SettingsScreen::ImagesCardComponent::FIELDS,
         translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
         social_links: [ :name, :url ],
@@ -83,10 +83,13 @@ module Admin
       end
 
       attributes, translated = site_arguments(permitted)
+      # Asked before the save, which assigns what was typed to `site`.
+      policy_alone = policy_alone?(site, permitted)
       result = Settings::Save.call(site, attributes: attributes, translations: translated, languages: language_arguments(site, permitted))
 
       if result.ok?
-        redirect_to admin_settings_path(**admin_url_options), status: :see_other, notice: t("admin.settings.saved")
+        notice = policy_alone ? t("admin.components.settings_screen.sign_in_card.saved") : t("admin.settings.saved")
+        redirect_to admin_settings_path(**admin_url_options), status: :see_other, notice: notice
       else
         forbidden_or(result) do
           @site_setting = site
@@ -159,7 +162,7 @@ module Admin
     # unless a new file came with it), the social link rows in the order the
     # form numbered them, and only the languages/fields actually posted.
     def site_arguments(permitted)
-      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, *Admin::Ui::MailFieldsComponent::FIELDS,
+      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, :passkey_policy, *Admin::Ui::MailFieldsComponent::FIELDS,
         *Admin::SettingsScreen::ImagesCardComponent::FIELDS).to_h
       attributes["image_widths"] = ImageSettings.parse_widths(attributes["image_widths"]) if attributes.key?("image_widths")
       attributes = drop_blank_file_params(attributes, fields: %w[logo])
@@ -170,6 +173,14 @@ module Admin
 
       translated = (permitted[:translations]&.to_h || {}).transform_values { |fields| fields.slice(*Settings::Save::TRANSLATED.map(&:to_s)) }.reject { |_, fields| fields.empty? }
       [ attributes, translated ]
+    end
+
+    # Whether the passkey policy is the one thing this save changes, against
+    # the stored row (`Values#changed_fields`; a chosen logo is a change
+    # those fields cannot see), so the toast can say "Sign-in policy saved."
+    def policy_alone?(site, permitted)
+      changed = Admin::SettingsScreen::Values.new(site: site, submitted: permitted).changed_fields
+      changed == [ "passkey_policy" ] && permitted[:logo].blank?
     end
 
     # The complete ordered `[{ "code", "fallbacks" }]` for `Settings::Save`, or

@@ -80,8 +80,8 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
   test "the screen is a nav of anchors, one card per section, and one footer" do
     get "/cs-studio/settings"
 
-    assert_select "nav[aria-label='Settings sections'] a", 7
-    %w[site languages publishing forms ai mail images].each do |id|
+    assert_select "nav[aria-label='Settings sections'] a", 8
+    %w[site languages publishing forms ai mail sign_in images].each do |id|
       assert_select "nav[aria-label='Settings sections'] a[href='##{id}']"
       assert_select "##{id}"
     end
@@ -723,5 +723,39 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "[data-field-name=mail_server][data-save-bar-changed=saved]"
     assert_select "[data-field-name=trash_retention_days][data-save-bar-changed=saved]"
     assert_select "[data-save-bar-changed]", count: 2
+  end
+  # -- Sign-in: the passkey policy, an owner's alone ----------------------------
+
+  test "the sign-in section is offered to an owner only, in the nav, the cards and ⌘K" do
+    get "/cs-studio/settings"
+    assert_select "nav[aria-label='Settings sections'] a[href='#sign_in']", text: "Sign-in"
+    assert_select "form#settings-form section#settings-sign_in-card input[type=radio][name='site_setting[passkey_policy]']", 3
+
+    sign_in_as(users(:two))
+    get "/cs-studio/settings"
+    assert_response :success
+    assert_select "nav[aria-label='Settings sections'] a[href='#sign_in']", 0
+    assert_select "#settings-sign_in-card", 0
+    assert_select "input[name='site_setting[passkey_policy]']", 0
+  end
+
+  test "an owner's save of the policy alone says so, and a save of more says Settings saved" do
+    save(passkey_policy: "everyone")
+    assert_redirected_to "/cs-studio/settings"
+    assert_equal I18n.t("admin.components.settings_screen.sign_in_card.saved"), flash[:notice]
+    assert_equal "everyone", @site.reload.passkey_policy
+
+    save(passkey_policy: "nobody", trash_retention_days: 12)
+    assert_equal I18n.t("admin.settings.saved"), flash[:notice]
+  end
+
+  test "a non-owner's crafted policy is the 403, and nothing is saved" do
+    sign_in_as(users(:two))
+
+    save(passkey_policy: "everyone", trash_retention_days: 12)
+
+    assert_response :forbidden
+    assert_nil @site.reload.passkey_policy
+    assert_not_equal 12, @site.trash_retention_days
   end
 end

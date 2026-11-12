@@ -444,4 +444,51 @@ class Settings::SaveTest < ActiveSupport::TestCase
     end
     assert_not Audit::Event.exists?(action: "settings.updated")
   end
+  test "an owner saves the policy and settings.updated records it" do
+    result = as_owner { Settings::Save.call(Current.site, attributes: { passkey_policy: "everyone" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal "everyone", Current.site.reload.passkey_policy
+    event = Audit::Event.find_by!(action: "settings.updated")
+    assert_equal [ nil, "everyone" ], event.field_changes["passkey_policy"]
+  end
+
+  test "an owner's save that posts the environment's default leaves the policy unset" do
+    default = Current.site.effective_passkey_policy
+
+    result = as_owner { Settings::Save.call(Current.site, attributes: { passkey_policy: default, time_zone: "Europe/Berlin" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_nil Current.site.reload.passkey_policy, "an untouched choice is no owner's decision"
+    assert_not Audit::Event.find_by!(action: "settings.updated").field_changes.key?("passkey_policy")
+  end
+
+  test "an unknown policy is refused" do
+    result = as_owner { Settings::Save.call(Current.site, attributes: { passkey_policy: "some" }) }
+
+    assert_not result.ok?
+    assert_nil Current.site.reload.passkey_policy
+  end
+
+  test "a non-owner's save carrying passkey_policy is refused whole and records access.denied" do
+    admin = users(:two)
+    assert AccessControl.holds?(admin, "settings.manage", channel: :admin), "the premise: the admin may manage settings"
+
+    result = as(admin) { Settings::Save.call(Current.site, attributes: { passkey_policy: "everyone", time_zone: "Europe/Berlin" }) }
+
+    assert result.denied?
+    assert_equal [ I18n.t("admin.settings.save.owner_only") ], result.errors
+    site = Current.site.reload
+    assert_nil site.passkey_policy
+    assert_not_equal "Europe/Berlin", site.time_zone
+    assert_equal 1, Audit::Event.where(action: "access.denied").count
+    assert_not Audit::Event.exists?(action: "settings.updated")
+  end
+
+  test "a trusted nil actor may set the policy" do
+    result = as(nil, channel: :console) { Settings::Save.call(Current.site, attributes: { passkey_policy: "everyone" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal "everyone", Current.site.reload.passkey_policy
+  end
 end

@@ -51,6 +51,7 @@ module Jump
       "forms" => "Settings › Forms",
       "ai" => "Settings › AI translation",
       "mail" => "Settings › Mail",
+      "sign_in" => "Settings › Sign-in",
       "images" => "Settings › Images"
     }.freeze
 
@@ -114,7 +115,7 @@ module Jump
     end
 
     def settings_rows
-      SettingsSections.for { |permission| AccessControl.holds?(actor, permission, channel: :admin) }
+      SettingsSections.for(owner: AccessControl.owner?(actor)) { |permission| AccessControl.holds?(actor, permission, channel: :admin) }
         .map { |section| { title: SETTINGS_TITLES.fetch(section.id), route: [ :admin_settings_path, [], { anchor: section.id } ] } }
         .select { |row| blank? || matches?(row[:title]) }
     end

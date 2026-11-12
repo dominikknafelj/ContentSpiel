@@ -258,6 +258,11 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/account_screen/recovery_card_component.html.erb
     app/controllers/admin/passkeys_controller.rb
     app/controllers/admin/recovery_codes_controller.rb
+    app/components/admin/settings_screen/sign_in_card_component.rb
+    app/components/admin/settings_screen/sign_in_card_component.html.erb
+    app/controllers/admin/enrolments_controller.rb
+    app/controllers/concerns/admin/passkey_enrolment.rb
+    app/views/admin/enrolments/show.html.erb
     app/controllers/admin/api_tokens_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
