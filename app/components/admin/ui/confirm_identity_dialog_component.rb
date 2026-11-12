@@ -17,10 +17,10 @@ module Admin
     #   appends a `request` target (`Admin::RecentConfirmation`): the script
     #   opens the dialog and then sends the remembered form again.
     # - The error line is the confirmation's own sentence, which the script
-    #   writes as it comes (`passkey_failed` or `limited`, from `data-messages`,
-    #   when the answer is not the confirmation's); the password is never drawn back, and the script
-    #   empties the field when the dialog closes and before Turbo caches the
-    #   page.
+    #   writes as it comes (`passkey_failed` or `limited`, from
+    #   `data-messages`, when the answer is not the confirmation's); the
+    #   password is never drawn back, and the script empties the field when
+    #   the dialog closes and before Turbo caches the page.
     class ConfirmIdentityDialogComponent < AdminComponent
       include Admin::Ui::Contract
 
