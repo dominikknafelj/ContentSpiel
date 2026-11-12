@@ -1,6 +1,8 @@
-# The second step of a sign-in (docs/reference/i18n.md): `admin.second_factor.show`
-# is the lazy-lookup scope of `app/views/admin/second_factors/show.html.erb`,
-# and the alerts beside it are `Admin::SecondFactorsController`'s.
+# The second step of a sign-in (docs/reference/i18n.md). `admin.second_factor.show`
+# is read by full key from `app/views/admin/second_factors/show.html.erb`,
+# never by a lazy lookup, which there would read the controller's plural
+# name (`admin.second_factors.show`); the alerts beside it are
+# `Admin::SecondFactorsController`'s.
 en:
   admin:
     second_factor:

@@ -177,12 +177,15 @@ class SecondFactorTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a right password then five wrong codes closes the account, and no session or known-device cookie was ever written" do
+  test "a right password then five wrong codes closes the account, mails its person, and no session or known-device cookie was ever written" do
     add_passkey(@user, client: fake_authenticator)
     password_step
     assert_equal 1, count_of(:account), "the password's count stands"
 
-    4.times { send_code("0000-0000") }
+    3.times { send_code("0000-0000") }
+    assert_enqueued_with(job: SignIn::LockoutMailJob, args: [ EMAIL, { locked_at: Time.current, from_address: ADDRESS, minutes: 1, origin: "http://www.example.com" } ]) do
+      send_code("0000-0000")
+    end
     assert_equal I18n.t("admin.second_factor.code_failed"), flash[:alert]
     locked = Audit::Event.where(action: "session.locked").sole
     assert_equal({ "bucket" => "account", "email_address" => EMAIL, "level" => 0, "seconds" => 60 }, locked.metadata)
