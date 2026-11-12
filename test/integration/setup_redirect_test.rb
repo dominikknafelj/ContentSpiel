@@ -13,8 +13,8 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
   # Only a page load is sent into the wizard: a GET or HEAD that asks for
   # HTML and is no prefetch. Anything else a browser asks for on its own (an
   # icon, DevTools' file, a prefetch) or a write answers 404, and loads no
-  # session: sent into the wizard, it wrote the session cookie back as it
-  # read it, over what a parallel request had just kept there.
+  # session: sent into the wizard, it would write the session cookie back as
+  # read, over what a parallel request had just kept there.
   test "a write is answered 404, and loads no session" do
     start_fresh_install
 

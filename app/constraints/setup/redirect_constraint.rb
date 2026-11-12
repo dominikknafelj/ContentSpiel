@@ -12,9 +12,9 @@
 # document or a script's fetch (`Sec-Fetch-Dest`). Everything else -- a
 # write, an icon the browser asks for on its own, DevTools' file, a
 # prefetch -- is answered 404 by `.refuses?`'s route, a bare Rack answer that
-# loads no session. Sent into the wizard, such a request loaded the session
-# and the cookie store wrote it back as it read it, over whatever a
-# parallel request had just kept there.
+# loads no session. Sent into the wizard, such a request would load the
+# session and the cookie store would write it back as read, over whatever
+# a parallel request had just kept there.
 #
 # Deliberately narrower than the whole `/#{ContentSpiel::ADMIN_PATH}` scope:
 # CS Studio's own root and every other admin screen still redirect to /setup

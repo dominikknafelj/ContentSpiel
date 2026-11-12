@@ -147,9 +147,10 @@ class SetupPasskeyStepTest < ActionDispatch::IntegrationTest
   end
 
   # The challenge is in a cookie of its own: a page of the wizard sent with
-  # the session cookie from before the options (the browser's favicon, a
-  # prefetch), answered after them, writes the session back as it read it,
-  # and the challenge is still there for the add.
+  # the session cookie from before the options (another tab's load of a
+  # wizard page, a prefetch of a wizard link), answered after them, writes
+  # the session back as it read it, and the challenge is still there for
+  # the add.
   test "a request that writes the session back after the options leaves the challenge alone" do
     walk_to_passkey_step
     session_key = Rails.application.config.session_options.fetch(:key)

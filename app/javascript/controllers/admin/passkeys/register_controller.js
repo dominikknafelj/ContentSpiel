@@ -42,8 +42,7 @@ const CONFIRM_HEADER = "X-Confirm-Identity"
 // hidden, the `unsupported` sentences (the page's own words) are shown, and
 // a Continue (Enter in the Name field) does nothing: no prompt is opened,
 // so nothing is said to have failed. The words are the element's
-// `data-messages`. Nothing here keeps
-// a credential beyond its one send.
+// `data-messages`. Nothing here keeps a credential beyond its one send.
 export default class extends Controller {
   static targets = ["name", "error", "dialog", "add", "unsupported"]
   static outlets = ["admin--passkeys--confirm"]

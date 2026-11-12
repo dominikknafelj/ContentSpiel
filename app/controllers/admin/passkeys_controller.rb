@@ -28,8 +28,9 @@ module Admin
   # flash or the session.
   #
   # Nothing of the ceremony reaches a page, a span or the log: the challenge
-  # is in its own encrypted cookie (`PasskeyChallenges`), the credential is filtered from the log
-  # (`filter_parameters`), and the answer holds neither.
+  # is in its own encrypted cookie (`PasskeyChallenges`), the credential is
+  # filtered from the log (`filter_parameters`), and the answer holds
+  # neither.
   class PasskeysController < BaseController
     include MailLinkOrigin
     include PasskeyChallenges
