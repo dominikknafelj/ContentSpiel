@@ -444,6 +444,7 @@ class Settings::SaveTest < ActiveSupport::TestCase
     end
     assert_not Audit::Event.exists?(action: "settings.updated")
   end
+
   test "an owner saves the policy and settings.updated records it" do
     result = as_owner { Settings::Save.call(Current.site, attributes: { passkey_policy: "everyone" }) }
 

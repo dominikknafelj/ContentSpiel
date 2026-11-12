@@ -724,6 +724,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "[data-field-name=trash_retention_days][data-save-bar-changed=saved]"
     assert_select "[data-save-bar-changed]", count: 2
   end
+
   # -- Sign-in: the passkey policy, an owner's alone ----------------------------
 
   test "the sign-in section is offered to an owner only, in the nav, the cards and ⌘K" do
