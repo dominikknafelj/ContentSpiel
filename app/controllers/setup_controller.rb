@@ -119,7 +119,9 @@ class SetupController < ApplicationController
   # "register" kept for `#update_passkey`. Under /setup, since the redirect
   # constraint sends CS Studio's own paths to the wizard until it ends; not
   # behind Confirm it's you, since the session was made by the password the
-  # founding owner has just set.
+  # founding owner has just set. That holds for a first passkey alone: an
+  # owner who holds one gets no options and no add here (404, as `#show`
+  # sends them on), and adds another from Your account, behind the gate.
   def passkey_options
     user = Current.user
     options, challenge = passkey_registration.options(user_handle: user.webauthn_handle!, user_name: user.email_address,
@@ -158,10 +160,10 @@ class SetupController < ApplicationController
       passkey_relying_party.present? && Passkeys::Policy.current.enrolment_due?(Current.user)
     end
 
-    # The options are the signed-in founding owner's alone, and only where a
-    # passkey can be made.
+    # The options are the signed-in founding owner's alone, only where a
+    # passkey can be made, and only while they hold none.
     def require_passkey_options_access
-      head :not_found unless authenticated? && passkey_relying_party
+      head :not_found unless authenticated? && passkey_relying_party && !Current.user.passkeys.exists?
     end
 
     def act_as_signed_in_user
@@ -271,7 +273,7 @@ class SetupController < ApplicationController
     # sentence the step shows. The codes are drawn in this answer alone,
     # never kept in the flash or the session.
     def update_passkey
-      return head(:not_found) unless passkey_relying_party
+      return head(:not_found) unless passkey_relying_party && !Current.user.passkeys.exists?
 
       challenge = take_passkey_challenge("register")
       result = Passkeys::Add.call(Current.user, registration: passkey_registration.verify(params[:credential], challenge: challenge),

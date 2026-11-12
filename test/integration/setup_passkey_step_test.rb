@@ -146,6 +146,26 @@ class SetupPasskeyStepTest < ActionDispatch::IntegrationTest
     assert_response :not_found, "the options are the signed-in owner's alone"
   end
 
+  # The step adds a first passkey, unconfirmed because the session is the
+  # password just set; an owner who holds one is past it, and a further one
+  # is added from Your account, behind Confirm it's you.
+  test "an owner who holds a passkey gets no options and no add from the step" do
+    walk_to_passkey_step
+    client = fake_authenticator
+    add_passkey_in_wizard(client: client)
+    assert_response :success
+    assert_equal 1, owner.passkeys.count
+
+    post setup_passkey_options_path, as: :json
+    assert_response :not_found
+
+    credential = client.create(challenge: WebAuthn.standard_encoder.encode(SecureRandom.random_bytes(32)), rp_id: "localhost", user_verified: true).to_json
+    patch setup_step_path("passkey"), params: { credential: credential, name: "Second" }.to_json,
+      headers: { "Content-Type" => "application/json", "Accept" => "#{STREAM}, application/json" }
+    assert_response :not_found
+    assert_equal [ "MacBook" ], owner.passkeys.pluck(:name)
+  end
+
   # The challenge is in a cookie of its own: a page of the wizard sent with
   # the session cookie from before the options (another tab's load of a
   # wizard page, a prefetch of a wizard link), answered after them, writes
