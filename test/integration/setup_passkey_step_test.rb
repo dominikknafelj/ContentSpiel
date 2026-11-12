@@ -51,6 +51,7 @@ class SetupPasskeyStepTest < ActionDispatch::IntegrationTest
     assert_select "#setup-passkey label", text: I18n.t("setup.passkey.name")
     assert_select "#setup-passkey p", text: I18n.t("setup.passkey.name_help")
     assert_select "#setup-passkey button[type=submit][data-admin--passkeys--register-target=add]", text: I18n.t("setup.passkey.add")
+    assert_select "#setup-passkey p[hidden][data-admin--passkeys--register-target=unsupported]", text: I18n.t("setup.passkey.unsupported")
     assert_select "head meta[name=turbo-cache-control][content=no-cache]"
     assert_select "head script[type=importmap]", text: /"admin"/
 
@@ -143,6 +144,29 @@ class SetupPasskeyStepTest < ActionDispatch::IntegrationTest
     delete admin_sign_out_path
     post setup_passkey_options_path, as: :json
     assert_response :not_found, "the options are the signed-in owner's alone"
+  end
+
+  # The challenge is in a cookie of its own: a page of the wizard sent with
+  # the session cookie from before the options (the browser's favicon, a
+  # prefetch), answered after them, writes the session back as it read it,
+  # and the challenge is still there for the add.
+  test "a request that writes the session back after the options leaves the challenge alone" do
+    walk_to_passkey_step
+    session_key = Rails.application.config.session_options.fetch(:key)
+    before_options = cookies[session_key]
+
+    post setup_passkey_options_path, as: :json
+    options = response.parsed_body
+    cookies[session_key] = before_options
+    get setup_step_path("passkey")
+    assert_response :success
+    assert Array(response.headers["Set-Cookie"]).join("\n").include?("#{session_key}="), "the page wrote the session cookie back"
+
+    credential = fake_authenticator.create(challenge: options.fetch("challenge"), rp_id: options.dig("rp", "id"), user_verified: true).to_json
+    patch setup_step_path("passkey"), params: { credential: credential, name: "MacBook" }.to_json,
+      headers: { "Content-Type" => "application/json", "Accept" => "#{STREAM}, application/json" }
+    assert_response :success
+    assert_equal [ "MacBook" ], owner.passkeys.pluck(:name)
   end
 
   test "the options are gone once setup is complete" do

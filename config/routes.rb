@@ -1,11 +1,17 @@
 Rails.application.routes.draw do
-  # While setup is required, every route below is unreachable: these two
+  # While setup is required, every route below is unreachable: these
   # catch-alls are declared first, so they win over
   # CS Studio and the public page routes. A lambda, so the constant is only
   # resolved per request (never while routes load during boot).
   constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
     match "/", to: redirect("/setup", status: 302), via: :all, as: :setup_required_root
     match "*path", to: redirect("/setup", status: 302), via: :all, format: false, as: :setup_required
+  end
+  # What is not a page load is refused by a bare Rack answer, which loads
+  # no session (the constraint's comment says why).
+  constraints(->(request) { Setup::RedirectConstraint.refuses?(request) }) do
+    match "/", to: ->(_env) { [ 404, { "content-type" => "text/plain" }, [] ] }, via: :all, as: :setup_refused_root
+    match "*path", to: ->(_env) { [ 404, { "content-type" => "text/plain" }, [] ] }, via: :all, format: false, as: :setup_refused
   end
 
   # A component browser for the ViewComponents under app/components

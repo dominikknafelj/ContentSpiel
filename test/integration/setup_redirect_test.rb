@@ -10,12 +10,43 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "non-GET requests are redirected too" do
+  # Only a page load is sent into the wizard: a GET or HEAD that asks for
+  # HTML and is no prefetch. Anything else a browser asks for on its own (an
+  # icon, DevTools' file, a prefetch) or a write answers 404, and loads no
+  # session: sent into the wizard, it wrote the session cookie back as it
+  # read it, over what a parallel request had just kept there.
+  test "a write is answered 404, and loads no session" do
     start_fresh_install
 
     post "/cs-studio/posts"
 
-    assert_redirected_to "/setup"
+    assert_response :not_found
+    assert_nil response.headers["Set-Cookie"]
+  end
+
+  test "an icon, DevTools' file and a prefetch are answered 404 and write no cookie" do
+    start_fresh_install
+    verify_setup_token
+    image = { "Accept" => "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", "Sec-Fetch-Dest" => "image" }
+
+    [ "/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png" ].each do |path|
+      get path, headers: image
+      assert_response :not_found, path
+      assert_nil response.headers["Set-Cookie"], "#{path} leaves the session cookie alone"
+    end
+
+    get "/.well-known/appspecific/com.chrome.devtools.json", headers: { "Accept" => "*/*", "Sec-Fetch-Dest" => "empty" }
+    assert_response :not_found
+    assert_nil response.headers["Set-Cookie"]
+
+    [ { "X-Sec-Purpose" => "prefetch" }, { "Sec-Purpose" => "prefetch" } ].each do |purpose|
+      get "/cs-studio/posts", headers: { "Accept" => "text/html" }.merge(purpose)
+      assert_response :not_found, purpose.keys.first
+      assert_nil response.headers["Set-Cookie"]
+    end
+
+    head "/about", headers: { "Accept" => "text/html" }
+    assert_redirected_to "/setup", "a HEAD for a page is a page load"
   end
 
   test "sign-in, health check and the MCP endpoint stay reachable" do
@@ -29,20 +60,6 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
 
     post "/mcp"
     assert_response :unauthorized
-  end
-
-  # A browser asks for /favicon.ico beside a page. Redirected into the
-  # wizard, that request loaded the session and wrote its cookie back as it
-  # read it, over a passkey challenge a parallel request had just kept, so
-  # the passkey step's first Add was refused.
-  test "the favicon is not sent into the wizard, and its answer writes no session cookie" do
-    start_fresh_install
-    verify_setup_token
-
-    get "/favicon.ico"
-
-    assert_response :not_found
-    assert_nil response.headers["Set-Cookie"], "the favicon's answer leaves the session cookie alone"
   end
 
   test "nothing is redirected once setup is complete" do

@@ -26,8 +26,8 @@ const CONFIRM_HEADER = "X-Confirm-Identity"
 // 4. A Continue with no options held, or a send the gate refused (403 with
 //    CONFIRM_HEADER: the window lapsed while the Name dialog stood open),
 //    goes back through `ensure()` when the server asks for it, fetches
-//    fresh options (the confirmation's own ceremony took the session's one
-//    challenge slot) and prompts again with the same name. That prompt comes
+//    fresh options (those held may have lapsed while the dialog stood
+//    open) and prompts again with the same name. That prompt comes
 //    after awaits, so WebKit may refuse it as outside a gesture; it is then
 //    a closed prompt, which says nothing, and Continue works with the
 //    options held.
@@ -38,19 +38,24 @@ const CONFIRM_HEADER = "X-Confirm-Identity"
 // once within its window, and otherwise the press goes the way of 4.
 //
 // Without an outlet (the wizard, which no confirmation gates) a 403 says
-// `failed`. Where the browser can make no passkey, the add button is
-// hidden. The words are the element's `data-messages`. Nothing here keeps
+// `failed`. Where the browser can make no passkey, the add buttons are
+// hidden, the `unsupported` sentences (the page's own words) are shown, and
+// a Continue (Enter in the Name field) does nothing: no prompt is opened,
+// so nothing is said to have failed. The words are the element's
+// `data-messages`. Nothing here keeps
 // a credential beyond its one send.
 export default class extends Controller {
-  static targets = ["name", "error", "dialog", "add"]
+  static targets = ["name", "error", "dialog", "add", "unsupported"]
   static outlets = ["admin--passkeys--confirm"]
   static values = { optionsUrl: String, createUrl: String, from: String, method: { type: String, default: "post" } }
 
   async connect() {
     this.options = null
     this.ceremony = await import("passkeys/ceremony")
-    if (!this.ceremony.supported()) {
+    this.unsupported = !this.ceremony.supported()
+    if (this.unsupported) {
       this.addTargets.forEach((button) => { button.hidden = true })
+      this.unsupportedTargets.forEach((sentence) => { sentence.hidden = false })
       return
     }
     if (!this.hasDialogTarget) this.refresh()
@@ -95,6 +100,7 @@ export default class extends Controller {
 
   continue(event) {
     event.preventDefault()
+    if (this.unsupported) return
     const name = this.hasNameTarget ? this.nameTarget.value.trim() : ""
     if (this.hasNameTarget && name === "") {
       this.errorTarget.textContent = this.say("name_blank")

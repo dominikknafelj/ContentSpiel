@@ -76,6 +76,9 @@ en:
       failed: "The passkey wasn't added. Try again."
       unavailable: "A passkey belongs to the site's address, and this page was reached at an IP address, so none can be made here. Once the site has its address, add one in Your account."
       continue: "Continue"
+      # Shown by `admin--passkeys--register` where the browser can make no
+      # passkey.
+      unsupported: "This browser can't make a passkey. Open this address in a browser that can and sign in: you'll come back to this step."
     site:
       heading: "Site identity"
       intro: "How your site introduces itself. You can change all of this later in the admin under Site settings."

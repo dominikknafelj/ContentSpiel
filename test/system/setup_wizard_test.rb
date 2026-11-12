@@ -18,6 +18,43 @@ class SetupWizardTest < ApplicationSystemTestCase
     with_virtual_authenticator { walk_from_the_token_to_a_live_homepage }
   end
 
+  # A founding owner the policy covers, in a browser that can make no
+  # passkey: the step says so in words, offers no Skip, and Enter in the
+  # Name field says nothing failed. At `localhost`, where a passkey could be
+  # made by another browser.
+  test "a covered founding owner in a browser without passkeys is told to open the wizard in one that has them" do
+    site_settings(:default).update!(passkey_policy: "owners_and_admins")
+    script = page.driver.browser.page.command("Page.addScriptToEvaluateOnNewDocument", source: "delete window.PublicKeyCredential")
+    on_localhost do
+      visit "/setup/token"
+      fill_in "Setup token", with: Setup::Token.value
+      press "Continue"
+      assert_selector "h1", text: "System check"
+      press "Continue"
+      fill_in "Email address", with: "owner@example.com"
+      fill_in "Password", with: "password12345"
+      fill_in "Confirm password", with: "password12345"
+      press "Continue"
+
+      assert_selector "h1", text: "Add a passkey"
+      assert_text I18n.t("setup.passkey.unsupported")
+      assert_selector "#setup-passkey button[type=submit]", visible: :hidden
+      assert_no_link "Skip for now"
+
+      fill_in "Name", with: "This browser"
+      find_field("Name").send_keys(:enter)
+      await_frames
+      assert_no_text I18n.t("setup.passkey.failed")
+      assert page.evaluate_script("document.getElementById('setup-passkey-name-error').textContent === ''"), "Enter said something failed"
+
+      visit "/setup/site"
+      assert_selector "h1", text: "Add a passkey"
+      assert_current_path "/setup/passkey"
+    end
+  ensure
+    page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: script["identifier"]) if script
+  end
+
   test "the admin step holds Continue back until the password is long enough" do
     visit "/setup/token"
     fill_in "Setup token", with: Setup::Token.value

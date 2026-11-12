@@ -11,8 +11,9 @@
     the credential to this step with PATCH. No Confirm it's you stands
     beside it: the session was made by the password just set, so a 403 is
     said as `failed`. Its words for a blank name and a refusal are Your
-    account's Name dialog's, served here in `data-messages`. Add passkey
-    stays hidden where the browser can make no passkey.
+    account's Name dialog's, served here in `data-messages`. Where the
+    browser can make no passkey, Add passkey stays hidden and the script
+    shows `unsupported` (another browser, signed in, comes back here).
 
     At an IP address no passkey can be made (no relying party): the step
     says so and Continue goes on.
@@ -47,6 +48,7 @@
             data: { "admin--passkeys--register-target": "name" } %>
       <p id="<%= field_id %>-help" class="mt-1 text-sm text-meta"><%= t(".name_help") %></p>
       <p id="<%= field_id %>-error" role="alert" class="mt-1 text-sm text-danger-ink empty:hidden" data-admin--passkeys--register-target="error"></p>
+      <p class="mt-4 text-dim" hidden data-admin--passkeys--register-target="unsupported"><%= t(".unsupported") %></p>
 
       <div class="mt-6 flex items-center justify-end gap-3">
         <% if @passkey_skippable %>

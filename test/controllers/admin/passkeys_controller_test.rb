@@ -102,7 +102,7 @@ class Admin::PasskeysControllerTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
     assert_equal({ "confirm" => true }, response.parsed_body)
     assert_equal "required", response.headers[Admin::RecentConfirmation::CONFIRM_HEADER]
-    assert_nil session[:passkey_challenge], "no challenge is issued"
+    assert_nil cookies["#{PasskeyChallenges::COOKIE_PREFIX}register"].presence, "no challenge is issued"
 
     post admin_account_passkeys_path, params: { credential: "{}", name: "Third" }.to_json,
       headers: { "Content-Type" => "application/json", "Accept" => "application/json" }

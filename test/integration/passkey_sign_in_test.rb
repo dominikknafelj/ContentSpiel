@@ -2,7 +2,7 @@ require "test_helper"
 
 # Signing in with a passkey alone, through the real controller and the
 # webauthn gem's fake authenticator (`PasskeyHelper`): the options, the
-# challenge kept in the session, the assertion, and what a success writes.
+# challenge kept in its cookie, the assertion, and what a success writes.
 # Every answer is 200 JSON naming where to go, so a script can't tell one
 # refusal from another; a refusal's sentence is the flash of the page it
 # names.
@@ -43,23 +43,23 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     assert_nil cookies["session_id"].presence
   end
 
-  def session_key = Rails.application.config.session_options.fetch(:key)
+  CHALLENGE_COOKIE = "#{PasskeyChallenges::COOKIE_PREFIX}sign_in".freeze
 
-  # The session cookie holding `values`, encrypted as the cookie store
-  # writes it: an integration test has no other way into the session.
-  def plant_session(values)
+  # The sign-in challenge's cookie holding `values`, encrypted as the
+  # concern writes it: an integration test has no other way into it.
+  def plant_challenge(values)
     jar = ActionDispatch::TestRequest.create.cookie_jar
-    jar.encrypted[session_key] = { value: values.deep_stringify_keys }
-    cookies[session_key] = jar[session_key]
+    jar.encrypted[CHALLENGE_COOKIE] = { value: values.deep_stringify_keys }
+    cookies[CHALLENGE_COOKIE] = jar[CHALLENGE_COOKIE]
   end
 
-  # The session cookie as the browser holds it now, to send again later as
-  # someone who copied it would.
-  def saved_session_cookie = cookies[session_key]
+  # The challenge's cookie as the browser holds it now, to send again later
+  # as someone who copied it would.
+  def saved_challenge_cookie = cookies[CHALLENGE_COOKIE]
 
   def send_again_with(saved_cookie, credential)
     cookies.delete("session_id")
-    cookies[session_key] = saved_cookie
+    cookies[CHALLENGE_COOKIE] = saved_cookie
     send_passkey(credential)
   end
 
@@ -107,12 +107,13 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     # Made by a synced passkey, whose counter stays 0, so the counter alone
     # would let a second sending through.
     first = assertion(options.fetch("challenge"), sign_count: 0)
-    before_first = saved_session_cookie
+    before_first = saved_challenge_cookie
     assert_equal admin_root_url, send_passkey(first)
     assert_equal 1, Session.count
+    assert_nil cookies[CHALLENGE_COOKIE].presence, "the take deletes the challenge's cookie"
 
-    # Twice: sent again with the cookie the first answer left (which holds
-    # no challenge), and with the cookie from before it (which still does,
+    # Twice: sent again after the first answer deleted the challenge's
+    # cookie, and with that cookie as it was before (which still holds it,
     # as a copy taken by whoever captured the assertion would): both are
     # refused, the second by the challenge's spent mark on the server.
     cookies.delete("session_id")
@@ -123,7 +124,7 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     # A refused answer spends its challenge too: the right assertion for it,
     # sent after a wrong one with the cookie that still holds it, is refused.
     challenge = options.fetch("challenge")
-    before_wrong = saved_session_cookie
+    before_wrong = saved_challenge_cookie
     refused_to_sign_in_page(send_passkey("not a credential"))
     refused_to_sign_in_page(send_again_with(before_wrong, assertion(challenge, sign_count: 0)))
 
@@ -132,10 +133,10 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     travel PasskeyChallenges::LIFETIME + 1.second
     refused_to_sign_in_page(send_passkey(late))
 
-    # Another purpose: a registration's challenge kept in the session, and
+    # Another purpose: a registration's challenge in the sign-in cookie, and
     # a sign-in assertion made for it.
     challenge = WebAuthn.standard_encoder.encode(SecureRandom.random_bytes(32))
-    plant_session(passkey_challenge: { purpose: "register", challenge: challenge, at: Time.current.to_i })
+    plant_challenge(purpose: "register", challenge: challenge, at: Time.current.to_i)
     refused_to_sign_in_page(send_passkey(assertion(challenge)))
 
     # A fresh challenge signs in.

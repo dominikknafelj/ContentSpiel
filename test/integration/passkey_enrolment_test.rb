@@ -51,6 +51,7 @@ class PasskeyEnrolmentTest < ActionDispatch::IntegrationTest
     assert_select "#enrolment label", text: I18n.t("admin.enrolment.show.name")
     assert_select "#enrolment p", text: I18n.t("admin.enrolment.show.name_help")
     assert_select "#enrolment button[type=submit]", text: I18n.t("admin.enrolment.show.add")
+    assert_select "#enrolment p[hidden][data-admin--passkeys--register-target=unsupported]", text: I18n.t("admin.enrolment.show.unsupported")
     assert_select "#confirm-identity"
     assert_select "head meta[name=turbo-cache-control][content=no-cache]"
     assert_select "head script[type=importmap]", text: /"admin"/

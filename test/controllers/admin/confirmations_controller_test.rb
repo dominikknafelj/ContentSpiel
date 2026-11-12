@@ -117,6 +117,37 @@ class Admin::ConfirmationsControllerTest < ActionDispatch::IntegrationTest
     assert_error :unprocessable_entity, :passkey_failed # a challenge is taken once
   end
 
+  # The challenge is in a cookie of its own: a page sent with the session
+  # cookie from before the options, answered after them, writes the session
+  # back as it read it, and the challenge is still there for the answer.
+  test "a request that writes the session back after the options leaves the challenge alone" do
+    client = fake_authenticator
+    add_passkey(@user, client: client)
+    # A session that holds something, as a browser's does, so a page that
+    # loads it writes it back.
+    session_key = Rails.application.config.session_options.fetch(:key)
+    jar = ActionDispatch::TestRequest.create.cookie_jar
+    jar.encrypted[session_key] = { value: { "held" => "1" } }
+    cookies[session_key] = before_options = jar[session_key]
+
+    challenge = options.fetch("challenge")
+    cookies[session_key] = before_options
+    # With forgery protection on, as outside tests, the page's CSRF meta
+    # tags load the session, and the cookie store writes it back.
+    begin
+      ActionController::Base.allow_forgery_protection = true
+      get admin_account_path
+    ensure
+      ActionController::Base.allow_forgery_protection = false
+    end
+    assert_response :success
+    assert Array(response.headers["Set-Cookie"]).join("\n").include?("#{session_key}="), "the page wrote the session cookie back"
+
+    confirm_with_passkey(passkey_assertion(client, challenge: challenge, user_handle: @user.webauthn_id))
+    assert_response :ok
+    assert @session.reload.confirmed_recently?
+  end
+
   test "a person with no passkey is offered none" do
     post admin_account_confirmation_options_path, as: :json
 

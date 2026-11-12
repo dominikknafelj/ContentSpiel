@@ -17,3 +17,6 @@ en:
         add: "Add passkey"
         sign_out: "Sign out"
         failed: "The passkey wasn't added. Try again."
+        # Shown by `admin--passkeys--register` where the browser can make no
+        # passkey.
+        unsupported: "This browser can't make a passkey. Sign out, then sign in again in a browser that can: you'll come back to this page."
