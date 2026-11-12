@@ -532,7 +532,7 @@ Rails.application.routes.draw do
     post "mcp", to: "mcp#create"
 
     # The socket of notes, presence and live editing. `internal` keeps it out
-    # of `bin/rails routes`; the routes guard reads it anyway. Rails' own
+    # of `bin/rails routes`; `test/lib/backend_paths_test.rb` reads it anyway. Rails' own
     # mount at `/cable` is off (`config.action_cable.mount_path = nil`).
     mount ActionCable.server => "cable", internal: true, anchor: true
   end
