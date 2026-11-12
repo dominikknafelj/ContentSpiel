@@ -41,6 +41,9 @@ class RecoveryCode < ApplicationRecord
     OpenSSL::HMAC.hexdigest("SHA256", key, code)
   end
 
+  # Derived from `secret_key_base`: a site whose secret changes holds no
+  # code that matches again, and its people make new sets
+  # (`docs/reference/hosting.md`, `SECRET_KEY_BASE`).
   def self.key = Rails.application.key_generator.generate_key(KEY_PURPOSE)
   private_class_method :key
 

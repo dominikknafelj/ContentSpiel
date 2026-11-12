@@ -21,6 +21,7 @@
 
 ### Changed
 
+- On upgrading, owners and admins are asked for a passkey: a production site that has never chosen who must sign in with one asks owners and admins, so at their next sign-in each of them without a passkey is sent to enrolment and cannot open CS Studio until they add one. To choose otherwise, set Settings → Sign-in before then, or from the console (`docs/reference/hosting.md`, "The reset mail": `bin/rails runner 'p Settings::Save.call(SiteSetting.instance, attributes: { passkey_policy: "nobody" }).ok?'`).
 - A password alone no longer signs in an account that holds a passkey or an unused recovery code: a right password goes on to the second step, and the known-device cookie `cs_known_device` is written only once a sign-in is whole.
 - `session.created` carries `{ "method" }` when a person signed in with a passkey or a recovery code, and reads "signed in with a passkey" or "signed in with a recovery code"; a password's reads "signed in".
 - While setup is pending only a page load (a GET or HEAD asking for HTML that is no prefetch) is sent to `/setup`; any other request is answered 404 without loading the session, so a client that does not ask for HTML gets 404 for `/`.

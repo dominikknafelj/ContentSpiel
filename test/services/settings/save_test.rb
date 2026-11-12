@@ -464,6 +464,27 @@ class Settings::SaveTest < ActiveSupport::TestCase
     assert_not Audit::Event.find_by!(action: "settings.updated").field_changes.key?("passkey_policy")
   end
 
+  # The command `docs/reference/hosting.md` gives an operator held at
+  # enrolment, run as written: with no actor, on a production site that never
+  # chose (unset is owners and admins there).
+  test "the console command in hosting.md sets the policy to nobody, with no actor, and records it" do
+    command = File.read(Rails.root.join("docs/reference/hosting.md"))[/`(bin\/rails runner 'p Settings::Save\.call[^`]*)`/, 1]
+    assert command, "hosting.md gives the command"
+    ruby = command[/\Abin\/rails runner '(.*)'\z/, 1]
+    assert_nil Current.actor
+    assert_nil Current.site.passkey_policy
+
+    with_singleton_override(Rails.env, :production?, -> { true }) do
+      output, = capture_io { assert_equal true, eval(ruby) }
+      assert_equal "true\n", output
+    end
+
+    assert_equal "nobody", Current.site.reload.passkey_policy
+    event = Audit::Event.find_by!(action: "settings.updated")
+    assert_nil event.actor_id
+    assert_equal [ nil, "nobody" ], event.field_changes["passkey_policy"]
+  end
+
   test "an unknown policy is refused" do
     result = as_owner { Settings::Save.call(Current.site, attributes: { passkey_policy: "some" }) }
 
