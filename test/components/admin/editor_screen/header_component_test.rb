@@ -59,6 +59,22 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector "a[href='/about']", text: "View on site"
   end
 
+  # With CS Studio on a host of its own no public page answers there, so the
+  # link names the public host, the address Copy hands out.
+  test "View on site is the path on one host and the public URL when CS Studio has its own" do
+    page = create_page(title: "About", published: true)
+    with_site_address("https://docs.example.org") do
+      render_header(page)
+      assert_selector "a[href='/about']", text: "View on site"
+
+      with_admin_address("https://studio.example.internal") do
+        render_header(page)
+        assert_selector "a[href='https://docs.example.org/about']", text: "View on site"
+        assert_selector "[data-admin--ui--clipboard-url-value='https://docs.example.org/about']"
+      end
+    end
+  end
+
   test "a scheduled record: Publish now primary and Edit schedule secondary" do
     post = create_post(title: "Later", published: false)
     as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }

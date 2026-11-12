@@ -117,6 +117,8 @@ module Admin
 
       def public_url = absolute_urls.url_for(record, locale)
 
+      def view_on_site_href = PublicSite::Urls.studio_link(public_path)
+
       def preview_path = preview_urls.path_for(record, locale)
 
       # For a post without an address: a published or scheduled page whose

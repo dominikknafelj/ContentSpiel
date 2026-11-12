@@ -193,6 +193,16 @@ class AdminHostTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "View on site opens the public host" do
+    both_hosts do
+      host! "studio.example.internal"
+      sign_in_as(users(:one))
+      get "/cs-studio/pages/#{@about.id}"
+      assert_response :success
+      assert_select "a[href='https://docs.example.org/about']", text: /View on site/
+    end
+  end
+
   # R5: the policy sets neither directive, so it restricts no socket.
   test "the content security policy restricts neither connect-src nor default-src" do
     both_hosts do
