@@ -24,13 +24,24 @@
 - On upgrading, owners and admins are asked for a passkey: a production site that has never chosen who must sign in with one asks owners and admins, so at their next sign-in each of them without a passkey is sent to enrolment and cannot open CS Studio until they add one. To choose otherwise, set Settings → Sign-in before then, or from the console (`docs/reference/hosting.md`, "The reset mail": `bin/rails runner 'p Settings::Save.call(SiteSetting.instance, attributes: { passkey_policy: "nobody" }).ok?'`).
 - A password alone no longer signs in an account that holds a passkey or an unused recovery code: a right password goes on to the second step, and the known-device cookie `cs_known_device` is written only once a sign-in is whole.
 - `session.created` carries `{ "method" }` when a person signed in with a passkey or a recovery code, and reads "signed in with a passkey" or "signed in with a recovery code"; a password's reads "signed in".
-- While setup is pending only a page load (a GET or HEAD asking for HTML that is no prefetch) is sent to `/setup`; any other request is answered 404 without loading the session, so a client that does not ask for HTML gets 404 for `/`.
+- While setup is pending only a page load (a GET or HEAD asking for HTML that is no prefetch) is sent to `/<ADMIN_PATH>/setup`; any other request is answered 404 without loading the session, so a client that does not ask for HTML gets 404 for `/`.
 - Settings has eight sections: Sign-in stands after Mail, for an owner alone.
 - `filter_parameters` holds `credential` (exactly) and `recovery_code`.
 
 ### Breaking
 
+- The MCP endpoint is now `POST /<ADMIN_PATH>/mcp` (`/cs-studio/mcp` by default). `/mcp` is an ordinary public page path.
+- The preview is now at `/<ADMIN_PATH>/preview/...`, the setup wizard at `/<ADMIN_PATH>/setup`, and Action Cable at `/<ADMIN_PATH>/cable`. The old addresses are ordinary public page paths, with no redirect. A guard in front of `/<ADMIN_PATH>` (Cloudflare Access, a WAF rule) now covers the whole backend; an MCP client behind Cloudflare Access needs a service token.
+- `ADMIN_PATH` may now be `preview`, `setup`, `mcp` or `cable`, and a top-level page with one of those slugs is now reachable.
+- `ADMIN_PATH` may no longer be `forms`, the first segment of the public form send.
 - The new top-level names `Passkey`, `RecoveryCode`, `Passkeys`, `RecoveryCodes` and `PasskeyChallenges` refuse a gem's `ContentSpiel::Plugins` hook owner of the same name (`passkey`, `recovery_code`, `passkeys`, `recovery_codes`, `passkey_challenges`) at boot. A gem with such an owner renames it.
+
+### Removed
+
+- Action Mailbox and its routes (the ingresses and the conductor under `/rails/conductor/action_mailbox/`).
+- Active Storage's direct uploads: `POST /rails/active_storage/direct_uploads` and `PUT /rails/active_storage/disk/:encoded_token` answer 404 to everyone, signed in or not. Every upload goes through CS Studio.
+- Turbo's native-app historical-location routes, which the public catch-all already shadowed.
+- The concern `ActiveStorageWriteAuthentication`, replaced by `ActiveStorageWriteRefusal`, which answers 404 to everyone.
 
 ### Migrations
 

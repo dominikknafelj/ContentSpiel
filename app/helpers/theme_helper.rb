@@ -319,8 +319,8 @@ module ThemeHelper
   # like a blank title), and `to_html` renders it for the *request's*
   # locale -- even when the document itself came from a fallback language,
   # an internal link should still point at the German page on a German
-  # URL. `urls:` is the controller's own `public_urls`, so `/preview`
-  # renders internal links under `/preview` and the public site doesn't.
+  # URL. `urls:` is the controller's own `public_urls`, so `/<ADMIN_PATH>/preview`
+  # renders internal links under `/<ADMIN_PATH>/preview` and the public site doesn't.
   #
   # A text that holds a heading and a list is remembered for the render:
   # `with_heading_ids` asks whether a list item is a text's own

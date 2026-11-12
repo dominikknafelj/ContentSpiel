@@ -25,7 +25,7 @@ class Setup::TokenTest < ActiveSupport::TestCase
   end
 
   test "the boot's line names the derived token, which a person can read nowhere else" do
-    assert_equal "[ContentSpiel] Setup is not complete. Open /setup and enter this setup token: #{Setup::Token.value}",
+    assert_equal "[ContentSpiel] Setup is not complete. Open /cs-studio/setup and enter this setup token: #{Setup::Token.value}",
       Setup::Token.log_line
   end
 
@@ -34,7 +34,7 @@ class Setup::TokenTest < ActiveSupport::TestCase
   test "with SETUP_TOKEN set the boot's line names the variable and holds no token" do
     ENV["SETUP_TOKEN"] = "chosen-by-the-operator"
 
-    assert_equal "[ContentSpiel] Setup is not complete. Open /setup and enter the setup token you set in SETUP_TOKEN.",
+    assert_equal "[ContentSpiel] Setup is not complete. Open /cs-studio/setup and enter the setup token you set in SETUP_TOKEN.",
       Setup::Token.log_line
     assert_not_includes Setup::Token.log_line, "chosen-by-the-operator"
   end

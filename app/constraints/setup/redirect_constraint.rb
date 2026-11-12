@@ -1,10 +1,11 @@
-# Sends every request to /setup while setup is required (design spec
+# Sends every request to /<ADMIN_PATH>/setup while setup is required (design spec
 # 2026-09-26 §3). A route constraint rather than a before_action so it also
 # covers CS Studio itself. Exempt: the wizard itself, CS Studio's sign-in,
 # sign-out and password reset (an admin resuming setup -- cs-studio spec §3),
-# the health check, the MCP endpoint (own bearer auth; no tokens exist yet
-# anyway) and Active Storage (the logo preview while setup runs). The
-# exemption check runs first so those paths never cost a database query.
+# the health check, the MCP endpoint at /<ADMIN_PATH>/mcp (own bearer auth; no
+# tokens exist yet anyway) and Active Storage (the logo preview while setup
+# runs). The exemption check runs first so those paths never cost a
+# database query.
 #
 # ONLY A PAGE LOAD IS SENT INTO THE WIZARD (`#page_load?`): a GET or HEAD
 # that asks for HTML by name, is no prefetch (Turbo's `X-Sec-Purpose`, the
@@ -17,18 +18,19 @@
 # a parallel request had just kept there.
 #
 # Deliberately narrower than the whole `/#{ContentSpiel::ADMIN_PATH}` scope:
-# CS Studio's own root and every other admin screen still redirect to /setup
-# while setup is pending -- only the three paths an admin needs to *resume*
-# setup by signing back in are carved out.
+# CS Studio's own root and every other admin screen still redirect to /<ADMIN_PATH>/setup
+# while setup is pending -- only EXEMPT_PREFIXES are carved out: the wizard,
+# the three paths an admin needs to *resume* setup by signing back in
+# (sign-in, sign-out, password reset), MCP, the health check and Active Storage.
 module Setup
   module RedirectConstraint
     EXEMPT_PREFIXES = [
-      "/setup",
+      "/#{ContentSpiel::ADMIN_PATH}/setup",
+      "/#{ContentSpiel::ADMIN_PATH}/mcp",
       "/#{ContentSpiel::ADMIN_PATH}/sign-in",
       "/#{ContentSpiel::ADMIN_PATH}/sign-out",
       "/#{ContentSpiel::ADMIN_PATH}/password",
       "/up",
-      "/mcp",
       "/rails/active_storage"
     ].freeze
     PREFETCH_HEADERS = %w[X-Sec-Purpose Sec-Purpose].freeze
@@ -36,7 +38,7 @@ module Setup
 
     module_function
 
-    # A page load while setup is pending: redirected to /setup.
+    # A page load while setup is pending: redirected to /<ADMIN_PATH>/setup.
     def matches?(request)
       !exempt?(request.path) && page_load?(request) && Setup.required?
     end

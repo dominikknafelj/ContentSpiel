@@ -123,7 +123,7 @@ kamal setup
 
 This installs Docker on the server, builds the site's image (it runs `theme:check` while it builds), pushes it, starts Postgres and the site.
 
-You should see, at the end: `Finished all in ... seconds`. Then open `https://<your-host>/setup` (your host name) and enter the setup token, the value of `SETUP_TOKEN`.
+You should see, at the end: `Finished all in ... seconds`. Then open `https://<your-host>/cs-studio/setup` (your host name; `cs-studio` is the default `ADMIN_PATH`) and enter the setup token, the value of `SETUP_TOKEN`.
 
 ### 4.3 Every later deploy
 

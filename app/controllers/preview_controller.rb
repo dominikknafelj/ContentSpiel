@@ -1,7 +1,7 @@
 # Drafts and scheduled content at their would-be URLs, for signed-in editors
 # only (spec §6.4). Renders the public theme's own views so the preview is
 # faithful, but never cacheable or indexable, and every link it renders stays
-# under /preview.
+# under /<ADMIN_PATH>/preview.
 class PreviewController < ApplicationController
   include PublicPageRendering
   # A person the passkey policy covered at sign-in adds a passkey first.
@@ -60,7 +60,7 @@ class PreviewController < ApplicationController
 
   # One `PublicSite::Urls` per request, `preview: true` so every link this
   # response renders (nav, listing, hreflang alternates) stays under
-  # /preview rather than the public address the same record would resolve
+  # /<ADMIN_PATH>/preview rather than the public address the same record would resolve
   # to outside preview.
   def public_urls
     @public_urls ||= PublicSite::Urls.new(preview: true, host: request.base_url)

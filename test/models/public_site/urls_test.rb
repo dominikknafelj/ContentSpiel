@@ -14,10 +14,10 @@ class PublicSite::UrlsTest < ActiveSupport::TestCase
     assert_equal "https://example.org/de/about", @urls.url_for(@about, "de")
   end
 
-  test "preview urls stay under /preview" do
+  test "preview urls stay under the admin path's preview" do
     urls = PublicSite::Urls.new(preview: true)
-    assert_equal "/preview/about", urls.path_for(@about, "en")
-    assert_equal "/preview/de/about", urls.path_for(@about, "de")
+    assert_equal "/cs-studio/preview/about", urls.path_for(@about, "en")
+    assert_equal "/cs-studio/preview/de/about", urls.path_for(@about, "de")
   end
 
   test "alternates list every enabled language with a path" do

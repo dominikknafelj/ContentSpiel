@@ -2,7 +2,7 @@ require "test_helper"
 
 # Who may open the cable (notes spec §6.2): a CS Studio session, read from
 # the same signed cookie the controllers read (`Authentication`), and nobody
-# else. `/cable` is one address for the whole app, so this is what keeps it
+# else. `<ADMIN_PATH>/cable` is one address for the whole app, so this is what keeps it
 # CS Studio's.
 class ApplicationCable::ConnectionTest < ActionCable::Connection::TestCase
   test "a CS Studio session connects as its user" do

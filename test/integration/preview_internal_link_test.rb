@@ -32,7 +32,7 @@ class PreviewInternalLinkTest < ActionDispatch::IntegrationTest
 
   def preview_as(user)
     sign_in_as(user)
-    get "/preview#{PublicSite::Urls.new.path_for(@holder, "en")}"
+    get "/cs-studio/preview#{PublicSite::Urls.new.path_for(@holder, "en")}"
     assert_response :success
     response.body
   end

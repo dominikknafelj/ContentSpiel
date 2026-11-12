@@ -9,11 +9,11 @@
 #
 # `helpers` proxies to the view context of whichever controller is actually
 # rendering: `PagesController` on the public site, `PreviewController` under
-# /preview, `ComponentPreviewsController` for Lookbook and component tests.
+# /<ADMIN_PATH>/preview, `ComponentPreviewsController` for Lookbook and component tests.
 # `post_url_path`/`page_url_path` read through each controller's own
 # `public_urls` (PagesHelper), which differs between them -- PreviewController
 # builds its with `preview: true` so every link a previewed page renders
-# stays under /preview. Delegating to `helpers` rather than including
+# stays under /<ADMIN_PATH>/preview. Delegating to `helpers` rather than including
 # ThemeHelper/PagesHelper directly is what keeps that distinction working: an
 # `include` would call the *module's* `public_urls`, and there isn't one --
 # it's a controller method the module only ever expected to be mixed into.

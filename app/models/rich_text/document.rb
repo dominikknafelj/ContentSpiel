@@ -200,7 +200,7 @@ module RichText
     # the draft's current address, and neither a draft's slug nor its trip to
     # the trash moves the version. Keyed on it, a preview would keep an old
     # href until some published change; rendered every time, it is what the
-    # editor just saved. Only signed-in editors pay for it (`/preview` and
+    # editor just saved. Only signed-in editors pay for it (`/<ADMIN_PATH>/preview` and
     # CS Studio's own reference renders). It is also what lets a preview's
     # link depend on who is looking (`PublicSite::Urls#drawn_target_path`, #152):
     # this key holds no actor, so an answer that does must never meet it.

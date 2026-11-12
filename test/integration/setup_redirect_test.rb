@@ -1,12 +1,12 @@
 require "test_helper"
 
 class SetupRedirectTest < ActionDispatch::IntegrationTest
-  test "every page redirects to /setup while setup is required" do
+  test "every page redirects to /cs-studio/setup while setup is required" do
     start_fresh_install
 
     [ "/", "/about", "/de/about", "/cs-studio", "/cs-studio/posts" ].each do |path|
       get path
-      assert_redirected_to "/setup", "expected #{path} to redirect to /setup"
+      assert_redirected_to "/cs-studio/setup", "expected #{path} to redirect to /cs-studio/setup"
     end
   end
 
@@ -46,7 +46,7 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
     end
 
     head "/about", headers: { "Accept" => "text/html" }
-    assert_redirected_to "/setup", "a HEAD for a page is a page load"
+    assert_redirected_to "/cs-studio/setup", "a HEAD for a page is a page load"
   end
 
   test "sign-in, health check and the MCP endpoint stay reachable" do
@@ -58,8 +58,20 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
     get admin_sign_in_path
     assert_response :success
 
-    post "/mcp"
+    post "/cs-studio/mcp"
     assert_response :unauthorized
+  end
+
+  test "the wizard itself is not redirected, and the preview is" do
+    start_fresh_install
+
+    get "/cs-studio/setup", headers: { "Accept" => "text/html" }
+    # The wizard's index sends on to its first step, never back to itself or out of the wizard.
+    assert_response :redirect
+    assert_equal "/cs-studio/setup/token", URI.parse(response.location).path
+
+    get "/cs-studio/preview", headers: { "Accept" => "text/html" }
+    assert_redirected_to "/cs-studio/setup"
   end
 
   test "nothing is redirected once setup is complete" do
@@ -67,6 +79,6 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     get "/cs-studio"
-    assert_not_equal "/setup", URI.parse(response.location.to_s).path
+    assert_not_equal "/cs-studio/setup", URI.parse(response.location.to_s).path
   end
 end

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <%# turbo-rails' consumer reads the socket's address here and otherwise asks /cable. %>
+    <%= action_cable_meta_tag %>
     <%= render "shared/theme_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%# The wizard loads the `application` entry point. The one step that

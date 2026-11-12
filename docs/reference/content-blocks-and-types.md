@@ -163,7 +163,7 @@ A visitor's form placed on a page: the block names a form built on CS Studio's F
 
 **The stylesheet and the strong band.** `form.css` is plain rules on tokens; the six tokens are defined from base tokens in `tokens.css` and re-valued inside `.content-section--strong` in `sections.css`, where the block is also `color-scheme: dark` so the browser draws its native controls for a dark ground. Their values are the design's and the contrast test held every pair as designed (60 pairs, `test/integration/design_tokens_test.rb`: "a form's field text, line, focus ring, error and thank-you are readable on the page, a tinted band and a strong band, in both themes").
 
-**Limits as built** (rows of `docs/roadmap.md`, "Forms"): a theme's own Form template is not read for the honeypot's hiding or for `data-turbo="false"` (`docs/reference/theming.md`, "Rules a change can break silently"); a send from `/preview` is a real submission; the five inputs' label markup is repeated in each template, the price of each being a contract component of its own.
+**Limits as built** (rows of `docs/roadmap.md`, "Forms"): a theme's own Form template is not read for the honeypot's hiding or for `data-turbo="false"` (`docs/reference/theming.md`, "Rules a change can break silently"); a send from `/<ADMIN_PATH>/preview` is a real submission; the five inputs' label markup is repeated in each template, the price of each being a contract component of its own.
 
 ## Sections
 
@@ -259,7 +259,7 @@ The `<section>` has no accessible name and no heading, so it is a grouping eleme
 
 **Types that are gone.** A block of an unregistered type in a column is skipped with a log line, as at the top level. A section whose own type is gone draws the blocks it holds once each, in reading order, stacked at the content width where the section was, with no band and no grid (`render_block`'s last branch): they are registered blocks, and rendering nothing would take a page's texts and pictures off the site because their wrapper's plugin was removed. Their images ask for the content-width `sizes`.
 
-**Caching and preview** are unchanged: a block write that changes something touches the page (its `updated_at`, not the settings form's `settings_changed_at`): a delete, a duplicate and a changed order always, a save when the block itself changed or a section's column was folded, and a save that wrote nothing not at all (`test/services/no_change_save_test.rb`), a live page's `after_commit` moves the public content version, and `/preview` renders a section as the public page does (`test/integration/preview_test.rb`).
+**Caching and preview** are unchanged: a block write that changes something touches the page (its `updated_at`, not the settings form's `settings_changed_at`): a delete, a duplicate and a changed order always, a save when the block itself changed or a section's column was folded, and a save that wrote nothing not at all (`test/services/no_change_save_test.rb`), a live page's `after_commit` moves the public content version, and `/<ADMIN_PATH>/preview` renders a section as the public page does (`test/integration/preview_test.rb`).
 
 ## Field types
 

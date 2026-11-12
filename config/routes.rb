@@ -4,8 +4,8 @@ Rails.application.routes.draw do
   # CS Studio and the public page routes. A lambda, so the constant is only
   # resolved per request (never while routes load during boot).
   constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
-    match "/", to: redirect("/setup", status: 302), via: :all, as: :setup_required_root
-    match "*path", to: redirect("/setup", status: 302), via: :all, format: false, as: :setup_required
+    match "/", to: redirect("/#{ContentSpiel::ADMIN_PATH}/setup", status: 302), via: :all, as: :setup_required_root
+    match "*path", to: redirect("/#{ContentSpiel::ADMIN_PATH}/setup", status: 302), via: :all, format: false, as: :setup_required
   end
   # What is not a page load is refused by a bare Rack answer, which loads
   # no session (the constraint's comment says why).
@@ -27,7 +27,7 @@ Rails.application.routes.draw do
 
   # CS Studio, the admin. Its path is configurable
   # (ContentSpiel::ADMIN_PATH) and sign-in lives under it, so the public site
-  # advertises no login page. Declared before /preview and the public
+  # advertises no login page. Declared before /<ADMIN_PATH>/preview and the public
   # catch-alls, which would otherwise swallow it as a page path.
   scope ContentSpiel::ADMIN_PATH, module: :admin, as: :admin do
     get "sign-in", to: "sessions#new", as: :sign_in
@@ -505,28 +505,45 @@ Rails.application.routes.draw do
         constraints: { thread_id: /\d+/, message_id: /\d+/, id: /\d+/ }
     end
   end
+
+  # The backend's plain routes, under the admin path (no `module:`, no `as:`).
+  scope ContentSpiel::ADMIN_PATH do
+    # Signed-in preview of unpublished pages and posts -- its own
+    # URL space, so the public routes below can stay session-free and cacheable,
+    # and under the admin path, so a top-level page slugged "preview" is a public
+    # page like any other. Two routes for the same reason the public site has two:
+    # an optional `(/:locale)` would leave "about" in /<ADMIN_PATH>/preview/about
+    # to be read as a locale.
+    get "preview/:locale(/*path)", to: "preview#show", constraints: LocaleRouteConstraint,
+      defaults: { path: "" }, format: false, as: :localized_preview
+    get "preview(/*path)", to: "preview#show", defaults: { path: "" }, format: false, as: :preview
+
+    # First-run setup wizard. SetupController itself 404s once setup is
+    # complete. Under the admin path, which the redirect constraint leaves open.
+    get "setup", to: "setup#index", as: :setup
+    # The passkey step's registration options (`SetupController#passkey_options`).
+    post "setup/passkey/options", to: "setup#passkey_options", as: :setup_passkey_options
+    get "setup/:step", to: "setup#show", as: :setup_step
+    patch "setup/:step", to: "setup#update"
+
+    # The MCP server, bearer-token authenticated (McpController#authenticate),
+    # under the admin path with the rest of the backend: the public site's
+    # catch-all below never sees it, and `/mcp` is a public page path like any other.
+    post "mcp", to: "mcp#create"
+
+    # The socket of notes, presence and live editing. `internal` keeps it out
+    # of `bin/rails routes`; `test/lib/backend_paths_test.rb` reads it anyway. Rails' own
+    # mount at `/cable` is off (`config.action_cable.mount_path = nil`).
+    mount ActionCable.server => "cable", internal: true, anchor: true
+  end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
-
-  # First-run setup wizard. SetupController
-  # itself 404s once setup is complete.
-  get "setup", to: "setup#index", as: :setup
-  # The passkey step's registration options (`SetupController#passkey_
-  # options`): under /setup, which the redirect constraint leaves open.
-  post "setup/passkey/options", to: "setup#passkey_options", as: :setup_passkey_options
-  get "setup/:step", to: "setup#show", as: :setup_step
-  patch "setup/:step", to: "setup#update"
-
-  # The MCP server, bearer-token authenticated
-  # (McpController#authenticate) -- declared here, before the public-site
-  # catch-all below, or "/mcp" would be swallowed as a page path instead.
-  post "mcp", to: "mcp#create"
 
   # A visitor's send of a form: the form
   # posts to its own endpoint, never to the page, so a public page stays a
   # GET that is the same for everyone. POST only: a GET of this address is
   # the public catch-all's below, a page path like any other (and a 404
   # unless a page is called "forms"). Declared before the catch-alls, which
-  # are GETs and could not take it anyway, as `mcp` is. `format: false`, as
+  # are GETs and could not take it anyway. `format: false`, as
   # the public routes have it: JSON or a plain page is chosen by the
   # `Accept` header (`FormSendsController#json?`), never by a suffix.
   post "forms/:form_id", to: "form_sends#create", as: :form_send, constraints: { form_id: /\d+/ }, format: false
@@ -538,14 +555,6 @@ Rails.application.routes.draw do
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
-
-  # Signed-in preview of unpublished pages and posts -- its own
-  # URL space, so the public routes below can stay session-free and cacheable.
-  # Two routes for the same reason the public site has two: an optional
-  # `(/:locale)` would leave "about" in /preview/about to be read as a locale.
-  get "preview/:locale(/*path)", to: "preview#show", constraints: LocaleRouteConstraint,
-    defaults: { path: "" }, format: false, as: :localized_preview
-  get "preview(/*path)", to: "preview#show", defaults: { path: "" }, format: false, as: :preview
 
   # Every locale is reachable under its own prefix (e.g. /de/about), including
   # whichever one is currently the site's default -- but a default-locale

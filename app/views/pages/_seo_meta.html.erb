@@ -24,7 +24,7 @@
     site's configured address and without the query string -- so the same
     address as the layout's `canonical` link. Never the request's URL: its
     host is whatever the client sent (`PublicController#public_urls`). In a
-    preview `public_urls` builds the /preview address on the request's own
+    preview `public_urls` builds the /<ADMIN_PATH>/preview address on the request's own
     origin. The fallback is for a record that has no address: a post in
     the preview that only a page's working rows list yet. %>
 <%= tag.meta property: "og:url", content: public_urls.url_for(post || page) || request.original_url %>

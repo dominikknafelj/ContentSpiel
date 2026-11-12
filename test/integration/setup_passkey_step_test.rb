@@ -1,7 +1,7 @@
 require "test_helper"
 
 # The wizard's passkey step, after the admin account: the founding owner adds
-# a passkey there through the step's own endpoints under /setup (the redirect
+# a passkey there through the step's own endpoints under /cs-studio/setup (the redirect
 # constraint keeps CS Studio's closed until setup ends), and is shown the
 # recovery codes, whose Done goes on to the site's identity. The policy
 # decides whether the step may be skipped; a request with no relying party

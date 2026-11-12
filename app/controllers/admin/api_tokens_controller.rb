@@ -127,8 +127,8 @@ module Admin
 
     # The endpoint an assistant connects to: the public host (the same
     # `PublicSite::Urls.default_host` every absolute public URL is built
-    # from) plus `/mcp` (`McpController`, outside the admin scope).
-    helper_method def mcp_url = "#{PublicSite::Urls.default_host}/mcp"
+    # from) plus `mcp_path` (`McpController`, under the admin path).
+    helper_method def mcp_url = "#{PublicSite::Urls.default_host}#{mcp_path}"
 
     # A ready-to-paste client configuration, in the `mcpServers` shape
     # MCP clients (Claude Desktop/Code, Cursor, ...) share -- `token` is the

@@ -862,7 +862,7 @@ The helpers of the page tree and the article (`ThemeHelper`, theming spec §7). 
 | `title` | String, as published, in the language shown, falling back as the site does. |
 | `subtitle` | String or nil, as published, same fallback. |
 | `slug` | String: the last part of the page's stored address in this language; `""` for the homepage. |
-| `path` | String: the address, with the language's prefix and, in the preview, `/preview`. |
+| `path` | String: the address, with the language's prefix and, in the preview, `/<ADMIN_PATH>/preview`. |
 | `depth` | Integer: 0 for the homepage, 1 for a page directly under it. |
 | `children` | Array of `Node`, in the tree's order, frozen (a node is remembered for the render). **Empty for a node that was not read as part of a branch**: the homepage in `page_ancestors` (its branch is the whole site, so `leaf?` is true of it there), and, in a preview only, a page above that the section's tree does not hold. |
 | `current?` | this is the shown page. |

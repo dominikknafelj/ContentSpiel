@@ -31,14 +31,14 @@ module PublicSite
     # `RichText::RenderContext` (design spec §3.3), which needs to know
     # (a preview render skips the render cache, `RichText::Document#to_html`)
     # whether the `urls` it was handed
-    # resolves internal links under `/preview` or not, without duplicating
+    # resolves internal links under `/<ADMIN_PATH>/preview` or not, without duplicating
     # the `preview:` flag as a second constructor argument that could drift
     # out of sync with this instance's own.
     def preview? = @preview
 
     def prefix(locale)
       code_prefix = locale.to_s == Locales.default ? "" : "/#{locale}"
-      @preview ? "/preview#{code_prefix}" : code_prefix
+      @preview ? "/#{ContentSpiel::ADMIN_PATH}/preview#{code_prefix}" : code_prefix
     end
 
     # `listed_on:` is the page whose list a post is being drawn in, and it

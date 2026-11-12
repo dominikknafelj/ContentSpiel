@@ -26,7 +26,7 @@ class SetupWizardTest < ApplicationSystemTestCase
     site_settings(:default).update!(passkey_policy: "owners_and_admins")
     script = page.driver.browser.page.command("Page.addScriptToEvaluateOnNewDocument", source: "delete window.PublicKeyCredential")
     on_localhost do
-      visit "/setup/token"
+      visit "/cs-studio/setup/token"
       fill_in "Setup token", with: Setup::Token.value
       press "Continue"
       assert_selector "h1", text: "System check"
@@ -47,16 +47,16 @@ class SetupWizardTest < ApplicationSystemTestCase
       assert_no_text I18n.t("setup.passkey.failed")
       assert page.evaluate_script("document.getElementById('setup-passkey-name-error').textContent === ''"), "Enter said something failed"
 
-      visit "/setup/site"
+      visit "/cs-studio/setup/site"
       assert_selector "h1", text: "Add a passkey"
-      assert_current_path "/setup/passkey"
+      assert_current_path "/cs-studio/setup/passkey"
     end
   ensure
     page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: script["identifier"]) if script
   end
 
   test "the admin step holds Continue back until the password is long enough" do
-    visit "/setup/token"
+    visit "/cs-studio/setup/token"
     fill_in "Setup token", with: Setup::Token.value
     press "Continue"
     assert_selector "h1", text: "System check"
@@ -73,7 +73,7 @@ class SetupWizardTest < ApplicationSystemTestCase
   end
 
   test "Where do I find the log? opens the commands under the field and keeps the focus" do
-    visit "/setup/token"
+    visit "/cs-studio/setup/token"
     assert_selector "h1", text: "Let's set up your site"
     assert_no_text "docker compose logs web"
 
@@ -96,7 +96,7 @@ class SetupWizardTest < ApplicationSystemTestCase
   end
 
   test "the Mail step's security switch sets the port unless another port was typed" do
-    visit "/setup/token"
+    visit "/cs-studio/setup/token"
     fill_in "Setup token", with: Setup::Token.value
     press "Continue"
     assert_selector "h1", text: "System check"
@@ -127,7 +127,7 @@ class SetupWizardTest < ApplicationSystemTestCase
   # The row puts Send test mail first and Continue last; the form's first
   # submit button is a hidden Continue, so Enter in any field continues.
   test "Enter in a Mail field continues and sends no mail, whatever the row's order" do
-    visit "/setup/token"
+    visit "/cs-studio/setup/token"
     fill_in "Setup token", with: Setup::Token.value
     press "Continue"
     assert_selector "h1", text: "System check"
@@ -156,7 +156,7 @@ class SetupWizardTest < ApplicationSystemTestCase
   end
 
   test "Send test mail shows it is working and a second press while waiting sends nothing" do
-    visit "/setup/token"
+    visit "/cs-studio/setup/token"
     fill_in "Setup token", with: Setup::Token.value
     press "Continue"
     assert_selector "h1", text: "System check"
@@ -193,7 +193,7 @@ class SetupWizardTest < ApplicationSystemTestCase
 
   def walk_from_the_token_to_a_live_homepage
     visit "/"
-    assert_current_path "/setup/token"
+    assert_current_path "/cs-studio/setup/token"
 
     assert_text "Welcome to Content·Spiel"
     assert_selector "h1", text: "Let's set up your site"
