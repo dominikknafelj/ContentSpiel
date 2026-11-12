@@ -42,6 +42,7 @@ Every variable read under `app`, `config` and `lib`, and nothing else; `db/` is 
 | `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` | host | With the two below, the Active Record encryption keys (`config/application.rb`), which seal the AI key, the mail login and form answers. Without them, the credentials' `active_record_encryption.*`; with neither, a save of a key or a login answers that the site has no encryption keys, and forms take no answers. **An env var that is set wins for that key alone, so keep all three in one place**, and keep them once set: losing them makes what they sealed unreadable (`docs/reference/translations.md`, "Active Record encryption keys"). Development and test set fixed keys of their own. | yes |
 | `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY` | host | As above. | yes |
 | `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` | host | As above. | yes |
+| `ADMIN_HOST` | host | Unset: one host serves the public site and CS Studio. With its scheme, the address of a host that serves CS Studio alone, for a backend behind a DMZ; it needs `PUBLIC_HOST`, another host name and the same scheme, or production does not start (`SiteAddress.admin`, `HostSettings.apply`). | no |
 | `ADMIN_PATH` | host | `cs-studio`. Where CS Studio and the sign-in are (`config/initializers/admin_path.rb`), read when the application starts. | no |
 | `ASSUME_SSL` | host | Unset. `1`, and no other value, counts every request as HTTPS ("What a host sets"). | no |
 | `BUNDLE_GEMFILE` | Bundler | The application's `Gemfile` (`config/boot.rb` sets it when unset). | no |

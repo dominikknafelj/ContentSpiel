@@ -5,8 +5,6 @@
 # (nil for "not configured"), the memo is dropped on both sides, and the
 # variable is put back as it was, also when the block raises.
 module SiteAddressHelper
-  VARIABLES = %w[PUBLIC_HOST ADMIN_HOST].freeze
-
   def with_site_address(value)
     with_variable("PUBLIC_HOST", value) { yield }
   end

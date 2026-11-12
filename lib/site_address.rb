@@ -4,10 +4,10 @@ require "ipaddr"
 # The site's public address, parsed once from `PUBLIC_HOST`, and beside it
 # the address CS Studio is served on when it has one of its own, from
 # `ADMIN_HOST` (`SiteAddress.admin`, read here alone, parsed the same way).
-# What the two must satisfy together is `HostSettings.apply`'s to refuse.
-# Everything that must agree about "where
-# this site lives" (host authorisation, HTTPS, absolute URLs, head tags)
-# reads it here instead of splitting the variable itself.
+# `HostSettings.apply` refuses a pair of the two that cannot work. Everything
+# that must agree about "where this site lives" (host authorisation, HTTPS,
+# absolute URLs, head tags) reads it here instead of splitting a variable
+# itself.
 #
 # `config/application.rb` requires this file itself although `lib/` is
 # autoloaded (`config.autoload_lib`): the environment file, which runs
