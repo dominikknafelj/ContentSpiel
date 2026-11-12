@@ -71,7 +71,7 @@ export default class extends Controller {
     if (this.held) return
 
     const [ceremony, { HeldOptions }] = await Promise.all([import("passkeys/ceremony"), import("passkeys/held_options")])
-    if (this.held) return
+    if (this.held || !this.element.isConnected) return
     this.ceremony = ceremony
     this.held = new HeldOptions(() => this.load(), { wanted: () => Boolean(this.pending) })
     this.held.start()
@@ -127,6 +127,7 @@ export default class extends Controller {
     if (!this.hasPasskeyTarget) return
 
     await this.loadModules()
+    if (!this.held) return
     if (!this.ceremony.supported()) {
       this.passkeyTarget.hidden = true
       if (this.hasDividerTarget) this.dividerTarget.hidden = true

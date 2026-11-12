@@ -22,8 +22,10 @@
 // page, while its dialog is open in a dialog) is a set fetched or kept;
 // otherwise a set due for replacing is dropped. One fetch is in flight at a
 // time, and an answer that `drop` or `stop` has passed over is never held.
-// The page's clock is `performance.now()`, so a change of the computer's
-// clock moves nothing.
+// A set's age is read on two clocks, and it is too old when either says so:
+// `performance.now()`, which a change of the computer's clock does not
+// move, and `Date.now()`, which goes on while a computer sleeps (where the
+// page's monotonic clock may stand still).
 export const REFRESH_AFTER = 4 * 60 * 1000
 export const FRESH_FOR = 4.5 * 60 * 1000
 
@@ -35,6 +37,7 @@ export class HeldOptions {
     this.wanted = wanted
     this.options = null
     this.heldAt = 0
+    this.heldAtWall = 0
     this.timer = null
     this.loading = null
     this.shown = () => {
@@ -72,6 +75,7 @@ export class HeldOptions {
   hold(options) {
     this.options = options
     this.heldAt = performance.now()
+    this.heldAtWall = Date.now()
     clearTimeout(this.timer)
     this.timer = setTimeout(() => {
       if (document.visibilityState === "visible") this.due()
@@ -81,7 +85,7 @@ export class HeldOptions {
   // The held set, given up, when it is fresh and no fresher one is on its
   // way; otherwise null.
   take() {
-    if (!this.options || this.loading || performance.now() - this.heldAt >= FRESH_FOR) return null
+    if (!this.options || this.loading || this.tooOld) return null
 
     const options = this.options
     this.options = null
@@ -91,7 +95,11 @@ export class HeldOptions {
 
   // A set is held but too old to use, or a fresh one is on its way.
   get late() {
-    return Boolean(this.loading) || (Boolean(this.options) && performance.now() - this.heldAt >= FRESH_FOR)
+    return Boolean(this.loading) || (Boolean(this.options) && this.tooOld)
+  }
+
+  get tooOld() {
+    return performance.now() - this.heldAt >= FRESH_FOR || Date.now() - this.heldAtWall >= FRESH_FOR
   }
 
   // The fresh set a late press waits for, given up as `take` gives it.
