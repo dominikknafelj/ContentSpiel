@@ -1,6 +1,6 @@
 # Which host a route answers on, when CS Studio has a host of its own
 # (`ADMIN_HOST`, `SiteAddress.admin`). Without one, both match every request
-# and one host serves the backend and the site, as before the variable.
+# and one host serves the backend and the site.
 #
 # Read per request, never while routes load: the address is not fixed when
 # the routes are drawn in a test, and a route drawn with a host baked in

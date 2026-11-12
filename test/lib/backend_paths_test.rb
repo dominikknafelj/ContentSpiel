@@ -21,6 +21,15 @@ class BackendPathsTest < ActiveSupport::TestCase
   ACTIVE_STORAGE_WRITE = "drawn because the read helpers share their file; `ActiveStorageWriteRefusal` answers 404 to everyone".freeze
 
   VIEW_COMPONENTS = "ViewComponent's preview routes, drawn in development and test only, never in production".freeze
+  HEALTH_CHECK = "the health check, asked by the proxy".freeze
+  SYSTEM_TEST_ENTRYPOINT = "Rails' own entrypoint of the browser tests, drawn in the test environment only".freeze
+
+  # The reasons whose routes answer on every host, ADMIN_HOST or not: the
+  # proxy asks `/up` on either name, both hosts embed Active Storage's files,
+  # the setup redirect gates CS Studio on the admin host too, and the test
+  # routes are never drawn in production. Every other route outside the prefix
+  # is the site's and carries `HostRouteConstraint::Site`.
+  HOST_FREE = [ SETUP_PENDING, HEALTH_CHECK, ACTIVE_STORAGE_READ, ACTIVE_STORAGE_WRITE, VIEW_COMPONENTS, SYSTEM_TEST_ENTRYPOINT ].freeze
 
   # Keys are `"VERB spec"`, as `key` writes them.
   PUBLIC = {
@@ -30,7 +39,7 @@ class BackendPathsTest < ActiveSupport::TestCase
     "GET /:locale(/*path)" => "the public site's pages, under a language",
     "GET /*path" => "the public site's pages",
     "POST /forms/:form_id" => "a visitor's send of a form",
-    "GET /up(.:format)" => "the health check, asked by the proxy",
+    "GET /up(.:format)" => HEALTH_CHECK,
     "GET /rails/active_storage/blobs/redirect/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,
     "GET /rails/active_storage/blobs/proxy/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,
     "GET /rails/active_storage/blobs/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,
@@ -42,7 +51,7 @@ class BackendPathsTest < ActiveSupport::TestCase
     "POST /rails/active_storage/direct_uploads(.:format)" => ACTIVE_STORAGE_WRITE,
     "GET /rails/view_components(.:format)" => VIEW_COMPONENTS,
     "GET /rails/view_components/*path(.:format)" => VIEW_COMPONENTS,
-    "GET /_system_test_entrypoint(.:format)" => "Rails' own entrypoint of the browser tests, drawn in the test environment only"
+    "GET /_system_test_entrypoint(.:format)" => SYSTEM_TEST_ENTRYPOINT
   }.freeze
 
   test "the guard is looking at the routes" do
@@ -78,15 +87,28 @@ class BackendPathsTest < ActiveSupport::TestCase
 
   # Each constraint object is read per request (`SiteAddress.admin`), so the
   # guard holds that the object is on the route whatever ADMIN_HOST says here.
-  test "every route under ADMIN_PATH carries the admin host's constraint, and every public page route the site's" do
+  test "every route under ADMIN_PATH carries the admin host's constraint" do
     backend = Rails.application.routes.routes.select { |route| under_prefix?(route) }
     assert_includes backend.map { |route| route.path.spec.to_s }, "/#{ContentSpiel::ADMIN_PATH}/cable"
     assert_empty backend.reject { |route| constrained_by?(route, HostRouteConstraint::Backend) }.map { |route| key(route) }
+  end
 
-    site = [ "GET /", "GET /:locale(/*path)", "GET /*path", "POST /forms/:form_id" ]
-    drawn = Rails.application.routes.routes.select { |route| site.include?(key(route)) }
-    assert_equal site.sort, drawn.map { |route| key(route) }.sort
-    assert_empty drawn.reject { |route| constrained_by?(route, HostRouteConstraint::Site) }.map { |route| key(route) }
+  test "every route outside ADMIN_PATH carries the site's constraint unless it is host-free" do
+    assert_includes Rails.application.routes.routes.map { |route| key(route) }, "GET /*path"
+    assert_empty site_routes_without_constraint(Rails.application.routes),
+      "these answer on the admin host too: draw them inside constraints(HostRouteConstraint::Site), " \
+      "or give them a reason in PUBLIC that HOST_FREE lists, saying why they answer on every host"
+  end
+
+  test "the site's check can fail" do
+    set = ActionDispatch::Routing::RouteSet.new
+    set.draw do
+      constraints(HostRouteConstraint::Site) do
+        get "covered", to: "x#y"
+        get "own", to: "x#y", constraints: ->(_request) { true }
+      end
+    end
+    assert_equal [ "GET /own(.:format)" ], site_routes_without_constraint(set)
   end
 
   test "the host check can fail" do
@@ -107,6 +129,11 @@ class BackendPathsTest < ActiveSupport::TestCase
   # mounted Rack app's (the cable) alike; the wrapper holds the objects.
   def constrained_by?(route, constraint)
     route.app.is_a?(ActionDispatch::Routing::Mapper::Constraints) && route.app.constraints.include?(constraint)
+  end
+
+  def site_routes_without_constraint(route_set)
+    route_set.routes.reject { |route| under_prefix?(route) || HOST_FREE.include?(PUBLIC[key(route)]) }
+      .reject { |route| constrained_by?(route, HostRouteConstraint::Site) }.map { |route| key(route) }
   end
 
   def key(route)

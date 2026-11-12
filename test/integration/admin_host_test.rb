@@ -94,6 +94,21 @@ class AdminHostTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "while setup is pending the admin host is sent to the wizard, which answers there" do
+    start_fresh_install
+    both_hosts do
+      host! "studio.example.internal"
+      get "/cs-studio"
+      assert_redirected_to "http://studio.example.internal/cs-studio/setup"
+
+      # The wizard's index sends on to its first step, on the same host.
+      get "/cs-studio/setup"
+      assert_redirected_to "http://studio.example.internal/cs-studio/setup/token"
+      follow_redirect!
+      assert_response :success
+    end
+  end
+
   test "without ADMIN_HOST one host answers both" do
     with_site_address(PUBLIC_ADDRESS) do
       host! "docs.example.org"

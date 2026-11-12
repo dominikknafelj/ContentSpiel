@@ -2,10 +2,10 @@ Rails.application.routes.draw do
   # While setup is required, every route below is unreachable: these
   # catch-alls are declared first, so they win over
   # CS Studio and the public page routes. A lambda, so the constant is only
-  # resolved per request (never while routes load during boot). Outside both
-  # host constraints, these and the refusal below: inside the site's they
+  # resolved per request (never while routes load during boot). These and the
+  # refusal below stand outside both host constraints: inside the site's they
   # would stop gating CS Studio on the admin host while setup is pending, and
-  # on the public host the wizard they send to is a 404 there.
+  # on the public host the wizard they send to is a 404.
   constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
     match "/", to: redirect("/#{ContentSpiel::ADMIN_PATH}/setup", status: 302), via: :all, as: :setup_required_root
     match "*path", to: redirect("/#{ContentSpiel::ADMIN_PATH}/setup", status: 302), via: :all, format: false, as: :setup_required
