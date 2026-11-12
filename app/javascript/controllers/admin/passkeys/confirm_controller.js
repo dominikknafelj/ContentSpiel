@@ -24,9 +24,11 @@ import { messages } from "i18n/messages"
 // PROMPT OPENS IN THE PRESS"). "Use your passkey" stays disabled while no
 // options are held, and each set is used once (the server takes its
 // challenge with the first answer); a refusal or a closed prompt fetches a
-// fresh set. Each fetch carries its opening's number, and an answer of an
-// earlier one is dropped: the server keeps one challenge, the latest. A
-// closed prompt says nothing. Where the browser can use no passkey, the
+// fresh set. While the dialog stands open the set is kept from lapsing
+// (`passkeys/held_options`), a press on a set too old to use waits for a
+// fresh one, and an answer that comes after the dialog closed or opened
+// again is dropped: the server keeps one challenge, the latest. A closed
+// prompt says nothing. Where the browser can use no passkey, the
 // button and its "or" are hidden and the password is the way.
 //
 // The error line is the server's sentence, written as it comes; a passkey
@@ -34,9 +36,9 @@ import { messages } from "i18n/messages"
 // the confirmation's JSON say `passkey_failed` (the passkey) or `limited`
 // (the password), read from the wrapper's `data-messages`. The password is
 // sent as JSON, and the field is emptied as it is sent, when the dialog
-// closes and before Turbo caches the page. The ceremony is imported on
-// connect (`preload: false`), so a page without this dialog never fetches
-// it.
+// closes and before Turbo caches the page. The passkey modules are imported
+// on connect (`preload: false`), so a page without this dialog never
+// fetches them.
 const CONFIRM_HEADER = "X-Confirm-Identity"
 
 export default class extends Controller {
@@ -46,8 +48,6 @@ export default class extends Controller {
   async connect() {
     this.remembered = null
     this.pending = null
-    this.options = null
-    this.opening = 0
     this.remember = (event) => {
       const form = event.detail?.formSubmission?.formElement
       const response = event.detail?.fetchResponse
@@ -59,18 +59,30 @@ export default class extends Controller {
     document.addEventListener("turbo:before-cache", this.forget)
     this.closed = () => {
       this.password.value = ""
-      this.options = null
+      this.held?.drop()
       this.settle(false)
     }
     this.dialog.addEventListener("close", this.closed)
 
-    if (this.hasPasskeyTarget) this.ceremony = await import("passkeys/ceremony")
+    if (this.hasPasskeyTarget) await this.loadModules()
+  }
+
+  async loadModules() {
+    if (this.held) return
+
+    const [ceremony, { HeldOptions }] = await Promise.all([import("passkeys/ceremony"), import("passkeys/held_options")])
+    if (this.held) return
+    this.ceremony = ceremony
+    this.held = new HeldOptions(() => this.load(), { wanted: () => Boolean(this.pending) })
+    this.held.start()
   }
 
   disconnect() {
     document.removeEventListener("turbo:submit-end", this.remember)
     document.removeEventListener("turbo:before-cache", this.forget)
     this.dialog.removeEventListener("close", this.closed)
+    this.held?.stop()
+    this.held = null
     this.settle(false)
     this.remembered = null
   }
@@ -114,34 +126,39 @@ export default class extends Controller {
   async prepare() {
     if (!this.hasPasskeyTarget) return
 
-    const opening = ++this.opening
-    this.ceremony ||= await import("passkeys/ceremony")
+    await this.loadModules()
     if (!this.ceremony.supported()) {
       this.passkeyTarget.hidden = true
       if (this.hasDividerTarget) this.dividerTarget.hidden = true
       return
     }
 
-    this.options = null
+    this.held.drop()
     this.passkeyTarget.disabled = true
-    let answer
-    try {
-      answer = await this.ceremony.fetchOptions(this.optionsUrlValue)
-    } catch {
-      return
-    }
-    if (opening !== this.opening || answer.status !== 200 || !this.pending) return
+    const options = await this.held.refresh()
+    if (options && this.pending) this.passkeyTarget.disabled = false
+  }
 
-    this.options = answer.options
-    this.passkeyTarget.disabled = false
+  async load() {
+    const answer = await this.ceremony.fetchOptions(this.optionsUrlValue)
+    return answer.status === 200 ? answer.options : null
   }
 
   usePasskey(event) {
     event.preventDefault()
-    const options = this.options
-    if (!options) return
+    if (!this.held) return
+    const options = this.held.take()
+    if (options) return this.prompt(options)
+    if (!this.held.late) return
 
-    this.options = null
+    this.passkeyTarget.disabled = true
+    this.held.takeLate().then((fresh) => {
+      if (fresh && this.pending) this.prompt(fresh)
+      else if (this.pending) this.prepare()
+    })
+  }
+
+  prompt(options) {
     this.passkeyTarget.disabled = true
     this.errorTarget.textContent = ""
     this.ceremony
@@ -202,7 +219,7 @@ export default class extends Controller {
 
   close() {
     this.password.value = ""
-    this.options = null
+    this.held?.drop()
     if (this.dialog.open) this.dialog.close()
   }
 

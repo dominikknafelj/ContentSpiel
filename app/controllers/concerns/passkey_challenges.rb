@@ -3,7 +3,10 @@
 #
 # KEPT IN A COOKIE OF ITS OWN PER PURPOSE, never in the Rails session:
 # `cs_passkey_<purpose>`, encrypted, httponly, SameSite=Strict, path "/",
-# expiring with the challenge, holding `{ "purpose", "challenge", "at" }`.
+# holding `{ "purpose", "challenge", "at" }`. It is a browser-session cookie
+# with no `Expires`: the lifetime is the server's check of `at`, and a date
+# of the browser's own would only drop the cookie early on a machine whose
+# clock runs ahead of the server's.
 # Only the options answer (`#issue_passkey_challenge`) writes it and only the
 # take (`#take_passkey_challenge`) deletes it. The session would not do: the
 # cookie store writes the whole session back on every request that loads it,
@@ -14,8 +17,10 @@
 #
 # One older than LIFETIME, or issued for another purpose (a registration's
 # sent to sign-in), is no challenge, and the answer is refused as a wrong
-# passkey. A page left open past the lifetime needs one more press: its
-# script fetches fresh options after a refusal.
+# passkey. So a script that holds options keeps them from lapsing
+# (`passkeys/held_options`): it fetches fresh ones before LIFETIME is up and
+# when its tab is shown again, which also gives the visible tab the cookie
+# when a second tab has written its own.
 #
 # TAKEN ONCE, ON THE SERVER. The challenge's cookie is the browser's, so
 # deleting it only tells the browser to drop its copy: whoever kept the
@@ -56,7 +61,7 @@ module PasskeyChallenges
     now = Time.current
     cookies.encrypted[passkey_challenge_cookie(purpose)] = {
       value: { "purpose" => purpose, "challenge" => challenge, "at" => now.to_i },
-      expires: now + LIFETIME, httponly: true, same_site: :strict, secure: request.ssl?, path: "/"
+      httponly: true, same_site: :strict, secure: request.ssl?, path: "/"
     }
     nil
   end

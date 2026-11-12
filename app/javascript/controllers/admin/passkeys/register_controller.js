@@ -21,8 +21,8 @@ const CONFIRM_HEADER = "X-Confirm-Identity"
 // 3. The answer: a redirect is followed (`Turbo.visit`), a Turbo Stream is
 //    rendered (the card, the codes), and anything else says `failed`, or the
 //    server's own sentence from a 422 `{ "error" }`. A closed prompt says
-//    nothing, and its options are kept for the next press, since nothing was
-//    sent; after an answer they are spent and fetched afresh.
+//    nothing; after it, as after an answer, fresh options are fetched for
+//    the next press.
 // 4. A Continue with no options held, or a send the gate refused (403 with
 //    CONFIRM_HEADER: the window lapsed while the Name dialog stood open),
 //    goes back through `ensure()` when the server asks for it, fetches
@@ -37,6 +37,13 @@ const CONFIRM_HEADER = "X-Confirm-Identity"
 // connect, asked without the confirmation: a sign-in is one, so they come at
 // once within its window, and otherwise the press goes the way of 4.
 //
+// The options held for Continue (on a page with no dialog, always; with
+// one, while it stands open) are kept from lapsing (`passkeys/held_options`:
+// replaced before they lapse and when the tab is shown again). A
+// replacement the gate refuses leaves none, and Continue goes the way of 4,
+// as it does on a set too old to use; every fetch of options waits out the
+// one in flight, so the server's one challenge is always the latest set's.
+//
 // Without an outlet (the wizard, which no confirmation gates) a 403 says
 // `failed`. Where the browser can make no passkey, the add buttons are
 // hidden, the `unsupported` sentences (the page's own words) are shown, and
@@ -49,15 +56,29 @@ export default class extends Controller {
   static values = { optionsUrl: String, createUrl: String, from: String, method: { type: String, default: "post" } }
 
   async connect() {
-    this.options = null
-    this.ceremony = await import("passkeys/ceremony")
+    await this.loadModules()
+    if (!this.element.isConnected) return
     this.unsupported = !this.ceremony.supported()
     if (this.unsupported) {
       this.addTargets.forEach((button) => { button.hidden = true })
       this.unsupportedTargets.forEach((sentence) => { sentence.hidden = false })
       return
     }
+    this.held.start()
     if (!this.hasDialogTarget) this.refresh()
+  }
+
+  disconnect() {
+    this.held?.stop()
+  }
+
+  async loadModules() {
+    if (this.held) return
+
+    const [ceremony, { HeldOptions }] = await Promise.all([import("passkeys/ceremony"), import("passkeys/held_options")])
+    if (this.held) return
+    this.ceremony = ceremony
+    this.held = new HeldOptions(() => this.load(), { wanted: () => !this.hasDialogTarget || this.dialog.open })
   }
 
   get dialog() {
@@ -66,11 +87,12 @@ export default class extends Controller {
 
   async add(event) {
     event?.preventDefault()
-    this.ceremony ||= await import("passkeys/ceremony")
+    await this.loadModules()
     const options = await this.fetchOptions()
     if (options === undefined) return
 
-    this.options = options
+    if (options) this.held.hold(options)
+    else this.held.drop()
     this.errorTarget.textContent = options ? "" : this.say("failed")
     if (this.hasNameTarget) this.nameTarget.value = ""
     if (!this.dialog.open) this.dialog.showModal()
@@ -78,14 +100,22 @@ export default class extends Controller {
   }
 
   // The options, null when they could not be had, undefined when the person
-  // cancelled the confirmation they waited on.
+  // cancelled the confirmation they waited on. None held is kept: the
+  // answer's challenge replaces theirs on the server.
   async fetchOptions() {
+    await this.held.settled()
+    this.held.drop()
     let answer = await this.request()
     if (answer?.status === 403 && answer.options?.confirm === true) {
       if (!this.hasAdminPasskeysConfirmOutlet) return null
       if (!(await this.adminPasskeysConfirmOutlet.ensure())) return undefined
       answer = await this.request()
     }
+    return answer?.status === 200 && answer.options ? answer.options : null
+  }
+
+  async load() {
+    const answer = await this.request()
     return answer?.status === 200 && answer.options ? answer.options : null
   }
 
@@ -99,14 +129,14 @@ export default class extends Controller {
 
   continue(event) {
     event.preventDefault()
-    if (this.unsupported) return
+    if (this.unsupported || !this.held) return
     const name = this.hasNameTarget ? this.nameTarget.value.trim() : ""
     if (this.hasNameTarget && name === "") {
       this.errorTarget.textContent = this.say("name_blank")
       this.nameTarget.focus()
       return
     }
-    const options = this.options
+    const options = this.held.take()
     if (!options) return this.confirmAgain(name)
 
     this.prompt(options, name)
@@ -116,14 +146,9 @@ export default class extends Controller {
     this.errorTarget.textContent = ""
     this.ceremony
       .create(options)
-      .then((credential) => {
-        this.options = null
-        return this.send(this.ceremony.toJSON(credential), name)
-      })
+      .then((credential) => this.send(this.ceremony.toJSON(credential), name))
       .catch((error) => {
-        if (this.ceremony.cancelled(error)) return
-        this.options = null
-        this.errorTarget.textContent = this.say("failed")
+        if (!this.ceremony.cancelled(error)) this.errorTarget.textContent = this.say("failed")
         this.refresh()
       })
   }
@@ -160,7 +185,6 @@ export default class extends Controller {
     if (options === undefined || !this.element.isConnected) return
     if (!options) return this.refused()
 
-    this.options = options
     this.prompt(options, name)
   }
 
@@ -174,10 +198,8 @@ export default class extends Controller {
   // on a page with no dialog): the last set's challenge went with its
   // answer. A refusal by the gate leaves none, and the next Continue asks
   // for them through `ensure()`.
-  async refresh() {
-    const answer = await this.request()
-    const waiting = !this.hasDialogTarget || this.dialog.open
-    if (waiting && answer?.status === 200 && answer.options) this.options = answer.options
+  refresh() {
+    return this.held.refresh()
   }
 
   say(key) {

@@ -147,6 +147,20 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     assert_equal 2, Session.count
   end
 
+  test "the challenge's cookie lasts the browser's session, and the server alone refuses it after five minutes" do
+    challenge = options.fetch("challenge")
+    written = Array(response.headers["Set-Cookie"]).flat_map { |line| line.split("\n") }.find { |line| line.start_with?("#{CHALLENGE_COOKIE}=") }
+
+    assert written, "the options write the challenge's cookie"
+    assert_no_match(/expires=|max-age=/i, written, "no date of the browser's own: a clock ahead of the server's would drop it at once")
+
+    late = assertion(challenge)
+    travel PasskeyChallenges::LIFETIME + 1.second
+    assert saved_challenge_cookie.present?, "the browser still sends the cookie"
+    refused_to_sign_in_page(send_passkey(late))
+    assert_equal 0, Session.count
+  end
+
   test "a database error while a challenge is spent refuses the passkey, signs nobody in and logs the error's class alone" do
     [ ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished ].each do |error|
       credential = assertion(options.fetch("challenge"))

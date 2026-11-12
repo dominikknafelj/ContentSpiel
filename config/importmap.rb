@@ -106,8 +106,9 @@ pin_all_from "app/javascript/media", under: "media", preload: "admin"
 # imported: it is started as a module Worker from its asset URL.
 pin_all_from "app/javascript/mind_graph", under: "mind_graph", preload: false
 
-# The passkey ceremonies' one module (`passkeys/ceremony`): the browser's
-# WebAuthn calls, with no library. Imported with `import()` by the passkey
+# The passkey ceremonies' modules: `passkeys/ceremony`, the browser's
+# WebAuthn calls, with no library, and `passkeys/held_options`, which keeps
+# the options a script holds from lapsing. Imported with `import()` by the passkey
 # controllers when they connect (sign-in's `passkey_sign_in_controller.js`
 # is a site controller, registered on public pages too), so no page
 # preloads it and a public page never fetches it.

@@ -34,6 +34,55 @@ class Admin::PasskeySignInSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # The options' answers the page has had, finished (the page's own record
+  # of them, which a fetch joins once its answer is in).
+  OPTIONS_FETCHED = "performance.getEntriesByType('resource').filter((entry) => entry.name.endsWith('/sign-in/passkey/options')).length".freeze
+
+  def options_fetched = page.evaluate_script(OPTIONS_FETCHED)
+
+  # The server's clock is moved past the challenge's lifetime, which the page's
+  # clock does not follow: the options the page held at load would be refused,
+  # so only a fresh set signs in.
+  test "a tab shown again fetches fresh options, so a page left open past five minutes still signs in" do
+    with_virtual_authenticator do |authenticator|
+      add_virtual_passkey(@user, authenticator)
+      visit admin_sign_in_path
+      assert_selector READY
+      fetched = options_fetched
+      travel PasskeyChallenges::LIFETIME + 1.minute
+
+      page.execute_script("document.dispatchEvent(new Event('visibilitychange'))")
+      await_js("#{OPTIONS_FETCHED} > #{fetched}")
+      await_frames
+      press "Sign in with a passkey"
+
+      assert_selector "nav[aria-label='Modules']", wait: 15
+      assert_equal 1, Session.count
+    end
+  end
+
+  # The page's clock (`performance.now`, which `passkeys/held_options` reads)
+  # is moved five minutes on, as a computer that slept with the page open
+  # finds it, and the server's with it: only the fresh set fetched in the
+  # press signs in.
+  test "a press on options too old to use fetches fresh ones first and signs in" do
+    with_virtual_authenticator do |authenticator|
+      add_virtual_passkey(@user, authenticator)
+      visit admin_sign_in_path
+      assert_selector READY
+      travel PasskeyChallenges::LIFETIME
+      page.execute_script(<<~JS)
+        const real = performance.now.bind(performance)
+        performance.now = () => real() + 5 * 60 * 1000
+      JS
+
+      press "Sign in with a passkey"
+
+      assert_selector "nav[aria-label='Modules']", wait: 15
+      assert_equal 1, Session.count
+    end
+  end
+
   # The stub refuses the first call as a closed prompt does and hands every
   # later one to the browser's own `get`, which it kept.
   test "a cancelled prompt says nothing and the button works again" do

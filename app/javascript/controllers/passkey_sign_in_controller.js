@@ -15,30 +15,35 @@ import { Controller } from "@hotwired/stimulus"
 //
 // THE OPTIONS ARE FETCHED BEFORE THE PRESS. The browser's prompt may open
 // only inside the press (`passkeys/ceremony`, "THE PROMPT OPENS IN THE
-// PRESS"), so the options are asked for at connect and held, and the press
-// hands them straight to `get`. The divider and the button are shown once
-// the first options have arrived, and the button is disabled while none are
-// held (its prompt open, or fresh options on their way), so no press is
-// ever lost to a fetch. Each set is used once: the server takes its
-// challenge with the first answer.
+// PRESS"), so the options are asked for at connect and held
+// (`passkeys/held_options`, which replaces them before they lapse and when
+// the tab is shown again), and the press hands them straight to `get`. The
+// divider and the button are shown once the first options have arrived,
+// and the button is disabled while none are held (its prompt open, or the
+// first or the next set on its way), so no press is ever lost to a fetch. A
+// press on a set too old to use waits for a fresh one. Each set is used
+// once: the server takes its challenge with the first answer.
 //
 // The answer is posted as `credential` and the server says where to go
 // (`{ location }`: CS Studio, or the page with its alert), whatever
 // happened; the page is left for it. A prompt the person closed says
 // nothing and fetches fresh options, for the next press. Nothing is written
 // into the page but `hidden` and `disabled`, which connect decides afresh,
-// so a page shown again from Turbo's snapshot is decided again too.
+// so a page shown again from Turbo's snapshot is decided again too. The
+// modules are imported at connect, so a public page fetches neither.
 export default class extends Controller {
   static targets = ["divider", "button"]
   static values = { optionsUrl: String, verifyUrl: String }
 
   async connect() {
-    this.options = null
     this.buttonTarget.disabled = true
-    this.ceremony = await import("passkeys/ceremony")
+    const [ceremony, { HeldOptions }] = await Promise.all([import("passkeys/ceremony"), import("passkeys/held_options")])
+    this.ceremony = ceremony
     if (!this.element.isConnected) return
 
     if (this.ceremony.supported()) {
+      this.held = new HeldOptions(() => this.load())
+      this.held.start()
       this.fetch()
     } else {
       if (this.hasDividerTarget) this.dividerTarget.hidden = true
@@ -47,15 +52,25 @@ export default class extends Controller {
   }
 
   disconnect() {
-    this.options = null
+    this.held?.stop()
+    this.held = null
   }
 
   signIn(event) {
     event.preventDefault()
-    const options = this.options
-    if (!options) return
+    if (!this.held) return
+    const options = this.held.take()
+    if (options) return this.prompt(options)
+    if (!this.held.late) return
 
-    this.options = null
+    this.buttonTarget.disabled = true
+    this.held.takeLate().then((fresh) => {
+      if (fresh) this.prompt(fresh)
+      else this.fetch()
+    })
+  }
+
+  prompt(options) {
     this.buttonTarget.disabled = true
     this.ceremony
       .get(options)
@@ -66,12 +81,16 @@ export default class extends Controller {
       })
   }
 
+  async load() {
+    const { status, options } = await this.ceremony.fetchOptions(this.optionsUrlValue)
+    return status === 200 ? options : null
+  }
+
   async fetch() {
     this.buttonTarget.disabled = true
-    const { status, options } = await this.ceremony.fetchOptions(this.optionsUrlValue)
-    if (status !== 200 || !this.element.isConnected) return
+    const options = await this.held?.refresh()
+    if (!options || !this.element.isConnected) return
 
-    this.options = options
     if (this.hasDividerTarget) this.dividerTarget.hidden = false
     this.buttonTarget.hidden = false
     this.buttonTarget.disabled = false
