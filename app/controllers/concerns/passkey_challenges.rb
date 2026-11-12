@@ -44,6 +44,10 @@ module PasskeyChallenges
   SPENT_PURPOSE = "content_spiel passkey challenge".freeze
   COOKIE_PREFIX = "cs_passkey_".freeze
 
+  # The cookie of every purpose, which a sign-out deletes
+  # (`Authentication#terminate_session`).
+  def self.cookie_names = PURPOSES.map { |purpose| "#{COOKIE_PREFIX}#{purpose}" }
+
   private
 
   def issue_passkey_challenge(purpose, challenge)

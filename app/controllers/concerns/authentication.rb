@@ -136,8 +136,11 @@ module Authentication
       end
     end
 
+    # Every passkey challenge's cookie goes with the session: a challenge
+    # is the signed-out person's ceremony, never the next person's.
     def terminate_session
       Current.session.destroy
       cookies.delete(:session_id)
+      PasskeyChallenges.cookie_names.each { |name| cookies.delete(name, path: "/") }
     end
 end
