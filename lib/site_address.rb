@@ -1,7 +1,11 @@
 require "uri"
 require "ipaddr"
 
-# The site's public address, parsed once from `PUBLIC_HOST`. Everything that must agree about "where
+# The site's public address, parsed once from `PUBLIC_HOST`, and beside it
+# the address CS Studio is served on when it has one of its own, from
+# `ADMIN_HOST` (`SiteAddress.admin`, read here alone, parsed the same way).
+# What the two must satisfy together is `HostSettings.apply`'s to refuse.
+# Everything that must agree about "where
 # this site lives" (host authorisation, HTTPS, absolute URLs, head tags)
 # reads it here instead of splitting the variable itself.
 #
@@ -104,8 +108,14 @@ class SiteAddress
     end
   end
 
+  # The address CS Studio is served on alone; not configured when unset.
+  def self.admin
+    @admin ||= parse(ENV["ADMIN_HOST"], source: "ADMIN_HOST")
+  end
+
   def self.reset!
     @current = nil
+    @admin = nil
   end
 
   def self.invalid(source)
