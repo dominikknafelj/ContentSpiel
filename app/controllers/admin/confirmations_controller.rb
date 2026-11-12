@@ -51,7 +51,7 @@ module Admin
     rate_limit to: 10, within: 3.minutes, only: %i[ create passkey ], store: SignIn.store,
       by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { answer_limited }
     # The options, as sign-in's are (`SessionsController`): a count of their own, a bare 429.
-    rate_limit to: 10, within: 3.minutes, only: :options, name: "options", store: SignIn.store,
+    rate_limit to: 30, within: 1.minute, only: :options, name: "options", store: SignIn.store,
       by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { head :too_many_requests }
 
     def create

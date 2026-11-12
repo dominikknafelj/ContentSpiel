@@ -172,8 +172,8 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     assert_equal 0, Session.count
   end
 
-  test "the options are limited per address on a count of their own: the eleventh in three minutes is a bare 429 that keeps no challenge" do
-    10.times { options }
+  test "the options are limited per address on a count of their own: the thirty-first in a minute is a bare 429 that keeps no challenge" do
+    30.times { options }
     cookies.delete(CHALLENGE_COOKIE)
 
     post admin_sign_in_passkey_options_path, as: :json
@@ -184,7 +184,7 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     post admin_sign_in_path, params: { email_address: EMAIL, password: PASSWORD }
     assert_not_equal I18n.t("admin.sessions.limited"), flash[:alert], "a password is not counted with the options"
 
-    travel 3.minutes + 1.second
+    travel 1.minute + 1.second
     options
   end
 
