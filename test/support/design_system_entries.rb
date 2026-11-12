@@ -34,6 +34,7 @@ module DesignSystemEntries
     "Admin::Ui::ChannelChipComponent" => "Badge",
     "Admin::Ui::CheckboxComponent" => "ChoiceFields",
     "Admin::Ui::ConfirmDialogComponent" => "Dialog",
+    "Admin::Ui::ConfirmIdentityDialogComponent" => "StudioPasskeys",
     "Admin::Ui::ContentTypeDotComponent" => "Badge",
     "Admin::Ui::EmptyStateComponent" => "StudioEmptyState",
     "Admin::Ui::ErrorSummaryComponent" => "Notice",

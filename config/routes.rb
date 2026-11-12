@@ -340,6 +340,12 @@ Rails.application.routes.draw do
     # only: the request names a session, never a user.
     delete "account/sessions/:id", to: "account_sessions#destroy", as: :account_session
     delete "account/sessions", to: "account_sessions#destroy_others", as: :account_sessions
+    # Confirm it's you: the signed-in person's password, or the options for
+    # one of their own passkeys and its answer, before a change to how they
+    # sign in (`Admin::RecentConfirmation`).
+    post "account/confirmation", to: "confirmations#create", as: :account_confirmation
+    post "account/confirmation/options", to: "confirmations#options", as: :account_confirmation_options
+    post "account/confirmation/passkey", to: "confirmations#passkey", as: :account_confirmation_passkey
 
     # "Connect an AI assistant": the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list

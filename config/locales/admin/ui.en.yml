@@ -20,6 +20,23 @@ en:
         confirm_dialog:
           cancel: "Cancel"
 
+        # Confirm it's you, before a change to how a person signs in (Your
+        # account, enrolment). `wrong_password`, `passkey_failed` and `limited`
+        # are the confirmation's answers, which the dialog shows as they come.
+        confirm_identity_dialog:
+          title: "Confirm it's you"
+          lead_passkey: "To change how you sign in, confirm with your passkey or your password."
+          lead_password: "To change how you sign in, confirm with your password."
+          use_passkey: "Use your passkey"
+          or: "or"
+          password: "Password"
+          confirm_password: "Confirm with password"
+          confirm: "Confirm"
+          cancel: "Cancel"
+          passkey_failed: "That passkey didn't work. Try again, or use your password."
+          wrong_password: "That password isn't right."
+          limited: "Try again in a few minutes."
+
         # The recovery codes block, shown once (enrolment, the wizard, new codes).
         recovery_codes:
           title: "Save your recovery codes"

@@ -89,7 +89,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   # The sign-in steps that record these are not built yet: their sentences
   # stand ahead of them. An entry fails once something records it, so the
   # list empties as they arrive.
-  RECORDED_LATER = %w[session.confirmation_failed].freeze
+  RECORDED_LATER = %w[].freeze
 
   test "the sentence table lists no action nothing records" do
     literals, = scan_recorded_actions
