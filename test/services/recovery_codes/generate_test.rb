@@ -1,7 +1,10 @@
 require "test_helper"
 
 class RecoveryCodes::GenerateTest < ActiveSupport::TestCase
-  setup { @user = users(:reader) }
+  setup do
+    @user = users(:reader)
+    add_passkey(@user, client: fake_authenticator)
+  end
 
   def generate(actor: @user) = as(actor) { RecoveryCodes::Generate.call(@user) }
 
@@ -39,5 +42,19 @@ class RecoveryCodes::GenerateTest < ActiveSupport::TestCase
     assert result.denied?
     assert_empty @user.recovery_codes
     assert_equal [ "access.denied" ], Audit::Event.pluck(:action)
+  end
+
+  # Codes are a backup for passkeys: alone they would be the account's only
+  # second factor, asked at every sign-in until the ten were spent.
+  test "a person with no passkey is refused, and nothing is written or recorded" do
+    @user.passkeys.delete_all
+
+    result = generate
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_equal [ RecoveryCodes::Generate.passkey_first ], result.errors
+    assert_empty @user.recovery_codes
+    assert_empty Audit::Event.where(action: "recovery_codes.generated")
   end
 end

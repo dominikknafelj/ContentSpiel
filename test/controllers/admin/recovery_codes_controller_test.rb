@@ -13,6 +13,7 @@ class Admin::RecoveryCodesControllerTest < ActionDispatch::IntegrationTest
     site_settings(:default).update!(setup_completed_at: Time.current)
     @user = users(:reader)
     sign_in_as @user
+    add_passkey(@user, client: fake_authenticator)
   end
 
   def generate = post(admin_account_recovery_codes_path, headers: { "Accept" => STREAM })
@@ -44,5 +45,17 @@ class Admin::RecoveryCodesControllerTest < ActionDispatch::IntegrationTest
     assert_empty before & shown
     assert_not @user.recovery_codes.redeem(before.last)
     assert_equal 9, Audit::Event.where(action: "recovery_codes.generated").order(:id).last.metadata["replaced"]
+  end
+
+  test "without a passkey Generate is refused with a toast and makes no codes" do
+    @user.passkeys.delete_all
+
+    generate
+
+    assert_response :unprocessable_entity
+    assert_equal STREAM, response.media_type
+    assert_includes response.body, ERB::Util.html_escape(RecoveryCodes::Generate.passkey_first)
+    assert_empty shown
+    assert_empty @user.recovery_codes
   end
 end

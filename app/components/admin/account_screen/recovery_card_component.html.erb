@@ -6,16 +6,16 @@
     <% end %>
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p class="text-small text-dim" data-recovery-status><%= status %></p>
-      <% if made? %>
+      <% if passkey? && made? %>
         <%= render Admin::Ui::ButtonComponent.new(label: t(".regenerate"), variant: :secondary, size: :small, type: "button", data: dialog_trigger(DIALOG_ID)) %>
-      <% else %>
+      <% elsif passkey? %>
         <%= form_with url: generate_path, method: :post, data: { confirm_identity: "" } do %>
           <%= render Admin::Ui::ButtonComponent.new(label: t(".generate"), variant: :secondary, size: :small, type: "submit") %>
         <% end %>
       <% end %>
     </div>
   </div>
-  <% if made? %>
+  <% if made? && passkey? %>
     <%= render Admin::Ui::ConfirmDialogComponent.new(id: DIALOG_ID, title: t(".regenerate_title"), body: t(".regenerate_body", count: unused)) do |dialog| %>
       <% dialog.with_confirm_action do %>
         <%= form_with url: generate_path, method: :post, data: { confirm_identity: "" } do %>

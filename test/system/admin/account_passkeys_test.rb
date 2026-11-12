@@ -29,6 +29,10 @@ class Admin::AccountPasskeysSystemTest < ApplicationSystemTestCase
     visit_screen admin_account_path
   end
 
+  # A passkey stored for the account after the sign-in: Generate… is
+  # offered only to a person who holds one.
+  def holds_a_passkey = add_passkey(@user, client: fake_authenticator, name: "Laptop")
+
   def outside_the_window
     Session.find_each { |session| session.update_column(:confirmed_at, (Session::CONFIRM_WINDOW + 1.minute).ago) }
   end
@@ -38,7 +42,9 @@ class Admin::AccountPasskeysSystemTest < ApplicationSystemTestCase
     find(CODES_TEXT, visible: :all).text(:all).split
   end
 
+  # A set of codes, with the passkey they are a backup for.
   def make_codes
+    holds_a_passkey unless @user.passkeys.exists?
     texts = RecoveryCode.texts
     texts.each { |text| @user.recovery_codes.create!(digest: RecoveryCode.digest(text), generated_at: 1.day.ago) }
     texts
@@ -303,6 +309,7 @@ class Admin::AccountPasskeysSystemTest < ApplicationSystemTestCase
   # however many sets it shows.
   test "after Done and a visit back, the page holds no code" do
     sign_in_via_form(@user)
+    holds_a_passkey
     account
     no_cache = "head meta#recovery-codes-no-cache[name=turbo-cache-control][content=no-cache]"
 
@@ -336,6 +343,7 @@ class Admin::AccountPasskeysSystemTest < ApplicationSystemTestCase
 
   test "Escape closes the codes and forgets them" do
     sign_in_via_form(@user)
+    holds_a_passkey
     account
     press "Generate recovery codes…"
     shown = codes_shown
@@ -349,6 +357,7 @@ class Admin::AccountPasskeysSystemTest < ApplicationSystemTestCase
 
   test "Done waits for the box, Download saves the codes, Copy copies them" do
     sign_in_via_form(@user)
+    holds_a_passkey
     account
     page.execute_script(<<~JS)
       window.__copied = null
@@ -379,6 +388,7 @@ class Admin::AccountPasskeysSystemTest < ApplicationSystemTestCase
 
   test "a box the browser restored as ticked lets Done go at once" do
     sign_in_via_form(@user)
+    holds_a_passkey
     account
     press "Generate recovery codes…"
     codes_shown
@@ -398,6 +408,7 @@ class Admin::AccountPasskeysSystemTest < ApplicationSystemTestCase
 
   test "the codes dialog: Tab reaches Copy codes, Download and the box, Space ticks it, and Enter on Done closes it" do
     sign_in_via_form(@user)
+    holds_a_passkey
     account
     press "Generate recovery codes…"
     codes_shown

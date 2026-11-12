@@ -691,6 +691,8 @@ module ServiceCalls
     "RecoveryCodes::Generate" => lambda {
       target = stranger_target
       mine = stranger_target(email: "mine@example.com")
+      # Codes are a backup for passkeys: both accounts hold one.
+      [ target, mine ].each { |user| add_passkey(user, client: fake_authenticator) }
       { call: -> { RecoveryCodes::Generate.call(target) }, permission: "users.manage", on: target, control_actor: target,
         owner: mine, own: -> { RecoveryCodes::Generate.call(mine) }, own_event: "recovery_codes.generated" }
     },

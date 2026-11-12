@@ -82,6 +82,7 @@ en:
           intro: "Sign in with one when your passkeys aren't at hand. Each code works once."
           left: "%{left} of 10 codes left · made %{date}"
           none: "You have no recovery codes."
+          passkey_first: "Recovery codes come with your first passkey."
           low:
             one: "1 code left. Regenerate them before you run out."
             other: "%{count} codes left. Regenerate them before you run out."

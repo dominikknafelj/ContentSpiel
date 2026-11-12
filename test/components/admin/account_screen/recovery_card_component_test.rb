@@ -8,9 +8,9 @@ class Admin::AccountScreen::RecoveryCardComponentTest < ViewComponent::TestCase
 
   setup { travel_to Time.zone.parse("2026-11-11 12:00") }
 
-  def card(unused:, generated_at:)
+  def card(unused:, generated_at:, passkey: true)
     with_request_url("/cs-studio/account") do
-      render_inline Admin::AccountScreen::RecoveryCardComponent.new(unused: unused, generated_at: generated_at)
+      render_inline Admin::AccountScreen::RecoveryCardComponent.new(unused: unused, generated_at: generated_at, passkey: passkey)
     end
   end
 
@@ -54,5 +54,16 @@ class Admin::AccountScreen::RecoveryCardComponentTest < ViewComponent::TestCase
     assert_no_button "Regenerate…"
     assert_selector "form[action='/cs-studio/account/recovery-codes'][data-confirm-identity] button", text: "Generate recovery codes…"
     assert_no_selector "dialog#regenerate-recovery-codes", visible: :all
+  end
+
+  # Codes are a backup for passkeys (`RecoveryCodes::Generate` refuses
+  # without one), so a person with none is told where codes come from.
+  test "without a passkey it offers neither Generate… nor Regenerate…" do
+    card(unused: 0, generated_at: nil, passkey: false)
+
+    assert_selector "[data-recovery-status]", exact_text: I18n.t("#{WORDS}.passkey_first")
+    assert_no_selector "form", visible: :all
+    assert_no_button "Generate recovery codes…"
+    assert_no_button "Regenerate…"
   end
 end

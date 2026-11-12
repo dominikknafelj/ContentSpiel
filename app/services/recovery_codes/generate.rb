@@ -7,6 +7,12 @@ module RecoveryCodes
   # Only on the actor's own account: the codes are shown to whoever makes
   # them, so nobody makes them for someone else, not even an owner.
   #
+  # Only for a person who holds a passkey: codes are a backup for passkeys
+  # (removing the last passkey deletes them, `Passkeys::Remove`). Alone they
+  # would be the account's only second factor (`User#second_factor?`), so
+  # every sign-in would ask for one and spend it. Read under the row lock,
+  # so a passkey removed at the same moment cannot leave a fresh set behind.
+  #
   # `recovery_codes.generated` carries how many unused codes the new set
   # replaced, never a code or a digest.
   class Generate < ApplicationService
@@ -26,13 +32,19 @@ module RecoveryCodes
         # The account's row lock: two sets made at once would leave the
         # person holding texts that the other set's delete took away.
         User.lock.find(@user.id)
+        next unless @user.passkeys.exists?
+
         replaced = @user.recovery_codes.unused.count
         codes = write_codes(@user, at: Time.current)
         record_event("recovery_codes.generated", subject: @user, metadata: { "count" => codes.size, "replaced" => replaced }, snapshot: nil)
         codes
       end
+      return failure(@user, [ self.class.passkey_first ]) unless codes
+
       success(codes)
     end
+
+    def self.passkey_first = I18n.t("admin.recovery_codes.generate.passkey_first", raise: true)
 
     # The set's writes alone, with no authorization and no event, for a
     # caller that has authorized and records its own (`Passkeys::Add`, in
