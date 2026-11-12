@@ -24,8 +24,9 @@
 # challenge also spends it in `SignIn::SpentChallenge`, a table with a
 # unique digest, in one atomic insert that does nothing on a duplicate: of
 # any number of sends of one challenge, even at the same moment, exactly
-# one inserts the row and is let through. A database error is no spend, so
-# the challenge is refused. The row lives a second past the challenge's
+# one inserts the row and is let through. A failed statement or a lost
+# connection is no spend, so the challenge is refused and the error's class
+# logged; any other error is the code's own and is raised. The row lives a second past the challenge's
 # own lifetime, so it never lapses before the challenge does, and sits in
 # a table so that no cache eviction can drop it. The digest is an HMAC of
 # the purpose and the challenge, never the challenge itself. Every purpose
@@ -77,7 +78,7 @@ module PasskeyChallenges
   def spend_passkey_challenge(purpose, challenge, expires_at)
     digest = VisitorAddress.digest("#{purpose}:#{challenge}", purpose: SPENT_PURPOSE)
     SignIn::SpentChallenge.spend!(digest, expires_at: expires_at + 1.second)
-  rescue ActiveRecord::ActiveRecordError => error
+  rescue ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished => error
     # Refused, never let through: only the class of the error is logged.
     Rails.logger.warn("[passkey] a challenge could not be spent (#{error.class}), so it is refused")
     false

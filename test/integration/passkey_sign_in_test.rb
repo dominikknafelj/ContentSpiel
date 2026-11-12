@@ -7,6 +7,8 @@ require "test_helper"
 # refusal from another; a refusal's sentence is the flash of the page it
 # names.
 class PasskeySignInTest < ActionDispatch::IntegrationTest
+  include LogCapture
+
   EMAIL = "ann@example.org".freeze
   PASSWORD = "password12345".freeze
   # Past the per-address rate limit's pace (10 in 3 minutes), so a run of
@@ -145,11 +147,27 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     assert_equal 2, Session.count
   end
 
-  test "a database error while a challenge is spent refuses the passkey and signs nobody in" do
+  test "a database error while a challenge is spent refuses the passkey, signs nobody in and logs the error's class alone" do
+    [ ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished ].each do |error|
+      credential = assertion(options.fetch("challenge"))
+
+      log = capture_log do
+        with_singleton_override(SignIn::SpentChallenge, :insert_all, ->(*, **) { raise error, "the insert failed" }) do
+          refused_to_sign_in_page(send_passkey(credential))
+        end
+      end
+      assert_equal [ "[passkey] a challenge could not be spent (#{error}), so it is refused" ], log.lines.map(&:strip).grep(/\[passkey\]/)
+      assert_not_includes log, "the insert failed"
+      travel PACE
+    end
+    assert_equal 0, Session.count
+  end
+
+  test "an error of the code's own while a challenge is spent is not taken for the database's" do
     credential = assertion(options.fetch("challenge"))
 
-    with_singleton_override(SignIn::SpentChallenge, :insert_all, ->(*, **) { raise ActiveRecord::StatementInvalid, "the insert failed" }) do
-      refused_to_sign_in_page(send_passkey(credential))
+    with_singleton_override(SignIn::SpentChallenge, :insert_all, ->(*, **) { raise ActiveRecord::ReadOnlyError, "a write in a read-only block" }) do
+      assert_raises(ActiveRecord::ReadOnlyError) { send_passkey(credential) }
     end
     assert_equal 0, Session.count
   end

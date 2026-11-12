@@ -39,9 +39,13 @@ class SignIn::SpentChallengeRaceTest < ActiveSupport::TestCase
 
   def clean = SignIn::SpentChallenge.where(digest: DIGEST).delete_all # version: none (a test's own rows)
 
+  # One thread per connection of the pool, the test's own given back, so
+  # every thread holds its connection at the gate and all the inserts are
+  # sent at once.
   test "of several spends of one digest at the same moment exactly one wins" do
     gate = Queue.new
-    count = 6
+    ActiveRecord::Base.connection_pool.release_connection
+    count = ActiveRecord::Base.connection_pool.size
     threads = Array.new(count) do
       Thread.new do
         ActiveRecord::Base.connection_pool.with_connection do
