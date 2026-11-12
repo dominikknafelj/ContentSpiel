@@ -89,6 +89,9 @@ module Setup
     # nobody said, as from the console, and then there is nothing to say
     # about HTTPS. `production` is handed in so a test can say it.
     #
+    # `admin_address` is the optional CS Studio address (`SiteAddress.admin`):
+    # without one there is no "CS Studio address" row.
+    #
     # `reset_link_from_request` is whether a password reset mail takes its
     # link from the request when no address is set: the mailer's own rule
     # (`PasswordsMailer.request_origin_used?`, development and test), which
@@ -120,7 +123,7 @@ module Setup
     # row.
     def initialize(storage_probe: STORAGE_PROBE, image_probe: IMAGE_PROBE, worker_alive_probe: WORKER_ALIVE_PROBE,
       queue_adapter: ActiveJob::Base.queue_adapter_name,
-      address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
+      address: SiteAddress.current, admin_address: SiteAddress.admin, request_ssl: nil, production: Rails.env.production?,
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil, remote_ip: nil, cf_connecting_ip: nil,
       mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false)
       @storage_probe = storage_probe
@@ -133,6 +136,7 @@ module Setup
       @image_settings_link = image_settings_link
       @forms_link = forms_link
       @address = address
+      @admin_address = admin_address
       @request_ssl = request_ssl
       @production = production
       @reset_link_from_request = reset_link_from_request
@@ -154,7 +158,7 @@ module Setup
     end
 
     def run
-      [ site_address, https, visitor_address, theme, storage, image_processing, images, background_jobs, mail, forms ].compact
+      [ site_address, admin_address, https, visitor_address, theme, storage, image_processing, images, background_jobs, mail, forms ].compact
     end
 
     private
@@ -186,6 +190,15 @@ module Setup
           warning("Site address", "No site address is set. Any host name is accepted, addresses in pages follow the request, " \
             "and password reset mails are not sent until it is set.", command: SITE_ADDRESS_COMMAND)
         end
+      end
+
+      # The row exists only when ADMIN_HOST is set: CS Studio then answers at
+      # that origin alone, and the public address answers none of its pages.
+      def admin_address
+        return nil unless @admin_address.configured?
+
+        ok(I18n.t("admin.system_status.admin_address.label"),
+          I18n.t("admin.system_status.admin_address.message", origin: @admin_address.origin))
       end
 
       # Production only, and only for a request: nil (no row) otherwise. A
