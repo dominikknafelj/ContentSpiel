@@ -10,6 +10,7 @@ module ContentSpiel
   # cable socket) are under the admin path and so collide with nothing; what
   # is left is every first segment a route outside it claims:
   #
+  # - "forms" -- the public form send, `POST /forms/:form_id`;
   # - "up" -- Rails' own health check (`rails_health_check`);
   # - "rails" -- every engine Rails itself mounts under `/rails/*` in
   #   development (`/rails/info`, `/rails/mailers`, ActiveStorage's own
@@ -25,7 +26,7 @@ module ContentSpiel
   #   `Locales.enabled` -- a runtime setting this boot-time check can't
   #   read, and a locale disabled today can be re-enabled tomorrow with no
   #   deploy, spec §4.4).
-  RESERVED_PATHS = %w[up rails lookbook assets sitemap.xml].freeze + SUPPORTED_LOCALES.keys
+  RESERVED_PATHS = %w[forms up rails lookbook assets sitemap.xml].freeze + SUPPORTED_LOCALES.keys
 
   ADMIN_PATH = ENV.fetch("ADMIN_PATH", "cs-studio").to_s.delete_prefix("/").delete_suffix("/").tap do |path|
     raise ArgumentError, "ADMIN_PATH must be one URL segment like \"cs-studio\" (got #{path.inspect})" unless path.match?(/\A[a-z0-9][a-z0-9_-]*\z/)

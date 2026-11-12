@@ -33,6 +33,7 @@
 - The MCP endpoint is now `POST /<ADMIN_PATH>/mcp` (`/cs-studio/mcp` by default). `/mcp` is an ordinary public page path.
 - The preview is now at `/<ADMIN_PATH>/preview/...`, the setup wizard at `/<ADMIN_PATH>/setup`, and Action Cable at `/<ADMIN_PATH>/cable`. The old addresses are ordinary public page paths, with no redirect. A guard in front of `/<ADMIN_PATH>` (Cloudflare Access, a WAF rule) now covers the whole backend; an MCP client behind Cloudflare Access needs a service token.
 - `ADMIN_PATH` may now be `preview`, `setup`, `mcp` or `cable`, and a top-level page with one of those slugs is now reachable.
+- `ADMIN_PATH` may no longer be `forms`, the first segment of the public form send.
 - The new top-level names `Passkey`, `RecoveryCode`, `Passkeys`, `RecoveryCodes` and `PasskeyChallenges` refuse a gem's `ContentSpiel::Plugins` hook owner of the same name (`passkey`, `recovery_code`, `passkeys`, `recovery_codes`, `passkey_challenges`) at boot. A gem with such an owner renames it.
 
 ### Removed

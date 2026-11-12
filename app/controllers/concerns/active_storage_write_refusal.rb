@@ -11,7 +11,9 @@ module ActiveStorageWriteRefusal
   extend ActiveSupport::Concern
 
   included do
-    before_action :refuse_write, except: :show
+    # Prepended so it runs before `protect_from_forgery`'s checks: those
+    # answer a tokenless POST with 422 and load the session to do it.
+    before_action :refuse_write, except: :show, prepend: true
   end
 
   private

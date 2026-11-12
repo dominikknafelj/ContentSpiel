@@ -17,7 +17,7 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
   # this boot-time constant can't read).
   test "the reserved-paths denylist covers every already-claimed first segment" do
     assert_equal(
-      (%w[up rails lookbook assets sitemap.xml] + SUPPORTED_LOCALES.keys).sort,
+      (%w[forms up rails lookbook assets sitemap.xml] + SUPPORTED_LOCALES.keys).sort,
       ContentSpiel::RESERVED_PATHS.sort
     )
   end
@@ -28,8 +28,8 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
   # `tap` block against a bad value from inside this already-running test
   # process. A subprocess is what actually re-triggers it: one static
   # reserved word (`up`) and one locale code (`de`), enough to prove
-  # both halves of the denylist actually reach the raise, not every one of
-  # `RESERVED_PATHS`' 43 entries (the five static words and the 38 locale codes) -- the list itself is already
+  # both halves of the denylist actually reach the raise, not every entry
+  # of `RESERVED_PATHS` (the static words and every locale code) -- the list itself is already
   # covered exhaustively, without a subprocess, just above.
   test "booting with a reserved ADMIN_PATH actually fails" do
     %w[up de].each do |reserved|

@@ -27,14 +27,29 @@ class ActiveStorageAccessTest < ActionDispatch::IntegrationTest
     assert_not blob.service.exist?(blob.key)
   end
 
-  test "signed in, a direct upload is refused too, and opens no session" do
+  test "signed in, a direct upload is refused too" do
     sign_in_as(users(:one))
 
     assert_no_difference -> { ActiveStorage::Blob.count } do
       post "/rails/active_storage/direct_uploads", params: BLOB_PARAMS, as: :json
     end
     assert_response :not_found
+  end
+
+  # Forgery protection is off in the test environment but on in development
+  # and production, where its checks (422 for a missing token, and a session
+  # read to compare it) must not run before the refusal.
+  test "with forgery protection on, a tokenless direct upload is a 404 that reads and sets no session" do
+    previous = ActionController::Base.allow_forgery_protection
+    ActionController::Base.allow_forgery_protection = true
+
+    assert_no_difference -> { ActiveStorage::Blob.count } do
+      post "/rails/active_storage/direct_uploads", params: BLOB_PARAMS, as: :json
+    end
+    assert_response :not_found
     assert_nil response.headers["Set-Cookie"]
+  ensure
+    ActionController::Base.allow_forgery_protection = previous
   end
 
   test "signed in, a disk upload with a valid token writes nothing" do

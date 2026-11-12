@@ -4,8 +4,8 @@
 # sign-out and password reset (an admin resuming setup -- cs-studio spec §3),
 # the health check, the MCP endpoint at /<ADMIN_PATH>/mcp (own bearer auth; no
 # tokens exist yet anyway) and Active Storage (the logo preview while setup
-# runs). The
-# exemption check runs first so those paths never cost a database query.
+# runs). The exemption check runs first so those paths never cost a
+# database query.
 #
 # ONLY A PAGE LOAD IS SENT INTO THE WIZARD (`#page_load?`): a GET or HEAD
 # that asks for HTML by name, is no prefetch (Turbo's `X-Sec-Purpose`, the
