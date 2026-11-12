@@ -10,7 +10,7 @@ class SignInKnownDeviceTest < ActionDispatch::IntegrationTest
 
   EMAIL = "ann@example.org".freeze
   PASSWORD = "password12345".freeze
-  COOKIE = Admin::SessionsController::DEVICE_COOKIE.to_s
+  COOKIE = Admin::SignInCompletion::DEVICE_COOKIE.to_s
 
   setup do
     freeze_time

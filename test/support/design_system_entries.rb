@@ -9,7 +9,7 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794417878-dfbf".freeze
+  VERSION = "1794475441-77b8".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
@@ -19,7 +19,7 @@ module DesignSystemEntries
     PrefixInput PresenceMarker RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage
     SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
     StudioBlockCard StudioCommandPalette StudioDashboardCards StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms
-    StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioRail
+    StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioRail
     StudioSectionTile StudioSessions StudioSettings StudioShell StudioSignIn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations
     StudioTrash StudioTree StudioUsers StudioWizard TableGrid Tabs TextFields Toast Tooltip
   ].freeze
@@ -34,6 +34,7 @@ module DesignSystemEntries
     "Admin::Ui::ChannelChipComponent" => "Badge",
     "Admin::Ui::CheckboxComponent" => "ChoiceFields",
     "Admin::Ui::ConfirmDialogComponent" => "Dialog",
+    "Admin::Ui::ConfirmIdentityDialogComponent" => "StudioPasskeys",
     "Admin::Ui::ContentTypeDotComponent" => "Badge",
     "Admin::Ui::EmptyStateComponent" => "StudioEmptyState",
     "Admin::Ui::ErrorSummaryComponent" => "Notice",
@@ -55,6 +56,7 @@ module DesignSystemEntries
     "Admin::Ui::RailTabComponent" => "Tabs",
     "Admin::Ui::RailTabsComponent" => "Tabs",
     "Admin::Ui::RecordChipComponent" => "IconChip",
+    "Admin::Ui::RecoveryCodesComponent" => "StudioPasskeys",
     "Admin::Ui::SaveStatusComponent" => "SaveBar",
     "Admin::Ui::ScheduledDateComponent" => "StudioDashboardCards",
     "Admin::Ui::SettingsCardComponent" => "StudioSettings",

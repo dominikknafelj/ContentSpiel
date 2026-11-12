@@ -122,15 +122,25 @@ module Authentication
     end
 
     # The cookie ends with the session, never later: it is not permanent.
+    # The passkey policy is read here, once per session (`enrolment_due`),
+    # so a policy changed later reaches a person at their next sign-in; the
+    # policy it was read as is `auth.policy` on the request's span (a
+    # passkey sign-in has no `auth.sign_in`, and a password's has closed).
     def start_new_session_for(user, method: "password")
-      Session.start(user: user, method: method, user_agent: request.user_agent, ip_address: request.remote_ip).tap do |session|
+      policy = Passkeys::Policy.current
+      Telemetry.record(OpenTelemetry::Trace.current_span, "auth.policy" => policy.name)
+      Session.start(user: user, method: method, user_agent: request.user_agent, ip_address: request.remote_ip,
+        enrolment_due: policy.enrolment_due?(user)).tap do |session|
         Current.session = session
         cookies.signed[:session_id] = { value: session.id, httponly: true, same_site: :lax, expires: session.expires_at }
       end
     end
 
+    # Every passkey challenge's cookie goes with the session: a challenge
+    # is the signed-out person's ceremony, never the next person's.
     def terminate_session
       Current.session.destroy
       cookies.delete(:session_id)
+      PasskeyChallenges.cookie_names.each { |name| cookies.delete(name, path: "/") }
     end
 end

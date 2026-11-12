@@ -68,7 +68,7 @@ class Jump::SearchTest < ActiveSupport::TestCase
   test "the Settings rows are SettingsSections', titled one each" do
     assert_equal SettingsSections.ids, Jump::Search::SETTINGS_TITLES.keys
     assert_equal [ "Settings › Site", "Settings › Languages", "Settings › Publishing", "Settings › Forms", "Settings › AI translation",
-      "Settings › Mail", "Settings › Images" ], Jump::Search::SETTINGS_TITLES.values
+      "Settings › Mail", "Settings › Sign-in", "Settings › Images" ], Jump::Search::SETTINGS_TITLES.values
 
     %w[forms mail images].each do |id|
       rows = search(Jump::Search::SETTINGS_TITLES.fetch(id).delete_prefix("Settings › ")).find { |g| g[:label] == "Settings" }[:rows]
@@ -83,7 +83,7 @@ class Jump::SearchTest < ActiveSupport::TestCase
     assert_equal [ "Settings › Languages" ], settings[:rows].map { |r| r[:title] }
   end
 
-  test "a blank query by a viewer who holds every permission lists all seven Settings rows, past the group limit" do
+  test "a blank query by a viewer who holds every permission lists all eight Settings rows, past the group limit" do
     assert SettingsSections::ALL.all? { |section| AccessControl.holds?(@owner, section.permission, channel: :admin) }, "the premise: the owner holds every section's right"
     assert_operator SettingsSections.ids.size, :>, Jump::Search::LIMIT, "the premise: there are more sections than the limit"
 

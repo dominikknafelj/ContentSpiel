@@ -191,4 +191,64 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     assert_not result.ok?
     assert Session.exists?(session.id)
   end
+
+  # --- The console clears a lost person's passkeys --------------------------
+
+  def with_passkeys_and_codes(user)
+    2.times { |index| add_passkey(user, client: fake_authenticator, name: "Key #{index}") }
+    as(user) { RecoveryCodes::Generate.call(user) }
+    2.times { Session.start(user: user, method: "passkey", user_agent: nil, ip_address: nil) }
+    user
+  end
+
+  test "remove_passkeys from the console removes passkeys and codes, ends every session and records one passkey.removed" do
+    owner = with_passkeys_and_codes(users(:one))
+    audit_ids = Audit::Event.pluck(:id)
+
+    result = as(nil, channel: :console) { change(owner, actor: nil, remove_passkeys: true) }
+
+    assert result.ok?, result.errors.inspect
+    assert owner.reload.authenticate("brand-new-pass")
+    assert_empty owner.passkeys
+    assert_empty owner.recovery_codes
+    assert_empty owner.sessions
+    assert_not owner.second_factor?
+
+    events = Audit::Event.where.not(id: audit_ids)
+    removed = events.where(action: "passkey.removed").sole
+    assert_equal({ "count" => 2, "recovery_codes_removed" => RecoveryCode::COUNT, "reason" => "console" }, removed.metadata)
+    assert_equal owner, removed.subject
+    assert_nil removed.actor
+    assert_equal "console", removed.channel
+    assert_equal({ "reason" => "password_changed", "count" => 2 }, events.find_by!(action: "session.ended").metadata)
+  end
+
+  test "remove_passkeys from a signed-in actor is denied and changes nothing" do
+    owner = with_passkeys_and_codes(users(:one))
+    reader = with_passkeys_and_codes(users(:reader))
+
+    [ [ owner, owner ], [ owner, reader ] ].each do |actor, user|
+      audit_ids = Audit::Event.pluck(:id)
+
+      result = as(actor) { change(user, actor: actor, remove_passkeys: true) }
+
+      assert result.denied?, "#{actor.email_address} on #{user.email_address}"
+      assert_equal [ "access.denied" ], Audit::Event.where.not(id: audit_ids).pluck(:action)
+    end
+    [ owner, reader ].each do |user|
+      assert user.reload.authenticate("password")
+      assert_equal 2, user.passkeys.count
+      assert_equal RecoveryCode::COUNT, user.recovery_codes.count
+      assert_equal 2, user.sessions.count
+    end
+  end
+
+  test "the console's password change leaves passkeys alone unless asked" do
+    owner = with_passkeys_and_codes(users(:one))
+
+    assert as(nil, channel: :console) { change(owner, actor: nil) }.ok?
+
+    assert_equal 2, owner.passkeys.count
+    assert_not Audit::Event.exists?(action: "passkey.removed")
+  end
 end

@@ -19,7 +19,7 @@
     `#settings-language-forms` (forms can't nest, and the dialog forms can't be
     inside it either), through the `form=` attribute or a dialog trigger.
     Each card, nav link and rail row shows only for the right that owns it
-    (`SettingsSections`' `permission`), in the nav's order: a viewer with only
+    (`SettingsSections`' `permission`, and Sign-in for an owner alone), in the nav's order: a viewer with only
     `languages.manage` gets this same form with just the Languages card and the
     bar, and a rail of the languages alone.
 
@@ -46,7 +46,8 @@
 <% images_fingerprint = (ImageSettings.current(stored).fingerprint if manage_settings) %>
 <% images_progress = (Media::RenditionProgress.new(fingerprint: images_fingerprint).counts if manage_settings) %>
 <% mail_settings = (MailSettings.current(stored) if manage_settings) %>
-<% sections = SettingsSections.for { |permission| can?(permission) } %>
+<% owner = AccessControl.owner?(Current.actor) %>
+<% sections = SettingsSections.for(owner: owner) { |permission| can?(permission) } %>
 <% error_ids = { "title" => "settings-#{Locales.default}-title", "tagline" => "settings-#{Locales.default}-tagline", "time_zone" => "settings-time_zone",
      "trash_retention_days" => "settings-trash_retention_days", "form_keep_days" => "settings-form_keep_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
      "social_links" => "settings-social-0-name", "mail_server" => "settings-mail_server", "mail_port" => "settings-mail_port",
@@ -94,6 +95,10 @@
                   provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model)) %>
             <%= render Admin::SettingsScreen::MailCardComponent.new(site_setting: stored, mail_settings: mail_settings, values: values,
                   errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
+            <% if owner %>
+              <%= render Admin::SettingsScreen::SignInCardComponent.new(site: stored, policy: values.passkey_policy,
+                    uncovered: Passkeys::Policy.current(site: stored).uncovered_count, changed: values.saved_change("passkey_policy")) %>
+            <% end %>
             <%= render Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: images_progress, avif_available: ImageSettings.avif_available?,
                   errors: (@errors if @errors.respond_to?(:full_messages_for)), status_link: can?("system_status.view")) %>
           <% end %>

@@ -2,6 +2,53 @@
 
 ## Unreleased
 
+### Added
+
+- Passkeys for CS Studio. A person signs in with a passkey alone ("Sign in with a passkey" on the sign-in page, no email first), or with their password followed by a passkey or a recovery code. At an IP address (a `PUBLIC_HOST` that is an IP, development at 127.0.0.1) no passkey is offered: a passkey belongs to a domain, and WebAuthn refuses an IP.
+- The second step of a sign-in, a page of its own: after a right password for an account that holds a passkey or unused recovery codes, one of its passkeys or one of its codes within five minutes, "Start over" to go back, and from the code view "Use your passkey" back to the passkey. A wrong code and a used one get the same sentence, and every wrong proof counts in the account's sign-in bucket as a wrong password does.
+- Recovery codes: ten single-use codes (`XXXX-XXXX`), a backup for passkeys, made with a person's first passkey and with Generate… or Regenerate… on Your account (offered, and allowed, only to a person who holds a passkey), shown once with Copy, Download and "I have saved these codes", stored only as HMACs.
+- Your account's Passkeys card (each passkey's name, when it was added and last used, Rename, Remove…, "Add a passkey…") and Recovery codes card (how many are left, when they were made). Removing the last passkey of a person no policy holds to one deletes their recovery codes too, and they sign in with their password again.
+- Confirm it's you, a dialog in CS Studio (not the second step): adding or removing a passkey, its registration options and making recovery codes ask for the password or a passkey again when the sign-in, or the last confirmation, is more than ten minutes old. A wrong password counts in the account's bucket.
+- Settings → Sign-in, for an owner alone: who must sign in with a passkey, nobody, owners and admins (whoever may manage users, groups or API tokens) or everyone, with how many people it covers who have none yet. Unset, it is owners and admins in production and nobody in development and test.
+- Enrolment: a person the policy covers who has no passkey is sent, at their next sign-in, to a page that asks for one before anything else of CS Studio or the preview opens; a session already open carries on.
+- The setup wizard's passkey step, after the owner's account (ten steps now): under production's default policy the founding owner adds a passkey before any later step; with `nobody` it can be skipped; at an IP address it says why and goes on.
+- The console's way back for a person who lost every passkey and every code: the password command with `remove_passkeys: true` deletes their passkeys and codes, records `passkey.removed` and ends their sessions (`docs/reference/hosting.md`, "The reset mail").
+- The mails "A passkey was added to your account on <site>" and "A recovery code was used on <site>" (when, the passkey's name or the address and the codes left, and a button to Your account), sent only while mail works.
+- Audit events, all Security events but a rename, under "Sign-in" in the audit log's Action filter: `passkey.added`, `passkey.renamed`, `passkey.removed`, `recovery_codes.generated`, `recovery_code.used`, `session.second_factor_failed` (no actor) and `session.confirmation_failed`.
+- A per-address rate limit on the passkey options (sign-in, the second step and Confirm it's you), counted apart from the proofs: 30 a minute, past which the options answer a bare 429 and no passkey is offered until the minute ends.
+- Signing out deletes every passkey challenge's cookie (`cs_passkey_<purpose>`), so none is left for the next person on the browser.
+- Spans `auth.passkey`, `auth.recovery_code`, `auth.second_factor`, `auth.confirmation` and `auth.account_mail`, and the attributes `auth.passkey.ceremony`, `auth.policy`, `auth.second_factor.required` and `auth.mail.kind` (`docs/reference/hosting.md`, "Telemetry", with a Honeycomb query for the second step's failures).
+
+### Changed
+
+- On upgrading, owners and admins are asked for a passkey: a production site that has never chosen who must sign in with one asks owners and admins, so at their next sign-in each of them without a passkey is sent to enrolment and cannot open CS Studio until they add one. To choose otherwise, set Settings → Sign-in before then, or from the console (`docs/reference/hosting.md`, "The reset mail": `bin/rails runner 'p Settings::Save.call(SiteSetting.instance, attributes: { passkey_policy: "nobody" }).ok?'`).
+- A password alone no longer signs in an account that holds a passkey or an unused recovery code: a right password goes on to the second step, and the known-device cookie `cs_known_device` is written only once a sign-in is whole.
+- `session.created` carries `{ "method" }` when a person signed in with a passkey or a recovery code, and reads "signed in with a passkey" or "signed in with a recovery code"; a password's reads "signed in".
+- While setup is pending only a page load (a GET or HEAD asking for HTML that is no prefetch) is sent to `/setup`; any other request is answered 404 without loading the session, so a client that does not ask for HTML gets 404 for `/`.
+- Settings has eight sections: Sign-in stands after Mail, for an owner alone.
+- `filter_parameters` holds `credential` (exactly) and `recovery_code`.
+
+### Breaking
+
+- The new top-level names `Passkey`, `RecoveryCode`, `Passkeys`, `RecoveryCodes` and `PasskeyChallenges` refuse a gem's `ContentSpiel::Plugins` hook owner of the same name (`passkey`, `recovery_code`, `passkeys`, `recovery_codes`, `passkey_challenges`) at boot. A gem with such an owner renames it.
+
+### Migrations
+
+- `20261112090000_create_passkeys_and_recovery_codes`: the tables `passkeys` (a person's WebAuthn credentials: the credential id, unique, the public key, the sign count, a name, the transports and the last use) and `recovery_codes` (each code's HMAC, unique per account, with when it was made and used), and `users.webauthn_id` (unique, null until the account's first passkey).
+- `20261112090100_add_passkey_policy_and_confirmation`: `sessions.confirmed_at` (null for a session open before it, which is asked to confirm once) and `sessions.enrolment_due` (not null, false), and `site_settings.passkey_policy` (null: the environment's default).
+- `20261112090200_create_sign_in_spent_challenges`: the table `sign_in_spent_challenges` (the HMAC of each answered passkey challenge, unique, and when it expires, indexed), which the hourly session sweep empties of expired rows.
+
+### For a gem or an outside caller
+
+- `Session.start(user:, method:, user_agent:, ip_address:, enrolment_due: false, at:)`: a session is confirmed at its start (`confirmed_at`, `Session#confirm!`, `#confirmed_recently?`, `Session::CONFIRM_WINDOW`), and `enrolment_due` holds it at enrolment.
+- `SettingsSections.for(owner: false) { |permission| … }`: a section with `owner_only: true` (`SettingsSections::Section#owner_only`, Sign-in) is offered to an owner alone; a caller that does not say `owner:` offers it to nobody.
+- `SignIn::OUTCOMES` gains `second_factor_required`, an outcome of `SignIn::PasswordAttempt` with the account, and `SignIn::SECOND_STEP_LIFETIME` is 5 minutes.
+- `SignIn::Throttle#reserve_address(address:)` and `#release_address(address:)`: the wide address bucket's half of a reservation, for an attempt that names no account (a passkey sign-in), and the count a verified passkey takes back; `#await_second_proof(reservation, identifier:, address:, device: nil)`, what a right password owing a second proof gives back (the address's counts, and a lock its reservation wrote) while its run's count stands.
+- The passkey objects of `SignIn`, which know no session, cookie, route or mail: `SignIn::RelyingParty.for(address:, request_origin:, name:)` (nil at an IP), `SignIn::PasskeyRegistration.new(relying_party:)` with `#options(user_handle:, user_name:, display_name:, exclude: [])` and `#verify(json, challenge:)`, `SignIn::PasskeyCheck.new(relying_party:)` with `#options(allow: [])` and `#verify(json, challenge:, credentials:, ceremony:)`, and `SignIn::SpentChallenge.spend!(digest, expires_at:)`; and `SignIn::Proof.new(account:, identifier:, address:, span:, device: nil)` with `#recovery_code(text)`, `#password(text)` and `#passkey(json, challenge:, check:, ceremony:)`, a second proof counted in the account's bucket.
+- `Users::UpdatePassword.call(user, …, remove_passkeys: false)`: `true` from the console alone.
+- `Admin::Ui::RecoveryCodesComponent.new(codes:, frame: :dialog | :page, done_href: nil, id: "recovery-codes")` and `Admin::Ui::ConfirmIdentityDialogComponent.new(passkey:, url_options: {})`, shared components with their contracts (`docs/reference/design-system.md`, "Shared components").
+- The product layout loads CS Studio's entry point (`admin`) in place of `application` for a page that says `content_for :entry_point, "admin"`, as the setup layout does: the enrolment page.
+
 ## 0.3.0 (2026-11-11)
 
 ### Environment

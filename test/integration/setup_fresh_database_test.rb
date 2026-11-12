@@ -16,7 +16,7 @@ class SetupFreshDatabaseTest < ActionDispatch::IntegrationTest
     assert_equal 0, AccessControl::Group.count, "the token step, which anyone may post to, writes nothing"
 
     create_setup_admin
-    assert_redirected_to setup_step_path("site")
+    assert_redirected_to setup_step_path("passkey")
     assert_equal [ "Admin", "Author", "Editor", "Read only" ], AccessControl::Group.where(built_in: true).order(:name).pluck(:name)
     events = Audit::Event.where(action: "group.created")
     assert_equal [ "setup" ], events.pluck(:channel).uniq

@@ -10,6 +10,11 @@ class Session < ApplicationRecord
   ABSOLUTE_TIMEOUT = 14.days
   SEEN_EVERY = 5.minutes
 
+  # How long after a session last proved its person (its sign-in, or Confirm
+  # it's you) it may add or remove a passkey or make new recovery codes
+  # without proving it again.
+  CONFIRM_WINDOW = 10.minutes
+
   # How a person proved who they are. Every session is made through
   # `Session.start`, which refuses a method outside this list.
   METHODS = %w[password passkey sso recovery_code].freeze
@@ -54,10 +59,12 @@ class Session < ApplicationRecord
   # `test/models/session_test.rb` has each.
   after_destroy_commit :disconnect_cable
 
-  # The one way a session is made: seen now and ending ABSOLUTE_TIMEOUT on.
-  def self.start(user:, method:, user_agent:, ip_address:, at: Time.current)
+  # The one way a session is made: seen now, confirmed by the sign-in that
+  # made it, and ending ABSOLUTE_TIMEOUT on. `enrolment_due` is decided once,
+  # here, so a policy changed later reaches a person at their next session.
+  def self.start(user:, method:, user_agent:, ip_address:, enrolment_due: false, at: Time.current)
     create!(user: user, authenticated_with: method, user_agent: user_agent, ip_address: ip_address,
-      last_seen_at: at, expires_at: at + ABSOLUTE_TIMEOUT)
+      last_seen_at: at, expires_at: at + ABSOLUTE_TIMEOUT, confirmed_at: at, enrolment_due: enrolment_due)
   end
 
   # The sessions past their absolute timeout at `at`.
@@ -120,6 +127,17 @@ class Session < ApplicationRecord
   # write both just write it.
   def seen!(at = Time.current)
     update_column(:last_seen_at, at) if last_seen_at <= at - SEEN_EVERY # version: none (a session is on no public page)
+  end
+
+  # Whether the session proved its person within CONFIRM_WINDOW of `at`.
+  def confirmed_recently?(at = Time.current)
+    confirmed_at.present? && at < confirmed_at + CONFIRM_WINDOW
+  end
+
+  # Marks the session proved again at `at` (Confirm it's you). `update_column`,
+  # as `seen!`, so `updated_at` does not move.
+  def confirm!(at = Time.current)
+    update_column(:confirmed_at, at) # version: none (a session is on no public page)
   end
 
   private

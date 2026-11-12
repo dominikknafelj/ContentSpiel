@@ -74,6 +74,19 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
     assert_equal SignIn::Outcome.new(status: :locked, account: nil, trips: [ Trip.new(bucket: :account, level: 0, seconds: 60) ], bot_check_due: false), attempt
   end
 
+  test "a right password for an account with a second factor is second_factor_required, keeps the account's count and gives the address's back" do
+    @user.recovery_codes.create!(digest: RecoveryCode.digest(RecoveryCode.texts.first), generated_at: Time.current)
+
+    outcome = nil
+    spans = spans_of { outcome = attempt(password: PASSWORD) }
+
+    assert_equal SignIn::Outcome.new(status: :second_factor_required, account: @user, trips: [], bot_check_due: false), outcome
+    assert_equal 1, count_of(:account), "the run stands until the second step succeeds"
+    assert_equal 0, count_of(:wide)
+    assert_equal({ "auth.method" => "password", "auth.account_exists" => true, "auth.second_factor.required" => true, "auth.outcome" => "second_factor_required" },
+      spans.find { |span| span.name == "auth.sign_in" }.attributes.to_h)
+  end
+
   test "a failure that closes the account and the address carries both trips, the account's first" do
     45.times { |index| attempt(email: "person#{index}@example.org") }
     4.times { attempt }

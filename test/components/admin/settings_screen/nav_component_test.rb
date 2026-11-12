@@ -4,9 +4,9 @@ class Admin::SettingsScreen::NavComponentTest < ViewComponent::TestCase
   test "one anchor per section, in the screen's order" do
     render_inline Admin::SettingsScreen::NavComponent.new(sections: SettingsSections::ALL)
 
-    assert_selector "nav[aria-label='Settings sections'] a", count: 7
-    assert_equal %w[#site #languages #publishing #forms #ai #mail #images], page.all("a").map { |a| a[:href] }
-    assert_equal [ "Site", "Languages", "Publishing", "Forms", "AI translation", "Mail", "Images" ], page.all("a").map(&:text)
+    assert_selector "nav[aria-label='Settings sections'] a", count: 8
+    assert_equal %w[#site #languages #publishing #forms #ai #mail #sign_in #images], page.all("a").map { |a| a[:href] }
+    assert_equal [ "Site", "Languages", "Publishing", "Forms", "AI translation", "Mail", "Sign-in", "Images" ], page.all("a").map(&:text)
   end
 
   # Same-page links: a `_top` link would be a Turbo visit, which the save
@@ -21,7 +21,7 @@ class Admin::SettingsScreen::NavComponentTest < ViewComponent::TestCase
     render_inline Admin::SettingsScreen::NavComponent.new(sections: SettingsSections::ALL)
 
     assert_selector "nav[aria-label='Settings sections'][data-controller='admin--settings--nav'][data-action~='turbo:before-cache@document->admin--settings--nav#reset']"
-    assert_selector "a[data-admin--settings--nav-target=link]", count: 7
+    assert_selector "a[data-admin--settings--nav-target=link]", count: 8
     assert_no_selector "a[aria-current]"
   end
 
@@ -29,7 +29,7 @@ class Admin::SettingsScreen::NavComponentTest < ViewComponent::TestCase
     render_inline Admin::SettingsScreen::NavComponent.new(sections: SettingsSections::ALL)
 
     links = page.all("nav a")
-    assert_equal 7, links.size
+    assert_equal 8, links.size
     SettingsSections::ALL.zip(links).each do |section, link|
       chip = link.native.element_children.first
       assert_equal [ "span", "true" ], [ chip.name, chip["aria-hidden"] ], section.id

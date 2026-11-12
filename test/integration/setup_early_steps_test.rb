@@ -111,7 +111,7 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the token step welcomes, says Step 1 of 9 and has one primary" do
+  test "the token step welcomes, says Step 1 of 10 and has one primary" do
     get setup_step_path("token")
 
     assert_response :success
@@ -120,8 +120,8 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     end
     assert_select "h1", text: "Let's set up your site"
     assert_select "nav[aria-label='Setup steps']" do
-      assert_select "[aria-hidden=true] > span.bg-accent[style='width: 11%']"
-      assert_select "p", text: "Step 1 of 9"
+      assert_select "[aria-hidden=true] > span.bg-accent[style='width: 10%']"
+      assert_select "p", text: "Step 1 of 10"
     end
     primary = Admin::Ui::ButtonComponent.classes(:primary)
     assert_equal [ "Continue" ], css_select("[class]").select { |node| node["class"].include?(primary) }.map { |node| node.text.strip }
@@ -161,10 +161,10 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
       assert_select "span.text-label.text-meta", text: "Optional"
     end
     assert_select "nav[aria-label='Setup steps'] li", text: /Site identity/ do
-      assert_select "span.border-field-line.text-meta", text: "4"
+      assert_select "span.border-field-line.text-meta", text: "5"
     end
     assert_select "nav[aria-label='Setup steps'] .bg-live", count: 0
-    assert_select "nav[aria-label='Setup steps'] p", text: "Step 3 of 9"
+    assert_select "nav[aria-label='Setup steps'] p", text: "Step 3 of 10"
     assert_select "header", text: /CONTENT·SPIEL/
     assert_select "header", text: /First-run setup/
     assert_select "[role=radiogroup][aria-label='Theme']"
@@ -185,12 +185,12 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     assert_select "button", text: "Continue"
   end
 
-  test "creating the admin signs them in and moves to site identity" do
+  test "creating the admin signs them in and moves to the passkey step" do
     assert_difference "User.count", 1 do
       create_setup_admin
     end
 
-    assert_redirected_to setup_step_path("site")
+    assert_redirected_to setup_step_path("passkey")
     assert_equal "owner@example.com", User.last.email_address
     assert User.last.owner?, "the first account is the owner"
   end
@@ -232,6 +232,6 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
 
     get setup_step_path("admin")
 
-    assert_redirected_to setup_step_path("site")
+    assert_redirected_to setup_step_path("passkey")
   end
 end

@@ -60,6 +60,11 @@ module Telemetry
     auth.lockout_mail
     auth.session
     auth.session_sweep
+    auth.passkey
+    auth.recovery_code
+    auth.second_factor
+    auth.confirmation
+    auth.account_mail
   ].freeze
 
   ATTRIBUTES = %w[
@@ -75,6 +80,10 @@ module Telemetry
     auth.mail.queued
     auth.session.reason
     auth.session.count
+    auth.passkey.ceremony
+    auth.policy
+    auth.second_factor.required
+    auth.mail.kind
     server.address
     http.response.status_code
     error.type

@@ -41,7 +41,7 @@
 # `own:` changes), `own:` (the call made on that user's record) and
 # `own_event:` (the audit action it records).
 module ServiceCalls
-  # The five services open to any signed-in user for their OWN record.
+  # The services open to any signed-in user for their OWN record.
   # `manager_may:` is what a holder of the right to manage others (the Admin
   # group) gets when acting on someone else's record: the call, or a refusal
   # (`Users::UpdateProfile`'s anyone else goes through `Users::Save`, even
@@ -51,7 +51,11 @@ module ServiceCalls
     "ApiTokens::Revoke" => { manager_may: true, reason: "any signed-in user may revoke their own token; anyone else needs tokens.manage" },
     "Users::UpdatePassword" => { manager_may: true, reason: "any signed-in user may change their own password; anyone else needs users.manage" },
     "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" },
-    "Sessions::EndOthers" => { manager_may: false, reason: "any signed-in user may end their own other sessions; an owner ends someone else's through Sessions::EndAll, and nobody else may" }
+    "Sessions::EndOthers" => { manager_may: false, reason: "any signed-in user may end their own other sessions; an owner ends someone else's through Sessions::EndAll, and nobody else may" },
+    "Passkeys::Add" => { manager_may: false, reason: "a person adds a passkey to their own account only: it is their device, and nobody, not even an owner, adds one for someone else" },
+    "Passkeys::Rename" => { manager_may: false, reason: "a person renames their own passkeys only: nobody manages someone else's" },
+    "Passkeys::Remove" => { manager_may: false, reason: "a person removes their own passkeys only; a lost device is cleared from the console (Users::UpdatePassword, remove_passkeys)" },
+    "RecoveryCodes::Generate" => { manager_may: false, reason: "a person makes their own recovery codes only: the codes are shown to whoever makes them" }
   }.freeze
 
   # The two bulk services answer with their own result (no `denied?`): an id
@@ -655,6 +659,44 @@ module ServiceCalls
       { call: -> { Sessions::EndAll.call(target) }, permission: "users.manage", on: target }
     },
 
+    # See SELF_SERVICE: own only, so the control runs as the user themselves.
+    "Passkeys::Add" => lambda {
+      target = stranger_target
+      mine = stranger_target(email: "mine@example.com")
+      # Checked here: the check writes the account's WebAuthn handle.
+      theirs = passkey_registration(target)
+      own = passkey_registration(mine)
+      { call: -> { Passkeys::Add.call(target, registration: theirs, name: "MacBook") }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { Passkeys::Add.call(mine, registration: own, name: "MacBook") }, own_event: "passkey.added" }
+    },
+
+    "Passkeys::Rename" => lambda {
+      target = stranger_target
+      mine = stranger_target(email: "mine@example.com")
+      theirs = add_passkey(target, client: fake_authenticator)
+      own = add_passkey(mine, client: fake_authenticator)
+      { call: -> { Passkeys::Rename.call(theirs, name: "Renamed") }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { Passkeys::Rename.call(own, name: "Renamed") }, own_event: "passkey.renamed" }
+    },
+
+    "Passkeys::Remove" => lambda {
+      target = stranger_target
+      mine = stranger_target(email: "mine@example.com")
+      theirs = add_passkey(target, client: fake_authenticator)
+      own = add_passkey(mine, client: fake_authenticator)
+      { call: -> { Passkeys::Remove.call(theirs) }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { Passkeys::Remove.call(own) }, own_event: "passkey.removed" }
+    },
+
+    "RecoveryCodes::Generate" => lambda {
+      target = stranger_target
+      mine = stranger_target(email: "mine@example.com")
+      # Codes are a backup for passkeys: both accounts hold one.
+      [ target, mine ].each { |user| add_passkey(user, client: fake_authenticator) }
+      { call: -> { RecoveryCodes::Generate.call(target) }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { RecoveryCodes::Generate.call(mine) }, own_event: "recovery_codes.generated" }
+    },
+
     # The two bulk services: see OWN_RESULT. `ids` are real posts.
     "Posts::Bulk" => lambda {
       posts = [ create_post(title: "One", published: false), create_post(title: "Two", published: false) ]
@@ -671,6 +713,16 @@ module ServiceCalls
   # update; these cover the create, which a refusal handles differently (an
   # unsaved record is no audit subject, only its type goes in the metadata).
   VARIANTS = {
+    # The console's clearing of a lost person's passkeys: a signed-in actor
+    # is refused it, the trusted actor passes.
+    "Users::UpdatePassword" => {
+      "removing passkeys" => lambda {
+        target = stranger_target
+        add_passkey(target, client: fake_authenticator)
+        { call: -> { Users::UpdatePassword.call(target, password: "a-new-long-password-2", password_confirmation: "a-new-long-password-2", remove_passkeys: true) },
+          permission: "users.manage", on: target }
+      }
+    },
     "Pages::Save" => {
       "creating" => lambda {
         # Built here, as the trusted actor: inside `call` it would be created

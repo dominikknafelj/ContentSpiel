@@ -225,4 +225,24 @@ class SiteSettingTest < ActiveSupport::TestCase
     assert_equal "Danas Notizen", setting.reload.title(locale: "de")
     assert_nil setting.tagline(locale: "de")
   end
+
+  test "the policy unset is owners_and_admins in production and nobody elsewhere, and an unknown value is refused" do
+    setting = SiteSetting.instance
+    assert_nil setting.passkey_policy
+
+    assert_equal "owners_and_admins", setting.effective_passkey_policy(production: true)
+    assert_equal "nobody", setting.effective_passkey_policy(production: false)
+    assert_equal "nobody", setting.effective_passkey_policy
+
+    SiteSetting::PASSKEY_POLICIES.each do |policy|
+      setting.passkey_policy = policy
+      assert setting.valid?, policy
+      assert_equal policy, setting.effective_passkey_policy(production: true)
+      assert_equal policy, setting.effective_passkey_policy(production: false)
+    end
+
+    setting.passkey_policy = "admins"
+    assert_not setting.valid?
+    assert setting.errors.of_kind?(:passkey_policy, :inclusion)
+  end
 end

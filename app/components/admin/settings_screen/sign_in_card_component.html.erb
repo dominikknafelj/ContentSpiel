@@ -1,0 +1,10 @@
+<%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(SettingsSections.find("sign_in"), self), id: "settings-sign_in-card", intro: t(".intro")) do %>
+  <div class="admin-column p-4" data-field-name="passkey_policy" <%= tag.attributes(data: { save_bar_changed: changed }) %>>
+    <%= render Admin::Ui::SegmentedComponent.new(mode: :radios, name: "site_setting[passkey_policy]", label: t(".legend"), legend: :visible,
+          id: FIELD_ID, describedby: "#{FIELD_ID}-help", segments: segments) %>
+    <p id="<%= FIELD_ID %>-help" class="mt-1.5 text-sm text-meta"><%= t(".admins_help") %></p>
+    <% if count_line? %>
+      <p class="mt-3 text-sm text-ink" data-passkey-uncovered><%= count_line %></p>
+    <% end %>
+  </div>
+<% end %>

@@ -13,7 +13,14 @@ Rails.application.config.filter_parameters += [
   :mail_username,
   # The bot check's answer, posted by the Turnstile widget as `cf-turnstile-response` (`SignIn::BotCheck`):
   # a one-time pass that must reach no log, and whose name no entry above matches.
-  :turnstile
+  :turnstile,
+  # A passkey's answer to a ceremony, posted as `credential` (the WebAuthn JSON: its credential id, and at
+  # registration its public key), which reaches no log; no entry above matches the name. The exact name, not a
+  # bare :credential, which would also drop the audit log's `credentials` change of a user and a form destination.
+  /\Acredential\z/,
+  # A recovery code typed at the second step or shown once when made: a one-time password that no entry above
+  # matches (not :passw, not :token).
+  :recovery_code
 ]
 
 # A visitor's answers to a form (personal data reaches no log). The endpoint (`FormSendsController`, controller

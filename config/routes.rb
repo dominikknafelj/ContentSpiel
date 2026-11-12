@@ -1,11 +1,17 @@
 Rails.application.routes.draw do
-  # While setup is required, every route below is unreachable: these two
+  # While setup is required, every route below is unreachable: these
   # catch-alls are declared first, so they win over
   # CS Studio and the public page routes. A lambda, so the constant is only
   # resolved per request (never while routes load during boot).
   constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
     match "/", to: redirect("/setup", status: 302), via: :all, as: :setup_required_root
     match "*path", to: redirect("/setup", status: 302), via: :all, format: false, as: :setup_required
+  end
+  # What is not a page load is refused by a bare Rack answer, which loads
+  # no session (the constraint's comment says why).
+  constraints(->(request) { Setup::RedirectConstraint.refuses?(request) }) do
+    match "/", to: ->(_env) { [ 404, { "content-type" => "text/plain" }, [] ] }, via: :all, as: :setup_refused_root
+    match "*path", to: ->(_env) { [ 404, { "content-type" => "text/plain" }, [] ] }, via: :all, format: false, as: :setup_refused
   end
 
   # A component browser for the ViewComponents under app/components
@@ -26,6 +32,16 @@ Rails.application.routes.draw do
   scope ContentSpiel::ADMIN_PATH, module: :admin, as: :admin do
     get "sign-in", to: "sessions#new", as: :sign_in
     post "sign-in", to: "sessions#create"
+    post "sign-in/passkey/options", to: "sessions#passkey_options", as: :sign_in_passkey_options
+    post "sign-in/passkey", to: "sessions#passkey", as: :sign_in_passkey
+    # The second step, after a right password for an account that holds a
+    # passkey or recovery codes (`Admin::SecondFactorsController`). Under
+    # `sign-in/`, which `Setup::RedirectConstraint` lets through.
+    get "sign-in/second-step", to: "second_factors#show", as: :second_factor
+    post "sign-in/second-step/options", to: "second_factors#options", as: :second_factor_options
+    post "sign-in/second-step/passkey", to: "second_factors#passkey", as: :second_factor_passkey
+    post "sign-in/second-step/code", to: "second_factors#code", as: :second_factor_code
+    delete "sign-in/second-step", to: "second_factors#destroy"
     delete "sign-out", to: "sessions#destroy", as: :sign_out
 
     # ⌘K "Jump to..." results: a layout-less HTML
@@ -330,6 +346,25 @@ Rails.application.routes.draw do
     # only: the request names a session, never a user.
     delete "account/sessions/:id", to: "account_sessions#destroy", as: :account_session
     delete "account/sessions", to: "account_sessions#destroy_others", as: :account_sessions
+    # Confirm it's you: the signed-in person's password, or the options for
+    # one of their own passkeys and its answer, before a change to how they
+    # sign in (`Admin::RecentConfirmation`).
+    post "account/confirmation", to: "confirmations#create", as: :account_confirmation
+    post "account/confirmation/options", to: "confirmations#options", as: :account_confirmation_options
+    post "account/confirmation/passkey", to: "confirmations#passkey", as: :account_confirmation_passkey
+    # The Passkeys and Recovery codes cards, on the signed-in user's own
+    # account only: a passkey's id is looked up among theirs. The options
+    # are a registration's, fetched before the browser's prompt.
+    post "account/passkeys/options", to: "passkeys#options", as: :account_passkey_options
+    post "account/passkeys", to: "passkeys#create", as: :account_passkeys
+    patch "account/passkeys/:id", to: "passkeys#update", as: :account_passkey, constraints: { id: /\d+/ }
+    delete "account/passkeys/:id", to: "passkeys#destroy", constraints: { id: /\d+/ }
+    # Enrolment: where a person the passkey policy covered at sign-in, who
+    # holds no passkey, is sent from every CS Studio page until they add one
+    # (`Admin::PasskeyEnrolment`). The add itself is the Passkeys card's
+    # endpoints above, with `from: "enrolment"`.
+    get "enrolment", to: "enrolments#show", as: :enrolment
+    post "account/recovery-codes", to: "recovery_codes#create", as: :account_recovery_codes
 
     # "Connect an AI assistant": the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list
@@ -475,6 +510,9 @@ Rails.application.routes.draw do
   # First-run setup wizard. SetupController
   # itself 404s once setup is complete.
   get "setup", to: "setup#index", as: :setup
+  # The passkey step's registration options (`SetupController#passkey_
+  # options`): under /setup, which the redirect constraint leaves open.
+  post "setup/passkey/options", to: "setup#passkey_options", as: :setup_passkey_options
   get "setup/:step", to: "setup#show", as: :setup_step
   patch "setup/:step", to: "setup#update"
 

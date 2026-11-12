@@ -33,6 +33,10 @@ class Admin::AuditScreen::ToolbarComponentTest < ViewComponent::TestCase
 
     assert_selector "optgroup[label=Pages] option", text: "page.published"
     assert_selector "optgroup[label=Sign-in] option", text: "session.failed"
+    %w[passkey.added passkey.removed recovery_codes.generated recovery_code.used].each do |action|
+      assert_selector "optgroup[label=Sign-in] option", text: action
+    end
+    assert_no_selector "optgroup[label=Other] option", text: "passkey.added"
     assert_selector "optgroup[label=Other] option", text: "acme/x.y"
     assert_selector "optgroup[label=Other] option", text: "acme/x.z"
   end
