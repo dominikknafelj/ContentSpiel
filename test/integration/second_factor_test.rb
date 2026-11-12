@@ -114,6 +114,19 @@ class SecondFactorTest < ActionDispatch::IntegrationTest
 
     get admin_second_factor_path
     assert_select "input[name=recovery_code]", 1, "with no passkey the code view is the only one"
+    assert_select "a[href='#{admin_second_factor_path}']", count: 0
+  end
+
+  test "the code view of an account with a passkey links back to the passkey view beside Start over" do
+    add_passkey(@user, client: fake_authenticator)
+    password_step
+
+    get admin_second_factor_path(with: "code")
+
+    assert_select "input[name=recovery_code]", 1
+    assert_select "a[href='#{admin_second_factor_path}']", text: I18n.t("admin.second_factor.show.use_passkey")
+    assert_select "div:has(> a[href='#{admin_second_factor_path}']) > form[action='#{admin_second_factor_path}'] button",
+      text: I18n.t("admin.second_factor.show.start_over")
   end
 
   test "a right code signs in, uses the code, records recovery_code.used with what is left, queues the mail and lands on Your account's passkeys" do

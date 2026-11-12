@@ -3,7 +3,9 @@
     passkey" (the panel's one primary) and "Use a recovery code" when the
     account has one left. The code view (`?with=code`, and always for an
     account with no passkey): the code field with its help line and Sign in.
-    Both end in Start over, which forgets the step. The words are read by
+    Both end in Start over, which forgets the step; the code view of an
+    account with a passkey has "Use your passkey" beside it, a link back to
+    the passkey view. The words are read by
     full key: they are `admin.second_factor.show.*`, where a lazy lookup
     would read the controller's plural name.
 
@@ -47,6 +49,11 @@
     <% end %>
   <% end %>
 
-  <%= button_to t("admin.second_factor.show.start_over"), admin_second_factor_path, method: :delete,
-        class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
+  <div class="flex flex-wrap items-center gap-2">
+    <% if @code_view && @has_passkey %>
+      <%= link_to t("admin.second_factor.show.use_passkey"), admin_second_factor_path, class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
+    <% end %>
+    <%= button_to t("admin.second_factor.show.start_over"), admin_second_factor_path, method: :delete,
+          class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
+  </div>
 </div>
