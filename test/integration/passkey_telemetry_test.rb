@@ -8,10 +8,11 @@ require "test_helper"
 # only the keys `Telemetry::ATTRIBUTES` lists, each with one of its listed
 # words, and no span of the request, nor of a job it queued, holds what a
 # person typed or what a ceremony carries. The email, the password, the
-# recovery codes, the passkey's name, its credential id and public key, and
-# every challenge the options answered are planted or kept fresh in each
-# test and searched for in every name, attribute, status description, link
-# and event of every exported span, as typed, in either case and
+# recovery codes, the passkey's name, its credential id and public key, a
+# refused stranger's credential id, and every challenge the options
+# answered are planted or kept fresh in each test and searched for in every
+# name, attribute, status description, link and event of every exported
+# span (the password step's own request too), as typed, in either case and
 # URL-encoded.
 class PasskeyTelemetryTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
@@ -46,6 +47,7 @@ class PasskeyTelemetryTest < ActionDispatch::IntegrationTest
     @user = User.create!(email_address: @email, password: @password)
     @client = fake_authenticator
     @challenges = []
+    @stranger_ids = []
     @exporter = Rails.application.config.x.otel_test_exporter
     @exporter.reset
   end
@@ -123,6 +125,7 @@ class PasskeyTelemetryTest < ActionDispatch::IntegrationTest
       "a recovery code" => Array(@codes).flat_map { |code| [ code, code.delete("-") ] },
       "the passkey's name" => [ @name ],
       "the credential id or public key" => @user.passkeys.reload.flat_map { |passkey| [ passkey.external_id, passkey.public_key ] },
+      "a refused credential's id" => @stranger_ids,
       "a challenge" => @challenges
     }.each do |what, values|
       values.flat_map { forms_of(it) }.each { |value| assert_not_includes text, value, "a span holds #{what} (#{value})" }
@@ -161,20 +164,23 @@ class PasskeyTelemetryTest < ActionDispatch::IntegrationTest
   # site never stored) and one accepted, each request's spans apart.
   def passkey_sign_ins
     stranger = fake_authenticator
-    passkey_registration(@user, client: stranger)
+    @stranger_ids << passkey_registration(@user, client: stranger).external_id
     challenge = challenge_from(admin_sign_in_passkey_options_path)
-    refused = spans_of { passkey_sign_in(assertion(challenge, client: stranger)) }
+    credential = assertion(challenge, client: stranger)
+    assert_equal @stranger_ids, [ JSON.parse(credential).fetch("id") ], "the id the refused answer carries is planted"
+    refused = spans_of { passkey_sign_in(credential) }
     challenge = challenge_from(admin_sign_in_passkey_options_path)
     ok = spans_of { passkey_sign_in(assertion(challenge)) }
     assert_equal "passkey", Session.sole.authenticated_with
     [ refused, ok ]
   end
 
-  # The second step by code: a wrong one; after three more (the password's
+  # The second step by code (the password step's spans kept in
+  # @password_spans): a wrong one; after three more (the password's
   # count and four codes close the account for a minute), an attempt in that
   # minute; and once the minute has ended, a right one.
   def code_steps
-    password_step
+    @password_spans = spans_of { password_step }
     wrong = spans_of { send_code("0000-0000") }
     3.times { send_code("0000-0000") }
     locked = spans_of { send_code(@codes.first) }
@@ -258,9 +264,10 @@ class PasskeyTelemetryTest < ActionDispatch::IntegrationTest
     traces.concat(passkey_sign_ins)
     delete admin_sign_out_path
     traces.concat(code_steps)
+    traces << @password_spans
     delete admin_sign_out_path
 
-    password_step
+    traces << spans_of { password_step }
     challenge = challenge_from(admin_second_factor_options_path)
     traces << spans_of do
       post admin_second_factor_passkey_path, params: { credential: assertion(challenge) }, as: :json
