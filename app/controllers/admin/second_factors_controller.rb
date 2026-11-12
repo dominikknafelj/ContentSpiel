@@ -23,12 +23,13 @@ module Admin
   #
   # THE ANSWERS. A code is a form: a refusal goes back to the code view
   # with its sentence; a success lands on Your account's passkeys, which
-  # says how many codes are left (`flash[:recovery_code_left]`). A passkey
+  # says how many codes are left (`flash[:recovery_code_left]`), and forgets
+  # the page the person was sent from, as every other sign-in takes it. A passkey
   # is the `passkey-sign-in` script's, answered 200 JSON `{ "location" }`
   # whatever happened, as the sign-in page's passkey is: CS Studio (or the
   # page the person was sent from) on success, this step again with its
   # sentence on a refusal. A closed bucket is "Try again in a few minutes."
-  # (the address's: "Try again later."). The per-address rate limit counts
+  # (the address's: "Try again later."), on the refusal that closed it too. The per-address rate limit counts
   # every POST of a proof, with sign-in's figures.
   #
   # WHAT IS AUDITED. A refused proof is `session.second_factor_failed`,
@@ -91,7 +92,7 @@ module Admin
         answer_passkey(locked_sentence(outcome))
       else
         refused(user, outcome, method: "passkey")
-        answer_passkey(t(user.recovery_codes.unused.exists? ? "admin.second_factor.passkey_failed" : "admin.second_factor.passkey_failed_no_codes"))
+        answer_passkey(refusal_sentence(outcome) { t(user.recovery_codes.unused.exists? ? "admin.second_factor.passkey_failed" : "admin.second_factor.passkey_failed_no_codes") })
       end
     end
 
@@ -106,12 +107,13 @@ module Admin
         Audit.record("recovery_code.used", subject: user, metadata: { "left" => left })
         SignInMailer.queue_alert(:recovery_code_used, user, used_at: Time.current, from_address: request.remote_ip, left: left, **mail_link_origin)
         flash[:recovery_code_left] = left
+        session.delete(:return_to_after_authenticating)
         redirect_to admin_account_path(anchor: "passkeys")
       when :locked
         redirect_to admin_second_factor_path(with: "code"), alert: locked_sentence(outcome)
       else
         refused(user, outcome, method: "recovery_code")
-        redirect_to admin_second_factor_path(with: "code"), alert: t("admin.second_factor.code_failed")
+        redirect_to admin_second_factor_path(with: "code"), alert: refusal_sentence(outcome) { t("admin.second_factor.code_failed") }
       end
     end
 
@@ -164,6 +166,13 @@ module Admin
     def refused(user, outcome, method:)
       Audit.record("session.second_factor_failed", subject: user, metadata: { "method" => method })
       record_locks(outcome.trips, email: user.email_address, identifier: User.normalize_value_for(:email_address, user.email_address))
+    end
+
+    # The pause, when this refusal closed a bucket (as sign-in and Confirm
+    # it's you say it on the attempt that closed it), else the block's
+    # sentence for a wrong proof.
+    def refusal_sentence(outcome)
+      outcome.trips.any? ? locked_sentence(outcome) : yield
     end
 
     def locked_sentence(outcome)

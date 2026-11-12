@@ -186,7 +186,7 @@ class SecondFactorTest < ActionDispatch::IntegrationTest
     assert_enqueued_with(job: SignIn::LockoutMailJob, args: [ EMAIL, { locked_at: Time.current, from_address: ADDRESS, minutes: 1, origin: "http://www.example.com" } ]) do
       send_code("0000-0000")
     end
-    assert_equal I18n.t("admin.second_factor.code_failed"), flash[:alert]
+    assert_equal I18n.t("admin.sessions.locked"), flash[:alert], "the code that closed the account says the pause"
     locked = Audit::Event.where(action: "session.locked").sole
     assert_equal({ "bucket" => "account", "email_address" => EMAIL, "level" => 0, "seconds" => 60 }, locked.metadata)
 
@@ -205,6 +205,38 @@ class SecondFactorTest < ActionDispatch::IntegrationTest
     assert_not written?("session_id")
     assert_not written?(Admin::SignInCompletion::DEVICE_COOKIE)
     assert_equal 4, Audit::Event.where(action: "session.second_factor_failed").count
+  end
+
+  test "the passkey that closes the account says the pause, not that the passkey failed" do
+    add_passkey(@user, client: fake_authenticator)
+    password_step
+
+    3.times do
+      options
+      assert_equal admin_second_factor_path, send_passkey("not a credential")
+      assert_equal I18n.t("admin.second_factor.passkey_failed"), flash[:alert]
+    end
+    options
+    send_passkey("not a credential")
+
+    assert_equal I18n.t("admin.sessions.locked"), flash[:alert]
+    assert Audit::Event.exists?(action: "session.locked")
+    assert_equal 0, Session.count
+  end
+
+  # Sign-in's other ways take the page the person was sent from
+  # (`after_authentication_url`); a code lands on Your account, and the
+  # stored page is forgotten with it, never left for a later sign-in.
+  test "a code's sign-in forgets the page the person was sent from" do
+    get admin_pages_path
+    assert_redirected_to admin_sign_in_path
+    assert session[:return_to_after_authenticating].present?, "the premise: the page is stored"
+    password_step
+
+    send_code(@codes.first)
+
+    assert_redirected_to admin_account_path(anchor: "passkeys")
+    assert_nil session[:return_to_after_authenticating]
   end
 
   test "after five minutes the step says it took too long and the password must be typed again" do
