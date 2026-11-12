@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { messages } from "i18n/messages"
 
 // Confirm it's you (`Admin::Ui::ConfirmIdentityDialogComponent`), on the
 // dialog's wrapper. `ensure()` opens the dialog and resolves true once a
@@ -8,23 +9,36 @@ import { Controller } from "@hotwired/stimulus"
 //   when the server answered a call 403 `{ "confirm": true }`, before it
 //   makes the call again;
 // - a refused Turbo Stream request (`Admin::RecentConfirmation`), whose
-//   answer appends a `request` target here: the form that was sent, marked
-//   `data-confirm-identity` and remembered at its `turbo:submit-start`, is
-//   sent again once the person has confirmed.
+//   answer appends a `request` target here.
+//
+// THE FORM SENT AGAIN IS THE ONE THE GATE REFUSED, and only once. A form
+// marked `data-confirm-identity` is remembered at its `turbo:submit-end`
+// only when its answer was the gate's refusal (403 with CONFIRM_HEADER),
+// so a form never refused is never sent again, and of two in flight the
+// refused one is. The form is taken and forgotten in one step when the
+// confirmation settles: sent again on true, dropped on false, so a
+// cancelled change never comes back with a later request.
 //
 // THE OPTIONS ARE FETCHED WHEN THE DIALOG OPENS, never at the press: the
 // browser's prompt opens only inside the press (`passkeys/ceremony`, "THE
 // PROMPT OPENS IN THE PRESS"). "Use your passkey" stays disabled while no
 // options are held, and each set is used once (the server takes its
 // challenge with the first answer); a refusal or a closed prompt fetches a
-// fresh set. A closed prompt says nothing. Where the browser can use no
-// passkey, the button and its "or" are hidden and the password is the way.
+// fresh set. Each fetch carries its opening's number, and an answer of an
+// earlier one is dropped: the server keeps one challenge, the latest. A
+// closed prompt says nothing. Where the browser can use no passkey, the
+// button and its "or" are hidden and the password is the way.
 //
-// The error line is the server's sentence, written as it comes. The
-// password is sent as JSON, and the field is emptied as it is sent, when
-// the dialog closes and before Turbo caches the page. The ceremony is
-// imported on connect (`preload: false`), so a page without this dialog
-// never fetches it.
+// The error line is the server's sentence, written as it comes; a passkey
+// that failed in the browser, a network failure or an answer that is not
+// the confirmation's JSON say `passkey_failed` (the passkey) or `limited`
+// (the password), read from the wrapper's `data-messages`. The password is
+// sent as JSON, and the field is emptied as it is sent, when the dialog
+// closes and before Turbo caches the page. The ceremony is imported on
+// connect (`preload: false`), so a page without this dialog never fetches
+// it.
+const CONFIRM_HEADER = "X-Confirm-Identity"
+
 export default class extends Controller {
   static targets = ["passkey", "divider", "error", "request"]
   static values = { optionsUrl: String, passwordUrl: String, passkeyUrl: String }
@@ -33,11 +47,15 @@ export default class extends Controller {
     this.remembered = null
     this.pending = null
     this.options = null
+    this.opening = 0
     this.remember = (event) => {
-      if (event.target instanceof HTMLFormElement && event.target.matches("[data-confirm-identity]")) this.remembered = event.target
+      const form = event.detail?.formSubmission?.formElement
+      const response = event.detail?.fetchResponse
+      if (!(form instanceof HTMLFormElement) || !form.matches("[data-confirm-identity]")) return
+      if (response?.statusCode === 403 && response.header(CONFIRM_HEADER)) this.remembered = form
     }
     this.forget = () => this.close()
-    document.addEventListener("turbo:submit-start", this.remember)
+    document.addEventListener("turbo:submit-end", this.remember)
     document.addEventListener("turbo:before-cache", this.forget)
     this.closed = () => {
       this.password.value = ""
@@ -50,7 +68,7 @@ export default class extends Controller {
   }
 
   disconnect() {
-    document.removeEventListener("turbo:submit-start", this.remember)
+    document.removeEventListener("turbo:submit-end", this.remember)
     document.removeEventListener("turbo:before-cache", this.forget)
     this.dialog.removeEventListener("close", this.closed)
     this.settle(false)
@@ -81,12 +99,14 @@ export default class extends Controller {
     return promise
   }
 
-  // A refused stream request's mark: the remembered form goes again once
-  // confirmed. The mark is taken out at once, so a cached page holds none.
+  // A refused stream request's mark, taken out at once so a cached page
+  // holds none. The refused form is read when the confirmation settles: its
+  // `turbo:submit-end` has come by then.
   requestTargetConnected(element) {
     element.remove()
-    const form = this.remembered
     this.ensure().then((confirmed) => {
+      const form = this.remembered
+      this.remembered = null
       if (confirmed && form?.isConnected) form.requestSubmit()
     })
   }
@@ -94,6 +114,7 @@ export default class extends Controller {
   async prepare() {
     if (!this.hasPasskeyTarget) return
 
+    const opening = ++this.opening
     this.ceremony ||= await import("passkeys/ceremony")
     if (!this.ceremony.supported()) {
       this.passkeyTarget.hidden = true
@@ -103,10 +124,15 @@ export default class extends Controller {
 
     this.options = null
     this.passkeyTarget.disabled = true
-    const { status, options } = await this.ceremony.fetchOptions(this.optionsUrlValue)
-    if (status !== 200 || !this.pending) return
+    let answer
+    try {
+      answer = await this.ceremony.fetchOptions(this.optionsUrlValue)
+    } catch {
+      return
+    }
+    if (opening !== this.opening || answer.status !== 200 || !this.pending) return
 
-    this.options = options
+    this.options = answer.options
     this.passkeyTarget.disabled = false
   }
 
@@ -120,9 +146,9 @@ export default class extends Controller {
     this.errorTarget.textContent = ""
     this.ceremony
       .get(options)
-      .then((credential) => this.send(this.passkeyUrlValue, { credential: this.ceremony.toJSON(credential) }))
+      .then((credential) => this.send(this.passkeyUrlValue, { credential: this.ceremony.toJSON(credential) }, "passkey"))
       .catch((error) => {
-        if (!this.ceremony.cancelled(error)) throw error
+        if (!this.ceremony.cancelled(error)) this.fail("passkey")
       })
       .finally(() => {
         if (this.pending) this.prepare()
@@ -134,27 +160,44 @@ export default class extends Controller {
     const password = this.password.value
     this.password.value = ""
     this.errorTarget.textContent = ""
-    this.send(this.passwordUrlValue, { password })
+    this.send(this.passwordUrlValue, { password }, "password")
   }
 
-  async send(url, body) {
-    const response = await fetch(url, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? "",
-      },
-      body: JSON.stringify(body),
-    })
-    const answer = response.headers.get("Content-Type")?.includes("application/json") ? await response.json() : {}
+  // `way`: "passkey" or "password", whose sentence an answer that is not
+  // the confirmation's gets.
+  async send(url, body, way) {
+    let response, answer
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? "",
+        },
+        body: JSON.stringify(body),
+      })
+      answer = response.headers.get("Content-Type")?.includes("application/json") ? await response.json() : {}
+    } catch {
+      return this.fail(way)
+    }
+
     if (response.ok && answer.confirmed) {
       this.settle(true)
       this.close()
-    } else if (answer.error) {
+    } else if (typeof answer.error === "string") {
       this.errorTarget.textContent = answer.error
+    } else {
+      this.fail(way)
     }
+  }
+
+  fail(way) {
+    const words = messages(this.element)
+    this.errorTarget.textContent = way === "passkey"
+      ? words.t("components.ui.confirm_identity_dialog.passkey_failed")
+      : words.t("components.ui.confirm_identity_dialog.limited")
   }
 
   close() {
@@ -168,6 +211,7 @@ export default class extends Controller {
     if (!pending) return
 
     this.pending = null
+    if (!confirmed) this.remembered = null
     pending.resolve(confirmed)
   }
 }

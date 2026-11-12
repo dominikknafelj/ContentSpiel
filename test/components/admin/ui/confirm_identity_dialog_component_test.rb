@@ -53,4 +53,26 @@ class Admin::Ui::ConfirmIdentityDialogComponentTest < ViewComponent::TestCase
     root = page.find("##{Admin::Ui::ConfirmIdentityDialogComponent::ID}", visible: :all)
     assert_equal "#{URLS[:password_url]}?locale=de", root["data-admin--passkeys--confirm-password-url-value"]
   end
+
+  test "the script's own sentences for a failure that is not the confirmation's are on the wrapper" do
+    render_inline(Admin::Ui::ConfirmIdentityDialogComponent.new(passkey: true))
+
+    held = JSON.parse(page.find("##{Admin::Ui::ConfirmIdentityDialogComponent::ID}", visible: :all)["data-messages"])
+    assert_equal "That passkey didn't work. Try again, or use your password.", held["components.ui.confirm_identity_dialog.passkey_failed"]
+    assert_equal "Try again in a few minutes.", held["components.ui.confirm_identity_dialog.limited"]
+  end
+
+  # The browser test of the re-send is the Account screen's; this holds the
+  # rule's three lines: a form is remembered only from the gate's refusal,
+  # by its own answer, and a false settle forgets it.
+  test "the script sends again only the form the gate refused, and forgets it on a cancel" do
+    script = Rails.root.join("app/javascript/controllers/admin/passkeys/confirm_controller.js").read
+
+    assert_includes script, %(const CONFIRM_HEADER = "#{Admin::RecentConfirmation::CONFIRM_HEADER}")
+    assert_includes script, %(document.addEventListener("turbo:submit-end", this.remember))
+    assert_includes script, "response?.statusCode === 403 && response.header(CONFIRM_HEADER)"
+    assert_not_includes script, "turbo:submit-start"
+    assert_match(/const form = this\.remembered\n\s+this\.remembered = null/, script)
+    assert_includes script, "if (!confirmed) this.remembered = null"
+  end
 end
