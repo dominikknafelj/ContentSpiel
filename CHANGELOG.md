@@ -5,7 +5,7 @@
 ### Added
 
 - Passkeys for CS Studio. A person signs in with a passkey alone ("Sign in with a passkey" on the sign-in page, no email first), or with their password followed by a passkey or a recovery code. At an IP address (a `PUBLIC_HOST` that is an IP, development at 127.0.0.1) no passkey is offered: a passkey belongs to a domain, and WebAuthn refuses an IP.
-- The second step of a sign-in ("Confirm it's you"): after a right password for an account that holds a passkey or unused recovery codes, one of its passkeys or one of its codes within five minutes, "Start over" to go back. A wrong code and a used one get the same sentence, and every wrong proof counts in the account's sign-in bucket as a wrong password does.
+- The second step of a sign-in ("Confirm it's you"): after a right password for an account that holds a passkey or unused recovery codes, one of its passkeys or one of its codes within five minutes, "Start over" to go back, and from the code view "Use your passkey" back to the passkey. A wrong code and a used one get the same sentence, and every wrong proof counts in the account's sign-in bucket as a wrong password does.
 - Recovery codes: ten single-use codes (`XXXX-XXXX`), made with a person's first passkey and with Generate… or Regenerate… on Your account, shown once with Copy, Download and "I have saved these codes", stored only as HMACs.
 - Your account's Passkeys card (each passkey's name, when it was added and last used, Rename, Remove…, "Add a passkey…") and Recovery codes card (how many are left, when they were made). Removing the last passkey of a person no policy holds to one deletes their recovery codes too, and they sign in with their password again.
 - Confirm it's you: adding or removing a passkey, its registration options and making recovery codes ask for the password or a passkey again when the sign-in, or the last confirmation, is more than ten minutes old. A wrong password counts in the account's bucket.
@@ -15,12 +15,14 @@
 - The console's way back for a person who lost every passkey and every code: the password command with `remove_passkeys: true` deletes their passkeys and codes, records `passkey.removed` and ends their sessions (`docs/reference/hosting.md`, "The reset mail").
 - The mails "A passkey was added to your account on <site>" and "A recovery code was used on <site>" (when, the passkey's name or the address and the codes left, and a button to Your account), sent only while mail works.
 - Audit events, all Security events but a rename, under "Sign-in" in the audit log's Action filter: `passkey.added`, `passkey.renamed`, `passkey.removed`, `recovery_codes.generated`, `recovery_code.used`, `session.second_factor_failed` (no actor) and `session.confirmation_failed`.
+- A per-address rate limit on the passkey options (sign-in, the second step and Confirm it's you), counted apart from the proofs: 30 a minute, past which the options answer a bare 429 and no passkey is offered until the minute ends.
+- Signing out deletes every passkey challenge's cookie (`cs_passkey_<purpose>`), so none is left for the next person on the browser.
 - Spans `auth.passkey`, `auth.recovery_code`, `auth.second_factor`, `auth.confirmation` and `auth.account_mail`, and the attributes `auth.passkey.ceremony`, `auth.policy`, `auth.second_factor.required` and `auth.mail.kind` (`docs/reference/hosting.md`, "Telemetry", with a Honeycomb query for the second step's failures).
 
 ### Changed
 
 - A password alone no longer signs in an account that holds a passkey or an unused recovery code: a right password goes on to the second step, and the known-device cookie `cs_known_device` is written only once a sign-in is whole.
-- `session.created` carries `{ "method" }` when a person signed in with a passkey or a recovery code, and reads "signed in with a passkey" or "signed in with a recovery code"; a password's is as before.
+- `session.created` carries `{ "method" }` when a person signed in with a passkey or a recovery code, and reads "signed in with a passkey" or "signed in with a recovery code"; a password's reads "signed in".
 - While setup is pending only a page load (a GET or HEAD asking for HTML that is no prefetch) is sent to `/setup`; any other request is answered 404 without loading the session, so a client that does not ask for HTML gets 404 for `/`.
 - Settings has eight sections: Sign-in stands after Mail, for an owner alone.
 - `filter_parameters` holds `credential` (exactly) and `recovery_code`.
