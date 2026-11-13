@@ -37,7 +37,7 @@ class Session < ApplicationRecord
   # (`Session.start` drops it otherwise). Never rendered, logged or audited.
   encrypts :provider_token
 
-  validates :authenticated_with, inclusion: { in: METHODS }
+  validates :authenticated_with, inclusion: { in: ->(_) { METHODS + SignInMethods.names } }
 
   # What a `session.ended` for an expiry stores of the timeout it ended by
   # (`Sessions::End`, `Sessions::SweepJob`): the event's sentence reads it
@@ -93,9 +93,10 @@ class Session < ApplicationRecord
       provider_token: token, provider_checked_at: (at if rechecked_method?(method)))
   end
 
-  # Whether a method's provider is asked again. SSO is; a gem's method that
-  # registers a re-check joins here.
-  def self.rechecked_method?(method) = method == "sso"
+  # Whether a method's provider is asked again. SSO is, and so is a gem's
+  # method whose entry has a `recheck`; one with none is never asked, so it
+  # gets no check date and no stored token.
+  def self.rechecked_method?(method) = method == "sso" || SignInMethods.rechecked?(method)
   private_class_method :rechecked_method?
 
   # The sessions past their absolute timeout at `at`.

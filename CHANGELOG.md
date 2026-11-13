@@ -38,6 +38,7 @@
 - `ADMIN_PATH` may no longer be `forms`, the first segment of the public form send.
 - The new top-level names `Passkey`, `RecoveryCode`, `Passkeys`, `RecoveryCodes` and `PasskeyChallenges` refuse a gem's `ContentSpiel::Plugins` hook owner of the same name (`passkey`, `recovery_code`, `passkeys`, `recovery_codes`, `passkey_challenges`) at boot. A gem with such an owner renames it.
 - A new top-level name, `HostRouteConstraint` (`app/constraints/host_route_constraint.rb`): a gem whose hook owner has that name is refused at boot.
+- A new top-level name, `SignInMethods` (`app/models/sign_in_methods.rb`): a gem whose hook owner is `sign_in_methods` is refused at boot.
 
 ### Removed
 
@@ -70,6 +71,8 @@
 - `Users::UpdatePassword.call(user, …, remove_passkeys: false)`: `true` from the console alone.
 - `Admin::Ui::RecoveryCodesComponent.new(codes:, frame: :dialog | :page, done_href: nil, id: "recovery-codes")` and `Admin::Ui::ConfirmIdentityDialogComponent.new(passkey:, url_options: {})`, shared components with their contracts (`docs/reference/design-system.md`, "Shared components").
 - The product layout loads CS Studio's entry point (`admin`) in place of `application` for a page that says `content_for :entry_point, "admin"`, as the setup layout does: the enrolment page.
+- Added the hook `ContentSpiel::Plugins.sign_in_methods { |methods| methods.register "owner/name", label:, path:, recheck: nil, passkey_policy: :applies }`, for a gem's way to sign in to CS Studio. It is kept and replayed into `SignInMethods` on every boot and development reload, under the block types' owner rules (a bare name, a second owner in one call, an owner another hook has and an owner named like one of the CMS's top-level constants are refused, naming the place of the call). `label:` is an I18n key of the gem's, `path:` a route helper on `main_app` that the button POSTs to, `recheck:` an optional object answering `call(session)` with `:ok`, `:revoked` or `:unavailable` (a method with none is never asked again and its sessions keep no provider token), and `passkey_policy:` is `:applies` or `:exempt` (the method's provider is the second factor, as SSO's is). The hook registers the method and nothing else: it creates no account (a method finds an invited one), records nothing in the audit log but `session.created`, and is neither hidden nor refused by `SSO_REQUIRED`. `Session::METHODS + SignInMethods.names` are the methods a session may be made with.
+
 
 ## 0.3.0 (2026-11-11)
 

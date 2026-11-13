@@ -248,6 +248,30 @@ class SessionTest < ActiveSupport::TestCase
     assert_not_includes Session.expired_sso(t + 13.days), plain
   end
 
+  test "a session may be made with a registered method and not with an unknown one" do
+    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path)
+    assert Session.start(user: @user, method: "acme/saml", user_agent: nil, ip_address: nil).persisted?
+    assert_raises(ActiveRecord::RecordInvalid) { Session.start(user: @user, method: "acme/other", user_agent: nil, ip_address: nil) }
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "a method with a recheck gets a check date and its token, and one without neither" do
+    SignInMethods.register("acme/checked", label: "k", path: :admin_root_path, recheck: ->(_session) { :ok })
+    SignInMethods.register("acme/unchecked", label: "k", path: :admin_root_path)
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    checked = Session.start(user: @user, method: "acme/checked", user_agent: nil, ip_address: nil, provider_token: "tok", at: t)
+    unchecked = Session.start(user: @user, method: "acme/unchecked", user_agent: nil, ip_address: nil, provider_token: "tok", at: t)
+
+    assert_equal t, checked.provider_checked_at
+    assert_equal "tok", checked.reload.provider_token
+    assert_nil unchecked.provider_checked_at
+    assert_nil unchecked.reload.provider_token
+    assert_not_includes Session.expired_sso(t + 13.days), unchecked
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
   test "provider_check_due holds the sessions checked 24 hours ago or more" do
     t = Time.zone.local(2026, 11, 11, 9, 0, 0)
     held = sso_session(token: "refresh-token", at: t)
