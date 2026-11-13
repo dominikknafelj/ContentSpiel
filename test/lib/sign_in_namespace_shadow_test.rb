@@ -11,13 +11,16 @@ require "test_helper"
 # constant. That is why the sub-namespaces are the plurals `Sessions` and
 # `Passkeys`, and `RecoveryCodes`, never `Session`, `Passkey` or `RecoveryCode`.
 #
-# The names under `SignIn` are DERIVED from the directories (`app/models/
-# sign_in/`, `app/services/sign_in/`, `app/jobs/sign_in/`), never listed, and
-# compared with `TopLevelNames` (app/values/top_level_names.rb), the same list
+# The names under `SignIn` are DERIVED from the `sign_in/` directories of
+# every autoload root of the application (`Rails.autoloaders.main.dirs`, so a
+# new layer folder is read without an edit here), never listed, and compared
+# with `TopLevelNames` (app/values/top_level_names.rb), the same list
 # the Admin guard and a gem's owner are refused by. The domain is two levels
 # deep and no deeper: `SignIn::Passkeys::Add`, never `SignIn::Passkeys::X::Add`.
 class SignInNamespaceShadowTest < ActiveSupport::TestCase
-  ROOTS = %w[app/models app/services app/jobs].freeze
+  # The application's own autoload roots, as absolute paths; a gem's are not
+  # the application's.
+  ROOTS = Rails.autoloaders.main.dirs.select { |dir| dir.start_with?("#{Rails.root}/") }.freeze
 
   # A name under `SignIn` that is also a top-level constant, with the reason it
   # is safe. EMPTY today, and it should stay that way: an entry here means
@@ -30,7 +33,7 @@ class SignInNamespaceShadowTest < ActiveSupport::TestCase
   def self.children
     inflector = Rails.autoloaders.main.inflector
     ROOTS.flat_map do |root|
-      Dir[Rails.root.join(root, "sign_in", "*")].map do |path|
+      Dir[File.join(root, "sign_in", "*")].map do |path|
         inflector.camelize(File.basename(path, ".rb"), path)
       end
     end.uniq.sort
@@ -40,7 +43,7 @@ class SignInNamespaceShadowTest < ActiveSupport::TestCase
 
   test "the list is derived from the directories" do
     names = self.class.children
-    %w[Proof OutsideCall SpentChallenge Outcome].each { |name| assert_includes names, name }
+    %w[Proof OutsideCall SpentChallenge Outcome Protection Password Passkeys RecoveryCodes Sso Sessions Rules Methods].each { |name| assert_includes names, name }
     assert_operator names.size, :>=, 5
   end
 
@@ -73,7 +76,7 @@ class SignInNamespaceShadowTest < ActiveSupport::TestCase
   end
 
   test "nothing is deeper than two levels" do
-    deeper = ROOTS.flat_map { |root| Dir[Rails.root.join(root, "sign_in/*/*/")] }
-    assert_empty deeper, "The sign-in domain is two levels deep (SignIn::Passkeys::Add, plan decision 2); a third level is a directory: #{deeper.join(", ")}. A class nested inside a file (Throttle::Trip) is not a level."
+    deeper = ROOTS.flat_map { |root| Dir[File.join(root, "sign_in/*/*/")] }
+    assert_empty deeper, "The sign-in domain is two levels deep (SignIn::Passkeys::Add); a third level is a directory: #{deeper.join(", ")}. A class nested inside a file (Throttle::Trip) is not a level."
   end
 end
