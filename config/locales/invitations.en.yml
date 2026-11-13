@@ -15,6 +15,12 @@ en:
       expired: "This invite has expired. Ask the person who invited you to send a new one."
       used: "This invite has already been used."
       sign_in: "Sign in"
+      # "Continue with" is the provider's way in (`Admin::Ui::WayInButtonComponent`).
+      sso: "Continue with %{provider}"
+      # Both come back to the page with no token (the redirect lost it, and a
+      # token is in no address), so each is drawn alone, with the way on.
+      sso_mismatch: "%{provider} signed you in as %{got}, but this invitation is for %{email}. Open the link in your invitation mail again and sign in to %{provider} with that address, or ask for a new invitation."
+      sso_unfinished_again: "Open the link in your invitation mail again to try again."
       noscript: "Finishing your account needs JavaScript. Turn it on in your browser and open the link again."
     update:
       ready: "Your account is ready."

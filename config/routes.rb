@@ -77,6 +77,9 @@ Rails.application.routes.draw do
       get "invitation", to: "/invitations#show", as: :invitation
       post "invitation", to: "/invitations#update", as: :accept_invitation
       post "invitation/check", to: "/invitations#check", as: :check_invitation
+      # "Continue with <provider>" on the same page: the token in the body,
+      # never an address; an open invitation is sent to the provider.
+      post "invitation/sso", to: "/invitations#sso", as: :invitation_sso
       # The password reset. The token of the mailed link is in NO address a
       # server sees: the link is `password/edit#<token>`, a browser keeps what
       # follows the "#" to itself, and the form sends the token in its body,

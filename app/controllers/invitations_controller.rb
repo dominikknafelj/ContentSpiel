@@ -27,7 +27,15 @@
 # UNDER SSO_REQUIRED the password is no way in (`Invitations::Accept`
 # answers `[:sso_required]` for every token): a POST of the password form
 # starts the provider's sign-in for an open invitation instead
-# (`accept_with_sso_instead`, `SsoStarts`).
+# (`accept_with_sso_instead`, `SsoStarts`). "Continue with <provider>" is
+# that same start, asked for by name (`sso`), with the token in its body as
+# the form's is (the script copies it in when the button is pressed).
+#
+# COMING BACK WITH NO TOKEN. The provider's mismatch (`flash[:sso_mismatch]`,
+# both addresses) and a start that could not reach it (`flash[:alert]` on
+# a GET) redirect here, and the redirect lost the token: `show` draws the
+# notice alone, with no form and no script (any form would be dead), and the
+# sentence says to open the mail's link again.
 #
 # What the service answers for a link (`:expired`, `:used`) are symbols, not
 # words: the words are this page's (`config/locales/invitations.en.yml`).
@@ -46,11 +54,27 @@ class InvitationsController < ApplicationController
   # a bare 429, which the page's script takes as "not known": it shows the
   # form, and `update` decides.
   rate_limit to: 10, within: 3.minutes, only: :check, name: "check", with: -> { head :too_many_requests }
+  # A start asks the provider's discovery and writes a cookie, so it is
+  # counted too, on a count of its own.
+  rate_limit to: 20, within: 3.minutes, only: :sso, name: "sso", with: -> { head :too_many_requests }
+
+  helper_method :sso_provider
 
   # The page with no token: the form hidden, the two link states hidden, and
   # the script decides which to show. A `token` parameter is ignored: it
   # would be a token in an address.
   def show
+    mismatch = flash[:sso_mismatch]
+    @sso_mismatch = mismatch.slice("got", "email") if mismatch.is_a?(Hash) && sso_provider
+    @sso_unfinished = flash[:alert].presence if sso_provider && @sso_mismatch.nil?
+  end
+
+  # "Continue with <provider>": an open invitation goes to the provider, any
+  # other token gets the page's own answer, as a password sent for it does.
+  def sso
+    return head(:not_found) if sso_provider.nil?
+
+    accept_with_sso_instead
   end
 
   # THE EARLY CHECK, the reset page's `check` with one difference: the page
