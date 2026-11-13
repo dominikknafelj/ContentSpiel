@@ -51,7 +51,7 @@ module ServiceCalls
     "ApiTokens::Revoke" => { manager_may: true, reason: "any signed-in user may revoke their own token; anyone else needs tokens.manage" },
     "Users::UpdatePassword" => { manager_may: true, reason: "any signed-in user may change their own password; anyone else needs users.manage" },
     "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" },
-    "Sessions::EndOthers" => { manager_may: false, reason: "any signed-in user may end their own other sessions; an owner ends someone else's through Sessions::EndAll, and nobody else may" },
+    "SignIn::Sessions::EndOthers" => { manager_may: false, reason: "any signed-in user may end their own other sessions; an owner ends someone else's through SignIn::Sessions::EndAll, and nobody else may" },
     "SignIn::Passkeys::Add" => { manager_may: false, reason: "a person adds a passkey to their own account only: it is their device, and nobody, not even an owner, adds one for someone else" },
     "SignIn::Passkeys::Rename" => { manager_may: false, reason: "a person renames their own passkeys only: nobody manages someone else's" },
     "SignIn::Passkeys::Remove" => { manager_may: false, reason: "a person removes their own passkeys only; a lost device is cleared from the console (Users::UpdatePassword, remove_passkeys)" },
@@ -98,7 +98,7 @@ module ServiceCalls
   # in app/ and lib/, so a new caller is a deliberate edit here. The factory
   # returns `call:`.
   UNGATED = {
-    "Sessions::End" => {
+    "SignIn::Sessions::End" => {
       reason: "the ending of one session row nobody asked to end: Session.from_cookies ends an expiry and Sso::RecheckJob a session its provider revoked, so there is nobody to authorize",
       callers: %w[app/jobs/sso/recheck_job.rb app/models/session.rb]
     },
@@ -667,7 +667,7 @@ module ServiceCalls
       { call: -> { Sso::Link.call(target, identity:) } }
     },
 
-    # Owner-only, as Sessions::EndAll.
+    # Owner-only, as SignIn::Sessions::EndAll.
     "Sso::Unlink" => lambda {
       target = stranger_target
       target.update_columns(sso_issuer: "https://id.example.com", sso_subject: "sub-1", sso_linked_at: Time.current) # version: none (a test's setup)
@@ -676,29 +676,29 @@ module ServiceCalls
     },
 
     # See UNGATED.
-    "Sessions::End" => lambda {
+    "SignIn::Sessions::End" => lambda {
       session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
-      { call: -> { Sessions::End.call(session, reason: "ended_by_owner") } }
+      { call: -> { SignIn::Sessions::End.call(session, reason: "ended_by_owner") } }
     },
 
     # See SELF_SERVICE. The control runs as the user themselves, with no
     # session kept, so their one open session ends.
-    "Sessions::EndOthers" => lambda {
+    "SignIn::Sessions::EndOthers" => lambda {
       target = stranger_target
       Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
       mine = stranger_target(email: "mine@example.com")
       Session.start(user: mine, method: "password", user_agent: nil, ip_address: nil)
-      { call: -> { Sessions::EndOthers.call(user: target, keep: nil) }, permission: "users.manage", on: target,
+      { call: -> { SignIn::Sessions::EndOthers.call(user: target, keep: nil) }, permission: "users.manage", on: target,
         control_actor: target,
-        owner: mine, own: -> { Sessions::EndOthers.call(user: mine, keep: nil) }, own_event: "session.ended" }
+        owner: mine, own: -> { SignIn::Sessions::EndOthers.call(user: mine, keep: nil) }, own_event: "session.ended" }
     },
 
     # Owner-only: a holder of no grants is refused for users.manage, the
     # trusted actor passes, as every trusted code path does.
-    "Sessions::EndAll" => lambda {
+    "SignIn::Sessions::EndAll" => lambda {
       target = stranger_target
       Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
-      { call: -> { Sessions::EndAll.call(target) }, permission: "users.manage", on: target }
+      { call: -> { SignIn::Sessions::EndAll.call(target) }, permission: "users.manage", on: target }
     },
 
     # See SELF_SERVICE: own only, so the control runs as the user themselves.

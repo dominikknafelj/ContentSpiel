@@ -17,12 +17,12 @@ module Sso
   #
   # - `:ok` moves `provider_checked_at` to the run's `at`, and stores the
   #   refresh token the provider rotated to, in the same statement;
-  # - `:revoked` ends the session (`Sessions::End`, `sso_revoked`, no actor),
+  # - `:revoked` ends the session (`SignIn::Sessions::End`, `sso_revoked`, no actor),
   #   as does an SSO session whose account has no link any more;
   # - `:unavailable` writes nothing. THE GRACE COUNTS FROM THE LAST GOOD
   #   CHECK: a failed ask never moves the date, so a provider that stays out
   #   of reach ends the session at EVERY + GRACE (`expired_sso`, by a request
-  #   or `Sessions::SweepJob`), however many runs failed before.
+  #   or `SignIn::Sessions::SweepJob`), however many runs failed before.
   #
   # An ask that raises is `:unavailable` for that session alone and never
   # stops the run: a gem's recheck that raised or ran past its limit, and an
@@ -51,7 +51,7 @@ module Sso
   #    stored token are the ones read in 2; otherwise the answer is dropped;
   # 5. the advisory lock is released in an `ensure`.
   #
-  # So a request that touches the row (`seen!`, a sign-out, `Sessions::End`)
+  # So a request that touches the row (`seen!`, a sign-out, `SignIn::Sessions::End`)
   # waits at most for that short write, never for a provider. Only this job
   # writes `provider_token`, so the token sent is the token stored.
   #
@@ -185,7 +185,7 @@ module Sso
           changes[:provider_token] = token if token && token != row.provider_token
           row.update_columns(changes) # version: none (a session is on no public page)
         else
-          Sessions::End.call(row, reason: "sso_revoked", actor: nil)
+          SignIn::Sessions::End.call(row, reason: "sso_revoked", actor: nil)
           @tally[:ended] += 1
         end
       end

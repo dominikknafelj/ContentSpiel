@@ -311,7 +311,7 @@ Rails.application.routes.draw do
         # change to a user -- never a field of the editor's form.
         member { patch :owner }
         # "End all sessions…": an owner signs another user out everywhere
-        # (`Sessions::EndAll`, which refuses a non-owner and your own account).
+        # (`SignIn::Sessions::EndAll`, which refuses a non-owner and your own account).
         member { delete :sessions }
         # "Unlink…" in the Single sign-on zone (`Sso::Unlink`, owner only).
         member { delete :sso_link, to: "sso_links#destroy" }

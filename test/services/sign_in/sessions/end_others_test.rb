@@ -1,6 +1,6 @@
 require "test_helper"
 
-class Sessions::EndOthersTest < ActiveSupport::TestCase
+class SignIn::Sessions::EndOthersTest < ActiveSupport::TestCase
   include ActionCable::TestHelper
 
   setup do
@@ -12,7 +12,7 @@ class Sessions::EndOthersTest < ActiveSupport::TestCase
     others = 2.times.map { start(@user) }
     bystander = start(users(:author))
 
-    result = as(@user) { Sessions::EndOthers.call(user: @user, keep: @current) }
+    result = as(@user) { SignIn::Sessions::EndOthers.call(user: @user, keep: @current) }
 
     assert result.ok?, result.errors.inspect
     assert_equal 2, result.record
@@ -29,7 +29,7 @@ class Sessions::EndOthersTest < ActiveSupport::TestCase
   test "the defaults are the signed-in user and the session they act in" do
     other = start(@user)
 
-    result = Current.set(session: @current) { as(@user) { Sessions::EndOthers.call } }
+    result = Current.set(session: @current) { as(@user) { SignIn::Sessions::EndOthers.call } }
 
     assert result.ok?, result.errors.inspect
     assert_equal 1, result.record
@@ -38,7 +38,7 @@ class Sessions::EndOthersTest < ActiveSupport::TestCase
   end
 
   test "with no other session open nothing is ended and nothing recorded" do
-    result = as(@user) { Sessions::EndOthers.call(user: @user, keep: @current) }
+    result = as(@user) { SignIn::Sessions::EndOthers.call(user: @user, keep: @current) }
 
     assert result.ok?
     assert_equal 0, result.record
@@ -50,7 +50,7 @@ class Sessions::EndOthersTest < ActiveSupport::TestCase
     target = start(@user)
     untouched = start(@user)
 
-    result = as(@user) { Sessions::EndOthers.call(user: @user, keep: @current, only: target.id) }
+    result = as(@user) { SignIn::Sessions::EndOthers.call(user: @user, keep: @current, only: target.id) }
 
     assert result.ok?
     assert_equal 1, result.record
@@ -67,7 +67,7 @@ class Sessions::EndOthersTest < ActiveSupport::TestCase
     gone = start(@user).tap(&:destroy!)
 
     [ theirs.id, gone.id, "not-an-id", @current.id ].each do |id|
-      result = as(@user) { Sessions::EndOthers.call(user: @user, keep: @current, only: id) }
+      result = as(@user) { SignIn::Sessions::EndOthers.call(user: @user, keep: @current, only: id) }
 
       assert result.ok?, "#{id.inspect}: #{result.errors.inspect}"
       assert_equal 0, result.record, id.inspect
@@ -80,7 +80,7 @@ class Sessions::EndOthersTest < ActiveSupport::TestCase
   test "someone else's sessions are refused, even for a holder of users.manage" do
     other = start(@user)
 
-    result = as(users(:two)) { Sessions::EndOthers.call(user: @user, keep: nil) }
+    result = as(users(:two)) { SignIn::Sessions::EndOthers.call(user: @user, keep: nil) }
 
     assert result.denied?
     assert Session.exists?(other.id)
@@ -92,7 +92,7 @@ class Sessions::EndOthersTest < ActiveSupport::TestCase
     other = start(@user)
 
     with_singleton_override(Audit, :record, ->(*, **) { raise ActiveRecord::StatementInvalid, "the log is down" }) do
-      assert_raises(ActiveRecord::StatementInvalid) { as(@user) { Sessions::EndOthers.call(user: @user, keep: @current) } }
+      assert_raises(ActiveRecord::StatementInvalid) { as(@user) { SignIn::Sessions::EndOthers.call(user: @user, keep: @current) } }
     end
 
     assert Session.exists?(other.id)

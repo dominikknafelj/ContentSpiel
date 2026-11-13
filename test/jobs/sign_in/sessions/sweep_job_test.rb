@@ -1,6 +1,6 @@
 require "test_helper"
 
-class Sessions::SweepJobTest < ActiveJob::TestCase
+class SignIn::Sessions::SweepJobTest < ActiveJob::TestCase
   setup do
     @user = users(:one)
     @now = Time.current.change(usec: 0)
@@ -19,7 +19,7 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     SignIn::SpentChallenge.spend!("expired", expires_at: @now - 1.second)
     SignIn::SpentChallenge.spend!("current", expires_at: @now + 1.minute)
 
-    Sessions::SweepJob.perform_now(at: @now)
+    SignIn::Sessions::SweepJob.perform_now(at: @now)
 
     assert_equal [ "current" ], SignIn::SpentChallenge.pluck(:digest)
   end
@@ -30,7 +30,7 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     start(seen: @now - 1.hour, signed_in: @now - 15.days)
 
     assert_difference -> { Session.count }, -2 do
-      Sessions::SweepJob.perform_now(at: @now)
+      SignIn::Sessions::SweepJob.perform_now(at: @now)
     end
 
     assert_equal [ live ], Session.where(user: @user).to_a
@@ -55,7 +55,7 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     @exporter.reset
 
     OpenTelemetry.tracer_provider.tracer("test").in_span("job", kind: :consumer) do
-      Sessions::SweepJob.perform_now(at: @now)
+      SignIn::Sessions::SweepJob.perform_now(at: @now)
     end
 
     assert_equal [ live ], Session.where(user: @user).to_a
@@ -70,7 +70,7 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     held = sso_start(token: "rt", at: @now - 26.hours)
     idle = start(seen: @now - 13.hours)
 
-    without_encryption_keys { Sessions::SweepJob.perform_now(at: @now) }
+    without_encryption_keys { SignIn::Sessions::SweepJob.perform_now(at: @now) }
 
     assert_nil Session.find_by(id: held.id)
     assert_nil Session.find_by(id: idle.id)
@@ -79,27 +79,27 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
 
   test "an SSO session past both its check and its absolute timeout is counted once, as absolute" do
     sso_start(token: nil, at: @now - 15.days)
-    Sessions::SweepJob.perform_now(at: @now)
+    SignIn::Sessions::SweepJob.perform_now(at: @now)
     assert_equal [ { "reason" => "expired_absolute", "count" => 1, "after_days" => 14 } ], ended_events.map(&:metadata)
   end
 
   test "a session that is both idle and absolute is counted once, as absolute" do
     start(seen: @now - 20.days, signed_in: @now - 21.days)
-    Sessions::SweepJob.perform_now(at: @now)
+    SignIn::Sessions::SweepJob.perform_now(at: @now)
     assert_equal [ { "reason" => "expired_absolute", "count" => 1, "after_days" => 14 } ], ended_events.map(&:metadata)
   end
 
   test "more than a batch is ended and counted in one event" do
     rows = Array.new(3) { start(seen: @now - 13.hours) }
-    stub = Sessions::SweepJob.const_get(:BATCH)
-    Sessions::SweepJob.send(:remove_const, :BATCH)
-    Sessions::SweepJob.const_set(:BATCH, 2)
-    Sessions::SweepJob.perform_now(at: @now)
+    stub = SignIn::Sessions::SweepJob.const_get(:BATCH)
+    SignIn::Sessions::SweepJob.send(:remove_const, :BATCH)
+    SignIn::Sessions::SweepJob.const_set(:BATCH, 2)
+    SignIn::Sessions::SweepJob.perform_now(at: @now)
     assert_equal 0, Session.where(id: rows.map(&:id)).count
     assert_equal [ 3 ], ended_events.map { |e| e.metadata["count"] }
   ensure
-    Sessions::SweepJob.send(:remove_const, :BATCH)
-    Sessions::SweepJob.const_set(:BATCH, stub)
+    SignIn::Sessions::SweepJob.send(:remove_const, :BATCH)
+    SignIn::Sessions::SweepJob.const_set(:BATCH, stub)
   end
 
   # Each batch commits on its own: a later one that raises leaves the
@@ -107,9 +107,9 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
   # reaches the job.
   test "a batch that raises after another committed still records the ended ones, once" do
     rows = Array.new(3) { start(seen: @now - 13.hours) }
-    stub = Sessions::SweepJob.const_get(:BATCH)
-    Sessions::SweepJob.send(:remove_const, :BATCH)
-    Sessions::SweepJob.const_set(:BATCH, 2)
+    stub = SignIn::Sessions::SweepJob.const_get(:BATCH)
+    SignIn::Sessions::SweepJob.send(:remove_const, :BATCH)
+    SignIn::Sessions::SweepJob.const_set(:BATCH, 2)
     transaction = Session.method(:transaction)
     calls = 0
     # The absolute and the SSO sweep's one empty batch each, the idle sweep's
@@ -121,20 +121,20 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     end
 
     with_singleton_override(Session, :transaction, failing) do
-      assert_raises(ActiveRecord::ConnectionFailed) { Sessions::SweepJob.perform_now(at: @now) }
+      assert_raises(ActiveRecord::ConnectionFailed) { SignIn::Sessions::SweepJob.perform_now(at: @now) }
     end
 
     assert_equal 1, Session.where(id: rows.map(&:id)).count
     assert_equal [ { "reason" => "expired_idle", "count" => 2, "after_hours" => 12 } ], ended_events.map(&:metadata)
   ensure
-    Sessions::SweepJob.send(:remove_const, :BATCH)
-    Sessions::SweepJob.const_set(:BATCH, stub)
+    SignIn::Sessions::SweepJob.send(:remove_const, :BATCH)
+    SignIn::Sessions::SweepJob.const_set(:BATCH, stub)
   end
 
   test "a run with nothing to do records nothing" do
     start(seen: @now)
     assert_no_difference -> { Audit::Event.count } do
-      Sessions::SweepJob.perform_now(at: @now)
+      SignIn::Sessions::SweepJob.perform_now(at: @now)
     end
   end
 
@@ -142,7 +142,7 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     start(seen: @now - 13.hours)
     @exporter.reset
     OpenTelemetry.tracer_provider.tracer("test").in_span("job", kind: :consumer) do
-      Sessions::SweepJob.perform_now(at: @now)
+      SignIn::Sessions::SweepJob.perform_now(at: @now)
     end
     span = @exporter.finished_spans.find { |s| s.name == "auth.session_sweep" }
     assert_equal 1, span.attributes["auth.session.count"]
@@ -152,7 +152,7 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
   test "it is scheduled in every environment, hourly at minute 40 on default" do
     %w[production development test].each do |environment|
       schedule = YAML.load_file(Rails.root.join("config/recurring.yml")).dig(environment, "sessions_sweep")
-      assert_equal "Sessions::SweepJob", schedule["class"], environment
+      assert_equal "SignIn::Sessions::SweepJob", schedule["class"], environment
       assert_equal "default", schedule["queue"], environment
       assert_equal "every hour at minute 40", schedule["schedule"], environment
     end

@@ -1,6 +1,6 @@
 require "test_helper"
 
-class Sessions::EndAllTest < ActiveSupport::TestCase
+class SignIn::Sessions::EndAllTest < ActiveSupport::TestCase
   include ActionCable::TestHelper
 
   setup do
@@ -12,7 +12,7 @@ class Sessions::EndAllTest < ActiveSupport::TestCase
     sessions = 3.times.map { start(@user) }
     mine = start(@owner)
 
-    result = Current.set(session: mine) { as(@owner) { Sessions::EndAll.call(@user) } }
+    result = Current.set(session: mine) { as(@owner) { SignIn::Sessions::EndAll.call(@user) } }
 
     assert result.ok?, result.errors.inspect
     assert_equal 3, result.record
@@ -26,7 +26,7 @@ class Sessions::EndAllTest < ActiveSupport::TestCase
   end
 
   test "with no session open nothing is recorded" do
-    result = as(@owner) { Sessions::EndAll.call(@user) }
+    result = as(@owner) { SignIn::Sessions::EndAll.call(@user) }
 
     assert result.ok?
     assert_equal 0, result.record
@@ -36,7 +36,7 @@ class Sessions::EndAllTest < ActiveSupport::TestCase
   test "an admin who is not an owner is denied and nothing is ended" do
     session = start(@user)
 
-    result = as(users(:two)) { Sessions::EndAll.call(@user) }
+    result = as(users(:two)) { SignIn::Sessions::EndAll.call(@user) }
 
     assert result.denied?
     assert Session.exists?(session.id)
@@ -47,7 +47,7 @@ class Sessions::EndAllTest < ActiveSupport::TestCase
   test "an owner's own account is refused: that is Sign out everywhere else" do
     session = start(@owner)
 
-    result = as(@owner) { Sessions::EndAll.call(@owner) }
+    result = as(@owner) { SignIn::Sessions::EndAll.call(@owner) }
 
     assert_not result.ok?
     assert_not result.denied?

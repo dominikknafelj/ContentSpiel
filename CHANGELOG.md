@@ -57,6 +57,7 @@
   - `SignIn::PasswordAttempt` is `SignIn::Password::Attempt`.
   - `SignIn::LeakedPassword` is `SignIn::Password::Leaked` (its `error.type` on a span reads `SignIn::Password::Leaked::Unavailable`).
   - `Users::LeakedPasswordRule` is `SignIn::Password::LeakedRule`.
+  - `Sessions::End`, `Sessions::EndAll`, `Sessions::EndOthers` and `Sessions::SweepJob` are `SignIn::Sessions::End`, `EndAll`, `EndOthers` and `SweepJob`. A `Sessions::SweepJob` queued before the deploy does not load afterwards; the next scheduled run comes from `config/recurring.yml` and is the new class, so nothing is lost.
   - `SignIn::Outcome` keeps its name.
 
 ### Removed

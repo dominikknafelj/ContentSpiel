@@ -20,7 +20,7 @@ en:
         not: "%{name} is not an owner"
         # `Users::Save`'s refusal to make a linked account an owner.
         sso_linked: "%{name} signs in with %{provider}. Unlink them first: owners don't sign in with single sign-on."
-      # `Sessions::EndAll`'s refusal on the owner's own account.
+      # `SignIn::Sessions::EndAll`'s refusal on the owner's own account.
       sessions:
         own: "End your own sessions from Your account."
       # `Sso::Unlink`'s refusal of an account with no link.

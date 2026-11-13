@@ -60,7 +60,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
       assert_equal @t, bare.reload.provider_checked_at
 
       # No token: the sweep ends it at 24 hours.
-      Sessions::SweepJob.perform_now(at: @t + 24.hours)
+      SignIn::Sessions::SweepJob.perform_now(at: @t + 24.hours)
       assert_nil Session.find_by(id: bare.id)
       assert_equal({ "reason" => "expired_sso", "count" => 1, "after_hours" => 24 }, ended_events.last.metadata)
       assert Session.exists?(held.id)
@@ -88,9 +88,9 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
       assert_equal counted, counts(run_at(@t + 74.hours)), "a session past its grace is not asked again, so an answer cannot keep it"
       assert_equal @t + 48.hours, down.reload.provider_checked_at
 
-      Sessions::SweepJob.perform_now(at: @t + 74.hours - 1.second)
+      SignIn::Sessions::SweepJob.perform_now(at: @t + 74.hours - 1.second)
       assert Session.exists?(down.id)
-      Sessions::SweepJob.perform_now(at: @t + 74.hours)
+      SignIn::Sessions::SweepJob.perform_now(at: @t + 74.hours)
       assert_nil Session.find_by(id: down.id)
       assert_equal({ "reason" => "expired_sso", "count" => 1, "after_hours" => 26 }, ended_events.last.metadata)
     end
@@ -112,9 +112,9 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
     assert_equal counted, counts(run_at(@t + 24.hours))
     assert_equal @t, session.reload.provider_checked_at
 
-    Sessions::SweepJob.perform_now(at: @t + 26.hours - 1.second)
+    SignIn::Sessions::SweepJob.perform_now(at: @t + 26.hours - 1.second)
     assert Session.exists?(session.id)
-    Sessions::SweepJob.perform_now(at: @t + 26.hours)
+    SignIn::Sessions::SweepJob.perform_now(at: @t + 26.hours)
     assert_nil Session.find_by(id: session.id)
     assert_equal({ "reason" => "expired_sso", "count" => 1, "after_hours" => 26 }, ended_events.last.metadata)
   end
@@ -140,7 +140,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
 
         Session.update_all(last_seen_at: @t + 26.hours) # version: none (a test's own rows)
         assert_nil session.reload.expiry(@t + 26.hours - 1.second)
-        Sessions::SweepJob.perform_now(at: @t + 26.hours)
+        SignIn::Sessions::SweepJob.perform_now(at: @t + 26.hours)
       end
       assert_nil Session.find_by(id: session.id)
       assert_equal({ "reason" => "expired_sso", "count" => 1, "after_hours" => 26 }, ended_events.last.metadata)

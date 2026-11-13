@@ -21,7 +21,7 @@ module Sso
   #
   # An account with no link is a failure, with no event and no mail.
   class Unlink < ApplicationService
-    # authorize: none (owner-only, asked through Users::Manageability.actor_owner? in #call as Sessions::EndAll asks it; no AccessControl permission says "owner")
+    # authorize: none (owner-only, asked through Users::Manageability.actor_owner? in #call as SignIn::Sessions::EndAll asks it; no AccessControl permission says "owner")
 
     def self.not_linked(user) = I18n.t("admin.users.sso.not_linked", name: user.name_or_email, raise: true)
 
