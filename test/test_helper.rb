@@ -33,11 +33,13 @@ end
 # LEAKED_PASSWORD_CHECK go too, so a test has a bot check only inside
 # `with_bot_check` and a leaked-password check only inside
 # `with_leaked_password_check`, neither of which asks the network
-# (test/support/sign_in_helper.rb).
+# (test/support/sign_in_helper.rb). The SSO variables go too: a developer's
+# provider would otherwise sign every test's page with a button.
 %w[PUBLIC_HOST ADMIN_HOST THEME_PATH
    MAIL_SMTP_SERVER MAIL_SMTP_PORT MAIL_SMTP_SECURITY MAIL_SMTP_USERNAME MAIL_SMTP_PASSWORD
    MAIL_SENDER_NAME MAIL_SENDER_ADDRESS
-   TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY LEAKED_PASSWORD_CHECK].each { |name| ENV.delete(name) }
+   TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY LEAKED_PASSWORD_CHECK
+   SSO_ISSUER SSO_CLIENT_ID SSO_CLIENT_SECRET SSO_NAME SSO_REQUIRED].each { |name| ENV.delete(name) }
 
 require_relative "../config/environment"
 SiteAddress.reset!

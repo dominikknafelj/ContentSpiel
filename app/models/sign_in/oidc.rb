@@ -1,0 +1,51 @@
+module SignIn
+  # Single sign-on through one OpenID Connect provider per site.
+  #
+  # THREE INVARIANTS hold for everything under this module. There is NO RACK
+  # MIDDLEWARE: the routes are the app's own, under `/<ADMIN_PATH>/sign-in/sso/`,
+  # inside the backend's host constraint, so with `ADMIN_HOST` set nothing of
+  # it answers on the public host. EVERY CALL TO THE PROVIDER (discovery, keys,
+  # the token endpoint) goes through `SignIn::OutsideCall`: bounded, untraced
+  # and named by class, status or fixed reason, never by message. And NOTHING
+  # HERE KNOWS A USER: it speaks to the provider and answers what the provider
+  # said; matching an identity to an account is a service's.
+  module Oidc
+    VARIABLES = %w[SSO_ISSUER SSO_CLIENT_ID SSO_CLIENT_SECRET SSO_NAME].freeze
+    STATE_LIFETIME = 10.minutes
+    CACHE_FOR = 1.hour
+    MAX_BODY = 65_536
+    OPEN_TIMEOUT = 3
+    READ_TIMEOUT = 5
+
+    # How a sign-in that did not finish is named in a span (it is not audited:
+    # no one is named, and a bot's run would bury the log).
+    UNFINISHED_REASONS = %w[cancelled provider_error bad_state bad_token unavailable].freeze
+    # Why a finished sign-in names no account (audited as `sso.refused`).
+    ACCOUNT_REASONS = %w[no_account email_unverified owner].freeze
+
+    # The host's variables are wrong in a way that would silently open what
+    # they meant to close, or point sign-in at the wrong place.
+    class Misconfigured < StandardError; end
+
+    # The provider could not be used; `reason` is one of the System status
+    # row's words (`unreachable`, `http_<status>`, `not_json`,
+    # `issuer_mismatch`, `missing_endpoint`) or `too_large`.
+    class Unavailable < SignIn::OutsideCall::Unavailable; end
+
+    # Whether the host requires single sign-in: `SSO_REQUIRED=1` and a whole
+    # provider (`Provider.required?` is the one reader of the variable).
+    def self.required?(env = ENV) = Provider.required?(env)
+
+    # The origin the provider is told to send the person back to, as
+    # `url_for` options: CS Studio's own address when it has one, else the
+    # site's, else (development and test) the request's, as
+    # `SignIn::RelyingParty` decides which site a passkey belongs to.
+    def self.callback_origin(request_origin:)
+      address = SiteAddress.admin.configured? ? SiteAddress.admin : SiteAddress.current
+      return address.url_options if address.configured?
+
+      uri = URI.parse(request_origin.to_s)
+      { host: uri.host, protocol: uri.scheme, port: uri.port == uri.default_port ? nil : uri.port }.compact
+    end
+  end
+end

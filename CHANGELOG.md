@@ -18,6 +18,7 @@
 - A per-address rate limit on the passkey options (sign-in, the second step and Confirm it's you), counted apart from the proofs: 30 a minute, past which the options answer a bare 429 and no passkey is offered until the minute ends.
 - Signing out deletes every passkey challenge's cookie (`cs_passkey_<purpose>`), so none is left for the next person on the browser.
 - Spans `auth.passkey`, `auth.recovery_code`, `auth.second_factor`, `auth.confirmation` and `auth.account_mail`, and the attributes `auth.passkey.ceremony`, `auth.policy`, `auth.second_factor.required` and `auth.mail.kind` (`docs/reference/hosting.md`, "Telemetry", with a Honeycomb query for the second step's failures).
+- `SSO_ISSUER`, `SSO_CLIENT_ID`, `SSO_CLIENT_SECRET` (a secret), `SSO_NAME` and `SSO_REQUIRED` (optional; the first four together make one OpenID Connect provider, some but not all is none and production's boot names the missing ones). `SSO_REQUIRED` without a whole provider, with a value other than `1`, or an `SSO_ISSUER` that is no `https` URL with a host stops the boot in every environment.
 - `ADMIN_HOST`: CS Studio on a host of its own. The reset mail, the lock-out mail's reset request link, the invitation, and the account link of the passkey-added and recovery-code-used mails link to it, the API tokens screen names the MCP address on it, and System status shows a "CS Studio address" row.
 
 ### Changed
