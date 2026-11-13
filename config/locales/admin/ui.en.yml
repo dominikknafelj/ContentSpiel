@@ -73,6 +73,7 @@ en:
         system_check_row:
           ok: "OK"
           warning: "Warning"
+          "off": "Off"
           copy_label: "Copy command for %{label}"
           open_mail_settings: "Open Mail settings →"
           open_image_settings: "Open Image settings →"
