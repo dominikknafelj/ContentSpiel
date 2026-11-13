@@ -43,6 +43,20 @@ module SignIn
       LOOPBACK = %w[127.0.0.1 [::1] localhost].freeze
       WELL_KNOWN = "/.well-known/openid-configuration".freeze
       DEFAULT_TOKEN_AUTH = [ "client_secret_basic" ].freeze
+      # The members of a public signing key of each type sign-in checks ID
+      # tokens with, and the labels kept beside them.
+      KEY_MEMBERS = { "RSA" => %w[kty n e], "EC" => %w[kty crv x y] }.freeze
+      KEY_LABELS = %w[kid use alg].freeze
+
+      # The token endpoint's answer: its status, and its body when that is a
+      # JSON object (nil when it is anything else). The body holds tokens, so
+      # `inspect` and `as_json` say the status alone.
+      TokenAnswer = Data.define(:status, :body) do
+        def inspect = "#<#{self.class.name} status=#{status}>"
+        alias_method :to_s, :inspect
+
+        def as_json(*) = { "status" => status }
+      end
 
       attr_reader :issuer, :client_id, :name
 
@@ -117,6 +131,40 @@ module SignIn
         JSON::JWK::Set.new(cached("keys", URI(configuration.jwks_uri), refresh: refresh) { |document| key_set(document) }["keys"])
       end
 
+      # The token endpoint's `TokenAnswer` to `form` (a code or a refresh
+      # grant), the endpoint read from `configuration` (the caller's, so the
+      # discovery span is not nested in the caller's token span). Raises
+      # `Unavailable` when the endpoint cannot be reached (`unreachable`) or
+      # answers more than MAX_BODY (`too_large`), unread.
+      #
+      # The client proves itself with client_secret_basic, the
+      # specification's default, or client_secret_post when that is the
+      # only method the document lists: a provider listing neither is sent
+      # Basic, and its refusal is its answer. Basic's id and secret are each
+      # form-encoded first (RFC 6749, 2.3.1), so a secret holding a `:` is
+      # read whole.
+      #
+      # The secret reaches the request and nothing else: `Net::HTTPRequest#inspect`
+      # names the method alone, and nothing here is logged or put in a span.
+      def post_token(form, configuration)
+        uri = URI(configuration.token_endpoint)
+        request = Net::HTTP::Post.new(uri)
+        request["Accept"] = "application/json"
+        if configuration.token_auth_methods == [ "client_secret_post" ]
+          form = form.merge("client_id" => client_id, "client_secret" => client_secret)
+        else
+          pair = [ client_id, client_secret ].map { |part| URI.encode_www_form_component(part) }.join(":")
+          request["Authorization"] = "Basic #{Base64.strict_encode64(pair)}"
+        end
+        request.set_form_data(form)
+        response = OutsideCall.perform(uri, request, open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT, max_body: MAX_BODY)
+        TokenAnswer.new(status: response.code.to_i, body: json_object(response.body))
+      rescue OutsideCall::Unavailable
+        raise Unavailable.new("a body over the limit", reason: "too_large")
+      rescue *NETWORK_ERRORS
+        raise Unavailable.new("the provider could not be reached", reason: "unreachable")
+      end
+
       def check_issuer!(production:)
         usable = self.class.secure_address?(uri, production: production) && uri.userinfo.nil?
         raise Misconfigured, "SSO_ISSUER must be an absolute https URL with a host (http only to localhost, outside production)." unless usable
@@ -149,7 +197,7 @@ module SignIn
 
             yield(document_at(uri)).tap { |fresh| Rails.cache.write(key, fresh, expires_in: CACHE_FOR) }
           rescue Unavailable => error
-            Telemetry.record(span, "auth.sso.reason" => error.reason, "error.type" => error_type(error))
+            Telemetry.record(span, "auth.sso.reason" => error.reason, "error.type" => Oidc.error_type(error))
             raise
           end
         end
@@ -217,28 +265,42 @@ module SignIn
           raise Unavailable.new("a document of the wrong shape", reason: "not_json")
         end
 
+        # `text` parsed when it is a JSON object, else nil.
+        def json_object(text)
+          value = JSON.parse(text.to_s)
+          value if value.is_a?(Hash)
+        rescue JSON::ParserError
+          nil
+        end
+
         def parsed_address(value)
           URI.parse(value.to_s)
         rescue URI::InvalidURIError
           nil
         end
 
+        # The set's signing keys, each cut to the members a signature check
+        # reads. A key of another type, or with a member of another shape
+        # (a `kty` or `n` that is no string), is left out rather than handed
+        # to json-jwt, which would raise a `NoMethodError` building it, so a
+        # set the provider got wrong refuses its tokens (no key by that `kid`)
+        # and never raises. A key with no `kid` is left out too: an ID token
+        # is checked only against the key its `kid` names
+        # (`SignIn::Oidc::IdToken`).
         def key_set(document)
           keys = document["keys"]
           raise Unavailable.new("a key set with no keys", reason: "not_json") unless keys.is_a?(Array) && keys.all?(Hash)
 
-          { "keys" => keys }
+          { "keys" => keys.select { |key| usable_key?(key) }.map { |key| key.slice(*KEY_MEMBERS.fetch(key["kty"]), *KEY_LABELS).compact } }
+        end
+
+        def usable_key?(key)
+          members = KEY_MEMBERS[key["kty"]]
+          members && (members + [ "kid" ]).all? { |name| key[name].is_a?(String) } &&
+            (KEY_LABELS - [ "kid" ]).all? { |name| key[name].nil? || key[name].is_a?(String) }
         end
 
         def words(value) = Array(value).grep(String)
-
-        # The status, or the network error's class, or the reason.
-        def error_type(error)
-          return error.status.to_s if error.status
-          return error.cause.class.name if error.reason == "unreachable" && error.cause
-
-          error.reason
-        end
 
         def uri
           URI.parse(issuer)

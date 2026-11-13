@@ -40,6 +40,15 @@ module SignIn
     # `issuer_mismatch`, `missing_endpoint`) or `too_large`.
     class Unavailable < SignIn::OutsideCall::Unavailable; end
 
+    # A span's `error.type` for an `Unavailable`: the status, or the network
+    # error's class, or the reason; never a message.
+    def self.error_type(error)
+      return error.status.to_s if error.status
+      return error.cause.class.name if error.reason == "unreachable" && error.cause
+
+      error.reason
+    end
+
     # Whether the host requires single sign-in: `SSO_REQUIRED=1` and a whole
     # provider (`Provider.required?` is the one reader of the variable).
     def self.required?(env = ENV) = Provider.required?(env)

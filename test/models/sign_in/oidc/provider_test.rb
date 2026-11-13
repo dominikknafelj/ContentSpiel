@@ -156,6 +156,20 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
     end
   end
 
+  test "a key set keeps only signing keys of a type it checks, each cut to its public members, and junk keys never raise" do
+    with_fake_idp do |idp|
+      served = JSON::JWK.new(OidcHelper::IDP_KEY.public_key).as_json
+      idp.answer_keys_with(body: { "keys" => [
+        served.merge("d" => "planted-private-member", "x5c" => [ "planted" ], "use" => "sig"),
+        served.merge("kty" => { "a" => "b" }), served.merge("kty" => "oct", "k" => "planted"), served.merge("n" => 12),
+        served.except("kid"), served.merge("alg" => [ "RS256" ]), { "kty" => "EC", "kid" => "ec-1", "crv" => "P-256", "x" => "x", "y" => "y" }
+      ] })
+      keys = idp.provider.keys
+      assert_equal [ [ idp.key_id, "RSA", "sig" ], [ "ec-1", "EC", nil ] ], keys.map { |key| key.values_at(:kid, :kty, :use) }
+      assert_equal %w[e kid kty n use], keys.first.keys.sort
+    end
+  end
+
   test "a discovery document naming another issuer is issuer_mismatch, and a refused socket is unreachable" do
     with_fake_idp do |idp|
       idp.answer_discovery_with(body: idp.discovery_document.merge("issuer" => "https://planted.example.org"))

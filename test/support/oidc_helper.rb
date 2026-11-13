@@ -50,9 +50,9 @@ require "socket"
 #   `path`, `params`: the query of a GET, the form of a POST, and `headers`);
 # - `code_for(nonce:)`: a code the token endpoint answers once with an ID
 #   token carrying that nonce;
-# - `answer_token_with(status:, body:)` and `answer_discovery_with(status:,
-#   body:)`: the next answer of that endpoint, once (a Hash is sent as JSON,
-#   a String as it is);
+# - `answer_token_with(status:, body:)`, `answer_discovery_with(status:,
+#   body:)` and `answer_keys_with(status:, body:)`: the next answer of that
+#   endpoint, once (a Hash is sent as JSON, a String as it is);
 # - `rotate_refresh_token(to)`: the next refresh answers `to`, which is then
 #   the token a refresh must send;
 # - `change_identity(**)`: what the next ID tokens say (`subject: "sub-2"`
@@ -157,6 +157,7 @@ module OidcHelper
 
     def answer_token_with(status: 200, body:) = @lock.synchronize { @answers["/idp/token"] = [ status, body ] }
     def answer_discovery_with(status: 200, body:) = @lock.synchronize { @answers["/idp/.well-known/openid-configuration"] = [ status, body ] }
+    def answer_keys_with(status: 200, body:) = @lock.synchronize { @answers["/idp/keys"] = [ status, body ] }
 
     def rotate_refresh_token(to) = @lock.synchronize { @next_refresh_token = to }
     def change_identity(subject: @identity["sub"], email: @identity["email"], email_verified: @identity["email_verified"], name: @identity["name"])
