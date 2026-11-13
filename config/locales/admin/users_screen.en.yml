@@ -84,7 +84,7 @@ en:
           confirm_body: "%{name} can no longer sign in with %{provider}, and is signed out everywhere. They get a mail to set a password here."
           confirm: "Unlink"
           unlinked: "%{name} is unlinked from %{provider}. A mail to set a password is on its way."
-          provider_fallback: "your sign-in provider"
+          provider_fallback: "single sign-on"
     invites:
       sent: "Invite sent to %{email}."
       resent: "New invite sent to %{email}."

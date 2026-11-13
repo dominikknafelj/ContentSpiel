@@ -45,7 +45,7 @@ en:
           title: "Sign-in"
           intro: "You sign in with %{provider}."
           body: "Your password, your second factor and signing out of %{provider} are managed there. Ask an owner if you need to sign in another way."
-          provider_fallback: "your sign-in provider"
+          provider_fallback: "single sign-on"
         # The Passkeys card: a row per passkey, its Rename and Remove…, and
         # the foot with "Add a passkey…". `last_required` stands in the row
         # of a covered person's last passkey, whose Remove is disabled.

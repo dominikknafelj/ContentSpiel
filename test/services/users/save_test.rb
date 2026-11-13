@@ -444,7 +444,7 @@ class Users::SaveTest < ActiveSupport::TestCase
 
       result = as_owner { Users::Save.call(user, attributes: { owner: "1" }) }
       assert_not result.ok?
-      assert_equal [ "#{user.email_address} signs in with #{OidcHelper::NAME}. Unlink them first: owners keep a password and a passkey." ], result.errors
+      assert_equal [ "#{user.email_address} signs in with #{OidcHelper::NAME}. Unlink them first: owners don't sign in with single sign-on." ], result.errors
       assert_not user.reload.owner?
     end
     assert_not Audit::Event.exists?(action: %w[user.updated user.owner_changed])

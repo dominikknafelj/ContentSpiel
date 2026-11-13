@@ -21,7 +21,7 @@ class Admin::AccountScreen::SsoCardComponentTest < ViewComponent::TestCase
   test "a provider with no name is the fallback words" do
     card(provider_name: nil)
 
-    assert_text "You sign in with your sign-in provider."
+    assert_text "You sign in with single sign-on."
     assert_text I18n.t("#{WORDS}.provider_fallback")
   end
 end

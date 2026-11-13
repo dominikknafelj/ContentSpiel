@@ -20,7 +20,7 @@ en:
       # Both come back to the page with no token (the redirect lost it, and a
       # token is in no address), so each is drawn alone, with the way on.
       sso_mismatch: "%{provider} signed you in as %{got}, but this invitation is for %{email}. Open the link in your invitation mail again and sign in to %{provider} with that address, or ask for a new invitation."
-      sso_unfinished_again: "Open the link in your invitation mail again to try again."
+      sso_unfinished_again: "Open the link in your invitation mail again to start over."
       noscript: "Finishing your account needs JavaScript. Turn it on in your browser and open the link again."
     # The start's own limit (`InvitationsController#sso`), drawn by the page as
     # an unfinished start is.

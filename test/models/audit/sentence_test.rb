@@ -775,7 +775,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "Single sign-on refused stranger@example.com: no invited account", refused.call("reason" => "no_account", "email" => "stranger@example.com")
     assert_equal "Single sign-on refused dana@example.com: the provider hasn't verified the email",
       refused.call("reason" => "email_unverified", "email" => "dana@example.com")
-    assert_equal "Single sign-on refused one@example.com: an owner signs in with a password and passkey", refused.call("reason" => "owner", "email" => "one@example.com")
+    assert_equal "Single sign-on refused one@example.com: owners don't sign in with single sign-on", refused.call("reason" => "owner", "email" => "one@example.com")
     assert_equal "Single sign-on refused an unnamed account: no invited account", refused.call("reason" => "no_account")
   end
 
@@ -796,7 +796,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     revoked = sentence_for(ended("sso_revoked", user_id: nil))
     assert revoked.actor.none
     assert revoked.security
-    assert_equal "“#{user}” signed out: single sign-on said no", read(revoked)
+    assert_equal "“#{user}” signed out: single sign-on no longer lets them in", read(revoked)
 
     unlinked = sentence_for(ended("sso_unlinked", count: 2, actor_type: "User", actor_id: @me.id))
     assert unlinked.actor.none, "the unlink is its own event, with its actor"

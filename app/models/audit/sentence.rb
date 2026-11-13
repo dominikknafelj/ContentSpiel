@@ -168,7 +168,7 @@ module Audit
     SSO_REFUSALS = {
       "no_account" => "no invited account",
       "email_unverified" => "the provider hasn't verified the email",
-      "owner" => "an owner signs in with a password and passkey"
+      "owner" => "owners don't sign in with single sign-on"
     }.freeze
 
     class << self
@@ -539,14 +539,14 @@ module Audit
         when "ended_by_self" then [ text("ended #{count == 1 ? "one" : count} of #{@you ? "your" : "their"} other sessions") ]
         when "ended_by_owner" then user ? subject_parts("ended every session of ", " (#{count})") : [ text("ended #{count} #{sessions}") ]
         when "password_changed" then counted_of(user, count, sessions, " ended by a password change")
-        when "sso_revoked" then signed_out_parts(user, count, sessions, ": single sign-on said no")
+        when "sso_revoked" then signed_out_parts(user, count, sessions, ": single sign-on no longer lets them in")
         when "sso_unlinked" then signed_out_parts(user, count, sessions, ": unlinked from single sign-on")
         when "expired_sso" then signed_out_parts(user, count, sessions, " after #{counted(metadata["after_hours"], "hour")} of single sign-on")
         else counted_of(user, count, sessions, " ended")
         end
       end
 
-      # "“Bo” signed out: single sign-on said no", with "(2 sessions)" when
+      # "“Bo” signed out: single sign-on no longer lets them in", with "(2 sessions)" when
       # it was more than one; "3 sessions signed out …" with no one to name.
       def signed_out_parts(user, count, sessions, after)
         return [ text("#{count} #{sessions} signed out#{after}") ] unless user

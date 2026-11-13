@@ -27,6 +27,6 @@ class Admin::UsersScreen::SsoZoneComponentTest < ViewComponent::TestCase
   test "a provider name that says nothing falls back to words" do
     zone(users(:reader), provider_name: nil)
 
-    assert_text "reader@example.com signs in with your sign-in provider and has no password here."
+    assert_text "reader@example.com signs in with single sign-on and has no password here."
   end
 end
