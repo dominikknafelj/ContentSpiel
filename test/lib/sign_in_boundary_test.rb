@@ -1,6 +1,5 @@
 require "test_helper"
 require_relative "../support/source_code"
-require_relative "dependency_direction_test"
 
 # The sign-in domain's public surface. Everything that signs a person in is
 # under `SignIn::` (app/models/sign_in/, app/services/sign_in/,
@@ -79,7 +78,7 @@ class SignInBoundaryTest < ActiveSupport::TestCase
   # What code inside the domain may not name.
   SCREENS = {
     admin: /(?<![\w:])(?:::)?Admin::/,
-    component: DependencyDirectionTest::COMPONENT,
+    component: SourceCode::COMPONENT,
     controller: /\b\w*Controller\b/,
     url_helpers: /\burl_helpers\b/,
     routes: /Rails\.application\.routes/

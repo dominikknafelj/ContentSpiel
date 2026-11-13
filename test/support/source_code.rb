@@ -3,6 +3,10 @@ require "ripper"
 # A source file's code with its comments blanked, for the guards that read the
 # app's files: prose in a comment may name anything, and only code is held.
 module SourceCode
+  # A component class by name (`Admin::Ui::DialogComponent`, `BarComponent`),
+  # for the guards that refuse one in a layer below the screens.
+  COMPONENT = /(?:\b[A-Z]\w*::)*\b[A-Z]\w*Component\b/
+
   # A comment line per language. A CSS line may begin with "#id", so CSS has none.
   COMMENT_LINES = { ".rb" => /^\s*#.*$/, ".erb" => /^\s*#.*$/, ".js" => %r{^\s*//.*$} }.freeze
 
