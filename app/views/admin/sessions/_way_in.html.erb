@@ -1,0 +1,9 @@
+<%# locals: (label:, url:, variant: :secondary, size: :regular, full: true) %>
+<%# One way in that leaves this site: the provider's start, a gem's sign-in
+    method, or the owner path's "Sign in with %{provider} instead". A real
+    button in a POST form with the form's token, sent without Turbo, since
+    the answer is a whole page on another site (a provider's redirect) that
+    Turbo's fetch could not follow. The provider's and a gem's are drawn
+    alike: the card drew no gem's button, so it takes the provider's look. %>
+<%= button_to label, url, method: :post, form: { data: { turbo: false } },
+      class: [ Admin::Ui::ButtonComponent.classes(variant, size: size), ("w-full" if full) ].compact.join(" ") %>

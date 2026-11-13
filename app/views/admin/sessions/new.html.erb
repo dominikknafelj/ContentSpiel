@@ -1,10 +1,32 @@
 <%# The sign-in form, on the product layout's panel: the site name above the
     heading, an alert or a notice from the last answer, the two fields, the
     bot check when one is due, and the full-width Sign in, the panel's one
-    primary; below the form, the passkey button where there can be one. The labels are real
+    primary; below the form, the other ways in. The labels are real
     <label>s. Field names (email_address, password) are what the controller
-    and every test post. %>
+    and every test post.
+
+    THREE PANELS, by the site's single sign-on (Design System card
+    StudioSingleSignOn, screens 1 and 2; `Admin::SessionsController#new`):
+
+    - no SSO_REQUIRED: the form, then "or", the provider's button when there
+      is a provider, each gem's sign-in method (`SignInMethods`), and the
+      passkey's, all secondary, so Sign in stays the one primary;
+    - SSO_REQUIRED: no form. The lead, the provider's button as the
+      primary, the gems' methods (SSO_REQUIRED neither hides nor refuses
+      one) and the small link to the owner path;
+    - the owner path (`?owner=1`, under SSO_REQUIRED only): the form with
+      the owner's heading and lead, the passkey's button, and the way back
+      to the provider. No gem's method: none signs an owner in
+      (`complete_sign_in`). The parameter only changes what is drawn: a
+      non-owner who signs in here meets the ordinary refusal
+      (`SignInRules`), so the path says nothing of who is an owner. %>
 <% mail_ready = MailSettings.current.ready? %>
+<% provider_name = @sso_provider&.name %>
+<% sso_panel = @sso_required && !@owner_path %>
+<% outside_methods = @owner_path ? [] : SignInMethods.entries %>
+<%# Ways in that are always drawn under the form: with one, the "or" is
+    drawn for them and does not wait for the passkey's script. %>
+<% drawn_ways = (@sso_provider && !@owner_path) || outside_methods.any? %>
 <%# On a site with both Turnstile keys the page is loaded whole, never
     drawn into a document by Turbo: the widget's frame is allowed by the
     policy of the response that loaded the document, and only this page's
@@ -15,7 +37,12 @@
   <% content_for :head do %><meta name="turbo-visit-control" content="reload"><% end %>
 <% end %>
 <div class="flex flex-col gap-[18px]">
-  <%= render "admin/shared/auth_heading", title: t(".title") %>
+  <%= render "admin/shared/auth_heading", title: @owner_path ? t(".owner_title") : t(".title") %>
+  <% if sso_panel %>
+    <p class="text-sm leading-relaxed text-dim"><%= t(".sso_lead", provider: provider_name) %></p>
+  <% elsif @owner_path %>
+    <p class="text-sm leading-relaxed text-dim"><%= t(".owner_lead", provider: provider_name) %></p>
+  <% end %>
 
   <%# Only to the browser whose cookie named a gone session
       (`Authentication#forget_ended_session`), and never beside a refusal.
@@ -25,71 +52,97 @@
   <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: "alert") do %><%= flash[:alert] %><% end %>
   <%= render Admin::Ui::NoticeComponent.new(tone: :ok, size: :compact, id: "notice") do %><%= flash[:notice] %><% end %>
 
-  <%= form_with url: admin_sign_in_path, class: "flex flex-col gap-[18px]" do |form| %>
-    <div class="admin-field">
-      <%= form.label :email_address, t(".email"), class: setup_label_class %>
-      <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username webauthn", value: params[:email_address], class: setup_input_class %>
-    </div>
+  <% if sso_panel %>
+    <%= render "admin/sessions/way_in", label: t(".sso", provider: provider_name), url: admin_sso_path, variant: :primary %>
+    <% outside_methods.each do |method| %>
+      <%= render "admin/sessions/way_in", label: t(method.label), url: main_app.public_send(method.path) %>
+    <% end %>
+    <p><%= link_to t(".owner_sign_in"), admin_sign_in_path(owner: 1), class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %></p>
+  <% else %>
+    <%= form_with url: admin_sign_in_path, class: "flex flex-col gap-[18px]" do |form| %>
+      <%# The owner path's refusal answers on the owner path. %>
+      <% if @owner_path %><%= hidden_field_tag :owner, 1, id: nil %><% end %>
+      <div class="admin-field">
+        <%= form.label :email_address, t(".email"), class: setup_label_class %>
+        <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username webauthn", value: params[:email_address], class: setup_input_class %>
+      </div>
 
-    <%# "Forgot your password?" rides the Password label row, right-aligned
-        (the field's `label_aside` slot), and wraps under the label where
-        the panel is too narrow for both. %>
-    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: t(".password"), autocomplete: "current-password") do |field| %>
-      <% if mail_ready %>
-        <% field.with_label_aside do %>
-          <%= link_to t(".forgot"), new_admin_password_path, class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
+      <%# "Forgot your password?" rides the Password label row, right-aligned
+          (the field's `label_aside` slot), and wraps under the label where
+          the panel is too narrow for both. %>
+      <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: t(".password"), autocomplete: "current-password") do |field| %>
+        <% if mail_ready %>
+          <% field.with_label_aside do %>
+            <%= link_to t(".forgot"), new_admin_password_path, class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
+          <% end %>
         <% end %>
+      <% end %>
+
+      <%# Where the link would stand when mail does not work: no console
+          command, this page is shown to anyone. %>
+      <% unless mail_ready %>
+        <p class="text-small text-meta"><%= t(".forgot_without_mail") %></p>
+      <% end %>
+
+      <%# The bot check, only when the controller hands one over (after
+          repeated failures, on a site with both Turnstile keys): inside the
+          form, so the widget's hidden answer is posted with it, and before
+          Sign in. The box has the widget's height from the first paint, so
+          Sign in does not move when Cloudflare draws into it. `bot-check`
+          draws and removes the widget by hand (its header says why). %>
+      <% if @bot_check %>
+        <div class="flex flex-col gap-2" data-controller="bot-check" data-bot-check-site-key-value="<%= @bot_check.site_key %>" data-bot-check-action-value="<%= SignIn::BotCheck::ACTION %>" data-messages="<%= messages_data("sessions.new.check_unavailable") %>">
+          <p id="turnstile-hint" class="text-small text-dim" aria-live="polite" data-bot-check-target="hint"><%= t(".check_hint") %></p>
+          <div class="min-h-[65px] w-full" data-bot-check-target="widget"></div>
+        </div>
+      <% end %>
+
+      <%# With the check drawn, Sign in is described by its hint, which is
+          where a screen reader that lands on the button learns of it. With
+          the keys, Sign in sends the form without Turbo (the submitter's
+          `data-turbo`, which Enter's implicit submission uses too), so the
+          answer is a whole load; the form's links stay Turbo's. %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full",
+            aria: (@bot_check ? { describedby: "turnstile-hint" } : {}), data: (@bot_check_configured ? { turbo: false } : {})) %>
+    <% end %>
+
+    <%# The ways in that leave this site, under the form and outside it, the
+        provider's first, each a secondary so Sign in stays the panel's one
+        primary, never behind the bot check. %>
+    <% if drawn_ways %>
+      <%= render "admin/sessions/or", data: { sign_in_divider: true } %>
+      <% if @sso_provider && !@owner_path %>
+        <%= render "admin/sessions/way_in", label: t(".sso", provider: provider_name), url: admin_sso_path %>
+      <% end %>
+      <% outside_methods.each do |method| %>
+        <%= render "admin/sessions/way_in", label: t(method.label), url: main_app.public_send(method.path) %>
       <% end %>
     <% end %>
 
-    <%# Where the link would stand when mail does not work: no console
-        command, this page is shown to anyone. %>
-    <% unless mail_ready %>
-      <p class="text-small text-meta"><%= t(".forgot_without_mail") %></p>
-    <% end %>
-
-    <%# The bot check, only when the controller hands one over (after
-        repeated failures, on a site with both Turnstile keys): inside the
-        form, so the widget's hidden answer is posted with it, and before
-        Sign in. The box has the widget's height from the first paint, so
-        Sign in does not move when Cloudflare draws into it. `bot-check`
-        draws and removes the widget by hand (its header says why). %>
-    <% if @bot_check %>
-      <div class="flex flex-col gap-2" data-controller="bot-check" data-bot-check-site-key-value="<%= @bot_check.site_key %>" data-bot-check-action-value="<%= SignIn::BotCheck::ACTION %>" data-messages="<%= messages_data("sessions.new.check_unavailable") %>">
-        <p id="turnstile-hint" class="text-small text-dim" aria-live="polite" data-bot-check-target="hint"><%= t(".check_hint") %></p>
-        <div class="min-h-[65px] w-full" data-bot-check-target="widget"></div>
+    <%# "Sign in with a passkey", last of the ways in. Drawn only where the
+        site has a relying party (none at an IP address), and `hidden` until
+        `passkey-sign-in` finds the browser can use a passkey, so a browser
+        that can't keeps the panel as it was; it stands below the others, so
+        nothing above moves when it shows. Its own "or" only when no other way
+        in drew one. On the owner path its refusal answers there
+        (`owner` on the verify address). %>
+    <% if passkey_relying_party %>
+      <div class="contents" data-controller="passkey-sign-in"
+           data-passkey-sign-in-options-url-value="<%= admin_sign_in_passkey_options_path %>"
+           data-passkey-sign-in-verify-url-value="<%= @owner_path ? admin_sign_in_passkey_path(owner: 1) : admin_sign_in_passkey_path %>">
+        <% unless drawn_ways %>
+          <%= render "admin/sessions/or", data: { passkey_sign_in_target: "divider" }, hidden: true %>
+        <% end %>
+        <button type="button" class="w-full <%= Admin::Ui::ButtonComponent.classes(:secondary) %>" hidden
+                data-passkey-sign-in-target="button" data-action="passkey-sign-in#signIn">
+          <%= render "admin/shared/icon", name: :fingerprint, size: "size-4" %>
+          <%= t(".passkey") %>
+        </button>
       </div>
     <% end %>
 
-    <%# With the check drawn, Sign in is described by its hint, which is
-        where a screen reader that lands on the button learns of it. With
-        the keys, Sign in sends the form without Turbo (the submitter's
-        `data-turbo`, which Enter's implicit submission uses too), so the
-        answer is a whole load; the form's links stay Turbo's. %>
-    <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full",
-          aria: (@bot_check ? { describedby: "turnstile-hint" } : {}), data: (@bot_check_configured ? { turbo: false } : {})) %>
-  <% end %>
-
-  <%# "Sign in with a passkey", under the form and outside it: a secondary,
-      so Sign in stays the panel's one primary, and never behind the bot
-      check. Drawn only where the site has a relying party (none at an IP
-      address), and `hidden` until `passkey-sign-in` finds the browser can
-      use a passkey, so a browser that can't keeps the panel as it was; it
-      stands below everything else, so nothing above moves when it shows. %>
-  <% if passkey_relying_party %>
-    <div class="contents" data-controller="passkey-sign-in"
-         data-passkey-sign-in-options-url-value="<%= admin_sign_in_passkey_options_path %>"
-         data-passkey-sign-in-verify-url-value="<%= admin_sign_in_passkey_path %>">
-      <div class="flex items-center gap-3 text-small text-meta" hidden data-passkey-sign-in-target="divider">
-        <span class="h-px flex-1 bg-line" aria-hidden="true"></span>
-        <span><%= t(".or") %></span>
-        <span class="h-px flex-1 bg-line" aria-hidden="true"></span>
-      </div>
-      <button type="button" class="w-full <%= Admin::Ui::ButtonComponent.classes(:secondary) %>" hidden
-              data-passkey-sign-in-target="button" data-action="passkey-sign-in#signIn">
-        <%= render "admin/shared/icon", name: :fingerprint, size: "size-4" %>
-        <%= t(".passkey") %>
-      </button>
-    </div>
+    <% if @owner_path %>
+      <%= render "admin/sessions/way_in", label: t(".sso_instead", provider: provider_name), url: admin_sso_path, variant: :tertiary, size: :small, full: false %>
+    <% end %>
   <% end %>
 </div>

@@ -122,7 +122,13 @@ module Admin
     rate_limit to: 30, within: 1.minute, only: :passkey_options, name: "options", store: SignIn.store,
       by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { head :too_many_requests }
 
+    # The page draws one of three panels by the site's single sign-on
+    # (`admin/sessions/new`): the provider, whether it is required, and the
+    # owner path, which is drawn only while it is.
     def new
+      @sso_provider = SignIn::Oidc::Provider.current
+      @sso_required = @sso_provider.present? && SignIn::Oidc.required?
+      @owner_path = owner_path?
       bot_check = SignIn::BotCheck.current
       @bot_check_configured = bot_check.present?
       @bot_check = bot_check if bot_check && (session[:sign_in_bot_check] || SignIn::Throttle.new.bot_check_due?(address: request.remote_ip))
@@ -154,7 +160,7 @@ module Admin
         else
           session.delete(:sign_in_bot_check)
         end
-        redirect_to admin_sign_in_path, alert: refusal_sentence(outcome)
+        redirect_to sign_in_page_path, alert: refusal_sentence(outcome)
       end
     end
 
@@ -233,6 +239,15 @@ module Admin
       request.content_security_policy = policy
     end
 
+    # THE OWNER PATH (`?owner=1`) is the page's to ask for, never decided
+    # from an account: the form and the passkey's verify address carry the
+    # parameter, and a refusal answered there goes back there, whoever
+    # tried, so an owner who mistyped is not sent to the panel with no form,
+    # and the answer says nothing of who is an owner.
+    def owner_path? = params[:owner] == "1" && SignIn::Oidc.required?
+
+    def sign_in_page_path = owner_path? ? admin_sign_in_path(owner: 1) : admin_sign_in_path
+
     def refusal_sentence(outcome)
       case outcome.status
       when :bot_check_required, :bot_check_failed then t("admin.sessions.bot_check")
@@ -253,7 +268,7 @@ module Admin
       return limited_span { answer_passkey_refused(t("admin.sessions.limited")) } if action_name == "passkey"
 
       Telemetry.in_span("auth.sign_in", attributes: { "auth.method" => "password", "auth.outcome" => "locked" }) do
-        limited_span { redirect_to admin_sign_in_path, alert: t("admin.sessions.limited") }
+        limited_span { redirect_to sign_in_page_path, alert: t("admin.sessions.limited") }
       end
     end
 
@@ -266,7 +281,7 @@ module Admin
     # nothing it could tell apart.
     def answer_passkey_refused(sentence)
       flash[:alert] = sentence
-      render json: { location: admin_sign_in_path }
+      render json: { location: sign_in_page_path }
     end
 
     def require_passkey_relying_party
