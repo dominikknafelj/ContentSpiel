@@ -63,6 +63,20 @@ class Admin::SsoLinksControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "A mail to set a password is on its way."
   end
 
+  test "the editor draws no password fields for a linked account, a line in their place" do
+    sign_in_as users(:one)
+
+    get "/cs-studio/users/#{@user.id}/edit"
+    assert_select "input[name='user[password]']", count: 0
+    assert_select "input[name='user[password_confirmation]']", count: 0
+    assert_select "details.admin-set-password", count: 0
+    assert_select "#user-form [data-sso-no-password]", text: "reader@example.com signs in with id.example.com and has no password here."
+
+    get "/cs-studio/users/#{users(:author).id}/edit"
+    assert_select "#user-form [data-sso-no-password]", count: 0
+    assert_select "details.admin-set-password input[name='user[password]']"
+  end
+
   test "an admin who is no owner is refused and nothing changes" do
     sign_in_manager
 
