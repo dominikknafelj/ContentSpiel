@@ -99,8 +99,8 @@ module ServiceCalls
   # returns `call:`.
   UNGATED = {
     "Sessions::End" => {
-      reason: "the ending of one expired session row: Session.from_cookies ends an expiry, which nobody asked for, so there is nobody to authorize",
-      callers: %w[app/models/session.rb]
+      reason: "the ending of one session row nobody asked to end: Session.from_cookies ends an expiry and Sso::RecheckJob a session its provider revoked, so there is nobody to authorize",
+      callers: %w[app/jobs/sso/recheck_job.rb app/models/session.rb]
     },
     "Sso::Link" => {
       reason: "the link of an account the provider's verified identity matched: Sso::Admit decides the match, and the service acts as that account",

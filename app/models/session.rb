@@ -131,8 +131,10 @@ class Session < ApplicationRecord
   # runs), and a row another request ended first is simply not among them,
   # so it is counted once. Called inside the transaction that records the
   # ending, which is ONE `session.ended` with this count, however many rows.
+  # A block is handed each row once it is destroyed (the sweep tallies the
+  # rows by the figure their event states).
   def self.destroy_each_locked
-    lock.order(:id).to_a.each(&:destroy!).size
+    lock.order(:id).to_a.each { |row| row.destroy!.tap { yield row if block_given? } }.size
   end
 
   # The live session a request's cookies name, or nil: the ONE lookup,

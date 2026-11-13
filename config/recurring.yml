@@ -45,6 +45,10 @@ production:
     class: Sessions::SweepJob
     queue: default
     schedule: every hour at minute 40
+  sso_recheck:
+    class: Sso::RecheckJob
+    queue: default
+    schedule: every hour at minute 25
 
 development:
   trash_purge_expired:
@@ -79,6 +83,10 @@ development:
     class: Sessions::SweepJob
     queue: default
     schedule: every hour at minute 40
+  sso_recheck:
+    class: Sso::RecheckJob
+    queue: default
+    schedule: every hour at minute 25
 
 test:
   trash_purge_expired:
@@ -109,3 +117,7 @@ test:
     class: Sessions::SweepJob
     queue: default
     schedule: every hour at minute 40
+  sso_recheck:
+    class: Sso::RecheckJob
+    queue: default
+    schedule: every hour at minute 25

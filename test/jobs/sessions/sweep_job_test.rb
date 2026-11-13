@@ -39,6 +39,39 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     assert events.all? { |e| e.actor.nil? && e.subject.nil? }
   end
 
+  def sso_start(token:, at:)
+    Session.start(user: @user, method: "sso", user_agent: nil, ip_address: nil, provider_token: token, at: at)
+      .tap { |s| s.update_column(:last_seen_at, @now) } # version: none (a test's own row)
+  end
+
+  # An expiry by single sign-on ends at 24 hours with no token and at 26 with
+  # one: the event's sentence reads its figure, so each figure is one event.
+  test "the sweep ends expired_sso sessions under one event per run and figure" do
+    live = sso_start(token: "rt", at: @now - 25.hours)
+    sso_start(token: nil, at: @now - 24.hours)
+    sso_start(token: nil, at: @now - 25.hours)
+    sso_start(token: "rt", at: @now - 26.hours)
+    start(seen: @now - 13.hours)
+    @exporter.reset
+
+    OpenTelemetry.tracer_provider.tracer("test").in_span("job", kind: :consumer) do
+      Sessions::SweepJob.perform_now(at: @now)
+    end
+
+    assert_equal [ live ], Session.where(user: @user).to_a
+    assert_equal [ { "reason" => "expired_sso", "count" => 2, "after_hours" => 24 },
+      { "reason" => "expired_sso", "count" => 1, "after_hours" => 26 },
+      { "reason" => "expired_idle", "count" => 1, "after_hours" => 12 } ], ended_events.map(&:metadata)
+    span = @exporter.finished_spans.find { |s| s.name == "auth.session_sweep" }
+    assert_equal 4, span.attributes["auth.session.count"], "the expired_sso sessions are counted with the others"
+  end
+
+  test "an SSO session past both its check and its absolute timeout is counted once, as absolute" do
+    sso_start(token: nil, at: @now - 15.days)
+    Sessions::SweepJob.perform_now(at: @now)
+    assert_equal [ { "reason" => "expired_absolute", "count" => 1, "after_days" => 14 } ], ended_events.map(&:metadata)
+  end
+
   test "a session that is both idle and absolute is counted once, as absolute" do
     start(seen: @now - 20.days, signed_in: @now - 21.days)
     Sessions::SweepJob.perform_now(at: @now)
@@ -68,11 +101,11 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     Sessions::SweepJob.const_set(:BATCH, 2)
     transaction = Session.method(:transaction)
     calls = 0
-    # The absolute sweep's one empty batch, the idle sweep's first batch of
-    # two, then its second batch raises.
+    # The absolute and the SSO sweep's one empty batch each, the idle sweep's
+    # first batch of two, then its second batch raises.
     failing = lambda do |*args, **options, &block|
       calls += 1
-      raise ActiveRecord::ConnectionFailed, "lost" if calls == 3
+      raise ActiveRecord::ConnectionFailed, "lost" if calls == 4
       transaction.call(*args, **options, &block)
     end
 

@@ -95,6 +95,10 @@ module Telemetry
     auth.sso.cached
     auth.sso.refresh_token
     auth.sso.issuer_host
+    auth.sso.recheck.checked
+    auth.sso.recheck.ok
+    auth.sso.recheck.revoked
+    auth.sso.recheck.unavailable
     auth.refused_by_rule
     server.address
     http.response.status_code

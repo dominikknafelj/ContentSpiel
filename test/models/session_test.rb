@@ -299,14 +299,20 @@ class SessionTest < ActiveSupport::TestCase
     assert_equal "expired_absolute", expiry_at(session, t + 14.days)
   end
 
-  test "from_cookies ends an expired sso session as expired_sso" do
+  test "a request that meets an SSO session past its check ends it as expired_sso" do
     t = Time.current
-    session = sso_session(token: nil, at: t - 25.hours)
-    session.update_columns(last_seen_at: t) # version: none (a test's own row)
+    bare = sso_session(token: nil, at: t - 24.hours)
+    held = sso_session(token: "refresh-token", at: t - 26.hours)
+    alive = sso_session(token: "refresh-token", at: t - 26.hours + 1.second)
+    [ bare, held, alive ].each { |row| row.update_columns(last_seen_at: t) } # version: none (a test's own rows)
 
-    assert_nil Session.from_cookies(cookie_jar(session), at: t)
-    assert_nil Session.find_by(id: session.id)
-    assert_equal "expired_sso", Audit::Event.where(action: "session.ended").order(:id).last.metadata["reason"]
+    assert_nil Session.from_cookies(cookie_jar(bare), at: t)
+    assert_nil Session.from_cookies(cookie_jar(held), at: t)
+    assert_equal alive, Session.from_cookies(cookie_jar(alive), at: t)
+    assert_nil Session.find_by(id: bare.id)
+    assert_nil Session.find_by(id: held.id)
+    assert_equal [ [ "expired_sso", 24 ], [ "expired_sso", 26 ] ],
+      Audit::Event.where(action: "session.ended").order(:id).last(2).map { |e| [ e.metadata["reason"], e.metadata["after_hours"] ] }
   end
 
   test "without encryption keys an sso session starts with no token" do

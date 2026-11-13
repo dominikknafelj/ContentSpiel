@@ -1,8 +1,9 @@
 module Sessions
   # Ends one session: destroys the row (so `Session#disconnect_cable` runs)
   # and records `session.ended` with its reason, in one transaction. It asks
-  # no permission: `Session.from_cookies` calls it for an expiry, which
-  # nobody asked for. The endings a person asks for (`Sessions::EndOthers`,
+  # no permission: `Session.from_cookies` calls it for an expiry and
+  # `Sso::RecheckJob` for a session its provider revoked, which nobody asked
+  # for. The endings a person asks for (`Sessions::EndOthers`,
   # `Sessions::EndAll`, a password change) authorize first and end their rows
   # through `Session.destroy_each_locked`, recording one event for them all.
   #
