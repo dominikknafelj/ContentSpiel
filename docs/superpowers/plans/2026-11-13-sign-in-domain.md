@@ -566,7 +566,7 @@ The style is that of `dependency_direction_test.rb` and `notes_boundary_test.rb`
 
   - `OWN = %w[app/models/sign_in.rb app/models/sign_in/**/*.rb app/services/sign_in/**/*.rb app/jobs/sign_in/**/*.rb]`
   - `OUTSIDE = "{app,lib,config}/**/*.{rb,erb,yml}"` minus `OWN`
-  - `REFERENCE = /(?<![\w:])(?:::)?SignIn(?:::[A-Z]\w*)*/`, normalised by stripping `/(::[A-Z][A-Z0-9_]*)+\z/`
+  - `REFERENCE = /(?<![\w:])(?:::)?SignIn\b(?:::[A-Z]\w*)*/`, normalised by stripping `/(::[A-Z][A-Z0-9_]*)+\z/`
   - Code extraction:
     - `.rb`: `SourceCode.without_ruby_comments`;
     - `.erb`: the inside of every `<%`/`<%=` tag, never `<%#`, with Ruby comments stripped;
@@ -616,7 +616,7 @@ The style is that of `dependency_direction_test.rb` and `notes_boundary_test.rb`
   - `"code outside SignIn names only its entry points"`: the message lists `path:line: Name`.
   - `"every entry point is still reached"`: a stale entry fails, naming it.
   - `"every entry point says why"`.
-  - `"SignIn names nothing of CS Studio's screens"`: over `OWN`, comments stripped, fail on `/(?<![\w:])(?:::)?Admin::/`, `DependencyDirectionTest::COMPONENT`, `/\b\w*Controller\b/`, `/\burl_helpers\b/` and `/Rails\.application\.routes/`. Report `path:line: pattern: text`. `app/jobs/sign_in/` is in `OWN`, which `dependency_direction_test` does not read.
+  - `"SignIn names nothing of CS Studio's screens"`: over `OWN`, comments stripped, fail on `/(?<![\w:])(?:::)?Admin::/`, `SourceCode::COMPONENT` (`test/support/source_code.rb`), `/\b\w*Controller\b/`, `/\burl_helpers\b/` and `/Rails\.application\.routes/`. Report `path:line: pattern: text`. `app/jobs/sign_in/` is in `OWN`, which `dependency_direction_test` does not read.
   - `"the reference pattern reads what it should"`: `SignIn::Sso::Admit::OWNER` → `SignIn::Sso::Admit`; `SignIn.store` → `SignIn`; `::SignIn::Rules.x` → `SignIn::Rules`; `MySignIn::X` → nothing; `SignInMailer` → nothing; an ERB `<%# SignIn::Proof %>` → nothing; a YAML `# class: SignIn::X` → nothing.
 - [ ] **Step 2: Check that the guard bites.** Add `SignIn::Outcome` to a line of `app/controllers/admin/sessions_controller.rb` (`_ = SignIn::Outcome`; the root's, and no entry). Expected: FAIL naming it. Then add `Admin::Ui` to `app/models/sign_in/proof.rb`. Expected: FAIL. Then add a bogus entry `"SignIn::Nothing"`. Expected: the stale test FAILS. Revert all three.
 - [ ] **Step 3: Run.** `bin/rails test test/lib/sign_in_boundary_test.rb test/lib/sign_in_namespace_shadow_test.rb test/lib/dependency_direction_test.rb test/lib/admin_namespace_shadow_test.rb`, then `bin/rails test`. Expected: PASS.
