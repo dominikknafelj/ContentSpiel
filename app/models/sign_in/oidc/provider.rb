@@ -197,7 +197,9 @@ module SignIn
 
             yield(document_at(uri)).tap { |fresh| Rails.cache.write(key, fresh, expires_in: CACHE_FOR) }
           rescue Unavailable => error
-            Telemetry.record(span, "auth.sso.reason" => error.reason, "error.type" => Oidc.error_type(error))
+            # A reason outside the span's words (none today) stays out of it.
+            Telemetry.record(span, { "auth.sso.reason" => (error.reason if Oidc.discovery_reason?(error.reason)),
+              "error.type" => Oidc.error_type(error) }.compact)
             raise
           end
         end

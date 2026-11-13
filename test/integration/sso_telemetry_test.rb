@@ -11,8 +11,10 @@ require "test_helper"
 # - the re-check's `auth.sso.recheck_run` stands under the job's CONSUMER
 #   span, with one CLIENT `auth.sso.recheck` under it per session asked;
 # - every key those spans write is in `Telemetry::ATTRIBUTES`, and each key
-#   WORDS names carries one of its words: `auth.sso.reason` on the callback
-#   one of `SignIn::Oidc::SPAN_REASONS`;
+#   WORDS names carries one of its words; `auth.sso.reason` carries each
+#   span's own (SPAN_WORDS): the callback's `SignIn::Oidc::SPAN_REASONS`,
+#   discovery's `DISCOVERY_REASONS` or an `http_<status>`, the re-check's
+#   `RECHECK_REASONS`;
 # - no span or event holds the code, the state, the nonce, the PKCE
 #   verifier, the ID, access or refresh token, the client secret or the email
 #   the provider gave. They are planted through the fake provider
@@ -20,10 +22,8 @@ require "test_helper"
 #   description, link and event of every exported span, as sent, in either
 #   case and URL-encoded, the email's local part and domain each alone.
 #
-# A GUARD OVER CODE THAT ALREADY STANDS: of single sign-on's tests this is
-# the one with no red step of its own. It holds the spans as they are, so a
-# change that moves one out of its parent, writes a new word or leaks a
-# value fails here whichever file made it.
+# So a change that moves a span out of its parent, writes a word outside its
+# span's set or leaks a value fails here, whichever file made it.
 class SsoTelemetryTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
@@ -41,9 +41,12 @@ class SsoTelemetryTest < ActionDispatch::IntegrationTest
   }.freeze
 
   # A key whose words depend on the span: the callback's reason is a
-  # sign-in's; discovery's, never written in these tests, is System status's.
+  # sign-in's, discovery's System status's, the re-check's an answer's. A
+  # callable is asked of the value.
   SPAN_WORDS = {
-    "auth.sso.callback" => { "auth.sso.reason" => SignIn::Oidc::SPAN_REASONS }
+    "auth.sso.callback" => { "auth.sso.reason" => SignIn::Oidc::SPAN_REASONS },
+    "auth.sso.discovery" => { "auth.sso.reason" => SignIn::Oidc.method(:discovery_reason?) },
+    "auth.sso.recheck" => { "auth.sso.reason" => SignIn::Oidc::RECHECK_REASONS }
   }.freeze
 
   setup do
@@ -99,7 +102,10 @@ class SsoTelemetryTest < ActionDispatch::IntegrationTest
       words = WORDS.merge(SPAN_WORDS.fetch(span.name, {}))
       attributes.each do |key, value|
         assert_includes Telemetry::ATTRIBUTES, key, "#{span.name} writes an unlisted key"
-        assert_includes words[key], value, "#{span.name}'s #{key} is an unlisted word" if words.key?(key)
+        next unless words.key?(key)
+
+        listed = words[key].respond_to?(:call) ? words[key].call(value) : words[key].include?(value)
+        assert listed, "#{span.name}'s #{key} is an unlisted word (#{value.inspect})"
       end
     end
   end
@@ -139,6 +145,15 @@ class SsoTelemetryTest < ActionDispatch::IntegrationTest
     [ started, called ]
   end
 
+  # A start the provider's discovery refused: its spans, on the sign-in page.
+  def start_refused
+    spans = spans_of do
+      post admin_sso_path
+      assert_redirected_to admin_sign_in_path
+    end
+    spans
+  end
+
   def assert_redirect_span(spans)
     redirect = named(spans, "auth.sso.redirect").sole
     assert_under_request(spans, redirect)
@@ -156,6 +171,14 @@ class SsoTelemetryTest < ActionDispatch::IntegrationTest
   test "an SSO sign-in, refused, unfinished and accepted, exports auth.sso.redirect, auth.sso.callback and auth.sso.token under the request with only listed words" do
     open_invitation("invited@example.com")
     with_fake_idp(email: "stranger@example.com", subject: "sub-stranger") do |idp|
+      # A provider whose discovery answers 500: the start is unfinished, and
+      # discovery's span says why in its own words.
+      idp.answer_discovery_with(status: 500, body: { "error" => "down" })
+      started = start_refused
+      assert_redirect_span(started)
+      discovery = named(started, "auth.sso.discovery").sole
+      assert_equal [ "http_500", "500" ], discovery.attributes.values_at("auth.sso.reason", "error.type")
+
       outcomes = []
 
       started, called = round_trip(idp)
@@ -217,6 +240,17 @@ class SsoTelemetryTest < ActionDispatch::IntegrationTest
         assert_listed_words(spans)
       end
       assert_equal 0, Session.count
+
+      # An answer that comes but cannot be used: an ID token signed by a key
+      # the provider never serves is `bad_token`, the session left for later.
+      Session.start(user: user, method: "sso", user_agent: nil, ip_address: nil, provider_token: "rt-1")
+      idp.answer_token_with(body: { "access_token" => "at-1", "token_type" => "Bearer", "id_token" => idp.id_token({}, key: :unknown) })
+      spans = run.call
+      recheck = named(spans, "auth.sso.recheck").sole
+      assert_equal [ "unavailable", "bad_token" ], recheck.attributes.values_at("auth.outcome", "auth.sso.reason")
+      assert_equal 1, named(spans, "auth.sso.recheck_run").sole.attributes["auth.sso.recheck.unavailable"]
+      assert_listed_words(spans)
+      assert_equal 1, Session.count
     end
   end
 

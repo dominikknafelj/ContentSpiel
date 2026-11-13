@@ -88,7 +88,11 @@ module SignIn
 
         def revoked = Result.new(status: :revoked, refresh_token: nil)
 
+        # `reason` is one of RECHECK_REASONS, the span's words; any other is
+        # a mistake of this file's.
         def unavailable(span = nil, reason = nil)
+          raise ArgumentError, "#{reason.inspect} is no recheck reason" if reason && !RECHECK_REASONS.include?(reason)
+
           Telemetry.record(span, "auth.sso.reason" => reason, "error.type" => reason) if span && reason
           Result.new(status: :unavailable, refresh_token: nil)
         end

@@ -35,6 +35,14 @@ module SignIn
     MISMATCH_REASON = "mismatch".freeze
     # Every word `auth.sso.callback`'s `auth.sso.reason` may carry.
     SPAN_REASONS = (UNFINISHED_REASONS + ACCOUNT_REASONS + [ MISMATCH_REASON ]).freeze
+    # Every word `auth.sso.discovery`'s `auth.sso.reason` may carry: why the
+    # discovery document or the key set could not be used, System status's
+    # words, and `http_<status>` (DISCOVERY_HTTP_REASON) for a refusing status.
+    DISCOVERY_REASONS = %w[unreachable not_json issuer_mismatch missing_endpoint].freeze
+    DISCOVERY_HTTP_REASON = /\Ahttp_\d{3}\z/
+    # Every word `auth.sso.recheck`'s `auth.sso.reason` may carry: a refresh
+    # answer that came but could not be used.
+    RECHECK_REASONS = %w[not_json bad_token].freeze
 
     # The host's variables are wrong in a way that would silently open what
     # they meant to close, or point sign-in at the wrong place.
@@ -55,6 +63,9 @@ module SignIn
 
       error.reason
     end
+
+    # Whether `word` is one of discovery's span reasons.
+    def self.discovery_reason?(word) = DISCOVERY_REASONS.include?(word) || DISCOVERY_HTTP_REASON.match?(word.to_s)
 
     # An issuer's host, which the audit log names the provider by: an
     # identity's, or the issuer an account was linked under.
