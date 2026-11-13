@@ -85,6 +85,48 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     assert users(:reader).reload.authenticate("reset-pass-1")
   end
 
+  # --- clear: a password nobody holds (Sso::Link) -----------------------------
+
+  test "clear needs the user's own actor or the console, and never asks the leak lookup" do
+    clear = ->(user, actor:) { Users::UpdatePassword.call(user, clear: true, keep_acting_session: false, actor: actor) }
+    sessions = 2.times.map { Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil) }
+
+    with_leaked_password_check(leaked: []) do
+      [ users(:two), users(:one), users(:author) ].each do |someone|
+        refused = as(someone) { clear.call(users(:reader), actor: someone) }
+        assert refused.denied?, "#{someone.email_address} may not clear another person's password"
+      end
+      assert users(:reader).reload.authenticate("password")
+      sessions.each { |session| assert Session.exists?(session.id) }
+
+      own = as(nil) { clear.call(users(:reader), actor: users(:reader)) }
+      assert own.ok?, own.errors.inspect
+      assert_not users(:reader).reload.authenticate("password")
+      sessions.each { |session| assert_not Session.exists?(session.id) }
+      assert_equal [ nil, "password changed" ], Audit::Event.find_by!(action: "user.updated").field_changes["credentials"]
+      assert_equal "password_changed", Audit::Event.find_by!(action: "session.ended").metadata["reason"]
+
+      console = as(nil, channel: :console) { clear.call(users(:author), actor: nil) }
+      assert console.ok?, console.errors.inspect
+      assert_not users(:author).reload.authenticate("password")
+
+      assert_empty leaked_password_requests
+    end
+  end
+
+  test "clear does not open sign-in: nobody can type the password it writes" do
+    throttle = SignIn::Throttle.new
+    cleared = []
+    with_singleton_override(SignIn::Throttle, :new, ->(**) { throttle }) do
+      with_singleton_override(throttle, :clear, ->(identifier:) { cleared << identifier }) do
+        as(nil) { Users::UpdatePassword.call(users(:reader), clear: true, keep_acting_session: false, actor: users(:reader)) }
+        assert_empty cleared
+        as(nil) { change(users(:reader), actor: users(:reader)) }
+        assert_equal [ "reader@example.com" ], cleared
+      end
+    end
+  end
+
   # --- Leaked passwords (Users::LeakedPasswordRule) ---------------------------
 
   test "a leaked password is refused and the user's sessions all stay" do

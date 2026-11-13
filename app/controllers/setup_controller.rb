@@ -156,8 +156,9 @@ class SetupController < ApplicationController
     # token's included: the policy covers them, they hold none, and this
     # request has a relying party. At an IP address none can be made, so
     # nothing is held (as `Admin::PasskeyEnrolment` holds nothing there).
+    # The wizard signs its founding owner in by password, its one way in.
     def passkey_due?
-      passkey_relying_party.present? && Passkeys::Policy.current.enrolment_due?(Current.user)
+      passkey_relying_party.present? && Passkeys::Policy.current.enrolment_due?(Current.user, method: "password")
     end
 
     # The options are the signed-in founding owner's alone, only where a

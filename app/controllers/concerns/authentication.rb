@@ -130,7 +130,7 @@ module Authentication
       policy = Passkeys::Policy.current
       Telemetry.record(OpenTelemetry::Trace.current_span, "auth.policy" => policy.name)
       Session.start(user: user, method: method, user_agent: request.user_agent, ip_address: request.remote_ip,
-        enrolment_due: policy.enrolment_due?(user)).tap do |session|
+        enrolment_due: policy.enrolment_due?(user, method: method)).tap do |session|
         Current.session = session
         cookies.signed[:session_id] = { value: session.id, httponly: true, same_site: :lax, expires: session.expires_at }
       end

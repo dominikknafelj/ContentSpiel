@@ -86,7 +86,9 @@ module ServiceCalls
   # the token names, or a callable that finds it after the call, for a service
   # that creates it).
   TOKEN_CREDENTIAL = {
-    "Invitations::Accept" => "the invitation's token is the right to make that one account (spec \"Invites\")"
+    "Invitations::Accept" => "the invitation's token is the right to make that one account (spec \"Invites\")",
+    "Invitations::AcceptWithSso" => "the provider's verified identity, whose email is the invitation's, is the right to make that one account",
+    "Sso::Admit" => "the provider's verified identity is the credential: it signs into the account it matches and nothing else"
   }.freeze
 
   # Low-level services that ask no permission because every caller has
@@ -99,6 +101,10 @@ module ServiceCalls
     "Sessions::End" => {
       reason: "the ending of one expired session row: Session.from_cookies ends an expiry, which nobody asked for, so there is nobody to authorize",
       callers: %w[app/models/session.rb]
+    },
+    "Sso::Link" => {
+      reason: "the link of an account the provider's verified identity matched: Sso::Admit decides the match, and the service acts as that account",
+      callers: %w[app/services/sso/admit.rb]
     }
   }.freeze
 
@@ -631,6 +637,42 @@ module ServiceCalls
       accept = ->(token) { Invitations::Accept.call(token: token, name: "Invited", password: PASSWORD, password_confirmation: PASSWORD) }
       token = target.generate_token_for(:accept)
       { call: -> { accept.call(token) }, bad_call: -> { accept.call(gone_token) }, owner: -> { User.find_by!(email_address: "invited@example.com") } }
+    },
+
+    # See TOKEN_CREDENTIAL. A good identity's email is the invitation's; a
+    # bad one's is another (a mismatch writes nothing).
+    "Invitations::AcceptWithSso" => lambda {
+      target = open_invitation("invited@example.com", groups: [ access_control_groups(:read_only) ])
+      identity = ->(email) { SignIn::Oidc::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email:, email_verified: true, name: "Invited", refresh_token: nil) }
+      { call: -> { Invitations::AcceptWithSso.call(target, identity: identity.call("invited@example.com")) },
+        bad_call: -> { Invitations::AcceptWithSso.call(target, identity: identity.call("someone-else@example.com")) },
+        owner: -> { User.find_by!(email_address: "invited@example.com") } }
+    },
+
+    # See TOKEN_CREDENTIAL. A good identity links the account its verified
+    # email names; a start from an invitation of another address answers a
+    # mismatch and writes nothing.
+    "Sso::Admit" => lambda {
+      target = stranger_target
+      Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
+      other = open_invitation("invited@example.com")
+      identity = SignIn::Oidc::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email: target.email_address, email_verified: true, name: nil, refresh_token: nil)
+      { call: -> { Sso::Admit.call(identity) }, bad_call: -> { Sso::Admit.call(identity, invitation: other) }, owner: target }
+    },
+
+    # See UNGATED.
+    "Sso::Link" => lambda {
+      target = stranger_target
+      identity = SignIn::Oidc::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email: target.email_address, email_verified: true, name: nil, refresh_token: nil)
+      { call: -> { Sso::Link.call(target, identity:, via: "sign_in") } }
+    },
+
+    # Owner-only, as Sessions::EndAll.
+    "Sso::Unlink" => lambda {
+      target = stranger_target
+      target.update_columns(sso_issuer: "https://id.example.com", sso_subject: "sub-1", sso_linked_at: Time.current) # version: none (a test's setup)
+      Session.start(user: target, method: "sso", user_agent: nil, ip_address: nil)
+      { call: -> { Sso::Unlink.call(target) }, permission: "users.manage", on: target }
     },
 
     # See UNGATED.

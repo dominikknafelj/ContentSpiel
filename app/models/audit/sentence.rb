@@ -132,6 +132,7 @@ module Audit
       session.created session.destroyed session.ended session.failed session.locked access.denied
       passkey.added passkey.renamed passkey.removed recovery_codes.generated recovery_code.used
       session.second_factor_failed session.confirmation_failed
+      sso.linked sso.refused sso.unlinked
     ].freeze
 
     ACTIONS = (
@@ -141,8 +142,9 @@ module Audit
 
     # Sign-in's refusals: nobody signed in, and the sentence must not invent
     # an actor. A second step refused is one of them: the password before it
-    # signed nobody in.
-    NO_ACTOR = %w[session.failed session.locked session.second_factor_failed].freeze
+    # signed nobody in. So is single sign-on's refusal: the provider named
+    # someone the site has no account for, or none it may sign in.
+    NO_ACTOR = %w[session.failed session.locked session.second_factor_failed sso.refused].freeze
 
     # The reasons of a `session.ended` whose sentence names who ended it
     # ("Ada ended every session of “Bo”"). An expiry has nobody to name, and
@@ -152,11 +154,22 @@ module Audit
     SESSION_ENDED_BY = %w[ended_by_self ended_by_owner].freeze
 
     # A passkey's or a code's change is a change to how the account is
-    # proved, so each is one, but a passkey's new name, which proves nothing.
+    # proved, so each is one, but a passkey's new name, which proves nothing;
+    # and a link to a sign-in provider, made, taken away or refused, is one
+    # too.
     SECURITY_ACTIONS = %w[
       session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted
       passkey.added passkey.removed recovery_codes.generated recovery_code.used session.second_factor_failed session.confirmation_failed
+      sso.linked sso.refused sso.unlinked
     ].freeze
+
+    # `sso.refused`'s reasons (`SignIn::Oidc::ACCOUNT_REASONS`) in words. A
+    # reason this code doesn't know says none.
+    SSO_REFUSALS = {
+      "no_account" => "no invited account",
+      "email_unverified" => "the provider hasn't verified the email",
+      "owner" => "an owner signs in with a password and passkey"
+    }.freeze
 
     class << self
       # One event for one viewer (resolving its target by itself).
@@ -459,6 +472,9 @@ module Audit
         when "session.second_factor_failed"
           subject_label ? subject_parts("Failed second sign-in step for ") : [ text("Failed second sign-in step") ]
         when "session.confirmation_failed" then [ text("didn't confirm it was #{@you ? "you" : "them"} before a sign-in change") ]
+        when "sso.linked" then [ text("linked #{@you ? "your" : "their"} account to single sign-on#{host_words}") ]
+        when "sso.refused" then refused_parts
+        when "sso.unlinked" then subject_parts("unlinked ", " from single sign-on")
         else language_parts
         end
       end
@@ -468,6 +484,7 @@ module Audit
         case self.class.metadata_of(event)["method"]
         when "passkey" then "signed in with a passkey"
         when "recovery_code" then "signed in with a recovery code"
+        when "sso" then "signed in with single sign-on"
         else "signed in"
         end
       end
@@ -522,8 +539,34 @@ module Audit
         when "ended_by_self" then [ text("ended #{count == 1 ? "one" : count} of #{@you ? "your" : "their"} other sessions") ]
         when "ended_by_owner" then user ? subject_parts("ended every session of ", " (#{count})") : [ text("ended #{count} #{sessions}") ]
         when "password_changed" then counted_of(user, count, sessions, " ended by a password change")
+        when "sso_revoked" then signed_out_parts(user, count, sessions, ": single sign-on said no")
+        when "sso_unlinked" then signed_out_parts(user, count, sessions, ": unlinked from single sign-on")
+        when "expired_sso" then signed_out_parts(user, count, sessions, " after #{counted(metadata["after_hours"], "hour")} of single sign-on")
         else counted_of(user, count, sessions, " ended")
         end
+      end
+
+      # "“Bo” signed out: single sign-on said no", with "(2 sessions)" when
+      # it was more than one; "3 sessions signed out …" with no one to name.
+      def signed_out_parts(user, count, sessions, after)
+        return [ text("#{count} #{sessions} signed out#{after}") ] unless user
+
+        [ Part.new(:subject, user), text(" signed out#{after}#{" (#{count} #{sessions})" if count > 1}") ]
+      end
+
+      # " (id.example.com)": the provider's host the event stored, or nothing.
+      def host_words
+        host = self.class.metadata_of(event)["issuer_host"]
+        host.present? ? " (#{host})" : ""
+      end
+
+      # The email the provider gave is the only name the event has: nobody was
+      # signed in, and no account is its subject.
+      def refused_parts
+        metadata = self.class.metadata_of(event)
+        email = metadata["email"].presence
+        reason = SSO_REFUSALS[metadata["reason"].to_s]
+        [ text("Single sign-on refused "), (email ? strong(email) : text("an unnamed account")), (text(": #{reason}") if reason) ].compact
       end
 
       # "12 hours", "1 day": the timeout the event stored

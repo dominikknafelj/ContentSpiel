@@ -50,13 +50,27 @@ module Users
   # any change. Only the trusted nil actor may ask it (the console's
   # command): from anyone signed in it is refused whole, an owner included,
   # since a second factor that someone else could clear protects nothing.
+  #
+  # `clear: true` writes a password nobody holds (`User.unusable_password`):
+  # the link to a sign-in provider (`Sso::Link`), after which the account
+  # signs in through the provider alone. Only the user's own actor (the
+  # account the provider just proved) or the trusted nil actor (the console)
+  # may ask it: from anyone else, an owner included, it is refused, since
+  # clearing someone's password is taking their way in. Nothing is typed, so
+  # there is no blank check and no leak lookup, and the sentence is the
+  # ordinary change's (`user.updated` with its credentials marker, the
+  # sessions ended as for any change). Sign-in is not opened afterwards
+  # (`SignIn::Throttle#clear`): nobody can type the new password, so a bucket
+  # held closed keeps out nobody who could otherwise get in.
   class UpdatePassword < ApplicationService
     include OwnerProtection
     include LeakedPasswordRule
 
-    def initialize(user, password:, password_confirmation:, current_password: nil, keep_acting_session: true, remove_passkeys: false, actor: Current.actor)
+    def initialize(user, password: nil, password_confirmation: nil, current_password: nil, keep_acting_session: true, remove_passkeys: false,
+      clear: false, actor: Current.actor)
       @user = user
       @remove_passkeys = remove_passkeys
+      @clear = clear
       @password = password.to_s
       @password_confirmation = password_confirmation.to_s
       @current_password = current_password
@@ -66,18 +80,23 @@ module Users
 
     def call
       return denied("users.manage", @user) if @remove_passkeys && !AccessControl.trusted?(actor, Current.channel)
+      return denied("users.manage", @user) if @clear && !own_password? && !AccessControl.trusted?(actor, Current.channel)
 
-      unless own_password?
+      unless own_password? || @clear
         return denied("users.manage", @user) unless authorize!("users.manage", @user)
         return owner_only_denial if owner_protected?
         return denied("users.manage", @user) if outranked?
       end
 
-      return current_password_mismatch if !@current_password.nil? && !@user.authenticate(@current_password)
-      return blank_password if @password.blank?
+      if @clear
+        @user.password = User.unusable_password
+      else
+        return current_password_mismatch if !@current_password.nil? && !@user.authenticate(@current_password)
+        return blank_password if @password.blank?
 
-      @user.assign_attributes(password: @password, password_confirmation: @password_confirmation)
-      return leaked_password_failure(@user) if leaked_password?(@user, @password)
+        @user.assign_attributes(password: @password, password_confirmation: @password_confirmation)
+        return leaked_password_failure(@user) if leaked_password?(@user, @password)
+      end
 
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)
@@ -89,7 +108,7 @@ module Users
       end
       return failure(@user) unless saved
 
-      SignIn::Throttle.new.clear(identifier: @user.email_address)
+      SignIn::Throttle.new.clear(identifier: @user.email_address) unless @clear
       success(@user)
     end
 

@@ -37,8 +37,9 @@ class User < ApplicationRecord
   # the email as the fallback -- `name_or_email` is the one reader, so no
   # screen decides the fallback for itself. A blank name is stored as nil,
   # so "no name" has one representation.
+  NAME_LIMIT = 120
   normalizes :name, with: ->(name) { name.to_s.strip.presence }
-  validates :name, length: { maximum: 120 }
+  validates :name, length: { maximum: NAME_LIMIT }
 
   # Presence here so the setup wizard shows a form error; uniqueness backs up
   # the unique index with a readable message instead of an exception.

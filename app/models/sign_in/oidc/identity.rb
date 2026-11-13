@@ -12,6 +12,9 @@ module SignIn
       alias_method :to_s, :inspect
 
       def as_json(*) = { "issuer" => issuer, "subject" => subject }
+
+      # The issuer's host, which the audit log names the provider by.
+      def issuer_host = URI.parse(issuer.to_s).host
     end
   end
 end
