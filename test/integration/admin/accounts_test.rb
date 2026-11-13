@@ -540,7 +540,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
       patch "/cs-studio/account/password", params: { current_password: "password", password: "new-password-1", password_confirmation: "new-password-1" }
 
       assert_response :unprocessable_entity
-      assert_select ".admin-error-summary[role=alert] li"
+      assert_select ".admin-error-summary[role=alert] li", text: I18n.t("admin.users.sso_linked_password", provider: OidcHelper::NAME)
       assert_equal digest, user.reload.password_digest
     end
   end
