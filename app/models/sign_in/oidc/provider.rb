@@ -180,7 +180,7 @@ module SignIn
         #
         # Each refusal has its fixed words, and its reason is one of the
         # System status row's, which are a fixed set: a document naming
-        # another issuer is `issuer_mismatch`; one missing a member sign-in
+        # another issuer, or none, is `issuer_mismatch`; one missing a member sign-in
         # needs (an endpoint, or another member the specification requires)
         # or naming an endpoint that is not https (`secure_address?`) is
         # `missing_endpoint`, since it names no endpoint sign-in can use; one
@@ -194,9 +194,8 @@ module SignIn
         def discovered(document)
           response = OpenIDConnect::Discovery::Provider::Config::Response.new(document.deep_symbolize_keys)
           response.expected_issuer = issuer
-          if response.issuer.present? && response.issuer != issuer
-            raise Unavailable.new("a document naming another issuer", reason: "issuer_mismatch")
-          end
+          # Exact: a blank or absent issuer is no match either.
+          raise Unavailable.new("a document naming another issuer", reason: "issuer_mismatch") if response.issuer != issuer
           response.validate!
           raise Unavailable.new("a document with no token endpoint", reason: "missing_endpoint") if response.token_endpoint.blank?
 

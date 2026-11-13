@@ -232,12 +232,17 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
     assert_not SignIn::Oidc::Provider.secure_address?(URI("/token"), production: false)
   end
 
-  test "another issuer is refused even with the gem's own issuer check turned off" do
+  test "another issuer, a blank one and none are refused even with the gem's own issuer check turned off" do
     was = OpenIDConnect.validate_discovery_issuer
     OpenIDConnect.validate_discovery_issuer = false
     with_https_document(https_document.merge("issuer" => "https://planted.example.org")) do |provider|
       error = assert_raises(SignIn::Oidc::Unavailable) { provider.configuration }
       assert_equal "issuer_mismatch", error.reason
+    end
+    [ https_document.except("issuer"), https_document.merge("issuer" => "") ].each do |document|
+      with_https_document(document) do |provider|
+        assert_equal "issuer_mismatch", assert_raises(SignIn::Oidc::Unavailable) { provider.configuration }.reason
+      end
     end
   ensure
     OpenIDConnect.validate_discovery_issuer = was
