@@ -181,7 +181,7 @@ class AdminHostTest < ActionDispatch::IntegrationTest
         https!
         host! "studio.example.internal"
         post "/cs-studio/sign-in/sso"
-        assert_response :see_other
+        assert_response :see_other, "the start on the admin host sends to the provider"
         callback = "#{ADMIN_ADDRESS}/cs-studio/sign-in/sso/callback"
         assert_equal callback, Rack::Utils.parse_query(URI(response.location).query)["redirect_uri"], "the redirect URI names the admin host"
         cookie = Array(response.headers["Set-Cookie"]).flat_map { |line| line.split("\n") }.find { |line| line.start_with?("cs_sso_state=") }
@@ -193,7 +193,7 @@ class AdminHostTest < ActionDispatch::IntegrationTest
         assert back.start_with?("#{callback}?"), "the provider sends the browser back to the admin host"
         get back
         assert_redirected_to "#{ADMIN_ADDRESS}/cs-studio", "the callback answers on the admin host"
-        assert_equal "sso", Session.sole.authenticated_with
+        assert_equal "sso", Session.sole.authenticated_with, "the admin host's callback signs in by sso"
 
         host! "docs.example.org"
         get "/cs-studio/sign-in/sso/callback", params: { code: "x", state: "y" }

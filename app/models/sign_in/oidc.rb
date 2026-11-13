@@ -30,6 +30,11 @@ module SignIn
     UNFINISHED_REASONS = %w[cancelled provider_error bad_state bad_token unavailable].freeze
     # Why a finished sign-in names no account (audited as `sso.refused`).
     ACCOUNT_REASONS = %w[no_account email_unverified owner].freeze
+    # A start from an invitation whose provider signed in another verified
+    # email: shown on the invitation page, never audited.
+    MISMATCH_REASON = "mismatch".freeze
+    # Every word `auth.sso.callback`'s `auth.sso.reason` may carry.
+    SPAN_REASONS = (UNFINISHED_REASONS + ACCOUNT_REASONS + [ MISMATCH_REASON ]).freeze
 
     # The host's variables are wrong in a way that would silently open what
     # they meant to close, or point sign-in at the wrong place.

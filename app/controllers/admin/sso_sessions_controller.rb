@@ -116,8 +116,14 @@ module Admin
       return refused(span, result.errors.first) unless result.ok?
 
       user = result.record
+      # `Sso::Admit` never answers an owner; were one answered, it is refused
+      # here, before anyone signed in in this browser is signed out, and
+      # recorded as Admit records an owner. `complete_sign_in` refuses it
+      # too, for every outside method.
+      return refused_owner(span, identity) if user.owner?
+
       terminate_session if resume_session
-      return refused(span, Sso::Admit::OWNER) unless complete_sign_in(user, method: "sso", provider_token: identity.refresh_token)
+      complete_sign_in(user, method: "sso", provider_token: identity.refresh_token)
 
       Telemetry.record(span, "auth.outcome" => "ok")
       redirect_to after_authentication_url
@@ -129,18 +135,29 @@ module Admin
     end
 
     # The span takes the reason only when it is one of the account reasons'
-    # words: any other failure a service answers is sentences, which reach
-    # no span.
+    # words (`SPAN_REASONS`): any other failure a service answers is
+    # sentences, which reach no span.
     def refused(span, reason)
       reason = reason.to_s
       Telemetry.record(span, { "auth.outcome" => "refused", "auth.sso.reason" => (reason if SignIn::Oidc::ACCOUNT_REASONS.include?(reason)) }.compact)
       redirect_to admin_sign_in_path, alert: t("admin.sessions.sso_refused", provider: sso_provider.name)
     end
 
+    # `sso.refused` as `Sso::Admit` writes it: nobody's, the provider's email
+    # cut to an address's length and only when it gave one.
+    def refused_owner(span, identity)
+      email = User.normalize_value_for(:email_address, identity.email.to_s)
+      metadata = { "reason" => Sso::Admit::OWNER, "issuer_host" => identity.issuer_host }
+      metadata["email"] = email.first(Sso::Admit::EMAIL_LIMIT) if email.present?
+      Current.actor = nil
+      Audit.record("sso.refused", metadata: metadata)
+      refused(span, Sso::Admit::OWNER)
+    end
+
     # The invitation page draws both addresses (`flash[:sso_mismatch]`): the
     # one the provider signed in and the one invited.
     def mismatch(span, invitation, email)
-      Telemetry.record(span, "auth.outcome" => "refused", "auth.sso.reason" => Sso::Admit::MISMATCH.to_s)
+      Telemetry.record(span, "auth.outcome" => "refused", "auth.sso.reason" => SignIn::Oidc::MISMATCH_REASON)
       flash[:sso_mismatch] = { "got" => email, "email" => invitation.email_address }
       redirect_to admin_invitation_path
     end

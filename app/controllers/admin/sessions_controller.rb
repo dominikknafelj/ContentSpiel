@@ -186,6 +186,8 @@ module Admin
         complete_sign_in(result.credential.user, method: "passkey")
         render json: { location: after_authentication_url }
       else
+        # Why, for the operator alone: the answer is the wrong passkey's.
+        Telemetry.record(OpenTelemetry::Trace.current_span, "auth.refused_by_rule" => true) if result.ok
         reservation.closes.each { |trip| Audit.record("session.locked", metadata: { "bucket" => "address_wide", "seconds" => trip.seconds }) }
         answer_passkey_refused(t("admin.sessions.passkey_failed"))
       end

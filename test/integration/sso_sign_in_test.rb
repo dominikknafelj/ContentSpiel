@@ -308,6 +308,8 @@ class SsoSignInTest < ActionDispatch::IntegrationTest
 
     with_sso(required: true) do
       assert_equal 1, send_sign_in_passkey(member_client, member) { |location| refused_passkey(location) }, "the refusal counts in the wide bucket"
+      request_span = @exporter.finished_spans.select { |span| span.kind == :server }.last
+      assert request_span.attributes["auth.refused_by_rule"], "the request's span says the rule refused it"
       assert_equal 0, Session.count, "the member is not signed in"
       assert_equal 0, Audit::Event.where(action: "session.created").count
 
@@ -349,6 +351,23 @@ class SsoSignInTest < ActionDispatch::IntegrationTest
     assert_equal admin_second_factor_path, second_step_passkey(client, linked), "a passkey after a link"
     assert_equal I18n.t("admin.second_factor.passkey_failed"), flash[:alert], "a passkey after a link"
     assert_equal 0, Session.count, "nobody is signed in after a link"
+  end
+
+  test "a recovery code refused by rule is not used, and works once SSO_REQUIRED is off" do
+    member, _client, codes = member_with_second_factors("member@example.org")
+    password_step(member)
+    with_sso(required: true) do
+      post admin_second_factor_code_path, params: { recovery_code: codes.first }
+      assert_equal I18n.t("admin.second_factor.code_failed"), flash[:alert], "the refusal is a wrong code's"
+    end
+    assert_equal 10, member.recovery_codes.unused.count, "the refused code is still unused"
+    assert_equal 0, Audit::Event.where(action: "recovery_code.used").count, "no code is recorded as used"
+    step = @exporter.finished_spans.select { |span| span.name == "auth.second_factor" }.last
+    assert_equal [ "refused", true ], step.attributes.values_at("auth.outcome", "auth.refused_by_rule"), "the operator sees the rule"
+
+    post admin_second_factor_code_path, params: { recovery_code: codes.first }
+    assert_redirected_to admin_account_path(anchor: "passkeys"), "the same code signs in with SSO_REQUIRED off"
+    assert_equal 9, member.recovery_codes.unused.count, "and only then is it used"
   end
 
   test "complete_sign_in refuses an owner by an outside method and an unknown method raises" do

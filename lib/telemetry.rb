@@ -95,6 +95,7 @@ module Telemetry
     auth.sso.cached
     auth.sso.refresh_token
     auth.sso.issuer_host
+    auth.refused_by_rule
     server.address
     http.response.status_code
     error.type
