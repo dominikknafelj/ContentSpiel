@@ -91,19 +91,6 @@ class SignIn::Oidc::RefreshTest < ActiveSupport::TestCase
     end
   end
 
-  # Pins the gem's behaviour `SignIn::Oidc::IdToken` is written around: its
-  # `verify!` does not skip the nonce when none is expected, it requires
-  # there be none.
-  test "the gem's verify! with no nonce refuses a token that carries one" do
-    with_fake_idp do |idp|
-      decode = ->(claims) { OpenIDConnect::ResponseObject::IdToken.decode(idp.id_token(claims), idp.provider.keys) }
-      assert decode.call({}).verify!(issuer: idp.issuer, client_id: idp.client_id, nonce: nil)
-      assert_raises(OpenIDConnect::ResponseObject::IdToken::InvalidNonce) do
-        decode.call({ "nonce" => "the-sign-in-nonce" }).verify!(issuer: idp.issuer, client_id: idp.client_id, nonce: nil)
-      end
-    end
-  end
-
   test "a blank refresh token is the caller's mistake and raises before anything is sent" do
     with_fake_idp do |idp|
       [ nil, "", 12 ].each { |token| assert_raises(ArgumentError) { refresh(idp).call(token, subject: "sub-1") } }

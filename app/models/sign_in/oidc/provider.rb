@@ -135,7 +135,7 @@ module SignIn
       # grant), the endpoint read from `configuration` (the caller's, so the
       # discovery span is not nested in the caller's token span). Raises
       # `Unavailable` when the endpoint cannot be reached (`unreachable`) or
-      # answers more than MAX_BODY (`too_large`), unread.
+      # answers more than MAX_BODY (`not_json`, as discovery's), unread.
       #
       # The client proves itself with client_secret_basic, the
       # specification's default, or client_secret_post when that is the
@@ -160,7 +160,7 @@ module SignIn
         response = OutsideCall.perform(uri, request, open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT, max_body: MAX_BODY)
         TokenAnswer.new(status: response.code.to_i, body: json_object(response.body))
       rescue OutsideCall::Unavailable
-        raise Unavailable.new("a body over the limit", reason: "too_large")
+        raise Unavailable.new("a body over the limit", reason: "not_json")
       rescue *NETWORK_ERRORS
         raise Unavailable.new("the provider could not be reached", reason: "unreachable")
       end

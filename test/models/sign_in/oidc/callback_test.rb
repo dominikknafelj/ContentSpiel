@@ -160,7 +160,9 @@ class SignIn::Oidc::CallbackTest < ActiveSupport::TestCase
       assert_equal "unavailable", callback(idp).call(params: params, kept: kept).reason
 
       idp.answer_token_with(body: { "id_token" => "x" * SignIn::Oidc::MAX_BODY })
-      assert_equal "unavailable", callback(idp).call(params: params, kept: kept).reason
+      finished = spans { assert_equal "unavailable", callback(idp).call(params: params, kept: kept).reason }
+      assert_equal "not_json", finished.select { |span| span.name == "auth.sso.token" }.sole.attributes["error.type"],
+        "a body over the limit is not_json, as at discovery"
 
       Rails.cache.clear
       idp.answer_discovery_with(status: 503, body: "down")
@@ -230,6 +232,10 @@ class SignIn::Oidc::CallbackTest < ActiveSupport::TestCase
       assert callback(idp).call(params: params, kept: kept).ok, "an exp a few seconds past is within the leeway"
       refuse.call("no iat", good.call({ "iat" => nil }))
       refuse.call("iat in the future", good.call({ "iat" => now + SignIn::Oidc::IdToken::LEEWAY.to_i + 5 }))
+      oldest = now - (SignIn::Oidc::IdToken::MAX_AGE + SignIn::Oidc::IdToken::LEEWAY).to_i
+      refuse.call("iat older than ten minutes and the leeway", good.call({ "iat" => oldest - 5, "exp" => now + 3600 }))
+      answer_with_token(idp, good.call({ "iat" => oldest + 5, "exp" => now + 3600 }))
+      assert callback(idp).call(params: params, kept: kept).ok, "an iat just inside ten minutes and the leeway"
 
       refuse.call("another nonce", good.call({ "nonce" => "planted-other-nonce" }))
       refuse.call("no nonce", good.call({ "nonce" => nil }))

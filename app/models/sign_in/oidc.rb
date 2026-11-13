@@ -37,7 +37,9 @@ module SignIn
 
     # The provider could not be used; `reason` is one of the System status
     # row's words (`unreachable`, `http_<status>`, `not_json`,
-    # `issuer_mismatch`, `missing_endpoint`) or `too_large`.
+    # `issuer_mismatch`, `missing_endpoint`). A body over MAX_BODY is
+    # `not_json` at every endpoint: it is not read, so it is no JSON object
+    # sign-in can use.
     class Unavailable < SignIn::OutsideCall::Unavailable; end
 
     # A span's `error.type` for an `Unavailable`: the status, or the network

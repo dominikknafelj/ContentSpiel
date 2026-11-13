@@ -15,8 +15,15 @@ module SignIn
     # the one the header's `kid` names in the provider's set, of the type and
     # curve the `alg` needs, never one the token carries (`jwk`, `jku`,
     # `x5u` are not read); a `kid` the cached set lacks reads the set again
-    # once (`keys(refresh: true)`, a provider's key rotation), and a token
-    # with no `kid` is refused, as no provider sign-in is built for omits it.
+    # once (`keys(refresh: true)`, a provider's key rotation).
+    #
+    # A TOKEN WITH NO `kid` IS REFUSED, even when the provider's set holds a
+    # single key. Without a `kid` the key would have to be guessed from the
+    # set, and the guess would change under a rotation: while the provider
+    # serves the old key beside the new one, the set holds two and a token
+    # that verified yesterday would be refused for a reason nobody could
+    # read. Okta, Entra ID, Google, Keycloak and Auth0 all send `kid`, so
+    # the rule costs nothing for the providers sign-in is built for.
     #
     # THE CLAIMS are checked here, not by the gem's
     # `OpenIDConnect::ResponseObject::IdToken#verify!`, which compares the
@@ -33,6 +40,10 @@ module SignIn
     # - `exp` is a number not more than LEEWAY in the past, and `iat` a
     #   number not more than LEEWAY in the future: LEEWAY is the clock skew
     #   between this server and the provider's that a token is allowed;
+    # - `iat` is not more than MAX_AGE plus LEEWAY in the past: a token is
+    #   used the moment the token endpoint issues it, so an old one is a
+    #   replay, whatever its `exp` says (a provider may give an ID token a
+    #   lifetime of hours);
     # - `nonce` is the kept one, compared with `secure_compare`, unless the
     #   caller passes NONCE_NOT_CHECKED (the refresh, which keeps no nonce).
     #
@@ -41,6 +52,7 @@ module SignIn
     # an error page.
     module IdToken
       LEEWAY = 60.seconds
+      MAX_AGE = 10.minutes
       ALGORITHMS = %w[RS256 RS384 RS512 PS256 PS384 PS512 ES256 ES384 ES512].freeze
       # The key type each algorithm needs, and for ES* the curve.
       KEY_FOR = {
@@ -120,6 +132,7 @@ module SignIn
 
         raise Refused unless claims["exp"].is_a?(Numeric) && claims["exp"] > now - LEEWAY.to_i
         raise Refused unless claims["iat"].is_a?(Numeric) && claims["iat"] <= now + LEEWAY.to_i
+        raise Refused if claims["iat"] < now - (MAX_AGE + LEEWAY).to_i
 
         return if nonce == NONCE_NOT_CHECKED
 
