@@ -3,7 +3,7 @@ module Admin
   # who they are, however they proved it: the session, the known device,
   # `session.created`, and forgetting the bot check's flag.
   #
-  # THE KNOWN DEVICE (`SignIn::KnownDevice`) is written here and nowhere
+  # THE KNOWN DEVICE (`SignIn::Protection::KnownDevice`) is written here and nowhere
   # else, so only a whole sign-in earns one: never a password step that
   # still owes its second proof, or a stolen password would earn its own
   # device bucket beside the account's lock. A bot never holds one, and it
@@ -24,7 +24,7 @@ module Admin
     private
 
     # `method` is how the person proved it: one of `Session::METHODS`, or a
-    # gem's method registered in `SignInMethods`; any other raises
+    # gem's method registered in `SignIn::Methods`; any other raises
     # `ArgumentError`, before anything is written. `session.created` names
     # the method unless it is the password. `provider_token` is an outside
     # provider's refresh token, kept on the session (`Session.start`) for
@@ -33,13 +33,13 @@ module Admin
     # True when the person is signed in. FALSE, with nothing written, for an
     # owner by an OUTSIDE METHOD (any but OWN_METHODS: single sign-on, or a
     # gem's): an owner keeps a way in of their own, which no outside service
-    # may stand in for (`SignInRules`). The caller answers a false as its
+    # may stand in for (`SignIn::Rules`). The caller answers a false as its
     # own refusal. This is the hook's promise to a gem's method
     # (`docs/reference/content-blocks-and-types.md`), so it is decided here
     # and not left to each caller.
     def complete_sign_in(user, method:, provider_token: nil)
       method = method.to_s
-      raise ArgumentError, "#{method.inspect} is no sign-in method" unless (Session::METHODS + SignInMethods.names).include?(method)
+      raise ArgumentError, "#{method.inspect} is no sign-in method" unless (Session::METHODS + SignIn::Methods.names).include?(method)
       return false if user.owner? && !OWN_METHODS.include?(method)
 
       session.delete(:sign_in_bot_check)
@@ -50,7 +50,7 @@ module Admin
       true
     end
 
-    def known_device = SignIn::KnownDevice.read(cookies.encrypted[DEVICE_COOKIE])
+    def known_device = SignIn::Protection::KnownDevice.read(cookies.encrypted[DEVICE_COOKIE])
 
     def remember_device(identifier)
       cookies.encrypted[DEVICE_COOKIE] = {

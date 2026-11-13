@@ -85,7 +85,7 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     assert users(:reader).reload.authenticate("reset-pass-1")
   end
 
-  # --- clear: a password nobody holds (Sso::Link) -----------------------------
+  # --- clear: a password nobody holds (SignIn::Sso::Link) ---------------------
 
   test "clear needs the user's own actor or the console, and never asks the leak lookup" do
     clear = ->(user, actor:) { Users::UpdatePassword.call(user, clear: true, keep_acting_session: false, actor: actor) }
@@ -115,9 +115,9 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
   end
 
   test "clear does not open sign-in: nobody can type the password it writes" do
-    throttle = SignIn::Throttle.new
+    throttle = SignIn::Protection::Throttle.new
     cleared = []
-    with_singleton_override(SignIn::Throttle, :new, ->(**) { throttle }) do
+    with_singleton_override(SignIn::Protection::Throttle, :new, ->(**) { throttle }) do
       with_singleton_override(throttle, :clear, ->(identifier:) { cleared << identifier }) do
         as(nil) { Users::UpdatePassword.call(users(:reader), clear: true, keep_acting_session: false, actor: users(:reader)) }
         assert_empty cleared
@@ -127,7 +127,7 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     end
   end
 
-  # --- Leaked passwords (Users::LeakedPasswordRule) ---------------------------
+  # --- Leaked passwords (SignIn::Password::LeakedRule) ------------------------
 
   test "a leaked password is refused and the user's sessions all stay" do
     leaked = "correct horse battery"
@@ -238,7 +238,7 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
 
   def with_passkeys_and_codes(user)
     2.times { |index| add_passkey(user, client: fake_authenticator, name: "Key #{index}") }
-    as(user) { RecoveryCodes::Generate.call(user) }
+    as(user) { SignIn::RecoveryCodes::Generate.call(user) }
     2.times { Session.start(user: user, method: "passkey", user_agent: nil, ip_address: nil) }
     user
   end

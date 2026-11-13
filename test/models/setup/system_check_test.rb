@@ -629,11 +629,11 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     provider = Struct.new(:name, :issuer, :error) { def configuration = raise(error) }
     reasons = %w[unreachable not_json issuer_mismatch missing_endpoint http_503]
     reasons.each do |reason|
-      error = SignIn::Oidc::Unavailable.new("x", reason: reason)
+      error = SignIn::Sso::Unavailable.new("x", reason: reason)
       message = result("Single sign-on", run_check(sso_provider: provider.new("Okta", "https://id.example.com/tenant/v2.0", error))).message
       assert_no_match(/translation missing|#{reason}/, message)
     end
-    assert_includes result("Single sign-on", run_check(sso_provider: provider.new("Okta", "https://id.example.com/tenant/v2.0", SignIn::Oidc::Unavailable.status(503)))).message, "HTTP status 503"
+    assert_includes result("Single sign-on", run_check(sso_provider: provider.new("Okta", "https://id.example.com/tenant/v2.0", SignIn::Sso::Unavailable.status(503)))).message, "HTTP status 503"
   end
 
   test "without a provider the row is off, which is neither ok nor a failure" do

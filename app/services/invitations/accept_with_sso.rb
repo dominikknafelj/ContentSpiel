@@ -1,13 +1,13 @@
 module Invitations
   # An open invitation accepted through the site's sign-in provider:
-  # `Sso::Admit` calls it once the provider's verified email is the
+  # `SignIn::Sso::Admit` calls it once the provider's verified email is the
   # invitation's. The account is made as `Invitations::Accept` makes it (the
   # invitation's address and groups, `Invitations::Acceptance`), but linked
   # from the start: the provider's issuer and subject, a password nobody
   # holds (`User.unusable_password`, never shown or kept) and the name the
   # provider gave, cut to a user's limit, or none. `invitation.accepted` and
-  # `sso.linked` (`via: "invitation"`, through `Sso::LinkedEvent`, the event's
-  # one writer, which says why this is not `Sso::Link`) are recorded in the one transaction,
+  # `sso.linked` (`via: "invitation"`, through `SignIn::Sso::LinkedEvent`, the event's
+  # one writer, which says why this is not `SignIn::Sso::Link`) are recorded in the one transaction,
   # both as the new account. Nothing is typed, so nothing is looked up in
   # the list of leaked passwords.
   #
@@ -24,7 +24,7 @@ module Invitations
   # looks again finds the account that won.
   class AcceptWithSso < ApplicationService
     include Acceptance
-    include Sso::LinkedEvent
+    include SignIn::Sso::LinkedEvent
 
     # authorize: none (the provider's verified identity is the credential, as an invitation's token is Accept's: an identity whose verified email is an open invitation's is the right to make that one account, and the service acts as the account it makes)
 

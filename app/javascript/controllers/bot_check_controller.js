@@ -6,7 +6,7 @@ import { messages } from "i18n/messages"
 // after repeated failures, and never on a site without both Turnstile
 // keys). The widget writes its answer into a hidden `cf-turnstile-response`
 // inside the box, which is inside the sign-in form, so the form posts it;
-// the server verifies it (`SignIn::BotCheck`). Sign in stays enabled
+// the server verifies it (`SignIn::Protection::BotCheck`). Sign in stays enabled
 // whatever the widget says: the server decides.
 //
 // EXPLICIT RENDERING, because of Turbo. Turnstile's implicit mode draws
@@ -29,7 +29,7 @@ import { messages } from "i18n/messages"
 // never Turnstile's "auto", which would follow the system and not the
 // person's choice; when the theme switch changes it the widget is drawn
 // again in the new one. `language` is the page's `lang`, and `action` is
-// the server's (`SignIn::BotCheck::ACTION`), which siteverify must answer
+// the server's (`SignIn::Protection::BotCheck::ACTION`), which siteverify must answer
 // back.
 //
 // When the script cannot be loaded (blocked, offline) the hint is replaced

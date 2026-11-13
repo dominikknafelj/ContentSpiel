@@ -9,7 +9,7 @@ module Admin
   # email that was tried in `metadata`, cut to MAX_EMAIL_LENGTH, and only
   # when it is an address at all: a password typed into the email box by
   # mistake has no "@" and is never kept. The pause mail is a job queued
-  # for any email, known or not (`SignIn::LockoutMailJob`, which looks the
+  # for any email, known or not (`SignIn::Protection::LockoutMailJob`, which looks the
   # account up), at most once an hour per email (`Throttle#notice_due?`); a
   # known device's lock is the person's own and mails nothing.
   #
@@ -32,9 +32,9 @@ module Admin
 
     def queue_lockout_mail(trip, email:, identifier:)
       Telemetry.in_span("auth.lockout_mail") do |span|
-        due = SignIn::Throttle.new.notice_due?(identifier: identifier)
+        due = SignIn::Protection::Throttle.new.notice_due?(identifier: identifier)
         if due
-          SignIn::LockoutMailJob.perform_later(email, locked_at: Time.current, from_address: request.remote_ip,
+          SignIn::Protection::LockoutMailJob.perform_later(email, locked_at: Time.current, from_address: request.remote_ip,
             minutes: trip.seconds.fdiv(60).ceil, **mail_link_origin)
         end
         Telemetry.record(span, "auth.mail.queued" => due)

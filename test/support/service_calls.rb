@@ -51,11 +51,11 @@ module ServiceCalls
     "ApiTokens::Revoke" => { manager_may: true, reason: "any signed-in user may revoke their own token; anyone else needs tokens.manage" },
     "Users::UpdatePassword" => { manager_may: true, reason: "any signed-in user may change their own password; anyone else needs users.manage" },
     "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" },
-    "Sessions::EndOthers" => { manager_may: false, reason: "any signed-in user may end their own other sessions; an owner ends someone else's through Sessions::EndAll, and nobody else may" },
-    "Passkeys::Add" => { manager_may: false, reason: "a person adds a passkey to their own account only: it is their device, and nobody, not even an owner, adds one for someone else" },
-    "Passkeys::Rename" => { manager_may: false, reason: "a person renames their own passkeys only: nobody manages someone else's" },
-    "Passkeys::Remove" => { manager_may: false, reason: "a person removes their own passkeys only; a lost device is cleared from the console (Users::UpdatePassword, remove_passkeys)" },
-    "RecoveryCodes::Generate" => { manager_may: false, reason: "a person makes their own recovery codes only: the codes are shown to whoever makes them" }
+    "SignIn::Sessions::EndOthers" => { manager_may: false, reason: "any signed-in user may end their own other sessions; an owner ends someone else's through SignIn::Sessions::EndAll, and nobody else may" },
+    "SignIn::Passkeys::Add" => { manager_may: false, reason: "a person adds a passkey to their own account only: it is their device, and nobody, not even an owner, adds one for someone else" },
+    "SignIn::Passkeys::Rename" => { manager_may: false, reason: "a person renames their own passkeys only: nobody manages someone else's" },
+    "SignIn::Passkeys::Remove" => { manager_may: false, reason: "a person removes their own passkeys only; a lost device is cleared from the console (Users::UpdatePassword, remove_passkeys)" },
+    "SignIn::RecoveryCodes::Generate" => { manager_may: false, reason: "a person makes their own recovery codes only: the codes are shown to whoever makes them" }
   }.freeze
 
   # The two bulk services answer with their own result (no `denied?`): an id
@@ -88,7 +88,7 @@ module ServiceCalls
   TOKEN_CREDENTIAL = {
     "Invitations::Accept" => "the invitation's token is the right to make that one account (spec \"Invites\")",
     "Invitations::AcceptWithSso" => "the provider's verified identity, whose email is the invitation's, is the right to make that one account",
-    "Sso::Admit" => "the provider's verified identity is the credential: it signs into the account it matches and nothing else"
+    "SignIn::Sso::Admit" => "the provider's verified identity is the credential: it signs into the account it matches and nothing else"
   }.freeze
 
   # Low-level services that ask no permission because every caller has
@@ -98,13 +98,13 @@ module ServiceCalls
   # in app/ and lib/, so a new caller is a deliberate edit here. The factory
   # returns `call:`.
   UNGATED = {
-    "Sessions::End" => {
-      reason: "the ending of one session row nobody asked to end: Session.from_cookies ends an expiry and Sso::RecheckJob a session its provider revoked, so there is nobody to authorize",
-      callers: %w[app/jobs/sso/recheck_job.rb app/models/session.rb]
+    "SignIn::Sessions::End" => {
+      reason: "the ending of one session row nobody asked to end: Session.from_cookies ends an expiry and SignIn::Sso::RecheckJob a session its provider revoked, so there is nobody to authorize",
+      callers: %w[app/jobs/sign_in/sso/recheck_job.rb app/models/session.rb]
     },
-    "Sso::Link" => {
-      reason: "the link of an account the provider's verified identity matched: Sso::Admit decides the match, and the service acts as that account",
-      callers: %w[app/services/sso/admit.rb]
+    "SignIn::Sso::Link" => {
+      reason: "the link of an account the provider's verified identity matched: SignIn::Sso::Admit decides the match, and the service acts as that account",
+      callers: %w[app/services/sign_in/sso/admit.rb]
     }
   }.freeze
 
@@ -643,7 +643,7 @@ module ServiceCalls
     # bad one's is another (a mismatch writes nothing).
     "Invitations::AcceptWithSso" => lambda {
       target = open_invitation("invited@example.com", groups: [ access_control_groups(:read_only) ])
-      identity = ->(email) { SignIn::Oidc::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email:, email_verified: true, name: "Invited", refresh_token: nil) }
+      identity = ->(email) { SignIn::Sso::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email:, email_verified: true, name: "Invited", refresh_token: nil) }
       { call: -> { Invitations::AcceptWithSso.call(target, identity: identity.call("invited@example.com")) },
         bad_call: -> { Invitations::AcceptWithSso.call(target, identity: identity.call("someone-else@example.com")) },
         owner: -> { User.find_by!(email_address: "invited@example.com") } }
@@ -652,91 +652,91 @@ module ServiceCalls
     # See TOKEN_CREDENTIAL. A good identity links the account its verified
     # email names; a start from an invitation of another address answers a
     # mismatch and writes nothing.
-    "Sso::Admit" => lambda {
+    "SignIn::Sso::Admit" => lambda {
       target = stranger_target
       Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
       other = open_invitation("invited@example.com")
-      identity = SignIn::Oidc::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email: target.email_address, email_verified: true, name: nil, refresh_token: nil)
-      { call: -> { Sso::Admit.call(identity) }, bad_call: -> { Sso::Admit.call(identity, invitation: other) }, owner: target }
+      identity = SignIn::Sso::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email: target.email_address, email_verified: true, name: nil, refresh_token: nil)
+      { call: -> { SignIn::Sso::Admit.call(identity) }, bad_call: -> { SignIn::Sso::Admit.call(identity, invitation: other) }, owner: target }
     },
 
     # See UNGATED.
-    "Sso::Link" => lambda {
+    "SignIn::Sso::Link" => lambda {
       target = stranger_target
-      identity = SignIn::Oidc::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email: target.email_address, email_verified: true, name: nil, refresh_token: nil)
-      { call: -> { Sso::Link.call(target, identity:) } }
+      identity = SignIn::Sso::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email: target.email_address, email_verified: true, name: nil, refresh_token: nil)
+      { call: -> { SignIn::Sso::Link.call(target, identity:) } }
     },
 
-    # Owner-only, as Sessions::EndAll.
-    "Sso::Unlink" => lambda {
+    # Owner-only, as SignIn::Sessions::EndAll.
+    "SignIn::Sso::Unlink" => lambda {
       target = stranger_target
       target.update_columns(sso_issuer: "https://id.example.com", sso_subject: "sub-1", sso_linked_at: Time.current) # version: none (a test's setup)
       Session.start(user: target, method: "sso", user_agent: nil, ip_address: nil)
-      { call: -> { Sso::Unlink.call(target) }, permission: "users.manage", on: target }
+      { call: -> { SignIn::Sso::Unlink.call(target) }, permission: "users.manage", on: target }
     },
 
     # See UNGATED.
-    "Sessions::End" => lambda {
+    "SignIn::Sessions::End" => lambda {
       session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
-      { call: -> { Sessions::End.call(session, reason: "ended_by_owner") } }
+      { call: -> { SignIn::Sessions::End.call(session, reason: "ended_by_owner") } }
     },
 
     # See SELF_SERVICE. The control runs as the user themselves, with no
     # session kept, so their one open session ends.
-    "Sessions::EndOthers" => lambda {
+    "SignIn::Sessions::EndOthers" => lambda {
       target = stranger_target
       Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
       mine = stranger_target(email: "mine@example.com")
       Session.start(user: mine, method: "password", user_agent: nil, ip_address: nil)
-      { call: -> { Sessions::EndOthers.call(user: target, keep: nil) }, permission: "users.manage", on: target,
+      { call: -> { SignIn::Sessions::EndOthers.call(user: target, keep: nil) }, permission: "users.manage", on: target,
         control_actor: target,
-        owner: mine, own: -> { Sessions::EndOthers.call(user: mine, keep: nil) }, own_event: "session.ended" }
+        owner: mine, own: -> { SignIn::Sessions::EndOthers.call(user: mine, keep: nil) }, own_event: "session.ended" }
     },
 
     # Owner-only: a holder of no grants is refused for users.manage, the
     # trusted actor passes, as every trusted code path does.
-    "Sessions::EndAll" => lambda {
+    "SignIn::Sessions::EndAll" => lambda {
       target = stranger_target
       Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
-      { call: -> { Sessions::EndAll.call(target) }, permission: "users.manage", on: target }
+      { call: -> { SignIn::Sessions::EndAll.call(target) }, permission: "users.manage", on: target }
     },
 
     # See SELF_SERVICE: own only, so the control runs as the user themselves.
-    "Passkeys::Add" => lambda {
+    "SignIn::Passkeys::Add" => lambda {
       target = stranger_target
       mine = stranger_target(email: "mine@example.com")
       # Checked here: the check writes the account's WebAuthn handle.
       theirs = passkey_registration(target)
       own = passkey_registration(mine)
-      { call: -> { Passkeys::Add.call(target, registration: theirs, name: "MacBook") }, permission: "users.manage", on: target, control_actor: target,
-        owner: mine, own: -> { Passkeys::Add.call(mine, registration: own, name: "MacBook") }, own_event: "passkey.added" }
+      { call: -> { SignIn::Passkeys::Add.call(target, registration: theirs, name: "MacBook") }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { SignIn::Passkeys::Add.call(mine, registration: own, name: "MacBook") }, own_event: "passkey.added" }
     },
 
-    "Passkeys::Rename" => lambda {
+    "SignIn::Passkeys::Rename" => lambda {
       target = stranger_target
       mine = stranger_target(email: "mine@example.com")
       theirs = add_passkey(target, client: fake_authenticator)
       own = add_passkey(mine, client: fake_authenticator)
-      { call: -> { Passkeys::Rename.call(theirs, name: "Renamed") }, permission: "users.manage", on: target, control_actor: target,
-        owner: mine, own: -> { Passkeys::Rename.call(own, name: "Renamed") }, own_event: "passkey.renamed" }
+      { call: -> { SignIn::Passkeys::Rename.call(theirs, name: "Renamed") }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { SignIn::Passkeys::Rename.call(own, name: "Renamed") }, own_event: "passkey.renamed" }
     },
 
-    "Passkeys::Remove" => lambda {
+    "SignIn::Passkeys::Remove" => lambda {
       target = stranger_target
       mine = stranger_target(email: "mine@example.com")
       theirs = add_passkey(target, client: fake_authenticator)
       own = add_passkey(mine, client: fake_authenticator)
-      { call: -> { Passkeys::Remove.call(theirs) }, permission: "users.manage", on: target, control_actor: target,
-        owner: mine, own: -> { Passkeys::Remove.call(own) }, own_event: "passkey.removed" }
+      { call: -> { SignIn::Passkeys::Remove.call(theirs) }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { SignIn::Passkeys::Remove.call(own) }, own_event: "passkey.removed" }
     },
 
-    "RecoveryCodes::Generate" => lambda {
+    "SignIn::RecoveryCodes::Generate" => lambda {
       target = stranger_target
       mine = stranger_target(email: "mine@example.com")
       # Codes are a backup for passkeys: both accounts hold one.
       [ target, mine ].each { |user| add_passkey(user, client: fake_authenticator) }
-      { call: -> { RecoveryCodes::Generate.call(target) }, permission: "users.manage", on: target, control_actor: target,
-        owner: mine, own: -> { RecoveryCodes::Generate.call(mine) }, own_event: "recovery_codes.generated" }
+      { call: -> { SignIn::RecoveryCodes::Generate.call(target) }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { SignIn::RecoveryCodes::Generate.call(mine) }, own_event: "recovery_codes.generated" }
     },
 
     # The two bulk services: see OWN_RESULT. `ids` are real posts.

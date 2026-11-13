@@ -401,7 +401,7 @@ test/jobs/media/rendition_job_test.rb: 10.3
 test/jobs/password_reset_request_job_test.rb: 0.1
 test/jobs/presence/sweep_test.rb: 0.2
 test/jobs/public_site/sync_went_live_job_test.rb: 0.9
-test/jobs/sign_in/lockout_mail_job_test.rb: 0.1
+test/jobs/sign_in/protection/lockout_mail_job_test.rb: 0.1
 test/jobs/trash/purge_expired_job_test.rb: 3.1
 test/lib/admin_contrast_test.rb: 0.1
 test/lib/admin_design_rules_test.rb: 6.5
@@ -582,12 +582,12 @@ test/models/session_test.rb: 0.1
 test/models/setup/system_check_test.rb: 1.9
 test/models/setup/token_test.rb: 0.0
 test/models/setup_test.rb: 0.1
-test/models/sign_in/bot_check_test.rb: 0.0
-test/models/sign_in/known_device_test.rb: 0.0
-test/models/sign_in/leaked_password_test.rb: 0.0
 test/models/sign_in/outside_call_test.rb: 0.5
-test/models/sign_in/password_attempt_test.rb: 0.3
-test/models/sign_in/throttle_test.rb: 0.4
+test/models/sign_in/password/attempt_test.rb: 0.3
+test/models/sign_in/password/leaked_test.rb: 0.0
+test/models/sign_in/protection/bot_check_test.rb: 0.0
+test/models/sign_in/protection/known_device_test.rb: 0.0
+test/models/sign_in/protection/throttle_test.rb: 0.4
 test/models/site_setting_test.rb: 0.1
 test/models/starter_content_test.rb: 2.4
 test/models/studio_modules_test.rb: 0.0

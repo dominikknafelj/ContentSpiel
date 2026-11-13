@@ -28,7 +28,7 @@ module Users
   # to be signed in in the same browser goes with the rest.
   #
   # A change opens sign-in for the account in every browser
-  # (`SignIn::Throttle#clear`: the account's bucket and every known
+  # (`SignIn::Protection::Throttle#clear`: the account's bucket and every known
   # device's), after the commit: whoever set the password proved the
   # account (the reset's token, the current password, the console; a
   # manager's set is `Users::Save`'s, which clears the same way), and a bot
@@ -36,7 +36,7 @@ module Users
   # The reset mail and the lock-out mail send a person here.
   #
   # A password in the list of leaked passwords is refused
-  # (`Users::LeakedPasswordRule`), asked only once the user is otherwise
+  # (`SignIn::Password::LeakedRule`), asked only once the user is otherwise
   # valid and before the transaction; a refusal ends no session.
   #
   # The password itself never reaches the log (Review Focus 5): the event
@@ -52,7 +52,7 @@ module Users
   # since a second factor that someone else could clear protects nothing.
   #
   # `clear: true` writes a password nobody holds (`User.unusable_password`):
-  # the link to a sign-in provider (`Sso::Link`), after which the account
+  # the link to a sign-in provider (`SignIn::Sso::Link`), after which the account
   # signs in through the provider alone. Only the user's own actor (the
   # account the provider just proved) or the trusted nil actor (the console)
   # may ask it: from anyone else, an owner included, it is refused, since
@@ -60,15 +60,15 @@ module Users
   # there is no blank check and no leak lookup, and the sentence is the
   # ordinary change's (`user.updated` with its credentials marker, the
   # sessions ended as for any change). Sign-in is not opened afterwards
-  # (`SignIn::Throttle#clear`): nobody can type the new password, so a bucket
+  # (`SignIn::Protection::Throttle#clear`): nobody can type the new password, so a bucket
   # held closed keeps out nobody who could otherwise get in.
   #
   # A linked account's password is refused otherwise, its own included
   # (`OwnerProtection#sso_linked_password_refusal`): it signs in through its
-  # provider alone, and the console's way back is `Sso::Unlink`.
+  # provider alone, and the console's way back is `SignIn::Sso::Unlink`.
   class UpdatePassword < ApplicationService
     include OwnerProtection
-    include LeakedPasswordRule
+    include SignIn::Password::LeakedRule
 
     def initialize(user, password: nil, password_confirmation: nil, current_password: nil, keep_acting_session: true, remove_passkeys: false,
       clear: false, actor: Current.actor)
@@ -117,7 +117,7 @@ module Users
       return sso_linked_password_refusal(issuer: linked_issuer) if linked_issuer
       return failure(@user) unless saved
 
-      SignIn::Throttle.new.clear(identifier: @user.email_address) unless @clear
+      SignIn::Protection::Throttle.new.clear(identifier: @user.email_address) unless @clear
       success(@user)
     end
 

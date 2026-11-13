@@ -65,7 +65,7 @@ en:
     # `name`, `name_help` and `failed` are the enrolment page's words
     # (`admin.enrolment.show`). `unavailable` and `continue` stand where no
     # passkey can be made: a page reached at an IP address has no relying
-    # party (`SignIn::RelyingParty`).
+    # party (`SignIn::Passkeys::RelyingParty`).
     passkey:
       title: "Add a passkey"
       lead: "Sign in with your device's unlock instead of your password. A passkey can't be phished or guessed."

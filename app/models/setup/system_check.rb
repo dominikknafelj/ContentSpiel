@@ -116,7 +116,7 @@ module Setup
     # Images row carry the link to the Images card.
     #
     # `sso_provider` is the site's OpenID Connect provider
-    # (`SignIn::Oidc::Provider.current`, nil when single sign-on is not set
+    # (`SignIn::Sso::Provider.current`, nil when single sign-on is not set
     # up) and `sso_required` whether SSO_REQUIRED is set, both handed in so a
     # test can say them.
     #
@@ -135,7 +135,7 @@ module Setup
       address: SiteAddress.current, admin_address: SiteAddress.admin, request_ssl: nil, production: Rails.env.production?,
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil, remote_ip: nil, cf_connecting_ip: nil,
       mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false,
-      sso_provider: SignIn::Oidc::Provider.current, sso_required: SignIn::Oidc.required?)
+      sso_provider: SignIn::Sso::Provider.current, sso_required: SignIn::Sso.required?)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -216,7 +216,7 @@ module Setup
       # Single sign-on: off with no provider (neutral: a site that does not
       # use it has nothing to fix), else whether the provider's discovery
       # document answers. The answer is the provider's cached discovery
-      # (`SignIn::Oidc::Provider#configuration`, cached for its CACHE_FOR), so
+      # (`SignIn::Sso::Provider#configuration`, cached for its CACHE_FOR), so
       # System status calls the provider only when the cache is empty, and
       # then through `SignIn::OutsideCall`'s timeouts. The row names the
       # provider and the issuer URL as configured (a host may hold several
@@ -230,7 +230,7 @@ module Setup
         facts = { provider: @sso_provider.name, issuer: @sso_provider.issuer }
         begin
           @sso_provider.configuration
-        rescue SignIn::Oidc::Unavailable => error
+        rescue SignIn::Sso::Unavailable => error
           return Result.new(label:, status: :warning,
             message: I18n.t("admin.system_status.sso.unreachable", **facts, reason: sso_reason(error.reason)))
         end

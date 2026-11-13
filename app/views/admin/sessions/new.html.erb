@@ -9,7 +9,7 @@
     StudioSingleSignOn, screens 1 and 2; `Admin::SessionsController#new`):
 
     - no SSO_REQUIRED: the form, then "or", the provider's button when there
-      is a provider, each gem's sign-in method (`SignInMethods`), and the
+      is a provider, each gem's sign-in method (`SignIn::Methods`), and the
       passkey's, all secondary, so Sign in stays the one primary;
     - SSO_REQUIRED: no form. The lead, the provider's button as the
       primary, the gems' methods (SSO_REQUIRED neither hides nor refuses
@@ -19,11 +19,11 @@
       to the provider. No gem's method: none signs an owner in
       (`complete_sign_in`). The parameter only changes what is drawn: a
       non-owner who signs in here meets the ordinary refusal
-      (`SignInRules`), so the path says nothing of who is an owner. %>
+      (`SignIn::Rules`), so the path says nothing of who is an owner. %>
 <% mail_ready = MailSettings.current.ready? %>
 <% provider_name = @sso_provider&.name %>
 <% sso_panel = @sso_required && !@owner_path %>
-<% outside_methods = @owner_path ? [] : SignInMethods.entries %>
+<% outside_methods = @owner_path ? [] : SignIn::Methods.entries %>
 <%# Ways in that are always drawn under the form: with one, the "or" is
     drawn for them and does not wait for the passkey's script. %>
 <% drawn_ways = (@sso_provider && !@owner_path) || outside_methods.any? %>
@@ -91,7 +91,7 @@
           Sign in does not move when Cloudflare draws into it. `bot-check`
           draws and removes the widget by hand (its header says why). %>
       <% if @bot_check %>
-        <div class="flex flex-col gap-2" data-controller="bot-check" data-bot-check-site-key-value="<%= @bot_check.site_key %>" data-bot-check-action-value="<%= SignIn::BotCheck::ACTION %>" data-messages="<%= messages_data("sessions.new.check_unavailable") %>">
+        <div class="flex flex-col gap-2" data-controller="bot-check" data-bot-check-site-key-value="<%= @bot_check.site_key %>" data-bot-check-action-value="<%= SignIn::Protection::BotCheck::ACTION %>" data-messages="<%= messages_data("sessions.new.check_unavailable") %>">
           <p id="turnstile-hint" class="text-small text-dim" aria-live="polite" data-bot-check-target="hint"><%= t(".check_hint") %></p>
           <div class="min-h-[65px] w-full" data-bot-check-target="widget"></div>
         </div>

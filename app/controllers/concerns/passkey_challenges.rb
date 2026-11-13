@@ -87,13 +87,13 @@ module PasskeyChallenges
     SignIn::SpentChallenge.take(purpose: purpose, value: challenge, expires_at: expires_at + 1.second)
   end
 
-  # The relying party this request's passkeys belong to (`SignIn::RelyingParty`),
+  # The relying party this request's passkeys belong to (`SignIn::Passkeys::RelyingParty`),
   # or nil at an IP address, where no passkey is offered. Named after the
   # site, or its host while it has no title.
   def passkey_relying_party
     return @passkey_relying_party if defined?(@passkey_relying_party)
 
     name = ::Locales.read(Current.site, :title, locale: ::Locales.default).presence || request.host
-    @passkey_relying_party = SignIn::RelyingParty.for(request_origin: request.base_url, name: name)
+    @passkey_relying_party = SignIn::Passkeys::RelyingParty.for(request_origin: request.base_url, name: name)
   end
 end

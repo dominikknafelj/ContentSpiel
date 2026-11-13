@@ -213,7 +213,7 @@ module ContentSpiel
       #       recheck: Acme::Saml::Recheck, passkey_policy: :exempt
       #   end
       #
-      # The arguments are `SignInMethods.register`'s (its comment says what
+      # The arguments are `SignIn::Methods.register`'s (its comment says what
       # each means), with the owner rules of `Registrar`. The hook registers
       # a method and nothing more: the gem's controller signs a person in
       # with `Admin::SignInCompletion#complete_sign_in`. Kept and replayed by
@@ -260,7 +260,7 @@ module ContentSpiel
       end
 
       # Every kept sign-in method hook, replayed the same way into
-      # `SignInMethods`.
+      # `SignIn::Methods`.
       def register_sign_in_methods(registry)
         replay(:sign_in_methods, REPLAYED_SIGN_IN_METHODS) do |location, owners|
           Registrar.new(registry, location, owners, kind: "sign-in method", takes: %i[attributes],

@@ -42,11 +42,11 @@ production:
     queue: images
     schedule: every 10 minutes
   sessions_sweep:
-    class: Sessions::SweepJob
+    class: SignIn::Sessions::SweepJob
     queue: default
     schedule: every hour at minute 40
   sso_recheck:
-    class: Sso::RecheckJob
+    class: SignIn::Sso::RecheckJob
     queue: default
     schedule: every hour at minute 25
 
@@ -80,11 +80,11 @@ development:
     queue: images
     schedule: every 10 minutes
   sessions_sweep:
-    class: Sessions::SweepJob
+    class: SignIn::Sessions::SweepJob
     queue: default
     schedule: every hour at minute 40
   sso_recheck:
-    class: Sso::RecheckJob
+    class: SignIn::Sso::RecheckJob
     queue: default
     schedule: every hour at minute 25
 
@@ -114,10 +114,10 @@ test:
     queue: default
     schedule: every 5 minutes
   sessions_sweep:
-    class: Sessions::SweepJob
+    class: SignIn::Sessions::SweepJob
     queue: default
     schedule: every hour at minute 40
   sso_recheck:
-    class: Sso::RecheckJob
+    class: SignIn::Sso::RecheckJob
     queue: default
     schedule: every hour at minute 25

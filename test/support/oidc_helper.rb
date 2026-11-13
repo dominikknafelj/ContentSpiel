@@ -7,7 +7,7 @@ require "socket"
 # offline_access:, required:) { |idp| … }` starts a TCPServer on 127.0.0.1
 # and an ephemeral port, whose issuer is `http://127.0.0.1:<port>/idp` (an
 # http issuer is allowed to 127.0.0.1 outside production,
-# `SignIn::Oidc::Provider#check_issuer!`), sets the four SSO_* variables to
+# `SignIn::Sso::Provider#check_issuer!`), sets the four SSO_* variables to
 # it (and SSO_REQUIRED=1 with `required: true`) through `with_sign_in_env`,
 # and puts them back after.
 #
@@ -96,7 +96,7 @@ module OidcHelper
       "SSO_NAME" => NAME, "SSO_REQUIRED" => required ? "1" : nil }, &)
   end
 
-  # `user` linked to a provider's subject, as `Sso::Link` leaves it, without
+  # `user` linked to a provider's subject, as `SignIn::Sso::Link` leaves it, without
   # the rest of the link (its password stays the one it had).
   def link_to_sso(user, subject: "sub-#{user.id}")
     user.update_columns(sso_issuer: "https://id.example.com/oauth2", sso_subject: subject, sso_linked_at: Time.current) # version: none (a test's setup)
@@ -130,7 +130,7 @@ module OidcHelper
       @acceptor.report_on_exception = false
     end
 
-    def provider = SignIn::Oidc::Provider.current
+    def provider = SignIn::Sso::Provider.current
     def client_id = CLIENT_ID
     def name = NAME
     def public_key = IDP_KEY.public_key

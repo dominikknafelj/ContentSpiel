@@ -137,7 +137,7 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
         assert_select "div.flex.flex-col.gap-2[data-controller=bot-check]", count: 1 do |groups|
           group = groups.sole
           assert_equal SignInHelper::BOT_CHECK_KEYS["TURNSTILE_SITE_KEY"], group["data-bot-check-site-key-value"]
-          assert_equal SignIn::BotCheck::ACTION, group["data-bot-check-action-value"]
+          assert_equal SignIn::Protection::BotCheck::ACTION, group["data-bot-check-action-value"]
           assert_equal "sessions.new.check_unavailable", JSON.parse(group["data-messages"]).keys.excluding("@locale").sole
           assert_select "p#turnstile-hint.text-small.text-dim[data-bot-check-target=hint]", text: "A quick check is needed before you can sign in."
           assert_select "p#turnstile-hint + div.min-h-\\[65px\\].w-full[data-bot-check-target=widget]:empty"

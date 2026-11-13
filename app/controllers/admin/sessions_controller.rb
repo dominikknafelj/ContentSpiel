@@ -6,7 +6,7 @@ module Admin
   # must render *before* a session exists, in the shared product layout the
   # setup wizard also uses.
   #
-  # The decision is `SignIn::PasswordAttempt`'s (the bot check, the account
+  # The decision is `SignIn::Password::Attempt`'s (the bot check, the account
   # and wide address buckets, the password); this controller answers it,
   # signs the account in, and audits.
   #
@@ -41,7 +41,7 @@ module Admin
   # used, late or issued for another purpose) the sign-in page with "That
   # passkey didn't work. Try again, or sign in with your password."; past
   # the wide bucket or the rate limit, the sign-in page with "Try again
-  # later.". A verified passkey of an account `SignInRules.passkey_allowed?`
+  # later.". A verified passkey of an account `SignIn::Rules.passkey_allowed?`
   # refuses (linked to its provider, or a non-owner under SSO_REQUIRED) is
   # the wrong passkey's refusal, its count left in the wide bucket. At an IP
   # address there is no relying party (`SignIn::
@@ -64,7 +64,7 @@ module Admin
   # cost more than for an unknown one), so both carry the email that was
   # tried in `metadata`, never the password. For the same reason the
   # account's pause mail is a job queued for any email, known or not
-  # (`SignIn::LockoutMailJob`, which looks the account up); a known
+  # (`SignIn::Protection::LockoutMailJob`, which looks the account up); a known
   # device's lock is the person's own and mails nothing. Nor a password
   # typed into the email box by mistake: a value without an "@" isn't an address, so
   # nothing is kept; an address is cut to the 254 characters an email
@@ -103,7 +103,7 @@ module Admin
     # carries a policy that lets the widget in (`allow_bot_check_origin`).
     # Declared before the rate limit's before_action, so a limited POST's
     # answer carries it too.
-    before_action :allow_bot_check_origin, only: %i[ new create ], if: -> { SignIn::BotCheck.current }
+    before_action :allow_bot_check_origin, only: %i[ new create ], if: -> { SignIn::Protection::BotCheck.current }
     # The per-address bucket, Rails' `rate_limit`: it counts every POST to
     # `create` and `passkey`, one count shared by both, a success and a
     # refusal alike, not failures alone. Its
@@ -126,20 +126,20 @@ module Admin
     # (`admin/sessions/new`): the provider, whether it is required, and the
     # owner path, which is drawn only while it is.
     def new
-      @sso_provider = SignIn::Oidc::Provider.current
-      @sso_required = @sso_provider.present? && SignIn::Oidc.required?
+      @sso_provider = SignIn::Sso::Provider.current
+      @sso_required = @sso_provider.present? && SignIn::Sso.required?
       @owner_path = owner_path?
-      bot_check = SignIn::BotCheck.current
+      bot_check = SignIn::Protection::BotCheck.current
       @bot_check_configured = bot_check.present?
-      @bot_check = bot_check if bot_check && (session[:sign_in_bot_check] || SignIn::Throttle.new.bot_check_due?(address: request.remote_ip))
+      @bot_check = bot_check if bot_check && (session[:sign_in_bot_check] || SignIn::Protection::Throttle.new.bot_check_due?(address: request.remote_ip))
     end
 
     def create
-      attempt = SignIn::PasswordAttempt.new(
+      attempt = SignIn::Password::Attempt.new(
         email: params[:email_address], password: params[:password],
         address: request.remote_ip, hostname: request.host,
         bot_check_token: params["cf-turnstile-response"],
-        device: known_device, allowed: SignInRules.method(:password_allowed?)
+        device: known_device, allowed: SignIn::Rules.method(:password_allowed?)
       )
       outcome = attempt.call
 
@@ -168,7 +168,7 @@ module Admin
     # browser offers any passkey of this site), and their challenge kept for
     # `passkey`.
     def passkey_options
-      options, challenge = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party).options(allow: [])
+      options, challenge = SignIn::Passkeys::Check.new(relying_party: passkey_relying_party).options(allow: [])
       issue_passkey_challenge("sign_in", challenge)
       render json: options
     end
@@ -177,17 +177,17 @@ module Admin
     # is taken before the assertion is read, so a refused or a late answer
     # spends it too.
     def passkey
-      throttle = SignIn::Throttle.new
+      throttle = SignIn::Protection::Throttle.new
       reservation = throttle.reserve_address(address: request.remote_ip)
       return answer_passkey_refused(t("admin.sessions.limited")) unless reservation.ok?
 
       challenge = take_passkey_challenge("sign_in")
-      result = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party)
+      result = SignIn::Passkeys::Check.new(relying_party: passkey_relying_party)
         .verify(params[:credential], challenge: challenge, credentials: Passkey, ceremony: "sign_in")
 
       # A passkey of an account the rule keeps to its provider is a wrong
       # passkey, asked after the verify so it takes a verify's work.
-      if result.ok && SignInRules.passkey_allowed?(result.credential.user)
+      if result.ok && SignIn::Rules.passkey_allowed?(result.credential.user)
         throttle.release_address(address: request.remote_ip)
         complete_sign_in(result.credential.user, method: "passkey")
         render json: { location: after_authentication_url }
@@ -244,7 +244,7 @@ module Admin
     # parameter, and a refusal answered there goes back there, whoever
     # tried, so an owner who mistyped is not sent to the panel with no form,
     # and the answer says nothing of who is an owner.
-    def owner_path? = params[:owner] == "1" && SignIn::Oidc.required?
+    def owner_path? = params[:owner] == "1" && SignIn::Sso.required?
 
     def sign_in_page_path = owner_path? ? admin_sign_in_path(owner: 1) : admin_sign_in_path
 

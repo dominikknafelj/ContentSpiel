@@ -56,7 +56,7 @@ class Admin::AccountScreen::RecoveryCardComponentTest < ViewComponent::TestCase
     assert_no_selector "dialog#regenerate-recovery-codes", visible: :all
   end
 
-  # Codes are a backup for passkeys (`RecoveryCodes::Generate` refuses
+  # Codes are a backup for passkeys (`SignIn::RecoveryCodes::Generate` refuses
   # without one), so a person with none is told where codes come from.
   test "without a passkey it offers neither Generate… nor Regenerate…" do
     card(unused: 0, generated_at: nil, passkey: false)

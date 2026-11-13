@@ -160,7 +160,7 @@ class SessionTest < ActiveSupport::TestCase
   test "unlinking a user from single sign-on disconnects them, keeping nobody else's" do
     @user.update_columns(sso_issuer: "https://id.example.com", sso_subject: "sub-1", sso_linked_at: Time.current) # version: none (a test's setup)
 
-    assert as(nil, channel: :console) { Sso::Unlink.call(@user, actor: nil) }.ok?
+    assert as(nil, channel: :console) { SignIn::Sso::Unlink.call(@user, actor: nil) }.ok?
 
     assert_equal 0, @user.sessions.count
     assert_equal [ DISCONNECT ] * 2, disconnects(@user)
@@ -260,7 +260,7 @@ class SessionTest < ActiveSupport::TestCase
   end
 
   test "a session may be made with a registered method and not with an unknown one" do
-    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path)
+    SignIn::Methods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path)
     assert Session.start(user: @user, method: "acme/saml", user_agent: nil, ip_address: nil).persisted?
     assert_raises(ActiveRecord::RecordInvalid) { Session.start(user: @user, method: "acme/other", user_agent: nil, ip_address: nil) }
   ensure
@@ -268,8 +268,8 @@ class SessionTest < ActiveSupport::TestCase
   end
 
   test "a method with a recheck gets a check date and its token, and one without neither" do
-    SignInMethods.register("acme/checked", label: "k", path: :admin_root_path, recheck: ->(_session) { :ok })
-    SignInMethods.register("acme/unchecked", label: "k", path: :admin_root_path)
+    SignIn::Methods.register("acme/checked", label: "k", path: :admin_root_path, recheck: ->(_session) { :ok })
+    SignIn::Methods.register("acme/unchecked", label: "k", path: :admin_root_path)
     t = Time.zone.local(2026, 11, 11, 9, 0, 0)
     checked = Session.start(user: @user, method: "acme/checked", user_agent: nil, ip_address: nil, provider_token: "tok", at: t)
     unchecked = Session.start(user: @user, method: "acme/unchecked", user_agent: nil, ip_address: nil, provider_token: "tok", at: t)

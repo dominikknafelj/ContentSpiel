@@ -7,7 +7,7 @@
 # THE REDIRECT URI is built once, here (`sso_redirect_uri`): the callback's
 # route on CS Studio's own address when there is one (`ADMIN_HOST`), else the
 # site's (`PUBLIC_HOST`), else, in development and test, the request's
-# origin (`SignIn::Oidc.callback_origin`). The start and the callback hand
+# origin (`SignIn::Sso.callback_origin`). The start and the callback hand
 # the same string to `Authorization.start` and `Callback.new`, since the
 # token endpoint refuses a code exchanged under another redirect URI than
 # the one it was issued to.
@@ -17,7 +17,7 @@
 # (`cookies.encrypted`), HttpOnly, Secure over HTTPS (always, in
 # production, which forces HTTPS), pathed to STATE_PATH so it is sent to the
 # callback and to no other address, and dropped by the browser after
-# `SignIn::Oidc::STATE_LIFETIME`, which the server checks against `at`
+# `SignIn::Sso::STATE_LIFETIME`, which the server checks against `at`
 # besides. It is SAMESITE LAX, unlike the passkey challenges' Strict: the
 # provider sends the person back with a top-level GET from its own site, a
 # cross-site navigation, on which a Strict cookie is not sent and every
@@ -30,7 +30,7 @@
 # and the state is spent in `SignIn::SpentChallenge` under the purpose
 # "sso", so a callback sent again with a copy of the cookie (another tab, a
 # replay of a captured answer) finds it spent. Whether the provider sent
-# back THIS state is not decided here: `SignIn::Oidc::Callback` alone
+# back THIS state is not decided here: `SignIn::Sso::Callback` alone
 # compares the `state` parameter with the kept one, in constant time.
 #
 # The including controller is under the admin path's routes and on the
@@ -49,11 +49,11 @@ module SsoStarts
   def sso_provider
     return @sso_provider if defined?(@sso_provider)
 
-    @sso_provider = SignIn::Oidc::Provider.current
+    @sso_provider = SignIn::Sso::Provider.current
   end
 
   def sso_redirect_uri
-    @sso_redirect_uri ||= admin_sso_callback_url(**SignIn::Oidc.callback_origin(request_origin: request.base_url))
+    @sso_redirect_uri ||= admin_sso_callback_url(**SignIn::Sso.callback_origin(request_origin: request.base_url))
   end
 
   # Sends the person to the provider, keeping the request's three values in
@@ -64,13 +64,13 @@ module SsoStarts
     raise ArgumentError, "#{intent.inspect} is not among #{INTENTS}" unless INTENTS.include?(intent)
 
     Telemetry.in_span("auth.sso.redirect", attributes: { "auth.sso.intent" => intent, "auth.sso.issuer_host" => sso_provider.issuer_host.to_s }) do |span|
-      authorization = SignIn::Oidc::Authorization.start(provider: sso_provider, redirect_uri: sso_redirect_uri)
+      authorization = SignIn::Sso::Authorization.start(provider: sso_provider, redirect_uri: sso_redirect_uri)
       keep_sso_state(authorization, intent: intent, invitation: invitation)
       # The provider's own endpoint, from its discovery document, never a
       # parameter of this request.
       redirect_to authorization.url, allow_other_host: true, status: :see_other
-    rescue SignIn::Oidc::Unavailable => error
-      Telemetry.record(span, "error.type" => SignIn::Oidc.error_type(error))
+    rescue SignIn::Sso::Unavailable => error
+      Telemetry.record(span, "error.type" => SignIn::Sso.error_type(error))
       unfinished = t("admin.sessions.sso_unfinished", provider: sso_provider.name)
       if intent == "invitation"
         # The invitation page draws it alone (`flash[:sso_unfinished]`).
@@ -89,7 +89,7 @@ module SsoStarts
         "at" => Time.current.to_i, "intent" => intent, "invitation_id" => invitation&.id
       },
       httponly: true, same_site: :lax, secure: request.ssl?, path: SsoStarts.state_path,
-      expires: SignIn::Oidc::STATE_LIFETIME
+      expires: SignIn::Sso::STATE_LIFETIME
     }
   end
 
@@ -101,7 +101,7 @@ module SsoStarts
     cookies.delete(STATE_COOKIE, path: SsoStarts.state_path)
     return unless kept.is_a?(Hash) && kept["state"].is_a?(String) && kept["at"].is_a?(Integer)
 
-    expires_at = Time.zone.at(kept["at"]) + SignIn::Oidc::STATE_LIFETIME
+    expires_at = Time.zone.at(kept["at"]) + SignIn::Sso::STATE_LIFETIME
     return unless Time.current <= expires_at
     # The spent mark outlives the state by a second, so it never lapses
     # before the state would be refused as late anyway.

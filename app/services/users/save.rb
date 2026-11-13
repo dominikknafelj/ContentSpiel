@@ -13,7 +13,7 @@ module Users
   # "a blank value is a no-op, not a write" rule `Admin::FileParams` applies
   # to an untouched file input. A typed password, though, always needs its
   # confirmation (`#unconfirmed_password`), and is refused when it is in the
-  # list of leaked passwords (`Users::LeakedPasswordRule`): asked only once
+  # list of leaked passwords (`SignIn::Password::LeakedRule`): asked only once
   # the user is otherwise valid, and before the transaction. The setup
   # wizard calls this inside its `LOCK TABLE users` transaction, so there the
   # lookup does run under a lock; that step has one person and one row, and
@@ -53,11 +53,11 @@ module Users
   # first. A typed password and a promotion each ask the link twice: before
   # anything is built, for the sentence, and again under the account's row
   # lock in the saving transaction (`OwnerProtection#linked_issuer_under_lock`),
-  # the lock `Sso::Link` takes before it reads the owner flag and clears the
+  # the lock `SignIn::Sso::Link` takes before it reads the owner flag and clears the
   # password, so of a link and a save at once one always sees the other.
   class Save < ApplicationService
     include OwnerProtection
-    include LeakedPasswordRule
+    include SignIn::Password::LeakedRule
 
     def initialize(user = User.new, attributes:, actor: Current.actor)
       @user = user
@@ -111,7 +111,7 @@ module Users
       # A password set here (the wizard's owner, a manager's typed one)
       # opens sign-in for the account in every browser, as
       # `Users::UpdatePassword` does, after the commit.
-      SignIn::Throttle.new.clear(identifier: @user.email_address) if attrs.key?(:password)
+      SignIn::Protection::Throttle.new.clear(identifier: @user.email_address) if attrs.key?(:password)
       success(@user)
     end
 
@@ -195,7 +195,7 @@ module Users
     end
 
     def sso_linked_owner_refusal(issuer: @user.sso_issuer)
-      failure(@user, [ I18n.t("admin.users.owner.sso_linked", name: @user.name_or_email, provider: SignInRules.provider_name(@user, issuer: issuer), raise: true) ])
+      failure(@user, [ I18n.t("admin.users.owner.sso_linked", name: @user.name_or_email, provider: SignIn::Rules.provider_name(@user, issuer: issuer), raise: true) ])
     end
 
     # Final fix wave (C, P17): a typed password needs a typed confirmation.

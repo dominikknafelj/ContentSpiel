@@ -4,7 +4,7 @@ require "application_system_test_case"
 # fake provider (`OidcHelper`, on 127.0.0.1 beside the Capybara server),
 # which answers its authorization address with a redirect back to the
 # callback, as a real provider does once the person has signed in there.
-# The redirect URI is the request's origin (`SignIn::Oidc.callback_origin`,
+# The redirect URI is the request's origin (`SignIn::Sso.callback_origin`,
 # with no site address in tests), so the provider sends the browser back to
 # the Capybara server it left, where the state's cookie waits.
 class Admin::SsoSignInSystemTest < ApplicationSystemTestCase

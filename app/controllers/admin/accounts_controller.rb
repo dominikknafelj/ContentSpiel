@@ -145,7 +145,7 @@ module Admin
     end
 
     # The provider's name for the Sign-in card of a linked person.
-    def sso_provider_name = SignInRules.provider_name(Current.user)
+    def sso_provider_name = SignIn::Rules.provider_name(Current.user)
     helper_method :sso_provider_name
 
     # A switch as the form sends it: "1" on, anything else off, absent nil.

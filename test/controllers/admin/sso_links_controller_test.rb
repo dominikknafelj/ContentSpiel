@@ -1,7 +1,7 @@
 require "test_helper"
 
 # "Unlink…" in the user editor's Single sign-on zone: owner only, answered by
-# `Sso::Unlink`; the zone and the badge are drawn for an owner viewer and a
+# `SignIn::Sso::Unlink`; the zone and the badge are drawn for an owner viewer and a
 # linked user.
 class Admin::SsoLinksControllerTest < ActionDispatch::IntegrationTest
   include ActionMailer::TestHelper

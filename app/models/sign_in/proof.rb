@@ -2,7 +2,7 @@ module SignIn
   # A second proof of an account the caller already holds: a recovery code
   # or a passkey for the second step of a sign-in, a passkey or the
   # password again for Confirm it's you. Each is decided as a password
-  # attempt is (`PasswordAttempt`), counted in the account's bucket, or the
+  # attempt is (`Password::Attempt`), counted in the account's bucket, or the
   # known device's, BEFORE anything is checked (`Throttle`, "A SECOND
   # PROOF"), and answered as a `SignIn::Outcome`:
   #
@@ -12,7 +12,7 @@ module SignIn
   #   the one the password step began included, and is `:ok`;
   # - a wrong one is `:refused` with the buckets its reservation closed;
   # - a right one for an account the caller's rule refuses (`allowed:`,
-  #   `SignInRules.passkey_allowed?`: a linked account, a non-owner under
+  #   `SignIn::Rules.passkey_allowed?`: a linked account, a non-owner under
   #   SSO_REQUIRED) is a wrong one: `:refused`, with the count its
   #   reservation made left standing and the run not forgotten. So a second
   #   step held from before the rule applied (SSO_REQUIRED switched on, or
@@ -41,7 +41,7 @@ module SignIn
     # `identifier`: the account bucket's key, the email as the accounts
     # store it. `device`: the `KnownDevice` the browser carries, or nil.
     # `allowed`: whether the account may be let in by a right proof.
-    def initialize(account:, identifier:, address:, span:, device: nil, throttle: SignIn::Throttle.new, allowed: ->(_account) { true })
+    def initialize(account:, identifier:, address:, span:, device: nil, throttle: SignIn::Protection::Throttle.new, allowed: ->(_account) { true })
       raise ArgumentError, "#{span.inspect} is not among #{SPANS}" unless SPANS.include?(span)
 
       @allowed = allowed
@@ -70,7 +70,7 @@ module SignIn
     end
 
     # An assertion of one of the account's passkeys, over the challenge the
-    # caller kept (`PasskeyCheck#verify`, which records the use).
+    # caller kept (`SignIn::Passkeys::Check#verify`, which records the use).
     def passkey(credential_json, challenge:, check:, ceremony:)
       prove("passkey") { check.verify(credential_json, challenge: challenge, credentials: @account.passkeys, ceremony: ceremony).ok }
     end

@@ -21,7 +21,7 @@ class Session < ApplicationRecord
   METHODS = %w[password passkey sso recovery_code].freeze
 
   # Why a session ended other than by signing out (`session.destroyed`):
-  # `metadata["reason"]` of every `session.ended` (`Sessions::End`).
+  # `metadata["reason"]` of every `session.ended` (`SignIn::Sessions::End`).
   END_REASONS = %w[expired_idle expired_absolute ended_by_self ended_by_owner password_changed
     sso_revoked sso_unlinked expired_sso].freeze
 
@@ -37,10 +37,10 @@ class Session < ApplicationRecord
   # (`Session.start` drops it otherwise). Never rendered, logged or audited.
   encrypts :provider_token
 
-  validates :authenticated_with, inclusion: { in: ->(_) { METHODS + SignInMethods.names } }
+  validates :authenticated_with, inclusion: { in: ->(_) { METHODS + SignIn::Methods.names } }
 
   # What a `session.ended` for an expiry stores of the timeout it ended by
-  # (`Sessions::End`, `Sessions::SweepJob`): the event's sentence reads it
+  # (`SignIn::Sessions::End`, `SignIn::Sessions::SweepJob`): the event's sentence reads it
   # from there, so an old event keeps its words when a timeout changes.
   #
   # `expired_sso` ends at 24 hours or at 26 (`#expiry`): given the session it
@@ -71,9 +71,9 @@ class Session < ApplicationRecord
   # and none may use `delete_all`, which would skip it: sign-out
   # (`Authentication#terminate_session`, `destroy`), `Users::UpdatePassword`
   # and `Users::Save` (`OwnerProtection#end_sessions_after_password_change`),
-  # `Sessions::EndOthers`, `Sessions::EndAll` and `Sso::Unlink` (all four
+  # `SignIn::Sessions::EndOthers`, `SignIn::Sessions::EndAll` and `SignIn::Sso::Unlink` (all four
   # through `.destroy_each_locked`), `Users::Destroy` (`User`'s `dependent: :destroy`),
-  # an expiry (`Sessions::End`, `destroy!`).
+  # an expiry (`SignIn::Sessions::End`, `destroy!`).
   # `test/models/session_test.rb` has each.
   after_destroy_commit :disconnect_cable
 
@@ -96,14 +96,14 @@ class Session < ApplicationRecord
   # Whether a method's provider is asked again. SSO is, and so is a gem's
   # method whose entry has a `recheck`; one with none is never asked, so it
   # gets no check date and no stored token.
-  def self.rechecked_method?(method) = method == "sso" || SignInMethods.rechecked?(method)
+  def self.rechecked_method?(method) = method == "sso" || SignIn::Methods.rechecked?(method)
   private_class_method :rechecked_method?
 
   # The sessions past their absolute timeout at `at`.
   scope :expired_absolute, ->(at) { where(expires_at: ..at) }
 
   # The sessions unseen for the idle timeout at `at`; read after the absolute
-  # ones are gone (`Sessions::SweepJob`), it holds only sessions that are
+  # ones are gone (`SignIn::Sessions::SweepJob`), it holds only sessions that are
   # idle alone.
   scope :expired_idle, ->(at) { where(last_seen_at: ..(at - IDLE_TIMEOUT)) }
 
@@ -153,7 +153,7 @@ class Session < ApplicationRecord
 
     if (reason = session.expiry(at))
       Telemetry.in_child_span("auth.session", attributes: { "auth.session.reason" => reason }) do
-        Sessions::End.call(session, reason: reason, actor: nil)
+        SignIn::Sessions::End.call(session, reason: reason, actor: nil)
       end
       return
     end

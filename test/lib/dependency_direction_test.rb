@@ -32,9 +32,8 @@ require_relative "../support/source_code"
 class DependencyDirectionTest < ActiveSupport::TestCase
   ROOTS = %w[app/models app/queries app/services app/values app/constraints lib].freeze
 
-  COMPONENT = /(?:\b[A-Z]\w*::)*\b[A-Z]\w*Component\b/
   PATTERNS = {
-    component: COMPONENT,
+    component: SourceCode::COMPONENT,
     application_controller: /\bApplicationController\b/,
     action_controller: /\bActionController\b(?:::Base\.helpers)?/,
     url_helpers: /\burl_helpers\b/,

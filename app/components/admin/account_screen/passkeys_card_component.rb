@@ -5,7 +5,7 @@ module Admin
     # foot, which counts them and offers "Add a passkey…".
     #
     # - REMOVE of a covered person's last passkey is disabled, with the
-    #   reason in its row, and has no dialog: `Passkeys::Remove` refuses it
+    #   reason in its row, and has no dialog: `SignIn::Passkeys::Remove` refuses it
     #   anyway, whoever asks. An uncovered person's last one says in its
     #   dialog that the password is the way in again.
     # - THE DIALOGS are the row's and the card's (`PasskeyDialogComponent`):
@@ -31,7 +31,7 @@ module Admin
       # The card for `user` as stored: their passkeys, oldest first, and
       # whether the policy covers them.
       def self.for(user, addable:, recovery_left: nil, url_options: {}, autofocus: nil)
-        new(passkeys: user.passkeys.order(:created_at, :id).to_a, covered: Passkeys::Policy.current.covers?(user), addable: addable,
+        new(passkeys: user.passkeys.order(:created_at, :id).to_a, covered: SignIn::Passkeys::Policy.current.covers?(user), addable: addable,
           recovery_left: recovery_left, url_options: url_options, autofocus: autofocus)
       end
 

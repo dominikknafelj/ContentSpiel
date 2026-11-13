@@ -25,7 +25,7 @@ module Admin
 
       # The policy now, for the lead's words; the session was held by the
       # one read at sign-in, and only `everyone` says "everyone".
-      @lead = Passkeys::Policy.current.name == "everyone" ? "everyone" : "owners_and_admins"
+      @lead = SignIn::Passkeys::Policy.current.name == "everyone" ? "everyone" : "owners_and_admins"
     end
   end
 end

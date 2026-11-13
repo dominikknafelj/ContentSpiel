@@ -15,7 +15,7 @@ module Admin
   # - `create`, the browser's credential (`params[:credential]`, JSON) and the
   #   typed name. A success is a stream that redraws both cards and Confirm
   #   it's you (which now offers the passkey), says "Passkey added." and,
-  #   when `Passkeys::Add` made codes (the person held no unused one), shows
+  #   when `SignIn::Passkeys::Add` made codes (the person held no unused one), shows
   #   them once on a page Turbo keeps no snapshot of. A refusal is 422
   #   `{ "error" }`, the sentence the dialog shows.
   #
@@ -54,7 +54,7 @@ module Admin
     # spends it too.
     def create
       challenge = take_passkey_challenge("register")
-      result = Passkeys::Add.call(Current.user, registration: registration.verify(params[:credential], challenge: challenge),
+      result = SignIn::Passkeys::Add.call(Current.user, registration: registration.verify(params[:credential], challenge: challenge),
         name: params[:name], **mail_link_origin)
       return render(json: { error: result.errors.first }, status: :unprocessable_entity) unless result.ok?
 
@@ -76,7 +76,7 @@ module Admin
     # sentence, and leaves the dialog open; a success redraws the card,
     # which closes it, and hands the focus back to the passkey's Rename.
     def update
-      result = Passkeys::Rename.call(@passkey, name: params[:name])
+      result = SignIn::Passkeys::Rename.call(@passkey, name: params[:name])
       if result.ok?
         respond_to do |format|
           format.turbo_stream do
@@ -98,10 +98,10 @@ module Admin
     # Back to the card, the whole screen drawn again: the passkey's row, the
     # count and, after the last one, the recovery codes all change. The last
     # passkey of a person the policy covers is refused whole
-    # (`Passkeys::Remove`), whatever asked, and said in a toast in the
+    # (`SignIn::Passkeys::Remove`), whatever asked, and said in a toast in the
     # card's own words; any other refusal says its own sentence.
     def destroy
-      result = Passkeys::Remove.call(@passkey)
+      result = SignIn::Passkeys::Remove.call(@passkey)
       return redirect_to(passkeys_card_path, status: :see_other, notice: t("admin.accounts.passkeys.removed")) if result.ok?
 
       message = removal_refusal(result)
@@ -125,12 +125,12 @@ module Admin
     end
 
     def removal_refusal(result)
-      return t("admin.components.account_screen.passkeys_card.last_required") if result.errors == [ Passkeys::Remove.last_required ]
+      return t("admin.components.account_screen.passkeys_card.last_required") if result.errors == [ SignIn::Passkeys::Remove.last_required ]
 
       result.errors.first
     end
 
-    def registration = SignIn::PasskeyRegistration.new(relying_party: passkey_relying_party)
+    def registration = SignIn::Passkeys::Registration.new(relying_party: passkey_relying_party)
 
     def passkeys_card_path = admin_account_path(**admin_url_options, anchor: AccountScreen::PasskeysCardComponent::HEADING_ID)
 

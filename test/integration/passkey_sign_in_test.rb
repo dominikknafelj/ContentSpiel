@@ -246,7 +246,7 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
   test "a passkey signs in an account whose email bucket a bot holds closed" do
     # The bot's wrong passwords, each from its own address behind a trusted
     # hop, until the account's bucket is closed.
-    (SignIn::Throttle::ACCOUNT_FREE_FAILURES + 1).times do |index|
+    (SignIn::Protection::Throttle::ACCOUNT_FREE_FAILURES + 1).times do |index|
       post admin_sign_in_path, params: { email_address: EMAIL, password: "guess#{index}" },
         headers: { "X-Forwarded-For" => "198.51.100.#{index + 1}" }, env: { "REMOTE_ADDR" => "10.0.0.2" }
     end
