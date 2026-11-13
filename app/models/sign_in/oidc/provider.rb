@@ -74,9 +74,13 @@ module SignIn
       def inspect = "#<#{self.class.name} issuer_host=#{issuer_host.inspect}>"
       alias_method :to_s, :inspect
 
+      # ActiveSupport's `Object#as_json` dumps every instance variable, the
+      # secret's included: a provider serialises as its issuer's host alone.
+      def as_json(*) = { "issuer_host" => issuer_host }
+
       def check_issuer!(production:)
         parsed = uri
-        usable = parsed&.host.present? && (parsed.scheme == "https" || (parsed.scheme == "http" && !production && LOOPBACK.include?(parsed.host)))
+        usable = parsed&.host.present? && parsed.userinfo.nil? && (parsed.scheme == "https" || (parsed.scheme == "http" && !production && LOOPBACK.include?(parsed.host)))
         raise Misconfigured, "SSO_ISSUER must be an absolute https URL with a host (http only to localhost, outside production)." unless usable
       end
 

@@ -71,6 +71,7 @@ module SignIn
         declared = response["Content-Length"]
         raise Unavailable.new("a body over the limit", reason: "too_large") if declared && declared.to_i > max_body
 
+        # The bound counts the body after decoding (a gzip body is inflated by read_body).
         body = +""
         response.read_body do |chunk|
           body << chunk

@@ -75,6 +75,20 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
     assert_raises(NoMethodError) { provider.client_secret }
   end
 
+  test "to_json and as_json hold no client secret" do
+    provider = SignIn::Oidc::Provider.current(WHOLE)
+    [ provider.to_json, provider.as_json.to_s, { provider: provider }.to_json, provider.inspect ].each do |text|
+      assert_not_includes text, WHOLE["SSO_CLIENT_SECRET"]
+    end
+  end
+
+  test "an issuer with a user or password in it is refused without naming it" do
+    [ "https://planted-user:planted-pw@sso.example.org", "https://planted-user@sso.example.org" ].each do |value|
+      error = assert_raises(SignIn::Oidc::Misconfigured) { SignIn::Oidc::Provider.check!(WHOLE.merge("SSO_ISSUER" => value)) }
+      assert_not_includes error.message, "planted"
+    end
+  end
+
   test "callback_origin is the admin address, then the public address, then the request's" do
     request = "http://www.example.com"
     assert_equal({ host: "www.example.com", protocol: "http" }, SignIn::Oidc.callback_origin(request_origin: request))
