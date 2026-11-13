@@ -50,7 +50,7 @@
 - The new top-level names `Passkey`, `RecoveryCode` and `PasskeyChallenges` refuse a gem's `ContentSpiel::Plugins` hook owner of the same name (`passkey`, `recovery_code`, `passkey_challenges`) at boot. A gem with such an owner renames it.
 - A new top-level name, `HostRouteConstraint` (`app/constraints/host_route_constraint.rb`): a gem whose hook owner has that name is refused at boot.
 - Sign-in classes released in 0.3.0 moved under `SignIn::`, with no alias:
-  - `SignIn::Throttle`, `SignIn::BotCheck`, `SignIn::KnownDevice` and `SignIn::LockoutMailJob` are `SignIn::Protection::Throttle`, `BotCheck`, `KnownDevice` and `LockoutMailJob`. A lockout mail queued before the deploy and not yet run does not load afterwards and is not sent (it fails once, in Solid Queue's failed jobs).
+  - `SignIn::Throttle`, `SignIn::BotCheck`, `SignIn::KnownDevice` and `SignIn::LockoutMailJob` are `SignIn::Protection::Throttle`, `BotCheck`, `KnownDevice` and `LockoutMailJob`. The bot check's `error.type` on its log line and span reads `SignIn::Protection::BotCheck::Unavailable` instead of `SignIn::BotCheck::Unavailable`, so a query or trigger on the old value goes quiet. A lockout mail queued before the deploy and not yet run does not load afterwards and is not sent (it fails once, in Solid Queue's failed jobs).
   - `SignIn::PasswordAttempt` is `SignIn::Password::Attempt`.
   - `SignIn::LeakedPassword` is `SignIn::Password::Leaked` (its `error.type` on a span reads `SignIn::Password::Leaked::Unavailable`, so a query on the old value finds nothing).
   - `Users::LeakedPasswordRule` is `SignIn::Password::LeakedRule`.

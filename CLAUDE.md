@@ -200,6 +200,7 @@ A rule a test holds is in the reference file for its area, under this same headi
 - A passkey's relying party is decided by `SignIn::Passkeys::RelyingParty` alone, and a browser binds a passkey to its id for good: a change of what it answers orphans every passkey already made. **No guard**.
 - Whether an account may sign in by its password or a passkey is `SignIn::Rules`' (a linked account never; a non-owner never while `SSO_REQUIRED` is set), and every place that reads one asks it. **No guard** for a new place that reads a password or a passkey (a new sign-in door, a confirmation, an API that takes a password) and does not ask `SignIn::Rules`: it is a way in that never asks the provider.
 - `SignIn::Sso::RecheckJob` holds no lock or transaction across a call to the provider. **No guard** that a new outside call added to it stays outside its write transaction.
+- Code outside `SignIn` names only its entry points, and the domain names no screen of CS Studio's (`test/lib/sign_in_boundary_test.rb`, `docs/reference/access-control-and-audit.md`). **No guard** reads what the boundary guard does not: the `.rake` files of `lib/tasks`, `db/` (migrations, seeds), `bin/`, `app/javascript`, or a `module SignIn` reopened outside the domain's folders (a constant added to the domain from elsewhere is read as outside code, or not at all).
 
 **`docs/reference/hosting.md`:**
 

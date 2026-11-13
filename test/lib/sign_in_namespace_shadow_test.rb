@@ -11,7 +11,8 @@ require "test_helper"
 # constant. That is why the sub-namespaces are the plurals `Sessions` and
 # `Passkeys`, and `RecoveryCodes`, never `Session`, `Passkey` or `RecoveryCode`.
 #
-# The names under `SignIn` are DERIVED from the `sign_in/` directories of
+# The names under `SignIn`, at EVERY level (not only `SignIn::X` but
+# `SignIn::Sso::X`), are DERIVED from the `sign_in/` directories of
 # every autoload root of the application (`Rails.autoloaders.main.dirs`, so a
 # new layer folder is read without an edit here), never listed, and compared
 # with `TopLevelNames` (app/values/top_level_names.rb), the same list
@@ -29,11 +30,18 @@ class SignInNamespaceShadowTest < ActiveSupport::TestCase
   # beside it.
   ALLOWED = {}.freeze
 
-  # The directories and files directly under `SignIn`, as Zeitwerk names them.
+  # Every name under `SignIn`, at every level, as Zeitwerk names it: the
+  # directories and files of `sign_in/` and of every folder below it, in every
+  # layer. Only the LAST segment matters (`SignIn::Sso::Session` is "Session"),
+  # because Ruby looks a bare constant up through the lexical scopes of
+  # `module SignIn; module Sso`, so a `Session` at any level hides the model for
+  # the code written inside that level and the ones under it.
   def self.children
     inflector = Rails.autoloaders.main.inflector
     ROOTS.flat_map do |root|
-      Dir[File.join(root, "sign_in", "*")].map do |path|
+      Dir[File.join(root, "sign_in", "**", "*")].filter_map do |path|
+        next unless File.directory?(path) || path.end_with?(".rb")
+
         inflector.camelize(File.basename(path, ".rb"), path)
       end
     end.uniq.sort
@@ -43,14 +51,14 @@ class SignInNamespaceShadowTest < ActiveSupport::TestCase
 
   test "the list is derived from the directories" do
     names = self.class.children
-    %w[Proof OutsideCall SpentChallenge Outcome Protection Password Passkeys RecoveryCodes Sso Sessions Rules Methods].each { |name| assert_includes names, name }
+    %w[Proof OutsideCall SpentChallenge Outcome Protection Password Passkeys RecoveryCodes Sso Sessions Rules Methods Throttle Add RecheckJob].each { |name| assert_includes names, name }
     assert_operator names.size, :>=, 5
   end
 
-  test "no name under SignIn is a top-level constant's" do
+  test "no name under SignIn, at any level, is a top-level constant's" do
     offenders = (self.class.children & self.class.top_level) - ALLOWED.keys
     assert_empty offenders, -> { <<~MESSAGE }
-      SignIn::#{offenders.first} exists, and #{offenders.first} is also a top-level constant. Every bare
+      A constant named #{offenders.first} exists under SignIn (at some level), and #{offenders.first} is also a top-level constant. Every bare
       `#{offenders.first}` inside `module SignIn` would now mean SignIn::#{offenders.first}, not the model
       or domain of that name, and fail without the file having changed.
       Name it in the plural or after what it does, as Sessions and Passkeys are

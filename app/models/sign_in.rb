@@ -29,13 +29,16 @@
 #
 # Two kinds live here. The root, Protection, Password, the passkey ceremonies
 # and Sso's protocol objects are plain objects that know no session, cookie,
-# route, controller or mail: CS Studio's sign-in is one caller, and a later
-# members' sign-in is another that counts apart under a scope of its own. The
-# services and jobs (`SignIn::Passkeys::Add`, `Remove` and `Rename`,
-# `SignIn::RecoveryCodes`, `SignIn::Sessions`, and `SignIn::Sso::Admit`,
-# `Link`, `Unlink` and `RecheckJob`) act on CS Studio's `User` and `Session`. The screens that ask the domain stay CS Studio's own,
-# under `Admin::`: a controller asks and answers (and keeps a passkey's
-# challenge), and the domain names none of them.
+# route, controller or screen of CS Studio's: it is one caller of them, and a
+# later members' sign-in is another that counts apart under a scope of its own.
+# (They are not all free of Rails: `SpentChallenge` is a record, and
+# Protection holds `LockoutMailJob`, which mails.) The services and jobs
+# (`SignIn::Passkeys::Add`, `Remove` and `Rename`, `SignIn::RecoveryCodes`,
+# `SignIn::Sessions`, `SignIn::Password::LeakedRule`, `SignIn::Sso::Admit`,
+# `Link`, `Unlink` and `RecheckJob`, and `SignIn::Protection::LockoutMailJob`)
+# act on CS Studio's `User` and `Session`, or send to them. The screens that
+# ask the domain stay CS Studio's own, under `Admin::`: a controller asks and
+# answers (and keeps a passkey's challenge), and the domain names none of them.
 #
 # Two guards hold the shape: `test/lib/sign_in_namespace_shadow_test.rb` (no
 # name under `SignIn` is a top-level constant's, nothing deeper than two
