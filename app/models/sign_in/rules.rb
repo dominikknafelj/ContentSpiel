@@ -27,7 +27,7 @@
 #
 # The services that set a password or add a second factor refuse a linked
 # account in words (`Users::Save`, `Users::UpdatePassword`, `SignIn::Passkeys::Add`,
-# `RecoveryCodes::Generate`): they are asked by someone already signed in,
+# `SignIn::RecoveryCodes::Generate`): they are asked by someone already signed in,
 # after their own authorization, so their answer tells nobody outside.
 #
 # It names no controller, route or request: the controllers ask it.

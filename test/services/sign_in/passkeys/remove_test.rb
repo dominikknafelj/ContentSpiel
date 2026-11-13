@@ -4,7 +4,7 @@ class SignIn::Passkeys::RemoveTest < ActiveSupport::TestCase
   setup do
     @user = users(:reader)
     @first = add_passkey(@user, client: fake_authenticator, name: "MacBook")
-    @codes = as(@user) { RecoveryCodes::Generate.call(@user) }.record
+    @codes = as(@user) { SignIn::RecoveryCodes::Generate.call(@user) }.record
   end
 
   def remove(passkey, actor: @user)

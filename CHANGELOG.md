@@ -57,9 +57,6 @@
   - `SignIn::PasswordAttempt` is `SignIn::Password::Attempt`.
   - `SignIn::LeakedPassword` is `SignIn::Password::Leaked` (its `error.type` on a span reads `SignIn::Password::Leaked::Unavailable`).
   - `Users::LeakedPasswordRule` is `SignIn::Password::LeakedRule`.
-  - `SignIn::RelyingParty` is `SignIn::Passkeys::RelyingParty`.
-  - `SignIn::PasskeyRegistration`, `SignIn::PasskeyCheck` and `SignIn::PasskeyCredential` are `SignIn::Passkeys::Registration`, `Check` and `Credential`.
-  - `Passkeys::Policy`, `Passkeys::Add`, `Passkeys::Remove` and `Passkeys::Rename` are `SignIn::Passkeys::Policy`, `Add`, `Remove` and `Rename`.
   - `SignIn::Outcome` keeps its name.
 
 ### Removed

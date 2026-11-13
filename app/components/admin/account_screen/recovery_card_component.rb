@@ -5,7 +5,7 @@ module Admin
     # (not destructive: the person gets a new set to save), or Generate…
     # when they hold none. Two or fewer left is a warn notice, and none left
     # of a set once made is the stronger one. Codes are a backup for
-    # passkeys (`RecoveryCodes::Generate` refuses without one), so a person
+    # passkeys (`SignIn::RecoveryCodes::Generate` refuses without one), so a person
     # with no passkey is offered neither and told where codes come from.
     #
     # Both forms carry `data-confirm-identity`: refused by Confirm it's

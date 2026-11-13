@@ -185,7 +185,7 @@ class Admin::PasskeysControllerTest < ActionDispatch::IntegrationTest
 
   test "an uncovered person's last passkey goes with the recovery codes" do
     passkey = add_passkey(@user, client: @client)
-    RecoveryCodes::Generate.call(@user, actor: @user)
+    SignIn::RecoveryCodes::Generate.call(@user, actor: @user)
 
     delete admin_account_passkey_path(passkey), headers: { "Accept" => STREAM }
 

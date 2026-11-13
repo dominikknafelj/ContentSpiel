@@ -238,7 +238,7 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
 
   def with_passkeys_and_codes(user)
     2.times { |index| add_passkey(user, client: fake_authenticator, name: "Key #{index}") }
-    as(user) { RecoveryCodes::Generate.call(user) }
+    as(user) { SignIn::RecoveryCodes::Generate.call(user) }
     2.times { Session.start(user: user, method: "passkey", user_agent: nil, ip_address: nil) }
     user
   end

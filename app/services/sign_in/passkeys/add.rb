@@ -59,7 +59,7 @@ module SignIn
           next LINKED if User.lock.find(@user.id).sso_linked?
 
           passkey.save!
-          codes = RecoveryCodes::Generate.new(@user, actor: actor).write_codes(@user, at: added_at) unless @user.recovery_codes.unused.exists?
+          codes = SignIn::RecoveryCodes::Generate.new(@user, actor: actor).write_codes(@user, at: added_at) unless @user.recovery_codes.unused.exists?
           @user.sessions.update_all(enrolment_due: false) # version: none (a session is on no public page)
 
           record_event("passkey.added", subject: passkey, metadata: { "name" => passkey.name })

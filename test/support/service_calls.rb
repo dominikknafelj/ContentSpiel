@@ -55,7 +55,7 @@ module ServiceCalls
     "SignIn::Passkeys::Add" => { manager_may: false, reason: "a person adds a passkey to their own account only: it is their device, and nobody, not even an owner, adds one for someone else" },
     "SignIn::Passkeys::Rename" => { manager_may: false, reason: "a person renames their own passkeys only: nobody manages someone else's" },
     "SignIn::Passkeys::Remove" => { manager_may: false, reason: "a person removes their own passkeys only; a lost device is cleared from the console (Users::UpdatePassword, remove_passkeys)" },
-    "RecoveryCodes::Generate" => { manager_may: false, reason: "a person makes their own recovery codes only: the codes are shown to whoever makes them" }
+    "SignIn::RecoveryCodes::Generate" => { manager_may: false, reason: "a person makes their own recovery codes only: the codes are shown to whoever makes them" }
   }.freeze
 
   # The two bulk services answer with their own result (no `denied?`): an id
@@ -730,13 +730,13 @@ module ServiceCalls
         owner: mine, own: -> { SignIn::Passkeys::Remove.call(own) }, own_event: "passkey.removed" }
     },
 
-    "RecoveryCodes::Generate" => lambda {
+    "SignIn::RecoveryCodes::Generate" => lambda {
       target = stranger_target
       mine = stranger_target(email: "mine@example.com")
       # Codes are a backup for passkeys: both accounts hold one.
       [ target, mine ].each { |user| add_passkey(user, client: fake_authenticator) }
-      { call: -> { RecoveryCodes::Generate.call(target) }, permission: "users.manage", on: target, control_actor: target,
-        owner: mine, own: -> { RecoveryCodes::Generate.call(mine) }, own_event: "recovery_codes.generated" }
+      { call: -> { SignIn::RecoveryCodes::Generate.call(target) }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { SignIn::RecoveryCodes::Generate.call(mine) }, own_event: "recovery_codes.generated" }
     },
 
     # The two bulk services: see OWN_RESULT. `ids` are real posts.

@@ -1,12 +1,12 @@
 require "test_helper"
 
-class RecoveryCodes::GenerateTest < ActiveSupport::TestCase
+class SignIn::RecoveryCodes::GenerateTest < ActiveSupport::TestCase
   setup do
     @user = users(:reader)
     add_passkey(@user, client: fake_authenticator)
   end
 
-  def generate(actor: @user) = as(actor) { RecoveryCodes::Generate.call(@user) }
+  def generate(actor: @user) = as(actor) { SignIn::RecoveryCodes::Generate.call(@user) }
 
   test "regenerating replaces every code, used ones too, and records how many unused it replaced" do
     first = generate.record
@@ -53,7 +53,7 @@ class RecoveryCodes::GenerateTest < ActiveSupport::TestCase
 
     assert_not result.ok?
     assert_not result.denied?
-    assert_equal [ RecoveryCodes::Generate.passkey_first ], result.errors
+    assert_equal [ SignIn::RecoveryCodes::Generate.passkey_first ], result.errors
     assert_empty @user.recovery_codes
     assert_empty Audit::Event.where(action: "recovery_codes.generated")
   end

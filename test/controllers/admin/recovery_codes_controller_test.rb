@@ -54,7 +54,7 @@ class Admin::RecoveryCodesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_equal STREAM, response.media_type
-    assert_includes response.body, ERB::Util.html_escape(RecoveryCodes::Generate.passkey_first)
+    assert_includes response.body, ERB::Util.html_escape(SignIn::RecoveryCodes::Generate.passkey_first)
     assert_empty shown
     assert_empty @user.recovery_codes
   end
