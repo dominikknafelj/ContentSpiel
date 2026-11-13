@@ -329,4 +329,13 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       assert_equal({ "kind" => "tip" }, Audit::Snapshot.for(block)["settings"])
     end
   end
+
+  test "filter_parameters masks code and state by their whole names, and not a name that contains them" do
+    filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
+    filtered = filter.filter("code" => "a", "state" => "b", "zip_code" => "10115", "estate" => "c", "code_of_conduct" => "d")
+
+    assert_equal "[FILTERED]", filtered["code"]
+    assert_equal "[FILTERED]", filtered["state"]
+    assert_equal({ "zip_code" => "10115", "estate" => "c", "code_of_conduct" => "d" }, filtered.except("code", "state"))
+  end
 end

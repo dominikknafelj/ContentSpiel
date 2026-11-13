@@ -83,9 +83,11 @@ class Session < ApplicationRecord
   #
   # A session of a provider that can be asked again starts with
   # `provider_checked_at` set (the sign-in is the first check); `provider_token`
-  # is its refresh token, dropped when the site cannot encrypt it.
+  # is its refresh token, dropped when the site cannot encrypt it and for a
+  # method that is never asked again (a token nothing reads is a secret at rest
+  # for nothing).
   def self.start(user:, method:, user_agent:, ip_address:, enrolment_due: false, provider_token: nil, at: Time.current)
-    token = provider_token.presence if Forms::Encryption.available?
+    token = provider_token.presence if rechecked_method?(method) && Forms::Encryption.available?
     create!(user: user, authenticated_with: method, user_agent: user_agent, ip_address: ip_address,
       last_seen_at: at, expires_at: at + ABSOLUTE_TIMEOUT, confirmed_at: at, enrolment_due: enrolment_due,
       provider_token: token, provider_checked_at: (at if rechecked_method?(method)))

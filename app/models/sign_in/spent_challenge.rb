@@ -15,6 +15,9 @@ module SignIn
   class SpentChallenge < ApplicationRecord
     self.table_name = "sign_in_spent_challenges"
 
+    # The HMAC's key purpose stays "passkey challenge" although `take` serves
+    # every purpose: it is part of every stored digest, so a rename would make
+    # a challenge or state spent a moment before a deploy spendable again.
     SPENT_PURPOSE = "content_spiel passkey challenge".freeze
 
     # True for the one take of a value of a purpose: the digest is an HMAC of

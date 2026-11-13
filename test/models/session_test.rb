@@ -290,4 +290,11 @@ class SessionTest < ActiveSupport::TestCase
     assert_not_includes raw, "refresh-token-plain"
     assert_equal "refresh-token-plain", session.reload.provider_token
   end
+
+  test "a session of a method that is never asked again stores no provider token" do
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, provider_token: "refresh-token")
+
+    assert_nil session.reload.provider_token
+    assert_nil session.provider_checked_at
+  end
 end
