@@ -113,6 +113,24 @@ class ProductionBootTest < ActiveSupport::TestCase
     end
   end
 
+  test "production with an ADMIN_HOST on the public host name does not start and says why" do
+    printed, status = boot_production("PUBLIC_HOST" => "https://docs.example.org", "ADMIN_HOST" => "https://docs.example.org")
+
+    assert_not status.success?, printed
+    assert_includes printed, "ADMIN_HOST must be another host name than PUBLIC_HOST's."
+    assert_no_match(/^hosts:/, printed)
+  end
+
+  test "production with an ADMIN_HOST answers both hosts and names the admin origin at boot" do
+    printed, status = boot_production("PUBLIC_HOST" => "https://docs.example.org", "ADMIN_HOST" => "https://studio.example.internal")
+    lines = printed.lines(chomp: true)
+
+    assert status.success?, printed
+    assert_includes lines, %(hosts: ["docs.example.org", "studio.example.internal"])
+    assert_includes lines, "[ContentSpiel] CS Studio is served on https://studio.example.internal alone; " \
+                           "https://docs.example.org answers no CS Studio address."
+  end
+
   test "production with a THEME_PATH that names no folder does not start, and says which variable and which path" do
     printed, status = boot_production("THEME_PATH" => "/no/such/theme/anywhere")
 
@@ -171,7 +189,7 @@ class ProductionBootTest < ActiveSupport::TestCase
     def boot_production(variables)
       env = {
         "RAILS_ENV" => "production", "SECRET_KEY_BASE_DUMMY" => "1",
-        "PUBLIC_HOST" => nil, "TRUSTED_PROXIES" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
+        "PUBLIC_HOST" => nil, "ADMIN_HOST" => nil, "TRUSTED_PROXIES" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
         "SECRET_KEY_BASE" => nil, "RAILS_MASTER_KEY" => nil, "DATABASE_URL" => nil, "ADMIN_PATH" => nil,
         "OTEL_EXPORTER_OTLP_ENDPOINT" => nil, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" => nil, "OTEL_CONSOLE" => nil
       }.merge(variables)

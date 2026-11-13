@@ -91,6 +91,23 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     end
   end
 
+  test "with an admin address the CS Studio address row says where CS Studio answers" do
+    with_site_address("https://docs.example.org") do
+      with_admin_address("https://studio.example.org") do
+        check = result("CS Studio address", Setup::SystemCheck.run)
+
+        assert_equal :ok, check.status
+        assert_equal "CS Studio answers at https://studio.example.org alone. The public address answers no CS Studio page.", check.message
+      end
+    end
+  end
+
+  test "without an admin address there is no CS Studio address row" do
+    with_admin_address(nil) do
+      assert_nil Setup::SystemCheck.run.find { |row| row.label == "CS Studio address" }
+    end
+  end
+
   test "HTTPS in production: an encrypted request is ok" do
     check = result("HTTPS", run_check(production: true, request_ssl: true))
 

@@ -96,6 +96,20 @@ class SignInMailerTest < ActionMailer::TestCase
     end
   end
 
+  test "with an admin host the reset request's and Your account's links name it, and without one the public host" do
+    [ [ "https://studio.example.internal", "studio.example.internal" ], [ nil, "docs.example.org" ] ].each do |admin, host|
+      with_site_address(SITE) do
+        with_admin_address(admin) do
+          [ locked(origin: "http://evil.example"), passkey_added, recovery_code_used(left: 3) ].each do |mail|
+            link = mail.text_part.body.to_s[%r{https?://\S+}]
+            assert_equal host, URI.parse(link).host
+            assert_equal host, URI.parse(Nokogiri::HTML5(mail.html_part.body.to_s).at_css("a")["href"]).host
+          end
+        end
+      end
+    end
+  end
+
   test "recovery_code_used says the address and how many codes are left, one and many" do
     with_site_address(SITE) do
       one = recovery_code_used(left: 1)

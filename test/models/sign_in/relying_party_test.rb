@@ -1,11 +1,12 @@
 require "test_helper"
 
 # Where a passkey belongs: the relying party's id is what a browser
-# binds a credential to, so it is decided once, from PUBLIC_HOST when the
-# site has an address and from the request otherwise.
+# binds a credential to, so it is decided once: from ADMIN_HOST when CS
+# Studio has an address of its own, from PUBLIC_HOST when the site has one,
+# and from the request otherwise.
 class SignIn::RelyingPartyTest < ActiveSupport::TestCase
   def party(request_origin: "http://www.example.com")
-    SignIn::RelyingParty.for(address: SiteAddress.current, request_origin: request_origin, name: "Site")
+    SignIn::RelyingParty.for(request_origin: request_origin, name: "Site")
   end
 
   test "the id is the registrable domain of PUBLIC_HOST and the origin the address" do
@@ -44,6 +45,39 @@ class SignIn::RelyingPartyTest < ActiveSupport::TestCase
 
     with_site_address("http://192.168.1.20") do
       assert_nil party(request_origin: "http://192.168.1.20")
+    end
+  end
+
+  test "with an admin host in another domain the id and origin are the admin host's" do
+    with_site_address("https://docs.example.org") do
+      with_admin_address("https://studio.example.internal") do
+        relying_party = party(request_origin: "https://studio.example.internal")
+        assert_equal "example.internal", relying_party.id
+        assert_equal [ "https://studio.example.internal" ], relying_party.allowed_origins
+      end
+
+      with_admin_address("https://cms") do
+        assert_equal "cms", party(request_origin: "https://cms").id, "a host with no registrable domain is its own id"
+        assert_equal [ "https://cms" ], party(request_origin: "https://cms").allowed_origins
+      end
+    end
+  end
+
+  test "with an admin host in the public host's domain the id is shared and the origin the admin host's" do
+    with_site_address("https://www.example.org") do
+      with_admin_address("https://studio.example.org:8443") do
+        relying_party = party(request_origin: "https://studio.example.org:8443")
+        assert_equal "example.org", relying_party.id
+        assert_equal [ "https://studio.example.org:8443" ], relying_party.allowed_origins
+      end
+    end
+  end
+
+  test "an admin host at an IP address has no relying party" do
+    with_site_address("https://www.example.org") do
+      with_admin_address("https://10.0.0.5") do
+        assert_nil party(request_origin: "https://10.0.0.5")
+      end
     end
   end
 end

@@ -106,6 +106,19 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_select "pre", text: /mcpServers/
   end
 
+  test "with an admin host the client configuration's url names it" do
+    with_site_address("https://docs.example.org") do
+      with_admin_address("https://studio.example.internal") do
+        sign_in_as(users(:one))
+        get "/cs-studio/api_tokens", headers: { "Host" => "studio.example.internal" }
+
+        assert_response :success
+        assert_includes response.body, "https://studio.example.internal/cs-studio/mcp"
+        assert_not_includes response.body, "docs.example.org/cs-studio/mcp"
+      end
+    end
+  end
+
   test "creating a token reveals it once, no-store, in the response itself" do
     sign_in_as(users(:one))
     assert_difference -> { ApiToken.count }, 1 do

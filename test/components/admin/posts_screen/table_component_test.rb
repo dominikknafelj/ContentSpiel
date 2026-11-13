@@ -176,6 +176,19 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     assert_no_selector "[role=menu] button", text: "Move to trash", visible: :all
   end
 
+  test "View on site is the path on one host and the public URL when CS Studio has its own" do
+    live = create_post(title: "Live one")
+    with_site_address("https://docs.example.org") do
+      render_table([ live ], paths: { live.id => "/blog/live-one" })
+      assert_selector "[role=menu] a[href='/blog/live-one']", text: "View on site", visible: :all
+
+      with_admin_address("https://studio.example.internal") do
+        render_table([ live ], paths: { live.id => "/blog/live-one" })
+        assert_selector "[role=menu] a[href='https://docs.example.org/blog/live-one']", text: "View on site", visible: :all
+      end
+    end
+  end
+
   test "a live post with unpublished changes carries the chip in the Status column; a draft with a stale mark and a plain live post do not" do
     live = create_post(title: "Marked live")
     assert Posts::Save.call(live, translations: { "en" => { title: "Typed" } }).ok?

@@ -212,4 +212,42 @@ class SiteAddressTest < ActiveSupport::TestCase
       assert_equal "https://outer.example.org", SiteAddress.current.origin
     end
   end
+
+  test "admin reads ADMIN_HOST and is memoised until reset" do
+    with_admin_address("https://studio.example.internal") do
+      assert_equal "https://studio.example.internal", SiteAddress.admin.origin
+
+      ENV["ADMIN_HOST"] = "https://changed.example.internal"
+      assert_equal "https://studio.example.internal", SiteAddress.admin.origin, "memoised"
+
+      SiteAddress.reset!
+      assert_equal "https://changed.example.internal", SiteAddress.admin.origin
+    end
+    with_admin_address(nil) { assert_not SiteAddress.admin.configured? }
+  end
+
+  test "an ADMIN_HOST that is no address is refused and the message names ADMIN_HOST" do
+    with_admin_address("nonsense") do
+      error = assert_raises(SiteAddress::Invalid) { SiteAddress.admin }
+      assert_equal "ADMIN_HOST must be the site's address with its scheme, for example https://www.example.org", error.message
+    end
+  end
+
+  test "with_admin_address puts the variable and the memo back, also when the block raises" do
+    with_site_address("https://public.example.org") do
+      with_admin_address("https://outer.example.internal") do
+        assert_raises(RuntimeError) do
+          with_admin_address("https://inner.example.internal") do
+            assert_equal "https://inner.example.internal", SiteAddress.admin.origin
+            raise "stop"
+          end
+        end
+
+        assert_equal "https://outer.example.internal", ENV["ADMIN_HOST"]
+        assert_equal "https://outer.example.internal", SiteAddress.admin.origin
+      end
+      assert_nil ENV["ADMIN_HOST"]
+      assert_not SiteAddress.admin.configured?
+    end
+  end
 end

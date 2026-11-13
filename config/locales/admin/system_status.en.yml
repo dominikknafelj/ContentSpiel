@@ -1,7 +1,7 @@
 # System status (docs/reference/i18n.md): `admin/system_status/show.html.erb`,
 # read by lazy lookup. The rows' words are `Admin::Ui::SystemCheckRowComponent`'s
 # (`ui.en.yml`), and the checks' own sentences stay `Setup::SystemCheck`'s English,
-# but for the Forms row's (`forms.en.yml`) and the Visitor address row's, below.
+# but for the Forms row's (`forms.en.yml`), the CS Studio address row's and the Visitor address row's, below.
 en:
   admin:
     system_status:
@@ -14,6 +14,11 @@ en:
           one: "%{passed} of %{count} check passed · last run %{time}"
           other: "%{passed} of %{count} checks passed · last run %{time}"
         run_again: "Run checks again"
+      # The "CS Studio address" row (`Setup::SystemCheck#admin_address`), present
+      # only when ADMIN_HOST is set.
+      admin_address:
+        label: "CS Studio address"
+        message: "CS Studio answers at %{origin} alone. The public address answers no CS Studio page."
       # The "Visitor address" row (`Setup::SystemCheck#visitor_address`):
       # OK with no Cloudflare header, OK when the header is the address the
       # request is counted by, and the warning when it is not.

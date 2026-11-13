@@ -125,10 +125,11 @@ module Admin
       @assignable_groups.find { |group| group.name == AccessControl::Seeds::READ_ONLY_NAME }
     end
 
-    # The endpoint an assistant connects to: the public host (the same
+    # The endpoint an assistant connects to: the admin host when one is set
+    # (the MCP endpoint answers there alone), else the public host (the same
     # `PublicSite::Urls.default_host` every absolute public URL is built
-    # from) plus `mcp_path` (`McpController`, under the admin path).
-    helper_method def mcp_url = "#{PublicSite::Urls.default_host}#{mcp_path}"
+    # from), plus `mcp_path` (`McpController`, under the admin path).
+    helper_method def mcp_url = "#{SiteAddress.admin.origin || PublicSite::Urls.default_host}#{mcp_path}"
 
     # A ready-to-paste client configuration, in the `mcpServers` shape
     # MCP clients (Claude Desktop/Code, Cursor, ...) share -- `token` is the

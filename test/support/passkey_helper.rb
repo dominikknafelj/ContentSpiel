@@ -39,7 +39,7 @@ module PasskeyHelper
 
   # The relying party a request from the client's origin meets.
   def passkey_relying_party(client)
-    SignIn::RelyingParty.for(address: SiteAddress.current, request_origin: client.origin, name: PASSKEY_SITE_NAME)
+    SignIn::RelyingParty.for(request_origin: client.origin, name: PASSKEY_SITE_NAME)
   end
 
   def passkey_registration(user, client: fake_authenticator)

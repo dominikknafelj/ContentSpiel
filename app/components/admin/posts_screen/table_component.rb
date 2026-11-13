@@ -55,10 +55,11 @@ module Admin
 
       def path_of(post) = paths[post.id]
 
-      # The site address of a live post: its path on the public site, in the
-      # editing language. Nothing for a draft or scheduled post (the public
-      # site answers 404) or one no page lists.
-      def site_path(post) = (paths[post.id] if post.live?)
+      # The site address of a live post, in the editing language: its path on
+      # the public site, or its public URL when CS Studio has a host of its
+      # own (`PublicSite::Urls.studio_link`). Nothing for a draft or scheduled
+      # post (the public site answers 404) or one no page lists.
+      def site_path(post) = (PublicSite::Urls.studio_link(paths[post.id]) if post.live?)
     end
   end
 end

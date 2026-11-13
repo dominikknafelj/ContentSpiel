@@ -29,15 +29,21 @@ module HostSettings
   ONE_YEAR = 365 * 24 * 60 * 60
   HSTS = { expires: ONE_YEAR, subdomains: false, preload: false }.freeze
 
-  # `address` and `env` are parameters so a test hands in its own; production
-  # takes the defaults. `SiteAddress.current` raises `SiteAddress::Invalid`
-  # for a value that is not an address, which stops the boot in the
-  # environment file with a message that names the variable.
-  def self.apply(config, address: SiteAddress.current, env: ENV)
+  # `address`, `admin` and `env` are parameters so a test hands in its own;
+  # production takes the defaults. `SiteAddress.current` raises
+  # `SiteAddress::Invalid` for a value that is not an address, which stops the
+  # boot in the environment file with a message that names the variable.
+  #
+  # An admin address is answered beside the public one and only with one: it
+  # needs a public address, another host name (the two would be one site) and
+  # the same scheme (`force_ssl` is one setting). The three refusals come
+  # before anything is set, and none repeats a value.
+  def self.apply(config, address: SiteAddress.current, admin: SiteAddress.admin, env: ENV)
+    check_admin!(address, admin)
     # Without an address `config.hosts` is left as it is (empty in
     # production: any host is answered), never emptied, so whatever else
     # filled it keeps its entries.
-    config.hosts = [ address.host ] if address.configured?
+    config.hosts = [ address.host, admin.host ].compact if address.configured?
     config.host_authorization = { exclude: HEALTH_CHECK }
 
     # HTTPS follows the address's own scheme: an http address (a private
@@ -53,6 +59,15 @@ module HostSettings
 
     config.action_mailer.default_url_options = address.url_options
   end
+
+  def self.check_admin!(address, admin)
+    return unless admin.configured?
+
+    raise SiteAddress::Invalid, "ADMIN_HOST needs PUBLIC_HOST: set the site's public address too." unless address.configured?
+    raise SiteAddress::Invalid, "ADMIN_HOST must be another host name than PUBLIC_HOST's." if admin.host == address.host
+    raise SiteAddress::Invalid, "ADMIN_HOST and PUBLIC_HOST must both be https, or both http." if admin.https? != address.https?
+  end
+  private_class_method :check_admin!
 
   def self.assume_ssl?(env) = env["ASSUME_SSL"] == "1"
   private_class_method :assume_ssl?
@@ -74,7 +89,7 @@ module HostSettings
   # proxy that ends TLS and sends no `X-Forwarded-Proto` makes every request
   # look plain, each is redirected to the address it asked for, no screen
   # can be reached, and this log is all the person has.
-  def self.announcement(address, env = ENV)
+  def self.announcement(address, env = ENV, admin: SiteAddress.admin)
     lines = []
     if !address.configured?
       lines << "[ContentSpiel] PUBLIC_HOST is not set. Any host name is accepted and nothing is forced to HTTPS."
@@ -90,6 +105,9 @@ module HostSettings
       else
         "[ContentSpiel] Only the exact host name #{address.host} is answered."
       end
+    end
+    if admin.configured?
+      lines << "[ContentSpiel] CS Studio is served on #{admin.origin} alone; #{address.origin} answers no CS Studio address."
     end
     if address.https? && !assume_ssl?(env)
       lines << "[ContentSpiel] If every request is redirected to itself, the proxy in front ends TLS and does not say so " \

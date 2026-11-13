@@ -62,6 +62,21 @@ class Public::PreviewBarComponentTest < ActiveSupport::TestCase
     assert_selector "a[href='/cs-studio/posts']", text: "Exit preview"
   end
 
+  # A preview is drawn on the admin host when CS Studio has one, where no
+  # public page answers, so a live record's Exit names the public host.
+  test "Exit preview of a live page is its path on one host and its public URL when CS Studio has its own" do
+    live = Page.create!(parent: @root, title: "Now", published_at: 1.day.ago)
+    with_site_address("https://docs.example.org") do
+      render_inline(Public::PreviewBarComponent.new(record: live, locale: "en"))
+      assert_selector "a[href='/now']", text: "Exit preview"
+
+      with_admin_address("https://studio.example.internal") do
+        render_inline(Public::PreviewBarComponent.new(record: live, locale: "en"))
+        assert_selector "a[href='https://docs.example.org/now']", text: "Exit preview"
+      end
+    end
+  end
+
   private
     def page_links = page.all("a").map(&:text)
 end

@@ -13,6 +13,20 @@ module PublicSite
       SiteAddress.current.origin
     end
 
+    # Where a link from CS Studio to a live public page goes ("View on site",
+    # the preview's Exit), given the page's public path. While one host
+    # serves both, the path itself: it opens on the host CS Studio was opened
+    # on, a local checkout's included, where the configured domain does not
+    # point here. With CS Studio on a host of its own (`ADMIN_HOST`), which
+    # answers no public page, the path on the public origin, as the editor's
+    # Copy address names it (`ADMIN_HOST` is refused at boot without
+    # `PUBLIC_HOST`).
+    def self.studio_link(path)
+      return path if path.nil? || !SiteAddress.admin.configured?
+
+      "#{configured_host}#{path}"
+    end
+
     def self.default_host
       configured_host || "https://www.example.com"
     end
