@@ -14,6 +14,11 @@ module Sso
   # owner tells them to ask for a reset themselves. Their passkeys and codes
   # went with the link and do not come back.
   #
+  # `#mailed?` says whether the mail was queued, read after `#call`: the
+  # caller's words must never promise a mail that is not sent (the owner's
+  # toast, `Admin::SsoLinksController`). Mail readiness is asked once, here,
+  # and the answer is both what is queued and what is said.
+  #
   # An account with no link is a failure, with no event and no mail.
   class Unlink < ApplicationService
     # authorize: none (owner-only, asked through Users::Manageability.actor_owner? in #call as Sessions::EndAll asks it; no AccessControl permission says "owner")
@@ -24,7 +29,10 @@ module Sso
       @user = user
       @actor = actor
       @origin = origin
+      @mailed = false
     end
+
+    def mailed? = @mailed
 
     def call
       return denied("users.manage", @user) unless Users::Manageability.actor_owner?(actor)
@@ -52,8 +60,11 @@ module Sso
 
     # After the outer commit, as the invitation mails are (`Invitations::Rules#queue_mail`).
     def queue_reset
+      return unless MailSettings.current.ready?
+
+      @mailed = true
       ActiveRecord.after_all_transactions_commit do
-        ApplicationMailer.queue(PasswordsMailer, :reset, @user, **{ origin: @origin }.compact) if MailSettings.current.ready?
+        ApplicationMailer.queue(PasswordsMailer, :reset, @user, **{ origin: @origin }.compact)
       end
     end
   end

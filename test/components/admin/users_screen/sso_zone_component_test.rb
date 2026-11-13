@@ -1,9 +1,9 @@
 require "test_helper"
 
 class Admin::UsersScreen::SsoZoneComponentTest < ViewComponent::TestCase
-  def zone(user, provider_name: "Acme ID")
+  def zone(user, provider_name: "Acme ID", mail_ready: true)
     with_request_url("/cs-studio/users/#{user.id}/edit") do
-      render_inline Admin::UsersScreen::SsoZoneComponent.new(user: user, provider_name: provider_name)
+      render_inline Admin::UsersScreen::SsoZoneComponent.new(user: user, provider_name: provider_name, mail_ready: mail_ready)
     end
   end
 
@@ -22,6 +22,13 @@ class Admin::UsersScreen::SsoZoneComponentTest < ViewComponent::TestCase
       assert_selector "button.bg-accent[type=submit]", text: "Unlink", visible: :all
     end
     assert_no_selector "dialog button.bg-danger", visible: :all
+  end
+
+  test "without mail the dialog promises no mail" do
+    zone(users(:reader), mail_ready: false)
+
+    assert_selector "dialog", text: "reader@example.com can no longer sign in with Acme ID, and is signed out everywhere. Mail isn't set up, so they get no mail to set a password until it is.", visible: :all
+    assert_no_text "They get a mail to set a password here."
   end
 
   test "a provider name that says nothing falls back to words" do

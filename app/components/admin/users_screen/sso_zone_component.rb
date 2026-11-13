@@ -15,13 +15,17 @@ module Admin
     # - The dialog is not destructive (the confirm is the primary button, as the
     #   owner zone's): the person regains a way in with the mail. Its form DELETEs
     #   `users/:id/sso_link`.
+    # - `mail_ready` is the caller's `MailSettings#ready?`: without mail the
+    #   dialog promises no mail (`confirm_body_no_mail`), as `Sso::Unlink` then
+    #   queues none.
     #
     # Like the owner zone, the trigger is an `admin--saving--pending-lock`
     # control, and the zone and its dialog sit after the user form, never inside it.
     class SsoZoneComponent < AdminComponent
-      def initialize(user:, provider_name:, url_options: {})
+      def initialize(user:, provider_name:, mail_ready:, url_options: {})
         @user = user
         @provider_name = provider_name
+        @mail_ready = mail_ready
         @url_options = url_options
       end
 
@@ -37,6 +41,7 @@ module Admin
       def provider = self.class.provider_words(@provider_name)
       def name = (user.persisted? ? user.name_in_database.presence || user.email_address_in_database : user.name_or_email)
       def dialog_id = self.class.dialog_id(user)
+      def confirm_body = t(@mail_ready ? ".confirm_body" : ".confirm_body_no_mail", name: name, provider: provider)
       def url = helpers.sso_link_admin_user_path(user, **url_options)
     end
   end

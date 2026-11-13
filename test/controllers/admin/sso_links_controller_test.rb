@@ -46,6 +46,23 @@ class Admin::SsoLinksControllerTest < ActionDispatch::IntegrationTest
     assert_select "[data-zone=sso]", count: 0
   end
 
+  test "without mail the dialog and the toast promise no mail, and none is queued" do
+    put_mail_state(:not_set_up)
+    sign_in_as users(:one)
+
+    get "/cs-studio/users/#{@user.id}/edit"
+    assert_includes CGI.unescapeHTML(response.body), "Mail isn't set up, so they get no mail to set a password until it is."
+    assert_not_includes response.body, "They get a mail to set a password here."
+
+    assert_no_enqueued_emails do
+      delete "/cs-studio/users/#{@user.id}/sso_link"
+    end
+    assert_not @user.reload.sso_linked?
+    follow_redirect!
+    assert_includes CGI.unescapeHTML(response.body), "reader@example.com is unlinked from id.example.com. Mail isn't set up, so no mail was sent: set up mail, then ask them to request a password reset."
+    assert_not_includes response.body, "A mail to set a password is on its way."
+  end
+
   test "an admin who is no owner is refused and nothing changes" do
     sign_in_manager
 

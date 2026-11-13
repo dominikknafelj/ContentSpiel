@@ -82,8 +82,10 @@ en:
           trigger: "Unlink…"
           title: "Unlink %{name} from %{provider}?"
           confirm_body: "%{name} can no longer sign in with %{provider}, and is signed out everywhere. They get a mail to set a password here."
+          confirm_body_no_mail: "%{name} can no longer sign in with %{provider}, and is signed out everywhere. Mail isn't set up, so they get no mail to set a password until it is."
           confirm: "Unlink"
           unlinked: "%{name} is unlinked from %{provider}. A mail to set a password is on its way."
+          unlinked_no_mail: "%{name} is unlinked from %{provider}. Mail isn't set up, so no mail was sent: set up mail, then ask them to request a password reset."
           provider_fallback: "single sign-on"
     invites:
       sent: "Invite sent to %{email}."

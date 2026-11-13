@@ -7,7 +7,7 @@
 <% end %>
 
 <%# After the user's form, never inside it (forms don't nest). Not destructive: the confirm is the primary button. %>
-<%= render Admin::Ui::ConfirmDialogComponent.new(id: dialog_id, title: t(".title", name: name, provider: provider), body: t(".confirm_body", name: name, provider: provider)) do |dialog| %>
+<%= render Admin::Ui::ConfirmDialogComponent.new(id: dialog_id, title: t(".title", name: name, provider: provider), body: confirm_body) do |dialog| %>
   <% dialog.with_confirm_action do %>
     <%= form_with url: url, method: :delete, data: { turbo_frame: "_top" } do %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".confirm"), variant: :primary, type: "submit") %>

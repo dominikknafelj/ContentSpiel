@@ -14,17 +14,24 @@ class Sso::UnlinkTest < ActiveSupport::TestCase
     put_mail_state(:working)
   end
 
-  def unlink(actor:, user: @user, channel: :admin) = as(actor, channel:) { Sso::Unlink.call(user, actor:, origin: "http://localhost:3000") }
+  def unlink(actor:, user: @user, channel: :admin) = unlinking(actor:, user:, channel:).first
+
+  # The result and the service, which says whether it queued the mail.
+  def unlinking(actor:, user: @user, channel: :admin)
+    service = Sso::Unlink.new(user, actor:, origin: "http://localhost:3000")
+    [ as(actor, channel:) { service.call }, service ]
+  end
 
   def queued = { fingerprint: MailSettings.current.fingerprint }
 
   test "an owner unlinks: the columns clear, every session ends as sso_unlinked, sso.unlinked is recorded and the reset mail is queued" do
-    result = nil
+    result = service = nil
     assert_enqueued_email_with PasswordsMailer, :reset, params: queued, args: [ @user, { origin: "http://localhost:3000" } ] do
-      result = unlink(actor: users(:one))
+      result, service = unlinking(actor: users(:one))
     end
 
     assert result.ok?, result.errors.inspect
+    assert service.mailed?
     @user.reload
     assert_equal [ nil, nil, nil ], @user.values_at(:sso_issuer, :sso_subject, :sso_linked_at)
     assert_empty @user.sessions
@@ -72,11 +79,13 @@ class Sso::UnlinkTest < ActiveSupport::TestCase
     assert_equal events, Audit::Event.count
   end
 
-  test "without mail ready the link still goes, and no mail is queued" do
+  test "without mail ready the link still goes, no mail is queued, and the service says so" do
     put_mail_state(:not_set_up)
 
     assert_no_enqueued_emails do
-      assert unlink(actor: users(:one)).ok?
+      result, service = unlinking(actor: users(:one))
+      assert result.ok?
+      assert_not service.mailed?
     end
     assert_not @user.reload.sso_linked?
   end
