@@ -42,9 +42,8 @@ module Sso
   # an existing link records nothing here (the session's `session.created`
   # is the controller's).
   #
-  # THE ANSWER says whether this call made the account from an invitation
-  # (`accepted_invitation?`), which is what the callback's "Your account is
-  # ready." toast reads.
+  # THE ANSWER is an `Answer`, a Result that also says whether this call made
+  # the account from an invitation (`accepted_invitation?`).
   #
   # RACES. Two callbacks of one person at once, or a subject linked by
   # another request between step 1 and a link: `Sso::Link` locks the
@@ -54,6 +53,18 @@ module Sso
   # made once more from step 1, which then finds what won.
   class Admit < ApplicationService
     # authorize: none (the provider's verified identity is the credential, as an invitation's token is)
+
+    # The Result of `match`, with the one fact the callback's "Your account is
+    # ready." toast reads and no other service has: whether this call made
+    # the account from an invitation. It answers everything a Result does.
+    class Answer < SimpleDelegator
+      def initialize(result, accepted_invitation:)
+        super(result)
+        @accepted_invitation = accepted_invitation
+      end
+
+      def accepted_invitation? = @accepted_invitation
+    end
 
     NO_ACCOUNT, EMAIL_UNVERIFIED, OWNER = SignIn::Oidc::ACCOUNT_REASONS
     MISMATCH = :mismatch
@@ -73,7 +84,8 @@ module Sso
     def call
       outcome = match
       outcome = match if outcome == AGAIN
-      outcome == AGAIN ? refuse(NO_ACCOUNT) : outcome
+      outcome = refuse(NO_ACCOUNT) if outcome == AGAIN
+      Answer.new(outcome, accepted_invitation: @accepted_invitation == true)
     end
 
     private
@@ -118,7 +130,7 @@ module Sso
     # lapsed or was withdrawn meanwhile is no invitation.
     def accept(invitation)
       result = Invitations::AcceptWithSso.call(invitation, identity: @identity)
-      return success(result.record, accepted_invitation: true) if result.ok?
+      return success(result.record).tap { @accepted_invitation = true } if result.ok?
 
       result.errors == [ Invitations::Acceptance::USED ] ? AGAIN : refuse(NO_ACCOUNT)
     end
