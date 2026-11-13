@@ -39,7 +39,7 @@ module Sso
         ended = @user.sessions.destroy_each_locked
         # No snapshot: the link is the event's own.
         record_event("session.ended", subject: @user, metadata: { "reason" => "sso_unlinked", "count" => ended }, snapshot: nil) if ended.positive?
-        record_event("sso.unlinked", subject: @user, metadata: { "issuer_host" => URI.parse(issuer).host }, snapshot: nil)
+        record_event("sso.unlinked", subject: @user, metadata: { "issuer_host" => SignIn::Oidc.issuer_host(issuer) }, snapshot: nil)
         true
       end
       return failure(@user, [ self.class.not_linked(@user) ]) unless unlinked

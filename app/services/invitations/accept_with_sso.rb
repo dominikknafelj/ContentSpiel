@@ -39,7 +39,8 @@ module Invitations
       return failure(@invitation, [ USED ]) if @invitation.used?
 
       user = build_user
-      outcome = accept_into(user) do
+      outcome = accept_into(user) do |group_ids|
+        record_event("invitation.accepted", subject: @user, field_changes: accepted_changes(group_ids), metadata: { "invitation_id" => @invitation.id })
         record_event("sso.linked", subject: user, snapshot: nil, metadata: {
           "via" => "invitation", "issuer_host" => @identity.issuer_host, "passkeys_removed" => 0, "recovery_codes_removed" => 0
         })

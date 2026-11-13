@@ -171,6 +171,52 @@ class Sso::AdmitTest < ActiveSupport::TestCase
     assert_equal invitation.reload.user, result.record
   end
 
+  test "a start from an invitation that has lapsed is no invitation" do
+    invitation = open_invitation("dana@example.com", sent_at: (Invitation::VALID_FOR + 1.day).ago)
+
+    result = admit(identity(subject: "sub-dana", email: "dana@example.com"), invitation: invitation)
+
+    assert_equal [ "no_account" ], result.errors
+    assert_not User.exists?(email_address: "dana@example.com")
+    assert invitation.reload.open?
+    assert_equal "no_account", refusals.sole.metadata["reason"]
+  end
+
+  test "a start from an invitation whose address now has an unlinked account links that account, as a sign-in" do
+    invitation = open_invitation("dana@example.com")
+    dana = as(nil) { User.create!(email_address: "dana@example.com", password: "a-long-password-1") }
+
+    result = admit(identity(subject: "sub-dana", email: "dana@example.com"), invitation: invitation)
+
+    assert result.ok?, result.errors.inspect
+    assert_equal dana, result.record
+    assert_equal "sub-dana", dana.reload.sso_subject
+    assert_equal "sign_in", Audit::Event.find_by!(action: "sso.linked").metadata["via"]
+    assert_empty Audit::Event.where(action: "invitation.accepted")
+  end
+
+  test "a start from an invitation for an owner's address is refused as owner" do
+    invitation = Invitation.create!(email_address: "one@example.com", sent_at: Time.current, inviter: users(:one))
+
+    result = admit(identity(email: "one@example.com"), invitation: invitation)
+
+    assert_equal [ "owner" ], result.errors
+    assert_not users(:one).reload.sso_linked?
+    assert users(:one).authenticate("password")
+    assert_equal "owner", refusals.sole.metadata["reason"]
+  end
+
+  test "a password that cannot be cleared is no refusal: it raises, nothing is linked and nothing is refused" do
+    with_singleton_override(Users::UpdatePassword, :call, ->(*, **) { ApplicationService::Result.failure(nil, [ "Password could not be saved" ]) }) do
+      assert_raises(Sso::Link::NotCleared) { admit(identity) }
+    end
+
+    assert_not users(:reader).reload.sso_linked?
+    assert users(:reader).authenticate("password")
+    assert_empty refusals
+    assert_empty Audit::Event.where(action: "sso.linked")
+  end
+
   test "an identity whose subject another account took meanwhile signs into that account, and the email's account stays unlinked" do
     users(:two).update_columns(sso_issuer: ISSUER, sso_subject: "sub-1", sso_linked_at: 1.day.ago) # version: none (a test's setup)
     # The first look by subject misses, as it would have a moment before the

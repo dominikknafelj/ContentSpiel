@@ -91,6 +91,17 @@ class Sso::LinkTest < ActiveSupport::TestCase
     assert_empty Audit::Event.where(action: %w[sso.linked user.updated session.ended])
   end
 
+  test "a password that cannot be cleared raises, rolls back whole, and leaves the caller's account unlinked in memory" do
+    with_singleton_override(Users::UpdatePassword, :call, ->(*, **) { ApplicationService::Result.failure(nil, [ "Password could not be saved" ]) }) do
+      assert_raises(Sso::Link::NotCleared) { link }
+    end
+
+    assert_not @user.sso_linked?, "the object the caller holds was read again"
+    assert_nil @user.sso_issuer
+    assert_not @user.reload.sso_linked?
+    assert_empty Audit::Event.where(action: "sso.linked")
+  end
+
   test "an unknown via is a mistake of the caller's" do
     assert_raises(ArgumentError) { link(via: "console") }
   end

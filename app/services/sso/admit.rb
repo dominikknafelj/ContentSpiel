@@ -25,7 +25,7 @@ module Sso
   # account is its subject's: the provider vouches for an email, but anyone
   # its directory lets register an address (a second user given the same
   # alias, a recycled mailbox, another tenant of a shared provider) would
-  # otherwise take over an account someone else already holds by subject
+  # otherwise take over an account someone else already holds by subject.
   # So an email finds an account only the first time, and
   # every later sign-in is by subject alone, which is also how a person whose
   # address changed at the provider still signs in.
@@ -51,6 +51,7 @@ module Sso
   class Admit < ApplicationService
     # authorize: none (the provider's verified identity is the credential, as an invitation's token is)
 
+    NO_ACCOUNT, EMAIL_UNVERIFIED, OWNER = SignIn::Oidc::ACCOUNT_REASONS
     MISMATCH = :mismatch
     EMAIL_LIMIT = 254
     # A link or an acceptance lost a race: match again.
@@ -68,40 +69,43 @@ module Sso
     def call
       outcome = match
       outcome = match if outcome == AGAIN
-      outcome == AGAIN ? refuse("no_account") : outcome
+      outcome == AGAIN ? refuse(NO_ACCOUNT) : outcome
     end
 
     private
 
     def match
       linked = User.linked_to(issuer: @identity.issuer, subject: @identity.subject).first
-      return linked.owner? ? refuse("owner") : success(linked) if linked
-      return refuse("email_unverified") unless @identity.email_verified == true
+      return linked.owner? ? refuse(OWNER) : success(linked) if linked
+      return refuse(EMAIL_UNVERIFIED) unless @identity.email_verified == true
 
       email = User.normalize_value_for(:email_address, @identity.email.to_s)
-      return refuse("no_account") if email.blank?
+      return refuse(NO_ACCOUNT) if email.blank?
       return failure(nil, [ MISMATCH, email ]) if @invitation && @invitation.email_address != email
 
       account = User.find_by(email_address: email)
       return link(account) if account
 
       invitation = Invitation.open.find_by(email_address: email)
-      return refuse("no_account") if invitation.nil? || invitation.expired?
+      return refuse(NO_ACCOUNT) if invitation.nil? || invitation.expired?
 
       accept(invitation)
     end
 
     def link(account)
-      return refuse("owner") if account.owner?
-      return refuse("no_account") if account.sso_linked?
+      return refuse(OWNER) if account.owner?
+      return refuse(NO_ACCOUNT) if account.sso_linked?
 
-      result = Link.call(account, identity: @identity, via: @invitation ? "invitation" : "sign_in")
+      # An email's link is a sign-in's, a start from an invitation's too: only
+      # an accepted invitation is linked `via: "invitation"`.
+      result = Link.call(account, identity: @identity, via: "sign_in")
       return success(result.record) if result.ok?
 
       case result.errors
-      when [ Link::OWNER ] then refuse("owner")
+      when [ Link::OWNER ] then refuse(OWNER)
       when [ Link::RACED ] then AGAIN
-      else refuse("no_account")
+      when [ Link::LINKED ] then refuse(NO_ACCOUNT)
+      else result
       end
     end
 
@@ -112,7 +116,7 @@ module Sso
       result = Invitations::AcceptWithSso.call(invitation, identity: @identity)
       return success(result.record) if result.ok?
 
-      result.errors == [ Invitations::Acceptance::USED ] ? AGAIN : refuse("no_account")
+      result.errors == [ Invitations::Acceptance::USED ] ? AGAIN : refuse(NO_ACCOUNT)
     end
 
     def refuse(reason)

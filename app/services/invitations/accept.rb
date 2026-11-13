@@ -49,7 +49,6 @@ module Invitations
     include Users::LeakedPasswordRule
 
     # authorize: none (the invitation token is the credential: a token that finds an open invitation is the right to make that one account, and the service acts as the account it makes, as the reset flow does)
-    # audit: none (not here but in Invitations::Acceptance#accept_into, which #call runs: invitation.accepted, as the new account, in the account's transaction)
 
     def initialize(token:, name:, password:, password_confirmation:)
       @token = token.to_s
@@ -66,7 +65,11 @@ module Invitations
       user = build_user
       return refused(user) if user.errors.any?
 
-      case accept_into(user)
+      outcome = accept_into(user) do |group_ids|
+        record_event("invitation.accepted", subject: @user, field_changes: accepted_changes(group_ids), metadata: { "invitation_id" => @invitation.id })
+      end
+
+      case outcome
       when :accepted then success(@user)
       when USED then failure(@invitation, [ USED ])
       else refused(user)

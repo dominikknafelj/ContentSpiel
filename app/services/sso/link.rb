@@ -28,6 +28,12 @@ module Sso
   # holds is refused by the unique index on (issuer, subject), the whole
   # transaction rolled back (`[:raced]`): the caller looks again and finds
   # that account.
+  #
+  # A password that cannot be cleared is no refusal of the identity: it
+  # raises `NotCleared` (`Users::UpdatePassword`'s sentences, which carry no
+  # value) and the transaction rolls back whole, so it is never told as
+  # "no invited account". Either way the account object the caller holds is
+  # read again, holding no link that was rolled back.
   class Link < ApplicationService
     # authorize: none (called by Sso::Admit once the provider's verified identity matched this account; the identity is the credential and the service acts as the account it proves)
 
@@ -36,6 +42,8 @@ module Sso
     OWNER = :owner
     LINKED = :linked
     RACED = :raced
+
+    class NotCleared < StandardError; end
 
     def initialize(user, identity:, via:, actor: user)
       raise ArgumentError, "via is one of #{VIA.join(", ")}, not #{via.inspect}" unless VIA.include?(via)
@@ -57,7 +65,7 @@ module Sso
 
         @user.assign_attributes(sso_issuer: @identity.issuer, sso_subject: @identity.subject, sso_linked_at: Time.current)
         cleared = Users::UpdatePassword.call(@user, clear: true, keep_acting_session: false, actor: actor)
-        raise ActiveRecord::Rollback unless cleared.ok?
+        raise NotCleared, "the password of user #{@user.id} was not cleared: #{cleared.errors.join(" ")}" unless cleared.ok?
 
         passkeys = Passkey.where(user_id: @user.id).delete_all # version: none (passkeys are on no public page)
         codes = RecoveryCode.where(user_id: @user.id).delete_all # version: none (recovery codes are on no public page)
@@ -69,12 +77,14 @@ module Sso
 
       case outcome
       when :done, :already then success(@user)
-      when OWNER, LINKED then failure(@user, [ outcome ])
-      else failure(@user)
+      else failure(@user, [ outcome ])
       end
     rescue ActiveRecord::RecordNotUnique
       @user.reload
       failure(@user, [ RACED ])
+    rescue NotCleared
+      @user.reload
+      raise
     end
   end
 end

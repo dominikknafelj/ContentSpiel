@@ -779,6 +779,10 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "Single sign-on refused an unnamed account: no invited account", refused.call("reason" => "no_account")
   end
 
+  test "every account reason of single sign-on has its words, and no other" do
+    assert_equal SignIn::Oidc::ACCOUNT_REASONS.sort, Audit::Sentence::SSO_REFUSALS.keys.sort
+  end
+
   test "sso.unlinked names the person unlinked" do
     assert_equal "You unlinked “two@example.com” from single sign-on", read(sentence_for(account_event("sso.unlinked", metadata: { "issuer_host" => "id.example.com" })))
   end

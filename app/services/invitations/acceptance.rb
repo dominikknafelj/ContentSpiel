@@ -7,10 +7,11 @@ module Invitations
   # `accept_into(user)` locks the invitation's row and asks `used?` again
   # under the lock, so of two presses at once the second reads USED. It then
   # saves the account (the save validates again), puts it in the
-  # invitation's groups, marks the invitation accepted and records
-  # `invitation.accepted` as the new account, its actor and its subject at
-  # once. A block given runs last, inside the same transaction and as the new
-  # account, for what one way adds (the link's own event). It answers
+  # invitation's groups and marks the invitation accepted. From then on the
+  # service acts as the new account, and the block, which every caller
+  # gives, runs inside the same transaction with the group ids: the caller
+  # records `invitation.accepted` there (`#accepted_changes` are its
+  # changes), and whatever its way adds (the link's own event). It answers
   # `:accepted`, USED, or `:invalid` when the save refuses the account (the
   # account's `errors` then say why). A row withdrawn meanwhile raises
   # `ActiveRecord::RecordNotFound` from the lock, and an account made for the
@@ -35,13 +36,17 @@ module Invitations
         # `after_commit` drops the memoised grants.
         group_ids.each { |group_id| AccessControl::Membership.create!(user: @user, group_id: group_id) }
         @invitation.update!(accepted_at: Time.current, user: @user)
-
-        changes = Audit::Snapshot.field_changes_for(@user)
-        changes["group_ids"] = [ [], group_ids ] if group_ids.any?
-        record_event("invitation.accepted", subject: @user, field_changes: changes, metadata: { "invitation_id" => @invitation.id })
-        yield if block_given?
+        yield group_ids
         :accepted
       end
+    end
+
+    # `invitation.accepted`'s changes: the new account's fields, and the
+    # groups it was put in.
+    def accepted_changes(group_ids)
+      changes = Audit::Snapshot.field_changes_for(@user)
+      changes["group_ids"] = [ [], group_ids ] if group_ids.any?
+      changes
     end
   end
 end

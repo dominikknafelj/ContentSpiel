@@ -13,8 +13,7 @@ module SignIn
 
       def as_json(*) = { "issuer" => issuer, "subject" => subject }
 
-      # The issuer's host, which the audit log names the provider by.
-      def issuer_host = URI.parse(issuer.to_s).host
+      def issuer_host = SignIn::Oidc.issuer_host(issuer)
     end
   end
 end
