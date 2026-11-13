@@ -40,10 +40,15 @@ module SignIn
     # - `exp` is a number not more than LEEWAY in the past, and `iat` a
     #   number not more than LEEWAY in the future: LEEWAY is the clock skew
     #   between this server and the provider's that a token is allowed;
-    # - `iat` is not more than MAX_AGE plus LEEWAY in the past: a token is
-    #   used the moment the token endpoint issues it, so an old one is a
-    #   replay, whatever its `exp` says (a provider may give an ID token a
-    #   lifetime of hours);
+    # - at sign-in, `iat` is not more than MAX_AGE plus LEEWAY in the past: a
+    #   token is used the moment the token endpoint issues it, so an old one
+    #   is a replay, whatever its `exp` says (a provider may give an ID token
+    #   a lifetime of hours). The refresh passes `age_limit: nil`: OpenID
+    #   Connect Core 12.2 asks for a new `iat`, but a provider that repeats
+    #   the sign-in's token would otherwise fail every re-check, and every
+    #   session would end at its grace for no reason a person can see. A
+    #   refreshed token is still held to `exp`, `iss`, `aud`, `sub` and its
+    #   signature, and the re-check compares its `sub` with the account's;
     # - `nonce` is the kept one, compared with `secure_compare`, unless the
     #   caller passes NONCE_NOT_CHECKED (the refresh, which keeps no nonce).
     #
@@ -73,13 +78,13 @@ module SignIn
 
       # The verified claims, a Hash of string keys; raises `Refused`, or
       # `Unavailable` when the provider's keys cannot be read.
-      def self.verify(token, provider:, nonce:)
+      def self.verify(token, provider:, nonce:, age_limit: MAX_AGE)
         unless nonce == NONCE_NOT_CHECKED || (nonce.is_a?(String) && !nonce.empty?)
           raise ArgumentError, "nonce: is the kept nonce, or NONCE_NOT_CHECKED"
         end
 
         claims = signed_claims(token, provider)
-        check_claims(claims, provider: provider, nonce: nonce)
+        check_claims(claims, provider: provider, nonce: nonce, age_limit: age_limit)
         claims
       end
 
@@ -119,7 +124,7 @@ module SignIn
         end
       end
 
-      def self.check_claims(claims, provider:, nonce:)
+      def self.check_claims(claims, provider:, nonce:, age_limit:)
         now = Time.current.to_i
         raise Refused unless claims["iss"].is_a?(String) && claims["iss"] == provider.issuer
 
@@ -132,7 +137,7 @@ module SignIn
 
         raise Refused unless claims["exp"].is_a?(Numeric) && claims["exp"] > now - LEEWAY.to_i
         raise Refused unless claims["iat"].is_a?(Numeric) && claims["iat"] <= now + LEEWAY.to_i
-        raise Refused if claims["iat"] < now - (MAX_AGE + LEEWAY).to_i
+        raise Refused if age_limit && claims["iat"] < now - (age_limit + LEEWAY).to_i
 
         return if nonce == NONCE_NOT_CHECKED
 

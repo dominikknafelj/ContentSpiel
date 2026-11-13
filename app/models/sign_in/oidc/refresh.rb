@@ -25,7 +25,9 @@ module SignIn
     # The refreshed ID token is verified with no nonce
     # (`IdToken::NONCE_NOT_CHECKED`): the re-check keeps none, and OpenID
     # Connect Core 12.2 lets the provider leave it out or repeat the
-    # sign-in's.
+    # sign-in's. Nor with the sign-in's age limit (`age_limit: nil`): a
+    # provider that repeats the sign-in's whole token would otherwise fail
+    # every re-check (`IdToken` says what is still checked).
     #
     # Neither token reaches a span, a log line or the `Result`'s `inspect`.
     class Refresh
@@ -75,7 +77,7 @@ module SignIn
           id_token = body["id_token"]
           unless id_token.nil?
             return unavailable(span, "not_json") unless id_token.is_a?(String)
-            return revoked if IdToken.verify(id_token, provider: provider, nonce: IdToken::NONCE_NOT_CHECKED)["sub"] != subject
+            return revoked if IdToken.verify(id_token, provider: provider, nonce: IdToken::NONCE_NOT_CHECKED, age_limit: nil)["sub"] != subject
           end
 
           Result.new(status: :ok, refresh_token: rotated || refresh_token)
