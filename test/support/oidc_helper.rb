@@ -88,6 +88,21 @@ module OidcHelper
     Rails.cache = cache if cache
   end
 
+  # The SSO_* variables of a provider no test talks to (the issuer is never
+  # read): for a rule that asks only whether single sign-on is configured,
+  # or required.
+  def with_sso(required: false, &)
+    with_sign_in_env({ "SSO_ISSUER" => "https://id.example.com/oauth2", "SSO_CLIENT_ID" => CLIENT_ID, "SSO_CLIENT_SECRET" => CLIENT_SECRET,
+      "SSO_NAME" => NAME, "SSO_REQUIRED" => required ? "1" : nil }, &)
+  end
+
+  # `user` linked to a provider's subject, as `Sso::Link` leaves it, without
+  # the rest of the link (its password stays the one it had).
+  def link_to_sso(user, subject: "sub-#{user.id}")
+    user.update_columns(sso_issuer: "https://id.example.com/oauth2", sso_subject: subject, sso_linked_at: Time.current) # version: none (a test's setup)
+    user
+  end
+
   class FakeIdp
     Request = Data.define(:method, :path, :params, :headers)
 

@@ -13,6 +13,12 @@ module RecoveryCodes
   # every sign-in would ask for one and spend it. Read under the row lock,
   # so a passkey removed at the same moment cannot leave a fresh set behind.
   #
+  # Never for a linked account (single sign-on): its provider is its second
+  # factor (`SignInRules`), and `Sso::Link` deleted its passkeys and codes.
+  # Refused as a stranger's is; a link landing meanwhile is caught by the
+  # passkey check under the lock, since the link deletes the passkeys under
+  # the same row lock.
+  #
   # `recovery_codes.generated` carries how many unused codes the new set
   # replaced, never a code or a digest.
   class Generate < ApplicationService
@@ -27,6 +33,7 @@ module RecoveryCodes
       # Never a token: it acts for its user within a group and has no
       # business with the account's sign-in.
       return denied("users.manage", @user) unless actor.is_a?(User) && actor == @user
+      return denied("users.manage", @user) if @user.sso_linked?
 
       codes = RecoveryCode.transaction do
         # The account's row lock: two sets made at once would leave the

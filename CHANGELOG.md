@@ -39,6 +39,7 @@
 - The new top-level names `Passkey`, `RecoveryCode`, `Passkeys`, `RecoveryCodes` and `PasskeyChallenges` refuse a gem's `ContentSpiel::Plugins` hook owner of the same name (`passkey`, `recovery_code`, `passkeys`, `recovery_codes`, `passkey_challenges`) at boot. A gem with such an owner renames it.
 - A new top-level name, `HostRouteConstraint` (`app/constraints/host_route_constraint.rb`): a gem whose hook owner has that name is refused at boot.
 - A new top-level name, `SignInMethods` (`app/models/sign_in_methods.rb`): a gem whose hook owner is `sign_in_methods` is refused at boot.
+- A new top-level name, `SignInRules` (`app/models/sign_in_rules.rb`): a gem whose hook owner is `sign_in_rules` is refused at boot.
 
 ### Removed
 

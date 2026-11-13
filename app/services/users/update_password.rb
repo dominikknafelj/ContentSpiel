@@ -62,6 +62,10 @@ module Users
   # sessions ended as for any change). Sign-in is not opened afterwards
   # (`SignIn::Throttle#clear`): nobody can type the new password, so a bucket
   # held closed keeps out nobody who could otherwise get in.
+  #
+  # A linked account's password is refused otherwise, its own included
+  # (`OwnerProtection#sso_linked_password_refusal`): it signs in through its
+  # provider alone, and the console's way back is `Sso::Unlink`.
   class UpdatePassword < ApplicationService
     include OwnerProtection
     include LeakedPasswordRule
@@ -87,6 +91,7 @@ module Users
         return owner_only_denial if owner_protected?
         return denied("users.manage", @user) if outranked?
       end
+      return sso_linked_password_refusal if @user.sso_linked? && !@clear
 
       if @clear
         @user.password = User.unusable_password

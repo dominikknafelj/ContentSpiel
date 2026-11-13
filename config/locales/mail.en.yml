@@ -19,6 +19,15 @@ en:
       intro: "Someone asked to reset the password for your account on %{site}. Use this link within %{minutes} minutes:"
       button: "Reset password"
       outro: "If this wasn't you, ignore this mail. Your password stays the same."
+    # The reset request's answer for an account that signs in through the
+    # provider alone (`PasswordsMailer#sso_reminder`): %{provider} is
+    # SSO_NAME. It carries no reset link, only the sign-in page.
+    sso_reminder:
+      subject: "Sign in to %{site} with %{provider}"
+      intro: "Someone asked to reset the password of your account on %{site}."
+      body: "Your account signs in with %{provider}, so it has no password here. Sign in with %{provider} on the sign-in page."
+      button: "Open the sign-in page"
+      ignore: "If you didn't ask, you can ignore this mail."
     # The mail to an account whose sign-in a run of failed attempts paused
     # (`SignInMailer#locked`): %{count} is the pause's minutes, %{time} when
     # the attempt that paused it came, in the site's zone, %{address} the

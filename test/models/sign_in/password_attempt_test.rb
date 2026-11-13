@@ -28,9 +28,10 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
     @throttle = SignIn::Throttle.new(store: @store)
   end
 
-  def attempt(email: EMAIL, password: "wrong", address: ADDRESS, token: nil, throttle: @throttle, bot_check: SignIn::BotCheck.current)
+  def attempt(email: EMAIL, password: "wrong", address: ADDRESS, token: nil, throttle: @throttle, bot_check: SignIn::BotCheck.current, allowed: nil)
+    options = { allowed: allowed }.compact
     SignIn::PasswordAttempt.new(email: email, password: password, address: address, hostname: HOSTNAME,
-      bot_check_token: token, throttle: throttle, bot_check: bot_check).call
+      bot_check_token: token, throttle: throttle, bot_check: bot_check, **options).call
   end
 
   # How many times the block hashes a password (a check, or the hash
@@ -72,6 +73,59 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
     assert_equal :refused, fifth.status
     assert_equal [ Trip.new(bucket: :account, level: 0, seconds: 60) ], fifth.trips
     assert_equal SignIn::Outcome.new(status: :locked, account: nil, trips: [ Trip.new(bucket: :account, level: 0, seconds: 60) ], bot_check_due: false), attempt
+  end
+
+  # REFUSALS BY RULE (`SignInRules`): a right password for an account the
+  # rule refuses is a wrong one in every way the attempt shows.
+  def by_rule(**options) = attempt(allowed: SignInRules.method(:password_allowed?), **options)
+
+  test "under SSO_REQUIRED a non-owner's right password is refused like a wrong one, and counts in the account's bucket" do
+    with_sso(required: true) do
+      wrong = nil
+      right = nil
+      assert_equal 1, hashes { wrong = by_rule }
+      assert_equal 1, hashes { right = by_rule(password: PASSWORD) }
+
+      assert_equal wrong, right
+      assert_equal SignIn::Outcome.new(status: :refused, account: nil, trips: [], bot_check_due: false), right
+      assert_equal 2, count_of(:account)
+
+      2.times { by_rule(password: PASSWORD) }
+      assert_equal [ Trip.new(bucket: :account, level: 0, seconds: 60) ], by_rule(password: PASSWORD).trips, "the fifth right password closes the bucket as a wrong one would"
+    end
+  end
+
+  test "an owner's right password still signs in under SSO_REQUIRED" do
+    @user.update_columns(owner: true) # version: none (a test's setup)
+
+    with_sso(required: true) do
+      outcome = by_rule(password: PASSWORD)
+      assert_equal :ok, outcome.status
+      assert_equal @user, outcome.account
+    end
+  end
+
+  test "a linked account's password is refused, required or not" do
+    link_to_sso(@user)
+    # The password a person could type (the console's, or one set before the
+    # link), so the refusal is the rule's and not a digest nobody holds.
+    @user.update_column(:password_digest, BCrypt::Password.create(PASSWORD, cost: BCrypt::Engine::MIN_COST)) # version: none (a test's setup)
+
+    assert_equal :refused, by_rule(password: PASSWORD).status
+    with_sso { assert_equal :refused, by_rule(password: PASSWORD).status }
+    with_sso(required: true) { assert_equal :refused, by_rule(password: PASSWORD).status }
+    assert_equal :ok, attempt(password: PASSWORD).status, "without the rule the same password signs in: the digest is the typed one"
+  end
+
+  test "a refusal by rule says nothing in the span that a wrong password does not" do
+    with_sso(required: true) do
+      wrong = spans_of { by_rule }.find { it.name == "auth.sign_in" }.attributes
+      right = spans_of { by_rule(password: PASSWORD) }.find { it.name == "auth.sign_in" }.attributes
+
+      assert_equal wrong, right
+      assert_equal "refused", right["auth.outcome"]
+      assert_equal true, right["auth.account_exists"]
+    end
   end
 
   test "a right password for an account with a second factor is second_factor_required, keeps the account's count and gives the address's back" do

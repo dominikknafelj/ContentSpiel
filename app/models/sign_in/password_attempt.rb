@@ -32,6 +32,14 @@ module SignIn
   #    reservation wrote, but the account's (or the device's) count stands
   #    until the second proof (`SignIn::Proof`) succeeds, so the password
   #    alone never clears a run nor signs anyone in.
+  # 5. A right password for an account the caller's rule refuses (`allowed:`,
+  #    `SignInRules.password_allowed?`: a linked account, a non-owner under
+  #    SSO_REQUIRED) is a wrong one: `:refused`, its count left standing in
+  #    the account's bucket as the reservation made it, after the same
+  #    `authenticate_by`. The account is dropped before `auth.account_exists`
+  #    is asked, so that is asked by the same query as for a wrong password,
+  #    and the span says `refused` and nothing of why: neither the answer,
+  #    the bucket, the work nor the span tells the rule from a wrong password.
   #
   # The email and the password reach `authenticate_by` as Strings, a list or
   # a hash as "", so a junk parameter is refused as any wrong address is and
@@ -53,8 +61,10 @@ module SignIn
   class PasswordAttempt
     attr_reader :address
 
-    # `device`: the `KnownDevice` the browser carries, or nil.
-    def initialize(email:, password:, address:, hostname:, bot_check_token:, device: nil, accounts: User, throttle: SignIn::Throttle.new, bot_check: SignIn::BotCheck.current)
+    # `device`: the `KnownDevice` the browser carries, or nil. `allowed`:
+    # whether an account whose password is right may sign in with it.
+    def initialize(email:, password:, address:, hostname:, bot_check_token:, device: nil, accounts: User, throttle: SignIn::Throttle.new,
+      bot_check: SignIn::BotCheck.current, allowed: ->(_account) { true })
       @email = email
       @device = device
       @password = password
@@ -64,6 +74,7 @@ module SignIn
       @accounts = accounts
       @throttle = throttle
       @bot_check = bot_check
+      @allowed = allowed
     end
 
     # The email as it is looked up: the String typed, or "" for anything
@@ -101,6 +112,7 @@ module SignIn
 
       password = @password.is_a?(String) ? @password : ""
       account = @accounts.authenticate_by(email_address: email, password: password)
+      account = nil if account && !@allowed.call(account)
       Telemetry.record(span, "auth.account_exists" => account.present? || @accounts.exists?(email_address: email)) unless password.empty?
       return outcome(:refused, trips: reservation.closes) unless account
 

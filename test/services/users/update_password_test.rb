@@ -293,4 +293,28 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     assert_equal 2, owner.passkeys.count
     assert_not Audit::Event.exists?(action: "passkey.removed")
   end
+
+  test "a password for a linked account is refused with the sentence, its own or a manager's; clearing it is not" do
+    user = link_to_sso(users(:reader))
+    digest = user.password_digest
+
+    [ user, users(:one) ].each do |actor|
+      target = actor == user ? user : User.find(user.id)
+      result = as(actor) { change(target, actor: actor) }
+      assert_not result.ok?, actor.email_address
+      assert_equal [ "This account signs in with id.example.com and has no password here." ], result.errors
+    end
+    assert_equal digest, user.reload.password_digest
+    assert_not Audit::Event.exists?(action: "user.updated")
+
+    assert as(user) { Users::UpdatePassword.call(user, clear: true, keep_acting_session: false, actor: user) }.ok?
+  end
+
+  test "a refusal of a linked account asks the authorization first: a stranger learns no link" do
+    user = link_to_sso(users(:reader))
+
+    result = as(users(:author)) { change(user, actor: users(:author)) }
+
+    assert result.denied?
+  end
 end

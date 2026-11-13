@@ -23,6 +23,11 @@ module Invitations
   #               whose address has had an account made for it since (the
   #               New user form): either way the person signs in. `record` is
   #               the invitation.
+  #   [:sso_required]  SSO_REQUIRED is set (`SignIn::Oidc.required?`): an
+  #               invited person accepts through the provider
+  #               (`Invitations::AcceptWithSso`), never with a password.
+  #               Answered before the token is read, so it is the one answer
+  #               for every token and says nothing of any; `record` is nil.
   # Any other failure is the form's: `errors` are the new user's sentences (a
   # blank, short or unconfirmed password; a name too long), `record` is the
   # invitation, still open, whose `errors` hold the same sentences by the
@@ -50,6 +55,8 @@ module Invitations
 
     # authorize: none (the invitation token is the credential: a token that finds an open invitation is the right to make that one account, and the service acts as the account it makes, as the reset flow does)
 
+    SSO_REQUIRED = :sso_required
+
     def initialize(token:, name:, password:, password_confirmation:)
       @token = token.to_s
       @name = name
@@ -58,6 +65,8 @@ module Invitations
     end
 
     def call
+      return failure(nil, [ SSO_REQUIRED ]) if SignIn::Oidc.required?
+
       @invitation = Invitation.find_by_token_for(:accept, @token)
       return failure(nil, [ EXPIRED ]) if @invitation.nil?
       return failure(@invitation, [ USED ]) if @invitation.used?

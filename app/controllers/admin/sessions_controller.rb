@@ -130,7 +130,7 @@ module Admin
         email: params[:email_address], password: params[:password],
         address: request.remote_ip, hostname: request.host,
         bot_check_token: params["cf-turnstile-response"],
-        device: known_device
+        device: known_device, allowed: SignInRules.method(:password_allowed?)
       )
       outcome = attempt.call
 
