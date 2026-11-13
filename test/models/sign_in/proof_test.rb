@@ -145,7 +145,7 @@ class SignIn::ProofTest < ActiveSupport::TestCase
 
   test "a passkey proof finds only the account's own passkeys" do
     client = fake_authenticator
-    check = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party(client))
+    check = SignIn::Passkeys::Check.new(relying_party: passkey_relying_party(client))
     other = users(:author)
     add_passkey(other, client: client)
 
@@ -176,7 +176,7 @@ class SignIn::ProofTest < ActiveSupport::TestCase
     code = RecoveryCode.texts.first
     @user.recovery_codes.create!(digest: RecoveryCode.digest(code), generated_at: Time.current)
     client = fake_authenticator
-    check = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party(client))
+    check = SignIn::Passkeys::Check.new(relying_party: passkey_relying_party(client))
     passkey = add_passkey(@user, client: client)
     _json, challenge = check.options
     credential = passkey_assertion(client, challenge: challenge, user_handle: @user.webauthn_handle!)

@@ -8,10 +8,10 @@ require "webauthn/fake_client"
 #   test's host unless named) holding its own authenticator, whose
 #   credentials and counters live as long as the client does.
 # - `passkey_registration(user, client:)`: the checked registration
-#   (`SignIn::PasskeyRegistration::Result`) a service is handed, nothing
+#   (`SignIn::Passkeys::Registration::Result`) a service is handed, nothing
 #   stored.
 # - `add_passkey(user, client:, name:)`: a passkey registered through
-#   `SignIn::PasskeyRegistration` and stored, as the app adds one.
+#   `SignIn::Passkeys::Registration` and stored, as the app adds one.
 # - `passkey_assertion(client, challenge:, user_handle:)`: the JSON a
 #   browser sends for a sign-in, answered to `challenge` with user
 #   verification; `user_handle` is the stored handle (`User#webauthn_id`),
@@ -39,12 +39,12 @@ module PasskeyHelper
 
   # The relying party a request from the client's origin meets.
   def passkey_relying_party(client)
-    SignIn::RelyingParty.for(request_origin: client.origin, name: PASSKEY_SITE_NAME)
+    SignIn::Passkeys::RelyingParty.for(request_origin: client.origin, name: PASSKEY_SITE_NAME)
   end
 
   def passkey_registration(user, client: fake_authenticator)
     relying_party = passkey_relying_party(client)
-    registration = SignIn::PasskeyRegistration.new(relying_party: relying_party)
+    registration = SignIn::Passkeys::Registration.new(relying_party: relying_party)
     _options, challenge = registration.options(user_handle: user.webauthn_handle!, user_name: user.email_address, display_name: user.email_address)
     result = registration.verify(client.create(challenge: challenge, rp_id: relying_party.id, user_verified: true).to_json, challenge: challenge)
     raise "the fake authenticator's registration was refused" unless result.ok

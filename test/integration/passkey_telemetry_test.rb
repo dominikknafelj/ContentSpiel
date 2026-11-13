@@ -28,7 +28,7 @@ class PasskeyTelemetryTest < ActionDispatch::IntegrationTest
   WORDS = {
     "auth.method" => %w[password passkey recovery_code],
     "auth.outcome" => SignIn::OUTCOMES.map(&:to_s),
-    "auth.passkey.ceremony" => [ "register", *SignIn::PasskeyCheck::CEREMONIES ],
+    "auth.passkey.ceremony" => [ "register", *SignIn::Passkeys::Check::CEREMONIES ],
     "auth.mail.kind" => SignInMailer::ACCOUNT_MAILS.map(&:to_s),
     "auth.mail.queued" => [ true, false ],
     "auth.policy" => SiteSetting::PASSKEY_POLICIES,

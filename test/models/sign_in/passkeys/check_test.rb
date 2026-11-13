@@ -1,10 +1,10 @@
 require "test_helper"
 
-class SignIn::PasskeyCheckTest < ActiveSupport::TestCase
+class SignIn::Passkeys::CheckTest < ActiveSupport::TestCase
   setup do
     @client = fake_authenticator
     @relying_party = passkey_relying_party(@client)
-    @check = SignIn::PasskeyCheck.new(relying_party: @relying_party)
+    @check = SignIn::Passkeys::Check.new(relying_party: @relying_party)
     @user = users(:reader)
     @passkey = add_passkey(@user, client: @client)
   end
@@ -114,7 +114,7 @@ class SignIn::PasskeyCheckTest < ActiveSupport::TestCase
 
   test "each ceremony is one auth.passkey span with its ceremony and outcome, and no attribute holds the credential id or the challenge" do
     exporter = Rails.application.config.x.otel_test_exporter
-    registration = SignIn::PasskeyRegistration.new(relying_party: @relying_party)
+    registration = SignIn::Passkeys::Registration.new(relying_party: @relying_party)
     planted = []
 
     exporter.reset

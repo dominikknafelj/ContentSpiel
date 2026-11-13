@@ -1,8 +1,8 @@
 # What any kind of sign-in calls to decide an attempt: plain objects that
 # count attempts, close buckets and say when a check is due
 # (`SignIn::Protection::Throttle`), and that make and check passkeys
-# (`SignIn::PasskeyRegistration`, `SignIn::PasskeyCheck`, over the one
-# relying party `SignIn::RelyingParty` decides: the one place the domain a
+# (`SignIn::Passkeys::Registration`, `SignIn::Passkeys::Check`, over the one
+# relying party `SignIn::Passkeys::RelyingParty` decides: the one place the domain a
 # passkey belongs to is decided), and that speak to the site's single
 # sign-on provider (`SignIn::Oidc`: its discovery, keys, authorization
 # request and tokens). Nothing here knows a session, a cookie, a

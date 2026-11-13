@@ -85,7 +85,7 @@ class SetupController < ApplicationController
       return redirect_to(setup_step_path("site")) if Current.user.passkeys.exists?
 
       @passkey_possible = passkey_relying_party.present?
-      @passkey_skippable = !Passkeys::Policy.current.covers_owners?
+      @passkey_skippable = !SignIn::Passkeys::Policy.current.covers_owners?
     when "site", "languages" then @site_setting = Current.site
     when "mail"
       @site_setting = Current.site
@@ -158,7 +158,7 @@ class SetupController < ApplicationController
     # nothing is held (as `Admin::PasskeyEnrolment` holds nothing there).
     # The wizard signs its founding owner in by password, its one way in.
     def passkey_due?
-      passkey_relying_party.present? && Passkeys::Policy.current.enrolment_due?(Current.user, method: "password")
+      passkey_relying_party.present? && SignIn::Passkeys::Policy.current.enrolment_due?(Current.user, method: "password")
     end
 
     # The options are the signed-in founding owner's alone, only where a
@@ -209,7 +209,7 @@ class SetupController < ApplicationController
     # founding owner (an owner is covered by every policy but `nobody`), and
     # where no passkey can be made at all.
     def optional_step?(step)
-      return !Passkeys::Policy.current.covers_owners? || passkey_relying_party.nil? if step == "passkey"
+      return !SignIn::Passkeys::Policy.current.covers_owners? || passkey_relying_party.nil? if step == "passkey"
 
       OPTIONAL_STEPS.include?(step)
     end
@@ -266,7 +266,7 @@ class SetupController < ApplicationController
     # The browser's credential (`params[:credential]`, JSON) and the typed
     # name, from `admin--passkeys--register` with the method PATCH. The
     # challenge is taken before anything is decided, so a refused answer
-    # spends it too. `Passkeys::Add` clears `enrolment_due` on the owner's
+    # spends it too. `SignIn::Passkeys::Add` clears `enrolment_due` on the owner's
     # sessions and makes the recovery codes; the answer is a stream that
     # draws them in place of the step's body (`#setup-passkey`), once, Done
     # leading on to "site", or a 303 there when no codes were made (the
@@ -277,7 +277,7 @@ class SetupController < ApplicationController
       return head(:not_found) unless passkey_relying_party && !Current.user.passkeys.exists?
 
       challenge = take_passkey_challenge("register")
-      result = Passkeys::Add.call(Current.user, registration: passkey_registration.verify(params[:credential], challenge: challenge),
+      result = SignIn::Passkeys::Add.call(Current.user, registration: passkey_registration.verify(params[:credential], challenge: challenge),
         name: params[:name], **mail_link_origin)
       return render(json: { error: result.errors.first }, status: :unprocessable_entity) unless result.ok?
 
@@ -288,7 +288,7 @@ class SetupController < ApplicationController
         Admin::Ui::RecoveryCodesComponent.new(codes: codes, frame: :page, done_href: setup_step_path("site"), id: PASSKEY_STEP_ID))
     end
 
-    def passkey_registration = SignIn::PasskeyRegistration.new(relying_party: passkey_relying_party)
+    def passkey_registration = SignIn::Passkeys::Registration.new(relying_party: passkey_relying_party)
 
     def update_site
       @site_setting = Current.site

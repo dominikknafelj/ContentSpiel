@@ -1,9 +1,9 @@
 require "test_helper"
 
-class Passkeys::PolicyTest < ActiveSupport::TestCase
+class SignIn::Passkeys::PolicyTest < ActiveSupport::TestCase
   def policy(name)
     Current.site.update!(passkey_policy: name)
-    Passkeys::Policy.current
+    SignIn::Passkeys::Policy.current
   end
 
   def holder_of(key)
@@ -18,10 +18,10 @@ class Passkeys::PolicyTest < ActiveSupport::TestCase
     owners_and_admins = policy("owners_and_admins")
 
     assert owners_and_admins.covers?(users(:one))
-    Passkeys::Policy::ADMIN_PERMISSIONS.each do |key|
+    SignIn::Passkeys::Policy::ADMIN_PERMISSIONS.each do |key|
       assert owners_and_admins.covers?(holder_of(key)), "a holder of #{key} is an admin"
     end
-    assert_equal %w[users.manage groups.manage tokens.manage], Passkeys::Policy::ADMIN_PERMISSIONS
+    assert_equal %w[users.manage groups.manage tokens.manage], SignIn::Passkeys::Policy::ADMIN_PERMISSIONS
     assert_not owners_and_admins.covers?(holder_of("posts.edit"))
     assert_not owners_and_admins.covers?(users(:reader))
     assert owners_and_admins.covers_owners?
@@ -43,8 +43,8 @@ class Passkeys::PolicyTest < ActiveSupport::TestCase
   test "unset, the policy is the environment's default, and a site row need not be Current's" do
     Current.site.update!(passkey_policy: nil)
 
-    assert_equal "nobody", Passkeys::Policy.current.name
-    assert_equal "everyone", Passkeys::Policy.current(site: SiteSetting.new(passkey_policy: "everyone")).name
+    assert_equal "nobody", SignIn::Passkeys::Policy.current.name
+    assert_equal "everyone", SignIn::Passkeys::Policy.current(site: SiteSetting.new(passkey_policy: "everyone")).name
   end
 
   test "enrolment is due for a covered person with no passkey only" do

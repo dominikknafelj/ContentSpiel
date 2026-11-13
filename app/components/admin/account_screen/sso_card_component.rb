@@ -3,7 +3,7 @@ module Admin
     # Your account's Sign-in card, drawn INSTEAD of the Password card for a
     # person linked to the sign-in provider (`User#sso_linked?`): they have
     # no password, passkeys or recovery codes here (`Sso::Link` removes
-    # them, and `UpdatePassword`, `Passkeys::Add` and `RecoveryCodes::Generate`
+    # them, and `UpdatePassword`, `SignIn::Passkeys::Add` and `RecoveryCodes::Generate`
     # refuse), so the card says who they sign in with and that the rest is
     # the provider's. It holds no form and no control; an owner is never
     # linked, so an owner's screen never draws it.

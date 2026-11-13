@@ -8,7 +8,7 @@ module RecoveryCodes
   # them, so nobody makes them for someone else, not even an owner.
   #
   # Only for a person who holds a passkey: codes are a backup for passkeys
-  # (removing the last passkey deletes them, `Passkeys::Remove`). Alone they
+  # (removing the last passkey deletes them, `SignIn::Passkeys::Remove`). Alone they
   # would be the account's only second factor (`User#second_factor?`), so
   # every sign-in would ask for one and spend it. Read under the row lock,
   # so a passkey removed at the same moment cannot leave a fresh set behind.
@@ -54,7 +54,7 @@ module RecoveryCodes
     def self.passkey_first = I18n.t("admin.recovery_codes.generate.passkey_first", raise: true)
 
     # The set's writes alone, with no authorization and no event, for a
-    # caller that has authorized and records its own (`Passkeys::Add`, in
+    # caller that has authorized and records its own (`SignIn::Passkeys::Add`, in
     # its transaction). Answers the texts as they are shown.
     def write_codes(user, at:)
       texts = RecoveryCode.texts

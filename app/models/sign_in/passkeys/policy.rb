@@ -1,0 +1,70 @@
+module SignIn
+  module Passkeys
+    # Who must sign in with a passkey (`SiteSetting#effective_passkey_policy`):
+    # `nobody`; `owners_and_admins`, the owners and whoever holds one of
+    # ADMIN_PERMISSIONS on CS Studio; or `everyone`.
+    #
+    # The policy is read at sign-in (`Session.start`'s `enrolment_due`), so a
+    # change reaches a person at their next session, never the one they are in.
+    # `SignIn::Passkeys::Remove` reads it at the moment of removal, so a covered person
+    # keeps at least one passkey.
+    #
+    # SINGLE SIGN-ON. A linked account is never covered: it signs in through
+    # its provider alone, which is its second factor, and it holds no passkey
+    # (`Sso::Link` deletes them). A session made by a method whose provider is
+    # the second factor (`SignIn::Methods.exempt?`: SSO, or a gem's method
+    # registered `passkey_policy: :exempt`) is never due for enrolment, linked
+    # or not. And while single sign-on is required (`SignIn::Oidc.required?`)
+    # an owner is covered whatever the stored policy: the owners are then the
+    # only people who sign in with a password, and an owner never links, so
+    # their own way in must not be a password alone.
+    class Policy
+      # The rights that make someone an admin here: whoever can make accounts,
+      # hand out rights or issue tokens can take over the site.
+      ADMIN_PERMISSIONS = %w[users.manage groups.manage tokens.manage].freeze
+
+      # The console, jobs and model tests run with no request's site.
+      def self.current(site: Current.site || SiteSetting.instance) = new(site.effective_passkey_policy)
+
+      attr_reader :name
+
+      def initialize(name)
+        @name = name
+      end
+
+      # Asks `AccessControl.holds?` of the SUBJECT, never the actor: whether
+      # this person counts as an admin (admin-area keys, which no record
+      # narrows). That is the one use of `holds?` outside navigation, and it
+      # gates no write by itself: who may write is each service's own rule,
+      # and the policy only says who must keep a passkey.
+      def covers?(user)
+        return false if user.sso_linked?
+        return true if user.owner? && sso_required?
+
+        case name
+        when "everyone" then true
+        when "owners_and_admins" then user.owner? || ADMIN_PERMISSIONS.any? { |key| AccessControl.holds?(user, key, channel: :admin) }
+        else false
+        end
+      end
+
+      def covers_owners? = name != "nobody" || sso_required?
+
+      # `method` is how the session being started proved its person.
+      def enrolment_due?(user, method:) = !SignIn::Methods.exempt?(method) && covers?(user) && !user.passkeys.exists?
+
+      # The covered people who hold no passkey. Counted in Ruby over the
+      # passkey-less users, since whether someone is an admin is a rights
+      # question for `AccessControl`, not a column; a site has tens of users.
+      def uncovered_count
+        return 0 unless covers_owners?
+
+        User.where.missing(:passkeys).to_a.count { |user| covers?(user) }
+      end
+
+      private
+
+      def sso_required? = SignIn::Oidc.required?
+    end
+  end
+end

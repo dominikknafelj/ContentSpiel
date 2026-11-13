@@ -4,9 +4,9 @@ require "test_helper"
 # binds a credential to, so it is decided once: from ADMIN_HOST when CS
 # Studio has an address of its own, from PUBLIC_HOST when the site has one,
 # and from the request otherwise.
-class SignIn::RelyingPartyTest < ActiveSupport::TestCase
+class SignIn::Passkeys::RelyingPartyTest < ActiveSupport::TestCase
   def party(request_origin: "http://www.example.com")
-    SignIn::RelyingParty.for(request_origin: request_origin, name: "Site")
+    SignIn::Passkeys::RelyingParty.for(request_origin: request_origin, name: "Site")
   end
 
   test "the id is the registrable domain of PUBLIC_HOST and the origin the address" do

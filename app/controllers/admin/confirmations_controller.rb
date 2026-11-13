@@ -12,7 +12,7 @@ module Admin
   # checks nothing. So a session left open on someone else's screen buys no
   # more guesses at the password than the sign-in page gives. A passkey is
   # looked for among the person's own alone (`Current.user.passkeys`), and
-  # its user handle must be the stored one (`SignIn::PasskeyCheck`).
+  # its user handle must be the stored one (`SignIn::Passkeys::Check`).
   #
   # THE ANSWERS are JSON for `admin--passkeys--confirm`, the error a
   # sentence the dialog shows as it is:
@@ -62,7 +62,7 @@ module Admin
       allow = Current.user.passkeys.pluck(:external_id)
       return head(:not_found) if allow.empty?
 
-      options, challenge = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party).options(allow: allow)
+      options, challenge = SignIn::Passkeys::Check.new(relying_party: passkey_relying_party).options(allow: allow)
       issue_passkey_challenge("confirm", challenge)
       render json: options
     end
@@ -72,7 +72,7 @@ module Admin
     def passkey
       challenge = take_passkey_challenge("confirm")
       outcome = proof.passkey(params[:credential], challenge: challenge,
-        check: SignIn::PasskeyCheck.new(relying_party: passkey_relying_party), ceremony: "confirm")
+        check: SignIn::Passkeys::Check.new(relying_party: passkey_relying_party), ceremony: "confirm")
       answer(outcome, method: "passkey", failed: :passkey_failed)
     end
 

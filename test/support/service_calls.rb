@@ -52,9 +52,9 @@ module ServiceCalls
     "Users::UpdatePassword" => { manager_may: true, reason: "any signed-in user may change their own password; anyone else needs users.manage" },
     "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" },
     "Sessions::EndOthers" => { manager_may: false, reason: "any signed-in user may end their own other sessions; an owner ends someone else's through Sessions::EndAll, and nobody else may" },
-    "Passkeys::Add" => { manager_may: false, reason: "a person adds a passkey to their own account only: it is their device, and nobody, not even an owner, adds one for someone else" },
-    "Passkeys::Rename" => { manager_may: false, reason: "a person renames their own passkeys only: nobody manages someone else's" },
-    "Passkeys::Remove" => { manager_may: false, reason: "a person removes their own passkeys only; a lost device is cleared from the console (Users::UpdatePassword, remove_passkeys)" },
+    "SignIn::Passkeys::Add" => { manager_may: false, reason: "a person adds a passkey to their own account only: it is their device, and nobody, not even an owner, adds one for someone else" },
+    "SignIn::Passkeys::Rename" => { manager_may: false, reason: "a person renames their own passkeys only: nobody manages someone else's" },
+    "SignIn::Passkeys::Remove" => { manager_may: false, reason: "a person removes their own passkeys only; a lost device is cleared from the console (Users::UpdatePassword, remove_passkeys)" },
     "RecoveryCodes::Generate" => { manager_may: false, reason: "a person makes their own recovery codes only: the codes are shown to whoever makes them" }
   }.freeze
 
@@ -702,32 +702,32 @@ module ServiceCalls
     },
 
     # See SELF_SERVICE: own only, so the control runs as the user themselves.
-    "Passkeys::Add" => lambda {
+    "SignIn::Passkeys::Add" => lambda {
       target = stranger_target
       mine = stranger_target(email: "mine@example.com")
       # Checked here: the check writes the account's WebAuthn handle.
       theirs = passkey_registration(target)
       own = passkey_registration(mine)
-      { call: -> { Passkeys::Add.call(target, registration: theirs, name: "MacBook") }, permission: "users.manage", on: target, control_actor: target,
-        owner: mine, own: -> { Passkeys::Add.call(mine, registration: own, name: "MacBook") }, own_event: "passkey.added" }
+      { call: -> { SignIn::Passkeys::Add.call(target, registration: theirs, name: "MacBook") }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { SignIn::Passkeys::Add.call(mine, registration: own, name: "MacBook") }, own_event: "passkey.added" }
     },
 
-    "Passkeys::Rename" => lambda {
+    "SignIn::Passkeys::Rename" => lambda {
       target = stranger_target
       mine = stranger_target(email: "mine@example.com")
       theirs = add_passkey(target, client: fake_authenticator)
       own = add_passkey(mine, client: fake_authenticator)
-      { call: -> { Passkeys::Rename.call(theirs, name: "Renamed") }, permission: "users.manage", on: target, control_actor: target,
-        owner: mine, own: -> { Passkeys::Rename.call(own, name: "Renamed") }, own_event: "passkey.renamed" }
+      { call: -> { SignIn::Passkeys::Rename.call(theirs, name: "Renamed") }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { SignIn::Passkeys::Rename.call(own, name: "Renamed") }, own_event: "passkey.renamed" }
     },
 
-    "Passkeys::Remove" => lambda {
+    "SignIn::Passkeys::Remove" => lambda {
       target = stranger_target
       mine = stranger_target(email: "mine@example.com")
       theirs = add_passkey(target, client: fake_authenticator)
       own = add_passkey(mine, client: fake_authenticator)
-      { call: -> { Passkeys::Remove.call(theirs) }, permission: "users.manage", on: target, control_actor: target,
-        owner: mine, own: -> { Passkeys::Remove.call(own) }, own_event: "passkey.removed" }
+      { call: -> { SignIn::Passkeys::Remove.call(theirs) }, permission: "users.manage", on: target, control_actor: target,
+        owner: mine, own: -> { SignIn::Passkeys::Remove.call(own) }, own_event: "passkey.removed" }
     },
 
     "RecoveryCodes::Generate" => lambda {

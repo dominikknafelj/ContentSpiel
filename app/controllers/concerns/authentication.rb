@@ -131,7 +131,7 @@ module Authentication
     # for enrolment); `provider_token` is kept on the session as
     # `Session.start` decides.
     def start_new_session_for(user, method:, provider_token: nil)
-      policy = Passkeys::Policy.current
+      policy = SignIn::Passkeys::Policy.current
       Telemetry.record(OpenTelemetry::Trace.current_span, "auth.policy" => policy.name)
       Session.start(user: user, method: method, user_agent: request.user_agent, ip_address: request.remote_ip,
         enrolment_due: policy.enrolment_due?(user, method: method), provider_token: provider_token).tap do |session|

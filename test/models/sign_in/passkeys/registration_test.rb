@@ -1,10 +1,10 @@
 require "test_helper"
 
-class SignIn::PasskeyRegistrationTest < ActiveSupport::TestCase
+class SignIn::Passkeys::RegistrationTest < ActiveSupport::TestCase
   setup do
     @client = fake_authenticator
     @relying_party = passkey_relying_party(@client)
-    @registration = SignIn::PasskeyRegistration.new(relying_party: @relying_party)
+    @registration = SignIn::Passkeys::Registration.new(relying_party: @relying_party)
     @user = users(:reader)
   end
 
@@ -79,7 +79,7 @@ class SignIn::PasskeyRegistrationTest < ActiveSupport::TestCase
     end
 
     oversized = { "type" => "public-key", "padding" => "a" * 20_000 }.to_json
-    assert_operator oversized.bytesize, :>, SignIn::PasskeyRegistration::MAX_CREDENTIAL_BYTES
+    assert_operator oversized.bytesize, :>, SignIn::Passkeys::Registration::MAX_CREDENTIAL_BYTES
     parses = 0
     original = JSON.method(:parse)
     with_singleton_override(JSON, :parse, ->(*args, **kwargs) { parses += 1; original.call(*args, **kwargs) }) do

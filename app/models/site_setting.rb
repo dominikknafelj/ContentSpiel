@@ -126,7 +126,7 @@ class SiteSetting < ApplicationRecord
     if: :will_save_change_to_form_keep_days?
 
   # Who must sign in with a passkey: nobody, the owners and those who manage
-  # users, groups or tokens (`Passkeys::Policy`), or everyone. Nil until an
+  # users, groups or tokens (`SignIn::Passkeys::Policy`), or everyone. Nil until an
   # owner chooses: `#effective_passkey_policy` reads it as the environment's
   # default, so a site made before the policy existed needs no value written.
   PASSKEY_POLICIES = %w[nobody owners_and_admins everyone].freeze

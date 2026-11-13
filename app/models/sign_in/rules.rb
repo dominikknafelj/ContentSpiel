@@ -26,7 +26,7 @@
 #   (test/controllers/admin/passwords_controller_test.rb).
 #
 # The services that set a password or add a second factor refuse a linked
-# account in words (`Users::Save`, `Users::UpdatePassword`, `Passkeys::Add`,
+# account in words (`Users::Save`, `Users::UpdatePassword`, `SignIn::Passkeys::Add`,
 # `RecoveryCodes::Generate`): they are asked by someone already signed in,
 # after their own authorization, so their answer tells nobody outside.
 #

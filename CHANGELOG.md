@@ -52,7 +52,15 @@
 - A new top-level name, `SignInMethods` (`app/models/sign_in_methods.rb`): a gem whose hook owner is `sign_in_methods` is refused at boot.
 - A new top-level name, `SignInRules` (`app/models/sign_in_rules.rb`): a gem whose hook owner is `sign_in_rules` is refused at boot.
 - A new top-level name, `Sso` (`app/services/sso/`, `app/jobs/sso/`): a gem whose hook owner is `sso` is refused at boot.
-- Sign-in's classes are one namespace, `SignIn::`, with no alias for the old names; each old name below is gone: `SignInRules` is `SignIn::Rules`, `SignInMethods` is `SignIn::Methods`, `SignIn::Throttle`, `SignIn::BotCheck`, `SignIn::KnownDevice` and `SignIn::LockoutMailJob` are `SignIn::Protection::Throttle`, `BotCheck`, `KnownDevice` and `LockoutMailJob`, `SignIn::PasswordAttempt` is `SignIn::Password::Attempt`, `SignIn::LeakedPassword` is `SignIn::Password::Leaked` (its `error.type` on a span reads `SignIn::Password::Leaked::Unavailable`) and `Users::LeakedPasswordRule` is `SignIn::Password::LeakedRule`. `SignIn::Outcome` keeps its name.
+- Sign-in classes released in 0.3.0 moved under `SignIn::`, with no alias:
+  - `SignIn::Throttle`, `SignIn::BotCheck`, `SignIn::KnownDevice` and `SignIn::LockoutMailJob` are `SignIn::Protection::Throttle`, `BotCheck`, `KnownDevice` and `LockoutMailJob`.
+  - `SignIn::PasswordAttempt` is `SignIn::Password::Attempt`.
+  - `SignIn::LeakedPassword` is `SignIn::Password::Leaked` (its `error.type` on a span reads `SignIn::Password::Leaked::Unavailable`).
+  - `Users::LeakedPasswordRule` is `SignIn::Password::LeakedRule`.
+  - `SignIn::RelyingParty` is `SignIn::Passkeys::RelyingParty`.
+  - `SignIn::PasskeyRegistration`, `SignIn::PasskeyCheck` and `SignIn::PasskeyCredential` are `SignIn::Passkeys::Registration`, `Check` and `Credential`.
+  - `Passkeys::Policy`, `Passkeys::Add`, `Passkeys::Remove` and `Passkeys::Rename` are `SignIn::Passkeys::Policy`, `Add`, `Remove` and `Rename`.
+  - `SignIn::Outcome` keeps its name.
 
 ### Removed
 

@@ -138,7 +138,7 @@ class SetupPasskeyStepTest < ActionDispatch::IntegrationTest
     patch setup_step_path("passkey"), params: { credential: "{}", name: "MacBook" }.to_json,
       headers: { "Content-Type" => "application/json", "Accept" => "#{STREAM}, application/json" }
     assert_response :unprocessable_entity
-    assert_equal Passkeys::Add.failed, response.parsed_body["error"]
+    assert_equal SignIn::Passkeys::Add.failed, response.parsed_body["error"]
     assert_not owner.passkeys.exists?
 
     delete admin_sign_out_path

@@ -77,7 +77,7 @@ module Admin
     # for `passkey`.
     def options
       allow = pending_user.passkeys.pluck(:external_id)
-      options, challenge = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party).options(allow: allow)
+      options, challenge = SignIn::Passkeys::Check.new(relying_party: passkey_relying_party).options(allow: allow)
       issue_passkey_challenge("second_factor", challenge)
       render json: options
     end
@@ -88,7 +88,7 @@ module Admin
       user = pending_user
       challenge = take_passkey_challenge("second_factor")
       outcome = proof_for(user).passkey(params[:credential], challenge: challenge,
-        check: SignIn::PasskeyCheck.new(relying_party: passkey_relying_party), ceremony: "second_factor")
+        check: SignIn::Passkeys::Check.new(relying_party: passkey_relying_party), ceremony: "second_factor")
 
       case outcome.status
       when :ok

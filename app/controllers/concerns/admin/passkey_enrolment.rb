@@ -2,7 +2,7 @@ module Admin
   # Enrolment's gate: a session the passkey policy covered when it started
   # (`Session#enrolment_due`, decided once by `start_new_session_for`), whose
   # person held no passkey then, reaches nothing of CS Studio or the preview
-  # but the enrolment page until a passkey is added (`Passkeys::Add` clears
+  # but the enrolment page until a passkey is added (`SignIn::Passkeys::Add` clears
   # the mark on every session of the person). A policy changed later reaches
   # nobody's open session: only the next sign-in reads it.
   #
@@ -15,7 +15,7 @@ module Admin
   # - anything else (a write, a script's fetch, JSON): 403, nothing done.
   #
   # Where the request has no relying party (an IP address in development,
-  # `SignIn::RelyingParty`), no passkey can be made, so nothing is held.
+  # `SignIn::Passkeys::RelyingParty`), no passkey can be made, so nothing is held.
   #
   # WHAT IT SKIPS, all of it what enrolment itself needs:
   # - `Admin::EnrolmentsController`, the page;
@@ -36,7 +36,7 @@ module Admin
 
     def require_passkey_enrolment
       return unless Current.session&.enrolment_due?
-      return if SignIn::RelyingParty.for(request_origin: request.base_url, name: request.host).nil?
+      return if SignIn::Passkeys::RelyingParty.for(request_origin: request.base_url, name: request.host).nil?
 
       if turbo_get?
         load_whole_page

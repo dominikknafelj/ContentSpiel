@@ -1,13 +1,13 @@
 require "test_helper"
 
-class Passkeys::RenameTest < ActiveSupport::TestCase
+class SignIn::Passkeys::RenameTest < ActiveSupport::TestCase
   setup do
     @user = users(:reader)
     @passkey = add_passkey(@user, client: fake_authenticator, name: "MacBook")
   end
 
   def rename(name, actor: @user)
-    as(actor) { Passkeys::Rename.call(@passkey, name: name) }
+    as(actor) { SignIn::Passkeys::Rename.call(@passkey, name: name) }
   end
 
   test "a person renames their own passkey, and the change is recorded with both names" do

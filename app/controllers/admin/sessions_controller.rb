@@ -168,7 +168,7 @@ module Admin
     # browser offers any passkey of this site), and their challenge kept for
     # `passkey`.
     def passkey_options
-      options, challenge = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party).options(allow: [])
+      options, challenge = SignIn::Passkeys::Check.new(relying_party: passkey_relying_party).options(allow: [])
       issue_passkey_challenge("sign_in", challenge)
       render json: options
     end
@@ -182,7 +182,7 @@ module Admin
       return answer_passkey_refused(t("admin.sessions.limited")) unless reservation.ok?
 
       challenge = take_passkey_challenge("sign_in")
-      result = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party)
+      result = SignIn::Passkeys::Check.new(relying_party: passkey_relying_party)
         .verify(params[:credential], challenge: challenge, credentials: Passkey, ceremony: "sign_in")
 
       # A passkey of an account the rule keeps to its provider is a wrong

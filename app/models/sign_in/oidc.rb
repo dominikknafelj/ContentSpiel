@@ -78,7 +78,7 @@ module SignIn
     # The origin the provider is told to send the person back to, as
     # `url_for` options: CS Studio's own address when it has one, else the
     # site's, else (development and test) the request's, as
-    # `SignIn::RelyingParty` decides which site a passkey belongs to.
+    # `SignIn::Passkeys::RelyingParty` decides which site a passkey belongs to.
     def self.callback_origin(request_origin:)
       address = SiteAddress.admin.configured? ? SiteAddress.admin : SiteAddress.current
       return address.url_options if address.configured?

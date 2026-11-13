@@ -97,7 +97,7 @@
                   errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
             <% if owner %>
               <%= render Admin::SettingsScreen::SignInCardComponent.new(site: stored, policy: values.passkey_policy,
-                    uncovered: Passkeys::Policy.current(site: stored).uncovered_count, changed: values.saved_change("passkey_policy")) %>
+                    uncovered: SignIn::Passkeys::Policy.current(site: stored).uncovered_count, changed: values.saved_change("passkey_policy")) %>
             <% end %>
             <%= render Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: images_progress, avif_available: ImageSettings.avif_available?,
                   errors: (@errors if @errors.respond_to?(:full_messages_for)), status_link: can?("system_status.view")) %>

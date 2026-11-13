@@ -1,6 +1,6 @@
 require "test_helper"
 
-class Passkeys::AddTest < ActiveSupport::TestCase
+class SignIn::Passkeys::AddTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
 
   ORIGIN = "https://www.example.org".freeze
@@ -8,7 +8,7 @@ class Passkeys::AddTest < ActiveSupport::TestCase
   setup { @user = users(:reader) }
 
   def add(user = @user, actor: user, registration: passkey_registration(user), name: "MacBook", origin: ORIGIN)
-    as(actor) { Passkeys::Add.call(user, registration: registration, name: name, origin: origin) }
+    as(actor) { SignIn::Passkeys::Add.call(user, registration: registration, name: name, origin: origin) }
   end
 
   def start(user) = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil, enrolment_due: true)
@@ -81,7 +81,7 @@ class Passkeys::AddTest < ActiveSupport::TestCase
   test "a refused registration writes nothing and records nothing" do
     session = start(@user)
 
-    result = add(registration: SignIn::PasskeyRegistration::REFUSED)
+    result = add(registration: SignIn::Passkeys::Registration::REFUSED)
 
     assert_not result.ok?
     assert_not result.denied?

@@ -1,6 +1,6 @@
 require "test_helper"
 
-class Passkeys::RemoveTest < ActiveSupport::TestCase
+class SignIn::Passkeys::RemoveTest < ActiveSupport::TestCase
   setup do
     @user = users(:reader)
     @first = add_passkey(@user, client: fake_authenticator, name: "MacBook")
@@ -8,7 +8,7 @@ class Passkeys::RemoveTest < ActiveSupport::TestCase
   end
 
   def remove(passkey, actor: @user)
-    as(actor) { Passkeys::Remove.call(passkey) }
+    as(actor) { SignIn::Passkeys::Remove.call(passkey) }
   end
 
   def covered! = Current.site.update!(passkey_policy: "everyone")

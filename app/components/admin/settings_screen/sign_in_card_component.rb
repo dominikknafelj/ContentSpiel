@@ -10,7 +10,7 @@ module Admin
     #   save, else the stored policy, or the environment's default while none
     #   is stored (`SiteSetting#effective_passkey_policy`).
     # - `uncovered` is how many people the SAVED policy covers who hold no
-    #   passkey (`Passkeys::Policy#uncovered_count`), said in a line under the
+    #   passkey (`SignIn::Passkeys::Policy#uncovered_count`), said in a line under the
     #   choice; at `nobody` (read from `site`, the saved row) there is no line,
     #   since nobody is covered.
     # - `changed` is the wrapper's `data-save-bar-changed` ("saved" when a

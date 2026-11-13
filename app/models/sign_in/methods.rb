@@ -16,7 +16,7 @@
 # for it.
 #
 # `passkey_policy:` is `:applies`, or `:exempt` when the method's provider is
-# itself the second factor, as SSO's is (`Passkeys::Policy#enrolment_due?`).
+# itself the second factor, as SSO's is (`SignIn::Passkeys::Policy#enrolment_due?`).
 module SignIn
   module Methods
     PASSKEY_POLICIES = %i[applies exempt].freeze
