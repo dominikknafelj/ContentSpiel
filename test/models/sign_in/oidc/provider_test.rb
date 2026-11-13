@@ -194,4 +194,70 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
       assert_equal 7, discovery_reads(idp)
     end
   end
+
+  # A provider on an https issuer whose document is answered without the
+  # network: `OutsideCall.perform` hands back `document` as a 200.
+  def with_https_document(document)
+    answer = Struct.new(:code, :body).new("200", document.to_json)
+    with_singleton_override(SignIn::OutsideCall, :perform, ->(*, **) { answer }) do
+      yield SignIn::Oidc::Provider.new(issuer: "https://idp.example.org", client_id: "client-1", secret: "s", name: "Example")
+    end
+  end
+
+  def https_document
+    {
+      "issuer" => "https://idp.example.org", "authorization_endpoint" => "https://idp.example.org/authorize",
+      "token_endpoint" => "https://idp.example.org/token", "jwks_uri" => "https://idp.example.org/keys",
+      "response_types_supported" => [ "code" ], "subject_types_supported" => [ "public" ],
+      "id_token_signing_alg_values_supported" => [ "RS256" ]
+    }
+  end
+
+  test "an https issuer whose document names an http endpoint is refused, and an https one is read" do
+    with_https_document(https_document) { |provider| assert_equal "https://idp.example.org/token", provider.configuration.token_endpoint }
+
+    %w[token_endpoint jwks_uri authorization_endpoint].each do |member|
+      with_https_document(https_document.merge(member => "http://idp.example.org/#{member}")) do |provider|
+        error = assert_raises(SignIn::Oidc::Unavailable, member) { provider.configuration }
+        assert_equal "missing_endpoint", error.reason
+      end
+    end
+  end
+
+  test "http to the loopback is an endpoint only outside production, as for the issuer" do
+    assert SignIn::Oidc::Provider.secure_address?(URI("http://127.0.0.1:9/token"), production: false)
+    assert_not SignIn::Oidc::Provider.secure_address?(URI("http://127.0.0.1:9/token"), production: true)
+    assert_not SignIn::Oidc::Provider.secure_address?(URI("http://idp.example.org/token"), production: false)
+    assert SignIn::Oidc::Provider.secure_address?(URI("https://idp.example.org/token"), production: true)
+    assert_not SignIn::Oidc::Provider.secure_address?(URI("/token"), production: false)
+  end
+
+  test "another issuer is refused even with the gem's own issuer check turned off" do
+    was = OpenIDConnect.validate_discovery_issuer
+    OpenIDConnect.validate_discovery_issuer = false
+    with_https_document(https_document.merge("issuer" => "https://planted.example.org")) do |provider|
+      error = assert_raises(SignIn::Oidc::Unavailable) { provider.configuration }
+      assert_equal "issuer_mismatch", error.reason
+    end
+  ensure
+    OpenIDConnect.validate_discovery_issuer = was
+  end
+
+  test "a document missing a required member is missing_endpoint, and one whose endpoint is no URL is not_json" do
+    with_https_document(https_document.except("subject_types_supported")) do |provider|
+      assert_equal "missing_endpoint", assert_raises(SignIn::Oidc::Unavailable) { provider.configuration }.reason
+    end
+    with_https_document(https_document.merge("token_endpoint" => "not a url")) do |provider|
+      assert_equal "not_json", assert_raises(SignIn::Oidc::Unavailable) { provider.configuration }.reason
+    end
+  end
+
+  test "the discovery entry's key carries the configuration's version" do
+    with_fake_idp do |idp|
+      idp.provider.configuration
+      digest = Digest::SHA256.hexdigest(idp.issuer)
+      assert Rails.cache.exist?("content_spiel/oidc/discovery/#{digest}/v#{SignIn::Oidc::Configuration::CACHE_VERSION}")
+      assert_not Rails.cache.exist?("content_spiel/oidc/discovery/#{digest}")
+    end
+  end
 end

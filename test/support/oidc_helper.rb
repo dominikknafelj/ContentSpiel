@@ -91,6 +91,9 @@ module OidcHelper
   class FakeIdp
     Request = Data.define(:method, :path, :params, :headers)
 
+    # Seconds a killed thread is given to finish its `ensure`.
+    JOIN_WAIT = 1
+
     STATUS_WORDS = { 200 => "OK", 302 => "Found", 400 => "Bad Request", 401 => "Unauthorized", 404 => "Not Found", 500 => "Internal Server Error" }.freeze
 
     attr_reader :issuer, :requests
@@ -109,6 +112,7 @@ module OidcHelper
       @issuer = "http://127.0.0.1:#{@server.addr[1]}/idp"
       @workers = []
       @acceptor = Thread.new { accept_loop }
+      @acceptor.report_on_exception = false
     end
 
     def provider = SignIn::Oidc::Provider.current
@@ -170,14 +174,20 @@ module OidcHelper
       end
     end
 
+    # The acceptor is joined after it is killed, so no worker is started
+    # once this returns.
     def down!
       @acceptor.kill
+      @acceptor.join(JOIN_WAIT)
       @server.close unless @server.closed?
     end
 
     def stop
       down!
-      @workers.each(&:kill)
+      @lock.synchronize { @workers.dup }.each do |worker|
+        worker.kill
+        worker.join(JOIN_WAIT)
+      end
     end
 
     # The authorization endpoint's answer to `url`, as a browser would be
@@ -204,15 +214,15 @@ module OidcHelper
     private
 
     def accept_loop
-      Thread.current.report_on_exception = false
       loop do
         client = @server.accept
-        @lock.synchronize { @workers << Thread.new(client) { |socket| serve(socket) } }
+        worker = Thread.new(client) { |socket| serve(socket) }
+        worker.report_on_exception = false
+        @lock.synchronize { @workers << worker }
       end
     end
 
     def serve(socket)
-      Thread.current.report_on_exception = false
       line = socket.gets.to_s
       return if line.empty?
 

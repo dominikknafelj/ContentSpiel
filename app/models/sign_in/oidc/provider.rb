@@ -107,14 +107,31 @@ module SignIn
       # The provider's signing keys; `refresh: true` reads them again past
       # the cache (a token signed by a key the cached set does not hold);
       # raises `Unavailable`.
+      #
+      # They are cached under the issuer, not under `jwks_uri`, as the
+      # document is: a provider that moves its key set is read at the new
+      # address within CACHE_FOR, when the document's entry ends, or at once
+      # when a token arrives signed by a `kid` the cached set lacks and the
+      # caller asks again with `refresh: true`.
       def keys(refresh: false)
         JSON::JWK::Set.new(cached("keys", URI(configuration.jwks_uri), refresh: refresh) { |document| key_set(document) }["keys"])
       end
 
       def check_issuer!(production:)
-        parsed = uri
-        usable = parsed&.host.present? && parsed.userinfo.nil? && (parsed.scheme == "https" || (parsed.scheme == "http" && !production && LOOPBACK.include?(parsed.host)))
+        usable = self.class.secure_address?(uri, production: production) && uri.userinfo.nil?
         raise Misconfigured, "SSO_ISSUER must be an absolute https URL with a host (http only to localhost, outside production)." unless usable
+      end
+
+      # The one rule for every address sign-in talks to the provider at (the
+      # issuer and the three endpoints its document names): an absolute URL
+      # with a host, https, or http only to the loopback outside production.
+      # The token endpoint is sent the client secret, the code and the PKCE
+      # verifier, and the key set decides which ID tokens are believed, so an
+      # http endpoint from an https issuer would hand both to anyone on the
+      # path.
+      def self.secure_address?(uri, production: Rails.env.production?)
+        uri.is_a?(URI::Generic) && uri.host.present? &&
+          (uri.scheme == "https" || (uri.scheme == "http" && !production && LOOPBACK.include?(uri.host)))
       end
 
       private
@@ -124,6 +141,7 @@ module SignIn
         # `uri`, written to the cache.
         def cached(kind, uri, refresh: false)
           key = "content_spiel/oidc/#{kind}/#{Digest::SHA256.hexdigest(issuer)}"
+          key = "#{key}/v#{Configuration::CACHE_VERSION}" if kind == "discovery"
           Telemetry.in_span("auth.sso.discovery", kind: :client, attributes: { "server.address" => uri.host.to_s }) do |span|
             value = Rails.cache.read(key) unless refresh
             Telemetry.record(span, "auth.sso.cached" => !value.nil?)
@@ -159,11 +177,33 @@ module SignIn
 
         # The document's members sign-in reads, once the gem has checked it
         # against this issuer.
+        #
+        # Each refusal has its fixed words, and its reason is one of the
+        # System status row's, which are a fixed set: a document naming
+        # another issuer is `issuer_mismatch`; one missing a member sign-in
+        # needs (an endpoint, or another member the specification requires)
+        # or naming an endpoint that is not https (`secure_address?`) is
+        # `missing_endpoint`, since it names no endpoint sign-in can use; one
+        # whose members are of the wrong shape (an endpoint that is no URL)
+        # is `not_json`, a document that is JSON but not a discovery
+        # document.
+        #
+        # The issuer is compared here as well as by the gem: the gem's check
+        # runs only while the process-wide `OpenIDConnect.validate_discovery_issuer`
+        # is true, and anything may set it false.
         def discovered(document)
           response = OpenIDConnect::Discovery::Provider::Config::Response.new(document.deep_symbolize_keys)
           response.expected_issuer = issuer
+          if response.issuer.present? && response.issuer != issuer
+            raise Unavailable.new("a document naming another issuer", reason: "issuer_mismatch")
+          end
           response.validate!
           raise Unavailable.new("a document with no token endpoint", reason: "missing_endpoint") if response.token_endpoint.blank?
+
+          endpoints = [ response.authorization_endpoint, response.token_endpoint, response.jwks_uri ]
+          unless endpoints.all? { |endpoint| self.class.secure_address?(parsed_address(endpoint)) }
+            raise Unavailable.new("a document naming an endpoint that is not https", reason: "missing_endpoint")
+          end
 
           Configuration.new(
             issuer: response.issuer, authorization_endpoint: response.authorization_endpoint,
@@ -172,8 +212,16 @@ module SignIn
             token_auth_methods: words(response.token_endpoint_auth_methods_supported).presence || DEFAULT_TOKEN_AUTH
           ).to_h.stringify_keys
         rescue OpenIDConnect::ValidationFailed
-          mismatch = response.issuer.present? && response.issuer != issuer
-          raise Unavailable.new(mismatch ? "a document naming another issuer" : "a document missing a member", reason: mismatch ? "issuer_mismatch" : "missing_endpoint")
+          missing = response.errors.details.values.flatten.any? { |detail| detail[:error] == :blank }
+          raise Unavailable.new("a document missing a member", reason: "missing_endpoint") if missing
+
+          raise Unavailable.new("a document of the wrong shape", reason: "not_json")
+        end
+
+        def parsed_address(value)
+          URI.parse(value.to_s)
+        rescue URI::InvalidURIError
+          nil
         end
 
         def key_set(document)

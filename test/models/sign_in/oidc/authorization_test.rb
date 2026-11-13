@@ -21,8 +21,7 @@ class SignIn::Oidc::AuthorizationTest < ActiveSupport::TestCase
         "scope" => "openid email profile offline_access",
         "state" => authorization.state, "nonce" => authorization.nonce,
         "code_challenge" => challenge(authorization.verifier), "code_challenge_method" => "S256"
-      }, params.except("prompt"))
-      assert_predicate params["prompt"].to_s, :empty?
+      }, params)
 
       [ authorization.state, authorization.nonce, authorization.verifier ].each do |value|
         assert_match(/\A[A-Za-z0-9_-]{43}\z/, value)
