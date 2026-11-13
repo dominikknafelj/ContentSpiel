@@ -38,7 +38,7 @@
 - `session.created` carries `{ "method" }` when a person signed in with a passkey or a recovery code, and reads "signed in with a passkey" or "signed in with a recovery code"; a password's reads "signed in".
 - While setup is pending only a page load (a GET or HEAD asking for HTML that is no prefetch) is sent to `/<ADMIN_PATH>/setup`; any other request is answered 404 without loading the session, so a client that does not ask for HTML gets 404 for `/`.
 - Settings has eight sections: Sign-in stands after Mail, for an owner alone.
-- `filter_parameters` holds `credential` (exactly) and `recovery_code`, and `code`, `state` and `nonce` (exactly: the single sign-on's callback and authorization address), which mask a request's log only: Active Record's `filter_attributes` and the audit snapshot leave them out, so a record's `state` column is shown and audited as before.
+- `filter_parameters` holds `credential` (exactly) and `recovery_code`, and `code`, `state` and `nonce` (exactly: the single sign-on's callback and authorization address), which mask a request's log only (a lambda that acts on a request's parameters), so a record's `state` column is shown by `inspect` and audited as before.
 - An account linked to single sign-on is refused its password and its passkeys as a wrong one would be (so is a non-owner's while `SSO_REQUIRED` is set), and a reset request for it mails the reminder to sign in with the provider in place of the reset link; with single sign-on off it mails nothing.
 
 ### Breaking

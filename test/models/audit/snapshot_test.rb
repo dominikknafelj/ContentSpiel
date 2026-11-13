@@ -344,11 +344,13 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     assert_equal "/cs-studio/sign-in/sso/callback?code=[FILTERED]&state=[FILTERED]&nonce=[FILTERED]&page=2", request.filtered_path
   end
 
-  test "the request-only names reach neither a record's inspect nor a snapshot" do
+  test "the single sign-on's request-only names reach neither a record's inspect nor a snapshot" do
+    # Once a request's filter is built, Rails folds the list's patterns into one.
+    Rails.application.env_config
     thread = Notes::Thread.new(state: "open")
 
     assert_includes thread.inspect, 'state: "open"'
-    assert_not ActiveRecord::Base.filter_attributes.intersect?(Rails.application.config.x.request_only_filter_parameters)
+    assert_equal "open", ActiveSupport::ParameterFilter.new(ActiveRecord::Base.filter_attributes).filter_param("state", "open")
     assert_equal({ "state" => "open", "code" => "en", "nonce" => "n" }, Audit::Snapshot.scrub("state" => "open", "code" => "en", "nonce" => "n"))
   end
 end

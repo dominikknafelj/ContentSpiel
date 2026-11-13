@@ -29,19 +29,23 @@ Rails.application.config.filter_parameters += [
 # the ID token to this start and is a secret until the callback spends it. Whole names only, since a bare :code
 # would mask every parameter that contains "code".
 #
-# REQUEST LOGS ONLY. This list reaches two more readers, which must not take these three: Active Record's
-# `filter_attributes` (its railtie adds `filter_parameters` to it on load, and it masks `inspect` and a logged
-# bind), and `Audit::Snapshot.keep?`, which drops a snapshot or changes key the list matches. Models have columns
-# called `state` (a note thread's, a form delivery's, a presence mark's, a translation state's) that are no
-# secret, and none holds a provider's code, state or nonce. So the names are kept in
-# `config.x.request_only_filter_parameters`: taken off `filter_attributes` below, after the railtie's hook (a hook
-# runs in the order it was registered, and runs at once if Active Record is already loaded), and left out by the
-# snapshot.
-Rails.application.config.x.request_only_filter_parameters = [ /\Acode\z/, /\Astate\z/, /\Anonce\z/ ].freeze
-Rails.application.config.filter_parameters += Rails.application.config.x.request_only_filter_parameters
-ActiveSupport.on_load(:active_record) do
-  self.filter_attributes -= Rails.application.config.x.request_only_filter_parameters
-end
+# REQUEST LOGS ONLY, so a lambda and not three patterns. This list has two more readers, which must not take these
+# names: Active Record's `filter_attributes` (its railtie adds this list to it as Active Record loads; it masks
+# `inspect` and a logged bind), and `Audit::Snapshot.keep?`, which drops a snapshot or changes key the list matches.
+# Models have columns called `state` (a note thread's, a form delivery's, a presence mark's, a translation state's)
+# that are no secret, and none holds a provider's code, state or nonce. A pattern cannot be taken back out for those
+# two: Rails folds every pattern of this list into one Regexp once a request's filter is first built
+# (`config.precompile_filter_parameters`), and the railtie copies the list whenever Active Record happens to load. A
+# lambda is never folded and tells the readers apart by its third argument: a request's parameters (each pair of a
+# logged query or a redirect's address is handed over as a Hash of its own) are a Hash, while `inspect` passes none
+# (`ParameterFilter#filter_param`), and a snapshot's key is asked with `true` for a value, which is no String.
+Rails.application.config.filter_parameters += [
+  lambda do |key, value, params = nil|
+    next unless params.is_a?(Hash)
+
+    value.replace("[FILTERED]") if value.is_a?(String) && %w[code state nonce].include?(key.to_s)
+  end
+]
 
 # A visitor's answers to a form (personal data reaches no log). The endpoint (`FormSendsController`, controller
 # `form_sends`) takes them as `answers[<field key>]`. Not a bare `:answers`
