@@ -53,9 +53,9 @@
   <%= render Admin::Ui::NoticeComponent.new(tone: :ok, size: :compact, id: "notice") do %><%= flash[:notice] %><% end %>
 
   <% if sso_panel %>
-    <%= render "admin/sessions/way_in", label: t(".sso", provider: provider_name), url: admin_sso_path, variant: :primary %>
+    <%= render Admin::Ui::WayInButtonComponent.new(label: t(".sso", provider: provider_name), url: admin_sso_path, variant: :primary) %>
     <% outside_methods.each do |method| %>
-      <%= render "admin/sessions/way_in", label: t(method.label), url: main_app.public_send(method.path) %>
+      <%= render Admin::Ui::WayInButtonComponent.new(label: t(method.label), url: main_app.public_send(method.path)) %>
     <% end %>
     <p><%= link_to t(".owner_sign_in"), admin_sign_in_path(owner: 1), class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %></p>
   <% else %>
@@ -110,12 +110,12 @@
         provider's first, each a secondary so Sign in stays the panel's one
         primary, never behind the bot check. %>
     <% if drawn_ways %>
-      <%= render "admin/sessions/or", data: { sign_in_divider: true } %>
+      <%= render Admin::Ui::OrDividerComponent.new(data: { sign_in_divider: true }) %>
       <% if @sso_provider && !@owner_path %>
-        <%= render "admin/sessions/way_in", label: t(".sso", provider: provider_name), url: admin_sso_path %>
+        <%= render Admin::Ui::WayInButtonComponent.new(label: t(".sso", provider: provider_name), url: admin_sso_path) %>
       <% end %>
       <% outside_methods.each do |method| %>
-        <%= render "admin/sessions/way_in", label: t(method.label), url: main_app.public_send(method.path) %>
+        <%= render Admin::Ui::WayInButtonComponent.new(label: t(method.label), url: main_app.public_send(method.path)) %>
       <% end %>
     <% end %>
 
@@ -131,7 +131,7 @@
            data-passkey-sign-in-options-url-value="<%= admin_sign_in_passkey_options_path %>"
            data-passkey-sign-in-verify-url-value="<%= @owner_path ? admin_sign_in_passkey_path(owner: 1) : admin_sign_in_passkey_path %>">
         <% unless drawn_ways %>
-          <%= render "admin/sessions/or", data: { passkey_sign_in_target: "divider" }, hidden: true %>
+          <%= render Admin::Ui::OrDividerComponent.new(hidden: true, data: { passkey_sign_in_target: "divider" }) %>
         <% end %>
         <button type="button" class="w-full <%= Admin::Ui::ButtonComponent.classes(:secondary) %>" hidden
                 data-passkey-sign-in-target="button" data-action="passkey-sign-in#signIn">
@@ -142,7 +142,7 @@
     <% end %>
 
     <% if @owner_path %>
-      <%= render "admin/sessions/way_in", label: t(".sso_instead", provider: provider_name), url: admin_sso_path, variant: :tertiary, size: :small, full: false %>
+      <%= render Admin::Ui::WayInButtonComponent.new(label: t(".sso_instead", provider: provider_name), url: admin_sso_path, variant: :tertiary) %>
     <% end %>
   <% end %>
 </div>

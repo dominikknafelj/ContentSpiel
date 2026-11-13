@@ -18,9 +18,6 @@ en:
         # In the hint's place when Turnstile's script cannot be loaded
         # (read by the `bot-check` script from its `data-messages`).
         check_unavailable: "The check couldn't load. Reload the page to try again."
-        # Between the password form and the passkey button, drawn only
-        # where the browser can use a passkey.
-        or: "or"
         passkey: "Sign in with a passkey"
         # The site's single sign-on provider, named as the host names it
         # (`SSO_NAME`): a secondary under the form, or the panel's primary

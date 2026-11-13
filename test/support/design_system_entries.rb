@@ -84,7 +84,12 @@ module DesignSystemEntries
   }.freeze
 
   # A component no card's "Code" section names yet, with the reason.
-  NOT_YET = {}.freeze
+  NOT_YET = {
+    "Admin::Ui::OrDividerComponent" =>
+      "Drawn by StudioSingleSignOn, StudioPasskeySignIn and StudioPasskeys (Confirm it's you), and named by none of their Code sections yet.",
+    "Admin::Ui::WayInButtonComponent" =>
+      "Drawn by StudioSingleSignOn (the provider's button, the owner path's way back and the invitation's), whose card has no Code section yet."
+  }.freeze
 
   # The card of a component (a class or its name): its `COVERED_BY` card,
   # else its own name less `Component` when that is a card, else nil.

@@ -28,7 +28,6 @@ en:
           lead_passkey: "To change how you sign in, confirm with your passkey or your password."
           lead_password: "To change how you sign in, confirm with your password."
           use_passkey: "Use your passkey"
-          or: "or"
           password: "Password"
           confirm_password: "Confirm with password"
           confirm: "Confirm"
@@ -36,6 +35,11 @@ en:
           passkey_failed: "That passkey didn't work. Try again, or use your password."
           wrong_password: "That password isn't right."
           limited: "Try again in a few minutes."
+
+        # The "or" between two ways in: the sign-in panel, Confirm it's you
+        # and the invitation page.
+        or_divider:
+          or: "or"
 
         # The recovery codes block, shown once (enrolment, the wizard, new codes).
         recovery_codes:

@@ -11,8 +11,16 @@ class SsoSignInPageTest < ActionDispatch::IntegrationTest
   # The provider's start: a POST form with its token, sent without Turbo,
   # since the provider is a whole page on another site.
   def provider_button = "form[action='#{admin_sso_path}'][method=post][data-turbo=false] button[type=submit]"
-  PRIMARY = "bg-accent".freeze
-  SECONDARY = "bg-accent-tint".freeze
+  # A button's look is the classes `ButtonComponent` draws its variant
+  # with, asked of the component rather than spelled here.
+  def look?(button, variant, size: :regular) = button["class"].to_s.include?(Admin::Ui::ButtonComponent.classes(variant, size: size))
+
+  def assert_look(button, variant, size: :regular)
+    assert look?(button, variant, size: size), "#{button.text.squish.inspect} is drawn as a #{size} #{variant}"
+  end
+
+  # The panel's primaries, by their words: one per panel.
+  def primaries = css_select("main button").select { |button| look?(button, :primary) }.map { |button| button.text.squish }
 
   # The panel's ways in, in the order drawn: every button but the password
   # field's Show.
@@ -26,8 +34,7 @@ class SsoSignInPageTest < ActionDispatch::IntegrationTest
       assert_select "form[action='#{admin_sign_in_path}'] input[name=email_address]"
       assert_select "form[action='#{admin_sign_in_path}'] input[name=password]"
       assert_select provider_button, text: "Sign in with Example ID", count: 1 do |button|
-        assert_includes button.first["class"], SECONDARY
-        assert_includes button.first["class"], "w-full"
+        assert_look button.first, :secondary
       end
       # The divider stands for the provider's button, which is always there,
       # so it is never hidden for want of a passkey.
@@ -35,7 +42,7 @@ class SsoSignInPageTest < ActionDispatch::IntegrationTest
 
       order = buttons_in_order
       assert_equal [ "Sign in", "Sign in with Example ID", "Sign in with a passkey" ], order
-      assert_select "main button.#{PRIMARY}", count: 1, text: "Sign in"
+      assert_equal [ "Sign in" ], primaries
       assert_select "a[href*='owner=1']", count: 0, text: "Owner sign-in"
     end
   end
@@ -68,7 +75,7 @@ class SsoSignInPageTest < ActionDispatch::IntegrationTest
       assert_select "h1", text: "Sign in"
       assert_select "main p", text: "This site signs you in with Example ID."
       assert_select provider_button, text: "Sign in with Example ID", count: 1 do |button|
-        assert_includes button.first["class"], PRIMARY
+        assert_look button.first, :primary
       end
       assert_select "input[name=password]", count: 0
       assert_select "button[data-passkey-sign-in-target=button]", count: 0
@@ -83,9 +90,9 @@ class SsoSignInPageTest < ActionDispatch::IntegrationTest
       assert_select "form[action='#{admin_sign_in_path}'] input[type=hidden][name=owner][value='1']"
       assert_select "button[data-passkey-sign-in-target=button]", text: "Sign in with a passkey"
       assert_select provider_button, text: "Sign in with Example ID instead", count: 1 do |button|
-        assert_includes button.first["class"], "underline"
+        assert_look button.first, :tertiary, size: :small
       end
-      assert_select "main button.#{PRIMARY}", count: 1, text: "Sign in"
+      assert_equal [ "Sign in" ], primaries
       assert_select "a", text: "Owner sign-in", count: 0
     end
   end
@@ -121,7 +128,7 @@ class SsoSignInPageTest < ActionDispatch::IntegrationTest
     SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path)
     get admin_sign_in_path
     assert_select "form[action='#{admin_root_path}'][method=post][data-turbo=false] button[type=submit]", text: "Sign in with Acme" do |button|
-      assert_includes button.first["class"], SECONDARY
+      assert_look button.first, :secondary
     end
     assert_select "[data-sign-in-divider]:not([hidden])", text: "or", count: 1
     assert_equal [ "Sign in", "Sign in with Acme", "Sign in with a passkey" ], buttons_in_order

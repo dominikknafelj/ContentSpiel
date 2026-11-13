@@ -9,11 +9,7 @@
           <%= helpers.render "admin/shared/icon", name: :fingerprint, size: "size-4" %>
           <%= t(".use_passkey") %>
         </button>
-        <div class="flex items-center gap-3 text-small text-meta" data-admin--passkeys--confirm-target="divider">
-          <span class="h-px flex-1 bg-line" aria-hidden="true"></span>
-          <span><%= t(".or") %></span>
-          <span class="h-px flex-1 bg-line" aria-hidden="true"></span>
-        </div>
+        <%= render Admin::Ui::OrDividerComponent.new(data: { "admin--passkeys--confirm-target": "divider" }) %>
       <% end %>
 
       <form id="<%= form_id %>" data-action="admin--passkeys--confirm#confirmPassword">

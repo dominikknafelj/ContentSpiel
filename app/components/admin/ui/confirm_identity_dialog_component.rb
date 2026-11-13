@@ -40,7 +40,7 @@ module Admin
           confirmed: [ "test/system/admin/account_passkeys_test.rb", "Confirm it's you with the passkey carries the remove on" ],
           cancelled: [ "test/system/admin/account_passkeys_test.rb", "a cancelled confirmation is not re-sent later" ]
         },
-        keys: %w[title lead_passkey lead_password use_passkey or password confirm_password confirm cancel passkey_failed wrong_password limited],
+        keys: %w[title lead_passkey lead_password use_passkey password confirm_password confirm cancel passkey_failed wrong_password limited],
         slots: [],
         controller: "admin--passkeys--confirm",
         keyboard: [ "test/system/admin/account_passkeys_test.rb", "Confirm it's you starts on the password, Enter sends it, and Escape backs out" ]
