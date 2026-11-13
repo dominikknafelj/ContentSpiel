@@ -149,7 +149,8 @@ class SsoSignInTest < ActionDispatch::IntegrationTest
     assert Session.find_by!(user: person, authenticated_with: "password").enrolment_due, "the same person by password"
   end
 
-  # Review Focus 1.
+  # A state answers once, in the browser it was given to, with its nonce,
+  # within its lifetime; anything else signs nobody in.
   test "a replayed state, another browser's state, no cookie, another nonce and a late state each end unfinished with no session" do
     with_fake_idp do |idp|
       # A replay: the very answer and cookie sent again after it signed in.

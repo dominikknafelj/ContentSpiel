@@ -172,7 +172,7 @@ class AdminHostTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Review Focus 5: the provider is told the admin host's callback, the
+  # Under an admin host the provider is told the admin host's callback, the
   # state's cookie is the admin path's, and the public host never answers the
   # callback.
   test "with an admin host the redirect URI names it, the callback answers there alone, and the public host's callback is the public 404" do

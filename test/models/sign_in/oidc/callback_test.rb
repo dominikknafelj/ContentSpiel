@@ -174,8 +174,8 @@ class SignIn::Oidc::CallbackTest < ActiveSupport::TestCase
     end
   end
 
-  # Review Focus 3: whatever the provider answers, the callback answers a
-  # reason and never raises.
+  # Whatever the provider answers, the callback answers a reason and never
+  # raises.
   test "alg none, wrong audience, wrong issuer, expired, unknown key and an oversized or non-JSON answer are refused without raising" do
     with_fake_idp do |idp|
       kept = kept()
