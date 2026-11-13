@@ -24,9 +24,16 @@
 # now. Accepting creates the account (`Invitations::Accept`): until then the
 # person is no user, and the page knows them by the invitation alone.
 #
+# UNDER SSO_REQUIRED the password is no way in (`Invitations::Accept`
+# answers `[:sso_required]` for every token): a POST of the password form
+# starts the provider's sign-in for an open invitation instead
+# (`accept_with_sso_instead`, `SsoStarts`).
+#
 # What the service answers for a link (`:expired`, `:used`) are symbols, not
 # words: the words are this page's (`config/locales/invitations.en.yml`).
 class InvitationsController < ApplicationController
+  include SsoStarts
+
   layout "product"
 
   # What `Invitations::Accept` answers for a link that is no good, and the
@@ -80,13 +87,15 @@ class InvitationsController < ApplicationController
       # ended on the server and not only replaced in the cookie: the browser
       # is the invited person's from here on.
       terminate_session if resume_session
-      start_new_session_for(result.record)
+      start_new_session_for(result.record, method: "password")
       # Recorded as sign-in records it (`Admin::SessionsController#create`):
       # the user's own event, actor and subject both, so their last sign-in
       # and the log say they signed in.
       Current.actor = result.record
       Audit.record("session.created", subject: result.record)
       redirect_to admin_root_path, status: :see_other, notice: t(".ready")
+    elsif result.errors == [ Invitations::Accept::SSO_REQUIRED ]
+      accept_with_sso_instead
     elsif (state = LINK_STATES[result.errors])
       @state = state
       render :show, status: :unprocessable_entity
@@ -105,6 +114,20 @@ class InvitationsController < ApplicationController
   end
 
   private
+
+  # A password sent while SSO_REQUIRED is set (a page drawn before the host
+  # set it, or a hand-made POST): the password is not looked at, and an open
+  # invitation is accepted the one way left, through the provider, as its
+  # "Continue with" button would start it. A link that is no good is the
+  # page's own expired or used state, as for a password.
+  def accept_with_sso_instead
+    invitation = invitation_for_token
+    state = link_state(invitation)
+    return start_sso(intent: "invitation", invitation: invitation) if state == :open
+
+    @state = state
+    render :show, status: :unprocessable_entity
+  end
 
   # A String or nothing: a list or a hash where a token belongs is no token.
   def token_param

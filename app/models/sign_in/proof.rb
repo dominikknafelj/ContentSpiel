@@ -10,7 +10,16 @@ module SignIn
   #   (no code is used, no passkey verified, no password hashed);
   # - a right proof forgets the bucket's run (`Throttle#record_success`),
   #   the one the password step began included, and is `:ok`;
-  # - a wrong one is `:refused` with the buckets its reservation closed.
+  # - a wrong one is `:refused` with the buckets its reservation closed;
+  # - a right one for an account the caller's rule refuses (`allowed:`,
+  #   `SignInRules.passkey_allowed?`: a linked account, a non-owner under
+  #   SSO_REQUIRED) is a wrong one: checked first, as any proof is (the
+  #   passkey verified, the code used), then `:refused` with the count its
+  #   reservation made left standing and the run not forgotten. So a second
+  #   step held from before the rule applied (SSO_REQUIRED switched on, or
+  #   the account linked, while the step was held) signs nobody in, and
+  #   neither the answer, the bucket nor the span tells the rule from a
+  #   wrong proof.
   #
   # A wrong code, a used one and anything that is no code are one refusal,
   # which says nothing of which it was. A passkey is looked for among the
@@ -26,9 +35,11 @@ module SignIn
 
     # `identifier`: the account bucket's key, the email as the accounts
     # store it. `device`: the `KnownDevice` the browser carries, or nil.
-    def initialize(account:, identifier:, address:, span:, device: nil, throttle: SignIn::Throttle.new)
+    # `allowed`: whether the account may be let in by a right proof.
+    def initialize(account:, identifier:, address:, span:, device: nil, throttle: SignIn::Throttle.new, allowed: ->(_account) { true })
       raise ArgumentError, "#{span.inspect} is not among #{SPANS}" unless SPANS.include?(span)
 
+      @allowed = allowed
       @account = account
       @identifier = identifier
       @address = address
@@ -68,7 +79,7 @@ module SignIn
     def decide
       reservation = @throttle.reserve(identifier: @identifier, address: @address, device: known_device_id)
       return outcome(:locked, trips: [ reservation.refused_by ]) unless reservation.ok?
-      return outcome(:refused, trips: reservation.closes) unless yield
+      return outcome(:refused, trips: reservation.closes) unless yield && @allowed.call(@account)
 
       @throttle.record_success(identifier: @identifier, address: @address, device: known_device_id)
       outcome(:ok, account: @account)

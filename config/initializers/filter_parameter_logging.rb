@@ -24,7 +24,11 @@ Rails.application.config.filter_parameters += [
   # The single sign-on callback's query (`code`, `state`): an authorization code and the state it answers, both
   # one-time secrets. Whole names only, since a bare :code would mask every parameter that contains "code".
   /\Acode\z/,
-  /\Astate\z/
+  /\Astate\z/,
+  # The nonce in the provider's authorization address, which the start's "Redirected to" line logs with this list
+  # over its query (`ActionDispatch::Http::FilterRedirect`): it ties the ID token to this start, and is a secret
+  # until the callback spends it. The whole name, as the two above.
+  /\Anonce\z/
 ]
 
 # A visitor's answers to a form (personal data reaches no log). The endpoint (`FormSendsController`, controller

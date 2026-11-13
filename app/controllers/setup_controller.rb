@@ -244,7 +244,7 @@ class SetupController < ApplicationController
       end
 
       if result&.ok?
-        start_new_session_for(result.record)
+        start_new_session_for(result.record, method: "password")
         # A sign-in like any other, so audited like one (`Admin::
         # SessionsController#create`): `session.created`, the user as actor
         # and subject, on this request's `:setup` channel. Without it the

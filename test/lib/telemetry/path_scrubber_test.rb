@@ -21,6 +21,10 @@ class Telemetry::PathScrubberTest < ActiveSupport::TestCase
       [ "url.query", "" ] => "",
       [ "http.target", "/#{ADMIN}/pages/12?note_quote=some+private+words" ] => "/#{ADMIN}/pages/12",
       [ "http.target", "/#{ADMIN}/password/edit?token=abc123#y" ] => "/#{ADMIN}/password/edit",
+      # The single sign-on callback's query is an authorization code and its state.
+      [ "url.query", "code=some-code&state=some-state" ] => FILTERED,
+      [ "http.target", "/#{ADMIN}/sign-in/sso/callback?code=some-code&state=some-state" ] => "/#{ADMIN}/sign-in/sso/callback",
+      [ "url.full", "https://example.org/#{ADMIN}/sign-in/sso/callback?code=some-code&state=some-state" ] => "https://example.org/#{ADMIN}/sign-in/sso/callback",
       [ "http.target", "/up" ] => "/up",
       [ "url.full", "https://example.org/en/blog?note_quote=some+private+words" ] => "https://example.org/en/blog",
       [ "url.full", "https://example.org/#{ADMIN}/password/edit?token=abc123" ] => "https://example.org/#{ADMIN}/password/edit",

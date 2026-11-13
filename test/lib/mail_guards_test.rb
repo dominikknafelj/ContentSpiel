@@ -128,6 +128,7 @@ class MailGuardsTest < ActiveSupport::TestCase
     "app/services/invitations/accounts.rb" => "an account made for an invited address closes its open invitation (the audit log's seam)",
     "app/controllers/admin/invites_controller.rb" => "the Users screen's invite, resend and withdraw",
     "app/controllers/invitations_controller.rb" => "the accept page",
+    "app/controllers/admin/sso_sessions_controller.rb" => "the provider's callback finds the open invitation the start was made from, and sends a mismatch back to its page",
     "app/controllers/concerns/admin/users_list.rb" => "the Users screen lists the open invitations among the users",
     "app/components/admin/users_screen/list_component.rb" => "an invitation's row in that list",
     "app/components/admin/users_screen/invite_dialog_component.rb" => "the invite dialog's empty form",

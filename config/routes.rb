@@ -48,6 +48,15 @@ Rails.application.routes.draw do
       post "sign-in/second-step/passkey", to: "second_factors#passkey", as: :second_factor_passkey
       post "sign-in/second-step/code", to: "second_factors#code", as: :second_factor_code
       delete "sign-in/second-step", to: "second_factors#destroy"
+      # Single sign-on (`Admin::SsoSessionsController`): the button's POST,
+      # which sends the person to the site's provider, and the provider's
+      # way back. Inside this host constraint, so with ADMIN_HOST set the
+      # callback answers on the admin host alone, and the provider sends the
+      # person back there (`SignIn::Oidc.callback_origin`). Under
+      # `sign-in/` too, which `Setup::RedirectConstraint` lets through; the
+      # state's cookie is pathed to `sign-in/sso` (`SsoStarts`).
+      post "sign-in/sso", to: "sso_sessions#create", as: :sso
+      get "sign-in/sso/callback", to: "sso_sessions#callback", as: :sso_callback
       delete "sign-out", to: "sessions#destroy", as: :sign_out
 
       # ⌘K "Jump to..." results: a layout-less HTML

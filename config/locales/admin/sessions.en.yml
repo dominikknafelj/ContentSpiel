@@ -42,3 +42,12 @@ en:
       passkey_failed: "That passkey didn't work. Try again, or sign in with your password."
       # The second step of a sign-in was not answered in time.
       second_factor_expired: "That took too long. Sign in again."
+      # Single sign-on's answer for every account the provider's identity
+      # finds no way into (no invited account, an unverified email, an
+      # owner's address, a linked account's address under another
+      # subject): one sentence for all, which says nothing of who exists.
+      sso_refused: "Your %{provider} account can't sign in to this site. Ask an owner to invite you."
+      # A single sign-on that did not finish: cancelled at the provider, a
+      # provider error, a state or token that did not hold, or a provider
+      # out of reach.
+      sso_unfinished: "Signing in with %{provider} didn't finish. Try again."

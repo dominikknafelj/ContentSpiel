@@ -33,7 +33,7 @@ bin/bundler-audit       # known CVEs in gems
 bin/importmap audit     # known CVEs in JS deps (import maps, no npm/node_modules)
 ```
 
-`config/brakeman.ignore` lists the warnings Brakeman is told to skip: none today (the four "SQL Injection" ignores on constant-built SQL went when `Media::Search` and `Translations::StateIndex` stopped building SQL text). A new entry needs its `note` saying why the warning is false; `bin/brakeman` must exit 0 either way.
+`config/brakeman.ignore` lists the warnings Brakeman is told to skip: one today, the single sign-on start's redirect to the provider (`SsoStarts#start_sso`, `allow_other_host`), whose address comes from the provider's discovery document and never from the request (the four "SQL Injection" ignores on constant-built SQL went when `Media::Search` and `Translations::StateIndex` stopped building SQL text). A new entry needs its `note` saying why the warning is false; `bin/brakeman` must exit 0 either way.
 
 **DB:** `bin/rails db:prepare` / `db:migrate` / `db:test:prepare`. Schema lives in `db/schema.rb` (Postgres, jsonb-heavy) -- no `db/structure.sql`.
 

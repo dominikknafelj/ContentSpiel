@@ -198,6 +198,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/admin/passwords_controller.rb
       app/controllers/admin/second_factors_controller.rb
       app/controllers/admin/sessions_controller.rb
+      app/controllers/admin/sso_sessions_controller.rb
       app/controllers/admin/system_status_controller.rb
       app/controllers/admin/media_assets_controller.rb
       app/controllers/admin/tag_suggestions_controller.rb

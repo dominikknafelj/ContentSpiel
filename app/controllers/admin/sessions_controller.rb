@@ -41,7 +41,10 @@ module Admin
   # used, late or issued for another purpose) the sign-in page with "That
   # passkey didn't work. Try again, or sign in with your password."; past
   # the wide bucket or the rate limit, the sign-in page with "Try again
-  # later.". At an IP address there is no relying party (`SignIn::
+  # later.". A verified passkey of an account `SignInRules.passkey_allowed?`
+  # refuses (linked to its provider, or a non-owner under SSO_REQUIRED) is
+  # the wrong passkey's refusal, its count left in the wide bucket. At an IP
+  # address there is no relying party (`SignIn::
   # RelyingParty`), so the page draws no passkey button and both actions
   # answer 404.
   #
@@ -176,7 +179,9 @@ module Admin
       result = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party)
         .verify(params[:credential], challenge: challenge, credentials: Passkey, ceremony: "sign_in")
 
-      if result.ok
+      # A passkey of an account the rule keeps to its provider is a wrong
+      # passkey, asked after the verify so it takes a verify's work.
+      if result.ok && SignInRules.passkey_allowed?(result.credential.user)
         throttle.release_address(address: request.remote_ip)
         complete_sign_in(result.credential.user, method: "passkey")
         render json: { location: after_authentication_url }

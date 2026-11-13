@@ -180,6 +180,28 @@ class InvitationsTest < ActionDispatch::IntegrationTest
     assert_select "body", /Your account is ready\./
   end
 
+  # `Invitations::Accept` answers `[:sso_required]` for every token; the page
+  # does not draw that answer, it starts the provider for an open invitation.
+  test "under SSO_REQUIRED a password sent for an open invitation starts the provider instead, and a lapsed or used link gets its own answer" do
+    with_fake_idp(required: true) do |idp|
+      assert_no_difference -> { User.count } do
+        accept
+      end
+      assert_response :see_other
+      assert response.location.start_with?("#{idp.issuer}/authorize?"), "an open invitation goes to the provider"
+      assert_equal 0, Session.count
+
+      accept(token: "not-a-token")
+      assert_response :unprocessable_entity
+      assert_select "[data-invitation-token-target='expired']:not([hidden])", { count: 1 }, "a token that is none is the expired answer"
+
+      User.create!(email_address: "dana@example.com", password: PASSWORD)
+      accept
+      assert_response :unprocessable_entity
+      assert_select "[data-invitation-token-target='used']:not([hidden])", { count: 1 }, "a used link is the used answer"
+    end
+  end
+
   test "the page takes no name from an address, and the form takes a name only as a string" do
     get PAGE, params: { name: "Mallory" }
     assert_response :success
