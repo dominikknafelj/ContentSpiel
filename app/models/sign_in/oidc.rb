@@ -71,7 +71,7 @@ module SignIn
     # identity's, or the issuer an account was linked under.
     def self.issuer_host(issuer) = URI.parse(issuer.to_s).host
 
-    # Whether the host requires single sign-in: `SSO_REQUIRED=1` and a whole
+    # Whether the host requires single sign-on: `SSO_REQUIRED=1` and a whole
     # provider (`Provider.required?` is the one reader of the variable).
     def self.required?(env = ENV) = Provider.required?(env)
 

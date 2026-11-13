@@ -72,7 +72,7 @@ module SignIn
         values.values.none? || values.values.all? ? [] : values.reject { |_, value| value }.keys
       end
 
-      # Whether single sign-in is required: SSO_REQUIRED is `1` and the
+      # Whether single sign-on is required: SSO_REQUIRED is `1` and the
       # provider is whole.
       def self.required?(env = ENV)
         env["SSO_REQUIRED"] == "1" && !current(env).nil?
