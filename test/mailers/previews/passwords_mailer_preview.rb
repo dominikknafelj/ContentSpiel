@@ -4,4 +4,9 @@ class PasswordsMailerPreview < ActionMailer::Preview
   def reset
     PasswordsMailer.reset(User.take, origin: "http://localhost:3000")
   end
+
+  # Preview this email at http://localhost:3000/rails/mailers/passwords_mailer/sso_reminder
+  def sso_reminder
+    PasswordsMailer.sso_reminder(User.take, provider: "Okta", origin: "http://localhost:3000")
+  end
 end

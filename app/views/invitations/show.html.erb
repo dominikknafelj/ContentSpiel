@@ -27,35 +27,70 @@
     typed, else the stored one); on the GET it is empty and the check's
     answer fills it, so no parameter of an address reaches the page. %>
 <% field_errors = @field_errors || {} %>
+<% provider_name = sso_provider&.name %>
+<% sso_required = sso_provider.present? && SignIn::Oidc.required? %>
+<%# Back from the provider with no token: the notice alone (see the
+    controller). %>
+<% sso_notice = @sso_mismatch || @sso_unfinished || @sso_limited %>
 <% name_value = @invitation && (params[:name].is_a?(String) ? params[:name] : @invitation.name) %>
-<%= tag.div class: "flex flex-col gap-[18px]", data: (@state ? {} : { controller: "invitation-token", "invitation-token-check-url-value": admin_check_invitation_path }) do %>
+<%= tag.div class: "flex flex-col gap-[18px]", data: ((@state || sso_notice) ? {} : { controller: "invitation-token", "invitation-token-check-url-value": admin_check_invitation_path }) do %>
   <%= render "admin/shared/auth_heading", title: t(".title", site: site_name) %>
 
-  <% if @state.nil? %>
+  <% if sso_notice %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: "alert") do %>
+      <% if @sso_mismatch %>
+        <p><%= t(".sso_mismatch", provider: provider_name, got: @sso_mismatch["got"], email: @sso_mismatch["email"]) %></p>
+      <% elsif @sso_limited %>
+        <p><%= @sso_limited %></p>
+      <% else %>
+        <p><%= @sso_unfinished %></p>
+        <p><%= t(".sso_unfinished_again") %></p>
+      <% end %>
+    <% end %>
+  <% elsif @state.nil? %>
     <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: "alert") do %><%= safe_join(Array(flash[:alert]).map { |message| tag.p(message) }) %><% end %>
 
     <noscript>
       <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, role: nil) do %><%= t(".noscript") %><% end %>
     </noscript>
 
-    <%= form_with url: admin_accept_invitation_path, method: :post, class: "flex flex-col gap-[18px]",
-          data: { invitation_token_target: "form" }, html: { hidden: @token.blank? } do |form| %>
-      <%= hidden_field_tag :token, @token, id: "invitation-token", autocomplete: "off", data: { invitation_token_target: "token" } %>
-      <p class="text-sm text-dim" data-invitation-token-target="line" <%= "hidden" unless @invitation %>>
-        <%= t(".finish_html", email: tag.strong(@invitation&.email_address, class: "font-medium text-ink", data: { invitation_token_target: "email" })) %>
-      </p>
-      <div class="admin-field">
-        <%= label_tag "name", t(".name"), class: setup_label_class %>
-        <%= text_field_tag "name", name_value, id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class,
-              aria: { invalid: ("true" if field_errors[:name].present?), describedby: ("name-errors" if field_errors[:name].present?) }.compact,
-              data: { invitation_token_target: "name" } %>
-        <%= render "admin/shared/field_errors", id: "name-errors", messages: Array(field_errors[:name]) %>
-      </div>
-      <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: t(".password"), meter: true, autofocus: true,
-            errors: field_errors[:password]) %>
-      <%= render Admin::Ui::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: t(".confirm"),
-            errors: field_errors[:password_confirmation]) %>
-      <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full", data: { password_submit: true }) %>
+    <% if sso_required %>
+      <%# SSO_REQUIRED: no password form. The wrapper is the script's `form`
+          (shown and hidden with the answer), and the hidden field is where
+          the token waits for the provider's button. %>
+      <%= tag.div class: "flex flex-col gap-[18px]", data: { invitation_token_target: "form", action: "submit->invitation-token#carryToken" }, hidden: @token.blank? do %>
+        <%= hidden_field_tag :token, @token, id: "invitation-token", autocomplete: "off", data: { invitation_token_target: "token" } %>
+        <%= render Admin::Ui::WayInButtonComponent.new(label: t(".sso", provider: provider_name), url: admin_invitation_sso_path, variant: :primary) %>
+      <% end %>
+    <% else %>
+      <%= form_with url: admin_accept_invitation_path, method: :post, class: "flex flex-col gap-[18px]",
+            data: { invitation_token_target: "form" }, html: { hidden: @token.blank? } do |form| %>
+        <%= hidden_field_tag :token, @token, id: "invitation-token", autocomplete: "off", data: { invitation_token_target: "token" } %>
+        <p class="text-sm text-dim" data-invitation-token-target="line" <%= "hidden" unless @invitation %>>
+          <%= t(".finish_html", email: tag.strong(@invitation&.email_address, class: "font-medium text-ink", data: { invitation_token_target: "email" })) %>
+        </p>
+        <div class="admin-field">
+          <%= label_tag "name", t(".name"), class: setup_label_class %>
+          <%= text_field_tag "name", name_value, id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class,
+                aria: { invalid: ("true" if field_errors[:name].present?), describedby: ("name-errors" if field_errors[:name].present?) }.compact,
+                data: { invitation_token_target: "name" } %>
+          <%= render "admin/shared/field_errors", id: "name-errors", messages: Array(field_errors[:name]) %>
+        </div>
+        <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: t(".password"), meter: true, autofocus: true,
+              errors: field_errors[:password]) %>
+        <%= render Admin::Ui::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: t(".confirm"),
+              errors: field_errors[:password_confirmation]) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full", data: { password_submit: true }) %>
+      <% end %>
+
+      <% if provider_name %>
+        <%# The provider's button is a form of its own, so it carries the
+            token the script copies in when it is pressed (`carryToken`). %>
+        <%= tag.div class: "flex flex-col gap-[18px]", data: { invitation_token_target: "ways", action: "submit->invitation-token#carryToken" }, hidden: @token.blank? do %>
+          <%= render Admin::Ui::OrDividerComponent.new %>
+          <%= render Admin::Ui::WayInButtonComponent.new(label: t(".sso", provider: provider_name), url: admin_invitation_sso_path) %>
+        <% end %>
+      <% end %>
     <% end %>
   <% end %>
 

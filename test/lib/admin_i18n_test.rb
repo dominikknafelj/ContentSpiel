@@ -203,6 +203,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/users_screen/owner_zone_component.html.erb
     app/components/admin/users_screen/sessions_zone_component.rb
     app/components/admin/users_screen/sessions_zone_component.html.erb
+    app/components/admin/users_screen/sso_zone_component.rb
+    app/components/admin/users_screen/sso_zone_component.html.erb
     app/components/admin/users_screen/group_cards_component.rb
     app/components/admin/users_screen/group_cards_component.html.erb
     app/views/admin/users/index.html.erb
@@ -256,6 +258,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/account_screen/passkey_rename_fields_component.html.erb
     app/components/admin/account_screen/recovery_card_component.rb
     app/components/admin/account_screen/recovery_card_component.html.erb
+    app/components/admin/account_screen/sso_card_component.rb
+    app/components/admin/account_screen/sso_card_component.html.erb
     app/controllers/admin/passkeys_controller.rb
     app/controllers/admin/recovery_codes_controller.rb
     app/components/admin/settings_screen/sign_in_card_component.rb

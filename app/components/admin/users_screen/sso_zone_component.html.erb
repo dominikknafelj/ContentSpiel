@@ -1,0 +1,16 @@
+<%= render Admin::Ui::ActionZoneComponent.new(heading_id: "sso-zone-title", heading: t(".heading"), body: t(".body", name: name, provider: provider),
+      pending_lock: true, class: "mt-6", data: { zone: "sso" }) do |zone| %>
+  <% zone.with_trigger do %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".trigger"), variant: :secondary, size: :small,
+          data: dialog_trigger(dialog_id).merge("admin--saving--pending-lock-target": "control")) %>
+  <% end %>
+<% end %>
+
+<%# After the user's form, never inside it (forms don't nest). Not destructive: the confirm is the primary button. %>
+<%= render Admin::Ui::ConfirmDialogComponent.new(id: dialog_id, title: t(".title", name: name, provider: provider), body: confirm_body) do |dialog| %>
+  <% dialog.with_confirm_action do %>
+    <%= form_with url: url, method: :delete, data: { turbo_frame: "_top" } do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".confirm"), variant: :primary, type: "submit") %>
+    <% end %>
+  <% end %>
+<% end %>

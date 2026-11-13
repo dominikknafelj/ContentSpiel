@@ -172,6 +172,40 @@ class AdminHostTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Under an admin host the provider is told the admin host's callback, the
+  # state's cookie is the admin path's, and the public host never answers the
+  # callback.
+  test "with an admin host the redirect URI names it, the callback answers there alone, and the public host's callback is the public 404" do
+    with_fake_idp do |idp|
+      both_hosts do
+        https!
+        host! "studio.example.internal"
+        post "/cs-studio/sign-in/sso"
+        assert_response :see_other, "the start on the admin host sends to the provider"
+        callback = "#{ADMIN_ADDRESS}/cs-studio/sign-in/sso/callback"
+        assert_equal callback, Rack::Utils.parse_query(URI(response.location).query)["redirect_uri"], "the redirect URI names the admin host"
+        cookie = Array(response.headers["Set-Cookie"]).flat_map { |line| line.split("\n") }.find { |line| line.start_with?("cs_sso_state=") }
+        assert_includes cookie.downcase, "path=/cs-studio/sign-in/sso", "the state's cookie is the admin path's"
+        assert_includes cookie.downcase, "secure", "over HTTPS the state's cookie is Secure"
+        assert_no_match(/;\s*domain=/i, cookie, "the state's cookie is the admin host's alone")
+
+        back = idp.authorize(response.location)
+        assert back.start_with?("#{callback}?"), "the provider sends the browser back to the admin host"
+        get back
+        assert_redirected_to "#{ADMIN_ADDRESS}/cs-studio", "the callback answers on the admin host"
+        assert_equal "sso", Session.sole.authenticated_with, "the admin host's callback signs in by sso"
+
+        host! "docs.example.org"
+        get "/cs-studio/sign-in/sso/callback", params: { code: "x", state: "y" }
+        assert_response :not_found, "the public host's callback"
+        assert_nil response.location, "the public host's callback names no other host"
+        assert_no_match(/studio\.example\.internal/, response.body)
+        post "/cs-studio/sign-in/sso"
+        assert_response :not_found, "the public host's start"
+      end
+    end
+  end
+
   test "the registration options on the admin host name the admin host's relying party" do
     both_hosts do
       https!

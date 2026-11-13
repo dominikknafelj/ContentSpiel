@@ -16,6 +16,17 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", setup_step_path("admin"), text: "Continue"
   end
 
+  # An Off row (single sign-on not set up) is a neutral line, never a reason
+  # to hold the person on this step: Continue is always there.
+  test "the single sign-on row is Off and does not stop the wizard" do
+    get setup_step_path("system_check")
+
+    assert_select "li[data-status=off]", text: /Off.*Single sign-on/m
+    assert_select "a[href=?]", setup_step_path("admin"), text: "Continue"
+    get setup_step_path("admin")
+    assert_response :success
+  end
+
   # The shared check list takes its frame from its caller: the wizard's is
   # the ruled list under the step's heading, with no card around it.
   test "the wizard's check list keeps its own frame" do

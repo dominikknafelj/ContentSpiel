@@ -41,7 +41,10 @@ module Admin
   # used, late or issued for another purpose) the sign-in page with "That
   # passkey didn't work. Try again, or sign in with your password."; past
   # the wide bucket or the rate limit, the sign-in page with "Try again
-  # later.". At an IP address there is no relying party (`SignIn::
+  # later.". A verified passkey of an account `SignInRules.passkey_allowed?`
+  # refuses (linked to its provider, or a non-owner under SSO_REQUIRED) is
+  # the wrong passkey's refusal, its count left in the wide bucket. At an IP
+  # address there is no relying party (`SignIn::
   # RelyingParty`), so the page draws no passkey button and both actions
   # answer 404.
   #
@@ -119,7 +122,13 @@ module Admin
     rate_limit to: 30, within: 1.minute, only: :passkey_options, name: "options", store: SignIn.store,
       by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { head :too_many_requests }
 
+    # The page draws one of three panels by the site's single sign-on
+    # (`admin/sessions/new`): the provider, whether it is required, and the
+    # owner path, which is drawn only while it is.
     def new
+      @sso_provider = SignIn::Oidc::Provider.current
+      @sso_required = @sso_provider.present? && SignIn::Oidc.required?
+      @owner_path = owner_path?
       bot_check = SignIn::BotCheck.current
       @bot_check_configured = bot_check.present?
       @bot_check = bot_check if bot_check && (session[:sign_in_bot_check] || SignIn::Throttle.new.bot_check_due?(address: request.remote_ip))
@@ -130,7 +139,7 @@ module Admin
         email: params[:email_address], password: params[:password],
         address: request.remote_ip, hostname: request.host,
         bot_check_token: params["cf-turnstile-response"],
-        device: known_device
+        device: known_device, allowed: SignInRules.method(:password_allowed?)
       )
       outcome = attempt.call
 
@@ -151,7 +160,7 @@ module Admin
         else
           session.delete(:sign_in_bot_check)
         end
-        redirect_to admin_sign_in_path, alert: refusal_sentence(outcome)
+        redirect_to sign_in_page_path, alert: refusal_sentence(outcome)
       end
     end
 
@@ -176,11 +185,15 @@ module Admin
       result = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party)
         .verify(params[:credential], challenge: challenge, credentials: Passkey, ceremony: "sign_in")
 
-      if result.ok
+      # A passkey of an account the rule keeps to its provider is a wrong
+      # passkey, asked after the verify so it takes a verify's work.
+      if result.ok && SignInRules.passkey_allowed?(result.credential.user)
         throttle.release_address(address: request.remote_ip)
         complete_sign_in(result.credential.user, method: "passkey")
         render json: { location: after_authentication_url }
       else
+        # Why, for the operator alone: the answer is the wrong passkey's.
+        Telemetry.record(OpenTelemetry::Trace.current_span, "auth.refused_by_rule" => true) if result.ok
         reservation.closes.each { |trip| Audit.record("session.locked", metadata: { "bucket" => "address_wide", "seconds" => trip.seconds }) }
         answer_passkey_refused(t("admin.sessions.passkey_failed"))
       end
@@ -226,6 +239,15 @@ module Admin
       request.content_security_policy = policy
     end
 
+    # THE OWNER PATH (`?owner=1`) is the page's to ask for, never decided
+    # from an account: the form and the passkey's verify address carry the
+    # parameter, and a refusal answered there goes back there, whoever
+    # tried, so an owner who mistyped is not sent to the panel with no form,
+    # and the answer says nothing of who is an owner.
+    def owner_path? = params[:owner] == "1" && SignIn::Oidc.required?
+
+    def sign_in_page_path = owner_path? ? admin_sign_in_path(owner: 1) : admin_sign_in_path
+
     def refusal_sentence(outcome)
       case outcome.status
       when :bot_check_required, :bot_check_failed then t("admin.sessions.bot_check")
@@ -246,7 +268,7 @@ module Admin
       return limited_span { answer_passkey_refused(t("admin.sessions.limited")) } if action_name == "passkey"
 
       Telemetry.in_span("auth.sign_in", attributes: { "auth.method" => "password", "auth.outcome" => "locked" }) do
-        limited_span { redirect_to admin_sign_in_path, alert: t("admin.sessions.limited") }
+        limited_span { redirect_to sign_in_page_path, alert: t("admin.sessions.limited") }
       end
     end
 
@@ -259,7 +281,7 @@ module Admin
     # nothing it could tell apart.
     def answer_passkey_refused(sentence)
       flash[:alert] = sentence
-      render json: { location: admin_sign_in_path }
+      render json: { location: sign_in_page_path }
     end
 
     def require_passkey_relying_party

@@ -46,6 +46,15 @@ module Users
   #   for the founding owner it creates. Demoting the last owner is
   #   refused by `User`'s own validation. Recorded as `user.owner_changed`,
   #   apart from any other change's `user.updated`.
+  #
+  # A linked account (single sign-on) takes no password here
+  # (`OwnerProtection#sso_linked_password_refusal`) and is never made an
+  # owner: owners keep a password and a passkey, so the owner unlinks it
+  # first. A typed password and a promotion each ask the link twice: before
+  # anything is built, for the sentence, and again under the account's row
+  # lock in the saving transaction (`OwnerProtection#linked_issuer_under_lock`),
+  # the lock `Sso::Link` takes before it reads the owner flag and clears the
+  # password, so of a link and a save at once one always sees the other.
   class Save < ApplicationService
     include OwnerProtection
     include LeakedPasswordRule
@@ -72,12 +81,18 @@ module Users
       attrs = @attributes.slice(:email_address, :name, :password, :password_confirmation)
       attrs.except!(:password, :password_confirmation) if attrs[:password].blank?
       attrs[:owner] = !@user.owner if owner_change
+      promotion = owner_change && attrs[:owner]
+      return sso_linked_password_refusal if attrs.key?(:password) && @user.sso_linked?
+      return sso_linked_owner_refusal if promotion && @user.sso_linked?
 
       @user.assign_attributes(attrs)
       return unconfirmed_password if attrs.key?(:password) && attrs[:password_confirmation].blank?
       return leaked_password_failure(@user) if attrs.key?(:password) && leaked_password?(@user, attrs[:password])
 
+      linked_issuer = nil
       saved = User.transaction do
+        next false if (attrs.key?(:password) || promotion) && (linked_issuer = linked_issuer_under_lock)
+
         @user.save || raise(ActiveRecord::Rollback)
         end_sessions_after_password_change
         sync_groups(old_group_ids, new_group_ids)
@@ -86,6 +101,10 @@ module Users
         record_changes(old_group_ids, new_group_ids)
         touch_what_the_forms_show((old_group_ids - new_group_ids) | (new_group_ids - old_group_ids))
         true
+      end
+      if linked_issuer
+        return sso_linked_password_refusal(issuer: linked_issuer) if attrs.key?(:password)
+        return sso_linked_owner_refusal(issuer: linked_issuer)
       end
       return failure(@user) unless saved
 
@@ -173,6 +192,10 @@ module Users
       owner = changes.delete("owner")
       record_event("user.owner_changed", subject: @user, field_changes: { "owner" => owner }) if owner
       record_event("user.updated", subject: @user, field_changes: changes) if changes.any?
+    end
+
+    def sso_linked_owner_refusal(issuer: @user.sso_issuer)
+      failure(@user, [ I18n.t("admin.users.owner.sso_linked", name: @user.name_or_email, provider: SignInRules.provider_name(@user, issuer: issuer), raise: true) ])
     end
 
     # Final fix wave (C, P17): a typed password needs a typed confirmation.

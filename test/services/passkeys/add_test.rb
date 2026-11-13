@@ -125,4 +125,29 @@ class Passkeys::AddTest < ActiveSupport::TestCase
       assert_no_enqueued_jobs
     end
   end
+
+  test "a linked account adds no passkey: its provider is its second factor" do
+    link_to_sso(@user)
+
+    result = nil
+    assert_no_difference -> { Passkey.count } do
+      result = add
+    end
+
+    assert result.denied?
+    assert_empty @user.recovery_codes
+    assert_not Audit::Event.exists?(action: "passkey.added")
+  end
+
+  test "a link that lands after the account was read is seen under the row lock" do
+    user = User.find(@user.id)
+    registration = passkey_registration(user)
+    link_to_sso(User.find(user.id))
+
+    result = nil
+    assert_no_difference -> { Passkey.count } do
+      result = add(user, registration: registration)
+    end
+    assert result.denied?
+  end
 end

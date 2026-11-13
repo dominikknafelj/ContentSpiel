@@ -159,4 +159,25 @@ class Invitations::AcceptTest < ActiveSupport::TestCase
     assert_nil result.record.name
     assert_equal result.record.id, Audit::Event.find_by!(action: "invitation.accepted").user_id
   end
+
+  # Under SSO_REQUIRED an invited person accepts through the provider
+  # (`Invitations::AcceptWithSso`); the password form is refused before the
+  # token is read, so the answer is one for every token, good or not.
+  test "the password acceptance of an invitation is refused under SSO_REQUIRED" do
+    with_sso(required: true) do
+      [ @token, "junk" ].each do |token|
+        result = nil
+        assert_no_difference -> { User.count } do
+          result = accept(token)
+        end
+        assert_not result.ok?
+        assert_equal [ :sso_required ], result.errors
+        assert_nil result.record
+      end
+    end
+    assert @invitation.reload.open?, "the invitation is still open"
+    assert_not Audit::Event.exists?(action: "invitation.accepted")
+
+    with_sso { assert accept.ok?, "single sign-on that is not required leaves the password form open" }
+  end
 end

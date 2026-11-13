@@ -5,6 +5,10 @@
 en:
   admin:
     users:
+      # A password set for an account linked to single sign-on
+      # (`Users::Save`, `Users::UpdatePassword`): %{provider} is SSO_NAME,
+      # or the host it was linked under while single sign-on is off.
+      sso_linked_password: "This account signs in with %{provider} and has no password here."
       created: "User created"
       saved: "User saved"
       deleted: "User deleted"
@@ -14,9 +18,14 @@ en:
         no_longer: "%{name} is no longer an owner"
         already: "%{name} is already an owner"
         not: "%{name} is not an owner"
+        # `Users::Save`'s refusal to make a linked account an owner.
+        sso_linked: "%{name} signs in with %{provider}. Unlink them first: owners don't sign in with single sign-on."
       # `Sessions::EndAll`'s refusal on the owner's own account.
       sessions:
         own: "End your own sessions from Your account."
+      # `Sso::Unlink`'s refusal of an account with no link.
+      sso:
+        not_linked: "%{name} is not linked to single sign-on."
       index:
         title: "Users"
         invite: "Invite person…"

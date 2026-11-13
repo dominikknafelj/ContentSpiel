@@ -9,6 +9,17 @@ class User < ApplicationRecord
   has_many :passkeys, dependent: :delete_all # version: none (passkeys are on no public page)
   has_many :recovery_codes, dependent: :delete_all, extend: RecoveryCode::Redeem # version: none (recovery codes are on no public page)
 
+  # The identity at the single sign-on provider this account is linked to
+  # (`sso_issuer` and `sso_subject`, both or neither: the database holds it).
+  # A linked account signs in through the provider alone.
+  scope :linked_to, ->(issuer:, subject:) { where(sso_issuer: issuer, sso_subject: subject) }
+
+  # A password nobody holds: a linked account's, written when it is linked.
+  # Never shown, kept or sent anywhere.
+  def self.unusable_password = SecureRandom.base58(48)
+
+  def sso_linked? = sso_subject.present?
+
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
   MINIMUM_PASSWORD_LENGTH = 12
@@ -26,8 +37,9 @@ class User < ApplicationRecord
   # the email as the fallback -- `name_or_email` is the one reader, so no
   # screen decides the fallback for itself. A blank name is stored as nil,
   # so "no name" has one representation.
+  NAME_LIMIT = 120
   normalizes :name, with: ->(name) { name.to_s.strip.presence }
-  validates :name, length: { maximum: 120 }
+  validates :name, length: { maximum: NAME_LIMIT }
 
   # Presence here so the setup wizard shows a form error; uniqueness backs up
   # the unique index with a readable message instead of an exception.

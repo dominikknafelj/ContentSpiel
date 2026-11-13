@@ -39,6 +39,13 @@ en:
             one: "Your other session ends, and that browser must sign in again. You stay signed in here."
             other: "Your %{count} other sessions end, and those browsers must sign in again. You stay signed in here."
           end_others_confirm: "Sign out everywhere else"
+        # The Sign-in card of a person linked to the provider, in place of
+        # Password; `provider_fallback` is for a provider that has no name.
+        sso_card:
+          title: "Sign-in"
+          intro: "You sign in with %{provider}."
+          body: "Your password, your second factor and signing out of %{provider} are managed there. Ask an owner if you need to sign in another way."
+          provider_fallback: "single sign-on"
         # The Passkeys card: a row per passkey, its Rename and Remove…, and
         # the foot with "Add a passkey…". `last_required` stands in the row
         # of a covered person's last passkey, whose Remove is disabled.

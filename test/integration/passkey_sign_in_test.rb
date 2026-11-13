@@ -170,7 +170,7 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
           refused_to_sign_in_page(send_passkey(credential))
         end
       end
-      assert_equal [ "[passkey] a challenge could not be spent (#{error}), so it is refused" ], log.lines.map(&:strip).grep(/\[passkey\]/)
+      assert_equal [ "[sign-in] a value could not be spent (#{error}), so it is refused" ], log.lines.map(&:strip).grep(/\[sign-in\]/)
       assert_not_includes log, "the insert failed"
       travel PACE
     end
@@ -271,7 +271,7 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     host! "www.example.com"
     get admin_sign_in_path
     assert_select "[data-controller~='passkey-sign-in'] button[hidden][data-passkey-sign-in-target=button]", text: I18n.t("admin.sessions.new.passkey")
-    assert_select "[data-passkey-sign-in-target=divider][hidden]", text: I18n.t("admin.sessions.new.or")
+    assert_select "[data-passkey-sign-in-target=divider][hidden]", text: I18n.t("admin.components.ui.or_divider.or")
     assert_select "input[name=email_address][autocomplete='username webauthn']"
   end
 end

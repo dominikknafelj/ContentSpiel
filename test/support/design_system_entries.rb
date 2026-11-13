@@ -9,7 +9,7 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794475441-77b8".freeze
+  VERSION = "1794577235-d559".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
@@ -20,7 +20,7 @@ module DesignSystemEntries
     SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
     StudioBlockCard StudioCommandPalette StudioDashboardCards StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms
     StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioRail
-    StudioSectionTile StudioSessions StudioSettings StudioShell StudioSignIn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations
+    StudioSectionTile StudioSessions StudioSettings StudioShell StudioSignIn StudioSingleSignOn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations
     StudioTrash StudioTree StudioUsers StudioWizard TableGrid Tabs TextFields Toast Tooltip
   ].freeze
 
@@ -50,6 +50,9 @@ module DesignSystemEntries
     "Admin::Ui::MailFieldsComponent" => "StudioSettings",
     "Admin::Ui::MailHostValueComponent" => "StudioSettings",
     "Admin::Ui::MailTestOutcomeComponent" => "StudioSettings",
+    # Also named by the Code sections of StudioPasskeySignIn and
+    # StudioPasskeys (Confirm it's you): a component maps to one card here.
+    "Admin::Ui::OrDividerComponent" => "StudioSingleSignOn",
     "Admin::Ui::PaginationComponent" => "StudioListTable",
     "Admin::Ui::RailPanelComponent" => "StudioRail",
     "Admin::Ui::RailSlotComponent" => "StudioRail",
@@ -72,6 +75,7 @@ module DesignSystemEntries
     "Admin::Ui::TranslationPendingComponent" => "StudioTranslationPair",
     "Admin::Ui::UnpublishedChipComponent" => "RecordState",
     "Admin::Ui::UserNameComponent" => "Person",
+    "Admin::Ui::WayInButtonComponent" => "StudioSingleSignOn",
     "Admin::Ui::AuditSentenceComponent" => "StudioAuditLog",
     "Admin::Ui::NoteInboxRowComponent" => "StudioNotesInbox",
     "Admin::Ui::NewRecordDialogComponent" => "StudioNewRecordDialog",

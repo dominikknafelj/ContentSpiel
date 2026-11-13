@@ -57,4 +57,14 @@ class RecoveryCodes::GenerateTest < ActiveSupport::TestCase
     assert_empty @user.recovery_codes
     assert_empty Audit::Event.where(action: "recovery_codes.generated")
   end
+
+  test "a linked account makes no recovery codes" do
+    link_to_sso(@user)
+
+    result = generate
+
+    assert result.denied?
+    assert_empty @user.recovery_codes
+    assert_not Audit::Event.exists?(action: "recovery_codes.generated")
+  end
 end

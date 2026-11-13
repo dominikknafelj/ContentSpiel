@@ -126,11 +126,15 @@ module Authentication
     # so a policy changed later reaches a person at their next sign-in; the
     # policy it was read as is `auth.policy` on the request's span (a
     # passkey sign-in has no `auth.sign_in`, and a password's has closed).
-    def start_new_session_for(user, method: "password")
+    # `method` is how the person proved it, which the policy reads too (a
+    # method whose provider is the second factor, as SSO's is, is never due
+    # for enrolment); `provider_token` is kept on the session as
+    # `Session.start` decides.
+    def start_new_session_for(user, method:, provider_token: nil)
       policy = Passkeys::Policy.current
       Telemetry.record(OpenTelemetry::Trace.current_span, "auth.policy" => policy.name)
       Session.start(user: user, method: method, user_agent: request.user_agent, ip_address: request.remote_ip,
-        enrolment_due: policy.enrolment_due?(user)).tap do |session|
+        enrolment_due: policy.enrolment_due?(user, method: method), provider_token: provider_token).tap do |session|
         Current.session = session
         cookies.signed[:session_id] = { value: session.id, httponly: true, same_site: :lax, expires: session.expires_at }
       end

@@ -111,6 +111,15 @@
     <%= render Admin::Ui::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options)) %>
   <% end %>
 
+  <%# A person linked to the provider has no password, passkeys or codes
+      here: the Sign-in card stands in the Password card's place, and the
+      Passkeys and Recovery codes cards are not drawn at all. A crafted
+      password change is refused by the service and its sentence is said
+      above the card. %>
+  <% if Current.user.sso_linked? %>
+    <%= render Admin::Ui::ErrorSummaryComponent.new(errors: Array(@errors)) %>
+    <%= render Admin::AccountScreen::SsoCardComponent.new(provider_name: sso_provider_name) %>
+  <% else %>
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>
     <%# `#password` is the card's anchor: what a link to "change your
         password" names, and where the form's own answer comes back to.
@@ -178,6 +187,8 @@
   </div>
   <div id="<%= Admin::AccountRecoveryCodes::SLOT_ID %>"></div>
   <%= render Admin::Ui::ConfirmIdentityDialogComponent.new(passkey: @confirm_with_passkey, url_options: admin_url_options) %>
+
+  <% end %>
 
   <%# Sessions: after both forms and in neither, so nothing in it is a
       change a save bar counts or "Leave without saving?" asks about. Its

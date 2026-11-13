@@ -49,11 +49,11 @@ class Passkeys::PolicyTest < ActiveSupport::TestCase
 
   test "enrolment is due for a covered person with no passkey only" do
     everyone = policy("everyone")
-    assert everyone.enrolment_due?(users(:reader))
+    assert everyone.enrolment_due?(users(:reader), method: "password")
 
     add_passkey(users(:reader), client: fake_authenticator)
-    assert_not everyone.enrolment_due?(users(:reader))
-    assert_not policy("nobody").enrolment_due?(users(:two))
+    assert_not everyone.enrolment_due?(users(:reader), method: "password")
+    assert_not policy("nobody").enrolment_due?(users(:two), method: "password")
   end
 
   test "uncovered_count counts covered people without a passkey" do
@@ -70,5 +70,44 @@ class Passkeys::PolicyTest < ActiveSupport::TestCase
 
     assert_equal User.where.missing(:passkeys).count, policy("everyone").uncovered_count
     assert_equal 0, policy("nobody").uncovered_count
+  end
+
+  def link(user) = user.update_columns(sso_issuer: "https://id.example.com", sso_subject: "sub-#{user.id}", sso_linked_at: Time.current) # version: none (a test's setup)
+
+  test "a linked user is not covered, and an sso session is never due for enrolment" do
+    everyone = policy("everyone")
+    link(users(:reader))
+
+    assert_not everyone.covers?(users(:reader))
+    assert_not everyone.enrolment_due?(users(:reader), method: "sso")
+    assert_not everyone.enrolment_due?(users(:two), method: "sso"), "an sso session is spared, linked or not"
+    assert everyone.enrolment_due?(users(:two), method: "password")
+    assert_equal User.where.missing(:passkeys).count - 1, everyone.uncovered_count
+  end
+
+  test "a registered method with passkey_policy exempt is spared, one that applies is not" do
+    SignInMethods.register("acme/saml", label: "acme.saml", path: :root_path, passkey_policy: :exempt)
+    SignInMethods.register("acme/ldap", label: "acme.ldap", path: :root_path)
+    everyone = policy("everyone")
+
+    assert_not everyone.enrolment_due?(users(:reader), method: "acme/saml")
+    assert everyone.enrolment_due?(users(:reader), method: "acme/ldap")
+  ensure
+    SignInMethods.reset!
+  end
+
+  test "while single sign-on is required an owner is covered whatever the policy" do
+    nobody = policy("nobody")
+    with_sign_in_env("SSO_ISSUER" => "https://id.example.com", "SSO_CLIENT_ID" => "client", "SSO_CLIENT_SECRET" => "secret",
+      "SSO_NAME" => "Example ID", "SSO_REQUIRED" => "1") do
+      assert nobody.covers?(users(:one))
+      assert nobody.covers_owners?
+      assert_not nobody.covers?(users(:two)), "an admin who is no owner signs in through the provider"
+      assert nobody.enrolment_due?(users(:one), method: "password")
+      assert_equal 1, nobody.uncovered_count
+    end
+    assert_not nobody.covers?(users(:one))
+    assert_not nobody.covers_owners?
+    assert_equal 0, nobody.uncovered_count
   end
 end

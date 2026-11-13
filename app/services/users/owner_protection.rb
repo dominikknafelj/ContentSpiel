@@ -15,6 +15,16 @@ module Users
   #   `user_field_changes` records that it changed as `"credentials"`
   #   instead -- a key no `filter_parameters` entry matches, with no value
   #   derived from the password.
+  # - A linked account (`User#sso_linked?`) has no password here: it signs
+  #   in through its provider alone (`SignInRules`), so a password set for
+  #   it is refused in words (`#sso_linked_password_refusal`), after the
+  #   authorization, so only someone who may manage the account learns of
+  #   the link. Clearing it (`Sso::Link`) is the one write it takes. The
+  #   in-memory account is asked first, for the sentence, and the row again
+  #   under its lock in the saving transaction (`#linked_issuer_under_lock`),
+  #   the lock `Sso::Link` takes before it clears the password: a link that
+  #   commits between the read and the save is seen, so no typed password
+  #   lands on a linked account.
   # - A password change ends that user's sessions
   #   (`#end_sessions_after_password_change`), in the transaction that
   #   writes the password -- here rather than in a controller, so no path
@@ -34,6 +44,20 @@ module Users
     # A non-owner may only manage users whose groups they could manage as they
     # stand (fix round 1, I1); see Manageability#outranked?.
     def outranked? = Manageability.outranked?(actor, @user)
+
+    def sso_linked_password_refusal(issuer: @user.sso_issuer)
+      @user.errors.add(:base, I18n.t("admin.users.sso_linked_password", provider: SignInRules.provider_name(@user, issuer: issuer), raise: true))
+      failure(@user)
+    end
+
+    # The issuer the account's row is linked under, read under the row's
+    # lock, or nil: inside the saving transaction, before the save.
+    def linked_issuer_under_lock
+      return unless @user.persisted?
+
+      issuer, subject = User.lock.where(id: @user.id).pick(:sso_issuer, :sso_subject)
+      issuer if subject.present?
+    end
 
     def owner_only_denial
       denied("users.manage", @user, message: "You don't have permission to change an owner's account")

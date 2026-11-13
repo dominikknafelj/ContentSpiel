@@ -157,6 +157,17 @@ class SessionTest < ActiveSupport::TestCase
     assert_empty disconnects(users(:two))
   end
 
+  test "unlinking a user from single sign-on disconnects them, keeping nobody else's" do
+    @user.update_columns(sso_issuer: "https://id.example.com", sso_subject: "sub-1", sso_linked_at: Time.current) # version: none (a test's setup)
+
+    assert as(nil, channel: :console) { Sso::Unlink.call(@user, actor: nil) }.ok?
+
+    assert_equal 0, @user.sessions.count
+    assert_equal [ DISCONNECT ] * 2, disconnects(@user)
+    assert_empty disconnects(users(:two))
+    assert Session.exists?(@other.id)
+  end
+
   test "deleting a user disconnects them, by an id that outlives the row" do
     cable = cable_of(@user)
 
@@ -205,5 +216,137 @@ class SessionTest < ActiveSupport::TestCase
   test "a session carries whether enrolment is due, false unless it is said" do
     assert_not Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil).enrolment_due
     assert Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil, enrolment_due: true).reload.enrolment_due
+  end
+
+  # The ending the session has when it is met at `at` (a session met is seen, so idleness is not in the way).
+  def expiry_at(session, at) = session.tap { |row| row.last_seen_at = at }.expiry(at)
+
+  def sso_session(token:, at:)
+    Session.start(user: @user, method: "sso", user_agent: nil, ip_address: nil, provider_token: token, at: at)
+  end
+
+  test "an sso session with no token expires at 24 hours and one with a token at 26, as expired_sso" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    bare = sso_session(token: nil, at: t)
+    held = sso_session(token: "refresh-token", at: t)
+
+    assert_equal t, bare.provider_checked_at
+    assert_nil expiry_at(bare, t + 24.hours - 1.second)
+    assert_equal "expired_sso", expiry_at(bare, t + 24.hours)
+    assert_nil expiry_at(held, t + 26.hours - 1.second)
+    assert_equal "expired_sso", expiry_at(held, t + 26.hours)
+
+    assert_equal [ bare ], Session.expired_sso(t + 24.hours).to_a
+    assert_equal [ bare, held ].sort_by(&:id), Session.expired_sso(t + 26.hours).sort_by(&:id)
+    assert_empty Session.expired_sso(t + 23.hours)
+    assert_equal({ "after_hours" => 24 }, Session.timeout_metadata("expired_sso"))
+    assert_equal({ "after_hours" => 24 }, Session.timeout_metadata("expired_sso", bare))
+    assert_equal({ "after_hours" => 26 }, Session.timeout_metadata("expired_sso", held))
+  end
+
+  test "a session of another method with a check date ends at 26 hours, token or not, and one with none is left alone" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    gem_session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, at: t)
+    gem_session.update_columns(provider_checked_at: t) # version: none (a test's own row)
+
+    assert_nil expiry_at(gem_session, t + 25.hours)
+    assert_equal "expired_sso", expiry_at(gem_session, t + 26.hours)
+    assert_equal [ gem_session ], Session.expired_sso(t + 26.hours).to_a
+    assert_empty Session.expired_sso(t + 25.hours)
+
+    plain = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, at: t)
+    assert_nil plain.provider_checked_at
+    assert_not_includes Session.expired_sso(t + 13.days), plain
+  end
+
+  test "a session may be made with a registered method and not with an unknown one" do
+    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path)
+    assert Session.start(user: @user, method: "acme/saml", user_agent: nil, ip_address: nil).persisted?
+    assert_raises(ActiveRecord::RecordInvalid) { Session.start(user: @user, method: "acme/other", user_agent: nil, ip_address: nil) }
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "a method with a recheck gets a check date and its token, and one without neither" do
+    SignInMethods.register("acme/checked", label: "k", path: :admin_root_path, recheck: ->(_session) { :ok })
+    SignInMethods.register("acme/unchecked", label: "k", path: :admin_root_path)
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    checked = Session.start(user: @user, method: "acme/checked", user_agent: nil, ip_address: nil, provider_token: "tok", at: t)
+    unchecked = Session.start(user: @user, method: "acme/unchecked", user_agent: nil, ip_address: nil, provider_token: "tok", at: t)
+
+    assert_equal t, checked.provider_checked_at
+    assert_equal "tok", checked.reload.provider_token
+    assert_nil unchecked.provider_checked_at
+    assert_nil unchecked.reload.provider_token
+    assert_not_includes Session.expired_sso(t + 13.days), unchecked
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "provider_check_due holds the sessions checked 24 hours ago or more" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    held = sso_session(token: "refresh-token", at: t)
+
+    assert_includes Session.provider_check_due(t + 24.hours), held
+    assert_not_includes Session.provider_check_due(t + 24.hours - 1.second), held
+  end
+
+  test "the absolute timeout wins over expired_sso" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    session = sso_session(token: nil, at: t)
+
+    assert_equal "expired_sso", expiry_at(session, t + 30.hours)
+    assert_equal "expired_absolute", expiry_at(session, t + 14.days)
+  end
+
+  test "a request that meets an SSO session past its check ends it as expired_sso" do
+    t = Time.current
+    bare = sso_session(token: nil, at: t - 24.hours)
+    held = sso_session(token: "refresh-token", at: t - 26.hours)
+    alive = sso_session(token: "refresh-token", at: t - 26.hours + 1.second)
+    [ bare, held, alive ].each { |row| row.update_columns(last_seen_at: t) } # version: none (a test's own rows)
+
+    assert_nil Session.from_cookies(cookie_jar(bare), at: t)
+    assert_nil Session.from_cookies(cookie_jar(held), at: t)
+    assert_equal alive, Session.from_cookies(cookie_jar(alive), at: t)
+    assert_nil Session.find_by(id: bare.id)
+    assert_nil Session.find_by(id: held.id)
+    assert_equal [ [ "expired_sso", 24 ], [ "expired_sso", 26 ] ],
+      Audit::Event.where(action: "session.ended").order(:id).last(2).map { |e| [ e.metadata["reason"], e.metadata["after_hours"] ] }
+  end
+
+  test "without encryption keys an sso session starts with no token" do
+    without_encryption_keys do
+      session = sso_session(token: "refresh-token", at: Time.current)
+      assert_nil session.reload.provider_token
+      assert_not_nil session.provider_checked_at
+    end
+  end
+
+  test "without encryption keys an SSO session with a token still expires at 26 hours, read without decrypting" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    held = sso_session(token: "refresh-token", at: t)
+    without_encryption_keys do
+      row = Session.find(held.id)
+      assert_nil expiry_at(row, t + 26.hours - 1.second)
+      assert_equal "expired_sso", expiry_at(row, t + 26.hours)
+      assert_equal({ "after_hours" => 26 }, Session.timeout_metadata("expired_sso", row))
+    end
+  end
+
+  test "the provider token is stored encrypted" do
+    session = sso_session(token: "refresh-token-plain", at: Time.current)
+    raw = Session.connection.select_value("SELECT provider_token FROM sessions WHERE id = #{session.id.to_i}") # sql: a test reads the raw column
+
+    assert_not_nil raw
+    assert_not_includes raw, "refresh-token-plain"
+    assert_equal "refresh-token-plain", session.reload.provider_token
+  end
+
+  test "a session of a method that is never asked again stores no provider token" do
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, provider_token: "refresh-token")
+
+    assert_nil session.reload.provider_token
+    assert_nil session.provider_checked_at
   end
 end

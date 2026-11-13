@@ -1,5 +1,5 @@
 <%# The check rows, shared by the setup wizard's step and CS Studio's System
-    status: warnings first, then OK, each group in the checks' own order.
+    status: warnings first, then OK, then Off, each group in the checks' own order.
     `list_class` is the list's frame, the caller's: the wizard's ruled list
     under its step's heading by default, and System status's rows divided
     inside its card.
@@ -13,7 +13,7 @@
 <% image_settings_href = local_assigns[:image_settings_href] %>
 <% forms_href = local_assigns[:forms_href] %>
 <ul class="<%= list_class %>">
-  <% results.sort_by.with_index { |result, index| [ result.ok? ? 1 : 0, index ] }.each_with_index do |result, index| %>
+  <% results.sort_by.with_index { |result, index| [ { ok: 1, off: 2 }.fetch(result.status, 0), index ] }.each_with_index do |result, index| %>
     <%= render Admin::Ui::SystemCheckRowComponent.new(result: result, index: index, copyable: copyable, mail_settings_href: mail_settings_href,
       image_settings_href: image_settings_href, forms_href: forms_href) %>
   <% end %>

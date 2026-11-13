@@ -75,6 +75,29 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
     assert_equal 1, known[:hashes]
   end
 
+  # A refusal by rule (`SignInRules`): a linked account, or a non-owner
+  # under SSO_REQUIRED, typing its right password is answered as another
+  # account typing a wrong one, with the same work.
+  test "a refused-by-rule right password answers as a wrong one: status, body, redirect and the same authenticate_by" do
+    other = User.create!(email_address: "ben@example.org", password: PASSWORD)
+    link_to_sso(@user)
+    @user.update_column(:password_digest, BCrypt::Password.create(PASSWORD, cost: BCrypt::Engine::MIN_COST)) # version: none (a test's setup)
+
+    wrong = answer_to(other.email_address)
+    linked = answer_to(EMAIL, password: PASSWORD)
+    assert_equal wrong, linked
+    assert_equal I18n.t("admin.sessions.refused"), linked[:flash]
+    assert_equal 1, linked[:hashes]
+
+    with_sso(required: true) do
+      third = User.create!(email_address: "cleo@example.org", password: PASSWORD)
+      fourth = User.create!(email_address: "dan@example.org", password: PASSWORD)
+      assert_equal answer_to(third.email_address), answer_to(fourth.email_address, password: PASSWORD)
+    end
+    assert_not Session.exists?, "nobody was signed in"
+    assert_equal 4, Audit::Event.where(action: "session.failed").count
+  end
+
   test "a required and a refused bot check answer the same for a known and an unknown address, and check no password" do
     with_bot_check(:failed) do
       3.times { |index| attempt("person#{index}@example.org") }

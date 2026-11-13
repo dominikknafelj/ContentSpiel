@@ -19,6 +19,21 @@ en:
       admin_address:
         label: "CS Studio address"
         message: "CS Studio answers at %{origin} alone. The public address answers no CS Studio page."
+      # The "Single sign-on" row (`Setup::SystemCheck#single_sign_on`): `ok`
+      # (with `required` after it while SSO_REQUIRED is set), `unreachable`
+      # with a phrase for the provider's reason word (`reasons`), and `off` (quoted: a bare off is YAML's false).
+      sso:
+        label: "Single sign-on"
+        ok: "%{provider} (%{issuer}) answers."
+        required: "Required for everyone but owners."
+        unreachable: "%{provider} (%{issuer}) didn't answer: %{reason}. Nobody can sign in with it until it does."
+        "off": "Not set up. The hosting reference lists its variables."
+        reasons:
+          unreachable: "it could not be reached"
+          http: "it answered with HTTP status %{status}"
+          not_json: "its answer was not a discovery document"
+          issuer_mismatch: "its document names another issuer"
+          missing_endpoint: "its document lacks an endpoint sign-in needs"
       # The "Visitor address" row (`Setup::SystemCheck#visitor_address`):
       # OK with no Cloudflare header, OK when the header is the address the
       # request is counted by, and the warning when it is not.

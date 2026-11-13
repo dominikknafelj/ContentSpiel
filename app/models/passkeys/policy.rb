@@ -7,6 +7,16 @@ module Passkeys
   # change reaches a person at their next session, never the one they are in.
   # `Passkeys::Remove` reads it at the moment of removal, so a covered person
   # keeps at least one passkey.
+  #
+  # SINGLE SIGN-ON. A linked account is never covered: it signs in through
+  # its provider alone, which is its second factor, and it holds no passkey
+  # (`Sso::Link` deletes them). A session made by a method whose provider is
+  # the second factor (`SignInMethods.exempt?`: SSO, or a gem's method
+  # registered `passkey_policy: :exempt`) is never due for enrolment, linked
+  # or not. And while single sign-on is required (`SignIn::Oidc.required?`)
+  # an owner is covered whatever the stored policy: the owners are then the
+  # only people who sign in with a password, and an owner never links, so
+  # their own way in must not be a password alone.
   class Policy
     # The rights that make someone an admin here: whoever can make accounts,
     # hand out rights or issue tokens can take over the site.
@@ -27,6 +37,9 @@ module Passkeys
     # gates no write by itself: who may write is each service's own rule,
     # and the policy only says who must keep a passkey.
     def covers?(user)
+      return false if user.sso_linked?
+      return true if user.owner? && sso_required?
+
       case name
       when "everyone" then true
       when "owners_and_admins" then user.owner? || ADMIN_PERMISSIONS.any? { |key| AccessControl.holds?(user, key, channel: :admin) }
@@ -34,17 +47,22 @@ module Passkeys
       end
     end
 
-    def covers_owners? = name != "nobody"
+    def covers_owners? = name != "nobody" || sso_required?
 
-    def enrolment_due?(user) = covers?(user) && !user.passkeys.exists?
+    # `method` is how the session being started proved its person.
+    def enrolment_due?(user, method:) = !SignInMethods.exempt?(method) && covers?(user) && !user.passkeys.exists?
 
     # The covered people who hold no passkey. Counted in Ruby over the
     # passkey-less users, since whether someone is an admin is a rights
     # question for `AccessControl`, not a column; a site has tens of users.
     def uncovered_count
-      return 0 if name == "nobody"
+      return 0 unless covers_owners?
 
       User.where.missing(:passkeys).to_a.count { |user| covers?(user) }
     end
+
+    private
+
+    def sso_required? = SignIn::Oidc.required?
   end
 end

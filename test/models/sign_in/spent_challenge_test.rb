@@ -17,6 +17,20 @@ class SignIn::SpentChallengeTest < ActiveSupport::TestCase
     end
   end
 
+  test "take spends a value once per purpose, and a database error is a refusal" do
+    expires_at = 5.minutes.from_now
+    assert SignIn::SpentChallenge.take(purpose: "sso", value: "v", expires_at: expires_at)
+    assert_not SignIn::SpentChallenge.take(purpose: "sso", value: "v", expires_at: expires_at)
+    assert SignIn::SpentChallenge.take(purpose: "sign_in", value: "v", expires_at: expires_at)
+    assert_equal 2, SignIn::SpentChallenge.count
+
+    [ ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished ].each do |error|
+      with_singleton_override(SignIn::SpentChallenge, :insert_all, ->(*, **) { raise error, "the insert failed" }) do
+        assert_not SignIn::SpentChallenge.take(purpose: "sso", value: "w", expires_at: expires_at)
+      end
+    end
+  end
+
   test "sweep deletes the rows past their expiry and keeps the others" do
     now = Time.current.change(usec: 0)
     SignIn::SpentChallenge.spend!("old", expires_at: now - 1.second)

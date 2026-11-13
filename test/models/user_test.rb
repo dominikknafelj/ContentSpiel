@@ -215,4 +215,31 @@ class UserTest < ActiveSupport::TestCase
     assert_equal 0, Passkey.where(user_id: user.id).count
     assert_equal 0, RecoveryCode.where(user_id: user.id).count
   end
+
+  test "sso_linked? follows the subject, and an issuer without a subject is refused by the database" do
+    user = users(:reader)
+    assert_not user.sso_linked?
+
+    user.update!(sso_issuer: "https://idp.example", sso_subject: "abc", sso_linked_at: Time.current)
+    assert user.sso_linked?
+
+    other = users(:two)
+    assert_raises(ActiveRecord::StatementInvalid) { other.update_columns(sso_issuer: "https://idp.example") } # version: none (a test's own row)
+    assert_raises(ActiveRecord::StatementInvalid) { other.update_columns(sso_subject: "abc") } # version: none (a test's own row)
+  end
+
+  test "two users cannot hold one issuer and subject, and one subject under two issuers is two links" do
+    users(:reader).update!(sso_issuer: "https://a.example", sso_subject: "s1")
+    assert_raises(ActiveRecord::RecordNotUnique) { users(:two).update!(sso_issuer: "https://a.example", sso_subject: "s1") }
+    users(:two).update!(sso_issuer: "https://b.example", sso_subject: "s1")
+
+    assert_equal [ users(:reader) ], User.linked_to(issuer: "https://a.example", subject: "s1").to_a
+    assert_equal users(:two), User.linked_to(issuer: "https://b.example", subject: "s1").first
+    assert_nil User.linked_to(issuer: "https://c.example", subject: "s1").first
+  end
+
+  test "an unusable password is long, random and different every time" do
+    assert_equal 48, User.unusable_password.length
+    assert_not_equal User.unusable_password, User.unusable_password
+  end
 end

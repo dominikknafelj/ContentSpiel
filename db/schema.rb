@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_12_090200) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_13_090100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -516,6 +516,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_090200) do
     t.string "authenticated_with", null: false
     t.datetime "confirmed_at"
     t.boolean "enrolment_due", default: false, null: false
+    t.text "provider_token"
+    t.datetime "provider_checked_at"
     t.index ["expires_at"], name: "index_sessions_on_expires_at"
     t.index ["last_seen_at"], name: "index_sessions_on_last_seen_at"
     t.index ["user_id"], name: "index_sessions_on_user_id"
@@ -597,8 +599,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_090200) do
     t.boolean "notes_sound", default: true, null: false
     t.boolean "notes_desktop", default: false, null: false
     t.string "webauthn_id"
+    t.string "sso_issuer"
+    t.string "sso_subject"
+    t.datetime "sso_linked_at"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
+    t.index ["sso_issuer", "sso_subject"], name: "index_users_on_sso_issuer_and_sso_subject", unique: true
     t.index ["webauthn_id"], name: "index_users_on_webauthn_id", unique: true
+    t.check_constraint "(sso_issuer IS NULL) = (sso_subject IS NULL)", name: "users_sso_issuer_with_subject"
   end
 
   add_foreign_key "access_control_grants", "access_control_groups", column: "group_id", on_delete: :cascade

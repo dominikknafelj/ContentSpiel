@@ -329,4 +329,28 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       assert_equal({ "kind" => "tip" }, Audit::Snapshot.for(block)["settings"])
     end
   end
+
+  test "filter_parameters masks code, state and nonce by their whole names, and not a name that contains them" do
+    filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
+    filtered = filter.filter("code" => "a", "state" => "b", "nonce" => "e", "zip_code" => "10115", "estate" => "c", "code_of_conduct" => "d")
+
+    assert_equal [ "[FILTERED]" ] * 3, filtered.values_at("code", "state", "nonce")
+    assert_equal({ "zip_code" => "10115", "estate" => "c", "code_of_conduct" => "d" }, filtered.except("code", "state", "nonce"))
+  end
+
+  test "a request's logged address masks the single sign-on's state, code and nonce" do
+    request = ActionDispatch::Request.new(Rack::MockRequest.env_for("/cs-studio/sign-in/sso/callback?code=c1&state=s1&nonce=n1&page=2", Rails.application.env_config))
+
+    assert_equal "/cs-studio/sign-in/sso/callback?code=[FILTERED]&state=[FILTERED]&nonce=[FILTERED]&page=2", request.filtered_path
+  end
+
+  test "the single sign-on's request-only names reach neither a record's inspect nor a snapshot" do
+    # Once a request's filter is built, Rails folds the list's patterns into one.
+    Rails.application.env_config
+    thread = Notes::Thread.new(state: "open")
+
+    assert_includes thread.inspect, 'state: "open"'
+    assert_equal "open", ActiveSupport::ParameterFilter.new(ActiveRecord::Base.filter_attributes).filter_param("state", "open")
+    assert_equal({ "state" => "open", "code" => "en", "nonce" => "n" }, Audit::Snapshot.scrub("state" => "open", "code" => "en", "nonce" => "n"))
+  end
 end

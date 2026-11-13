@@ -32,6 +32,10 @@ gem "useragent", "~> 0.16"
 # Passkeys (WebAuthn): the registration and sign-in ceremonies' options and their verification.
 gem "webauthn", "~> 3.5"
 
+# Single sign-on (OIDC): the discovery document's shape and issuer check, the authorization URL and the ID token's
+# signature and claims, used as a library with no OmniAuth middleware (`SignIn::Oidc`).
+gem "openid_connect", "~> 2.3"
+
 # webauthn asks only for openssl >= 2.2, which would take openssl 4, a major version above the 3.3 Ruby 3.4 ships,
 # under Active Record encryption, MessageEncryptor and Net::HTTP alike: held to the 3.x line. It compiles in the
 # image's build stage, whose libpq-dev brings libssl-dev.

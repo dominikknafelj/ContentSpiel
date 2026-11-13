@@ -182,6 +182,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/users
       app/controllers/admin/users_controller.rb
       app/controllers/admin/invites_controller.rb
+      app/controllers/admin/sso_links_controller.rb
       app/controllers/concerns/admin/users_list.rb
     ],
     shared: %w[
@@ -198,6 +199,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/admin/passwords_controller.rb
       app/controllers/admin/second_factors_controller.rb
       app/controllers/admin/sessions_controller.rb
+      app/controllers/admin/sso_sessions_controller.rb
       app/controllers/admin/system_status_controller.rb
       app/controllers/admin/media_assets_controller.rb
       app/controllers/admin/tag_suggestions_controller.rb

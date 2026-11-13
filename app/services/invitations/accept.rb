@@ -23,6 +23,11 @@ module Invitations
   #               whose address has had an account made for it since (the
   #               New user form): either way the person signs in. `record` is
   #               the invitation.
+  #   [:sso_required]  SSO_REQUIRED is set (`SignIn::Oidc.required?`): an
+  #               invited person accepts through the provider
+  #               (`Invitations::AcceptWithSso`), never with a password.
+  #               Answered before the token is read, so it is the one answer
+  #               for every token and says nothing of any; `record` is nil.
   # Any other failure is the form's: `errors` are the new user's sentences (a
   # blank, short or unconfirmed password; a name too long), `record` is the
   # invitation, still open, whose `errors` hold the same sentences by the
@@ -38,19 +43,19 @@ module Invitations
   # lookup, which is an outside call of up to five seconds and so must not
   # run while the invitation's row is locked (a second press would wait on
   # it). Only then is the row locked and asked again, and the account saved
-  # under the lock, so a second press that arrives while the first is in
+  # under the lock (`Invitations::Acceptance#accept_into`), so a second press that arrives while the first is in
   # flight reads `:used`. The save validates again. An account made for the
   # address after the row is locked is `:used` (`used?` under the lock, or
   # the unique index); one made in the moment between the first `used?` and
   # the account's judging is refused by the uniqueness rule instead, "Email
   # address has already been taken", and the next press reads `:used`.
   class Accept < ApplicationService
+    include Acceptance
     include Users::LeakedPasswordRule
 
     # authorize: none (the invitation token is the credential: a token that finds an open invitation is the right to make that one account, and the service acts as the account it makes, as the reset flow does)
 
-    EXPIRED = :expired
-    USED = :used
+    SSO_REQUIRED = :sso_required
 
     def initialize(token:, name:, password:, password_confirmation:)
       @token = token.to_s
@@ -60,6 +65,8 @@ module Invitations
     end
 
     def call
+      return failure(nil, [ SSO_REQUIRED ]) if SignIn::Oidc.required?
+
       @invitation = Invitation.find_by_token_for(:accept, @token)
       return failure(nil, [ EXPIRED ]) if @invitation.nil?
       return failure(@invitation, [ USED ]) if @invitation.used?
@@ -67,23 +74,8 @@ module Invitations
       user = build_user
       return refused(user) if user.errors.any?
 
-      outcome = Invitation.transaction do
-        @invitation.lock!
-        next USED if @invitation.used?
-        next :invalid unless user.save
-
-        # From here on everything is recorded as the new account's.
-        @user = @actor = user
-        group_ids = @invitation.invitation_groups.pluck(:group_id).sort
-        # Through `Membership` itself, as `Users::Save#sync_groups`, so its
-        # `after_commit` drops the memoised grants.
-        group_ids.each { |group_id| AccessControl::Membership.create!(user: @user, group_id: group_id) }
-        @invitation.update!(accepted_at: Time.current, user: @user)
-
-        changes = Audit::Snapshot.field_changes_for(@user)
-        changes["group_ids"] = [ [], group_ids ] if group_ids.any?
-        record_event("invitation.accepted", subject: @user, field_changes: changes, metadata: { "invitation_id" => @invitation.id })
-        :accepted
+      outcome = accept_into(user) do |group_ids|
+        record_event("invitation.accepted", subject: @user, field_changes: accepted_changes(group_ids), metadata: { "invitation_id" => @invitation.id })
       end
 
       case outcome

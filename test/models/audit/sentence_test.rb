@@ -307,7 +307,8 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   end
 
   test "the security keys" do
-    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted] + PASSKEY_EVENTS - %w[passkey.renamed]
+    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted] +
+      PASSKEY_EVENTS - %w[passkey.renamed] + SSO_EVENTS
     assert_equal secure.sort, Audit::Sentence::ACTIONS.select { |action| sentence_for(Audit::Event.new(action:, occurred_at: Time.current, last_occurred_at: Time.current)).security }.sort
   end
 
@@ -748,5 +749,63 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You signed in with a passkey", read(sentence_for(account_event("session.created", user: @me, metadata: { "method" => "passkey" })))
     assert_equal "You signed in with a recovery code", read(sentence_for(account_event("session.created", user: @me, metadata: { "method" => "recovery_code" })))
     assert_equal "You signed in", read(sentence_for(account_event("session.created", user: @me)))
+  end
+
+  # --- single sign-on ------------------------------------------------------------
+
+  SSO_EVENTS = %w[sso.linked sso.refused sso.unlinked].freeze
+
+  test "the three sso events are Security events and sso.refused has no actor" do
+    SSO_EVENTS.each do |action|
+      assert Audit::Sentence.known?(action), action
+      assert sentence_for(Audit::Event.new(action:, occurred_at: Time.current, last_occurred_at: Time.current)).security, action
+    end
+    assert sentence_for(event("sso.refused", user_id: nil, metadata: { "reason" => "no_account" })).actor.none
+    assert_not sentence_for(account_event("sso.linked", user: @me, metadata: { "issuer_host" => "id.example.com" })).actor.none
+  end
+
+  test "sso.linked names the provider's host" do
+    linked = account_event("sso.linked", user: users(:two), user_id: users(:two).id, metadata: { "via" => "sign_in", "issuer_host" => "id.example.com" })
+    assert_equal "two@example.com linked their account to single sign-on (id.example.com)", read(sentence_for(linked))
+  end
+
+  test "sso.refused names the email and the reason in words, or an unnamed account" do
+    refused = ->(metadata) { read(sentence_for(event("sso.refused", user_id: nil, metadata: { "issuer_host" => "id.example.com", **metadata }))) }
+
+    assert_equal "Single sign-on refused stranger@example.com: no invited account", refused.call("reason" => "no_account", "email" => "stranger@example.com")
+    assert_equal "Single sign-on refused dana@example.com: the provider hasn't verified the email",
+      refused.call("reason" => "email_unverified", "email" => "dana@example.com")
+    assert_equal "Single sign-on refused one@example.com: owners don't sign in with single sign-on", refused.call("reason" => "owner", "email" => "one@example.com")
+    assert_equal "Single sign-on refused an unnamed account: no invited account", refused.call("reason" => "no_account")
+  end
+
+  test "every account reason of single sign-on has its words, and no other" do
+    assert_equal SignIn::Oidc::ACCOUNT_REASONS.sort, Audit::Sentence::SSO_REFUSALS.keys.sort
+  end
+
+  test "sso.unlinked names the person unlinked" do
+    assert_equal "You unlinked “two@example.com” from single sign-on", read(sentence_for(account_event("sso.unlinked", metadata: { "issuer_host" => "id.example.com" })))
+  end
+
+  test "session.created by single sign-on says so" do
+    assert_equal "You signed in with single sign-on", read(sentence_for(account_event("session.created", user: @me, metadata: { "method" => "sso" })))
+  end
+
+  test "the three single sign-on endings, with no actor" do
+    user = users(:two).name_or_email
+    revoked = sentence_for(ended("sso_revoked", user_id: nil))
+    assert revoked.actor.none
+    assert revoked.security
+    assert_equal "“#{user}” signed out: single sign-on no longer lets them in", read(revoked)
+
+    unlinked = sentence_for(ended("sso_unlinked", count: 2, actor_type: "User", actor_id: @me.id))
+    assert unlinked.actor.none, "the unlink is its own event, with its actor"
+    assert_equal "“#{user}” signed out: unlinked from single sign-on (2 sessions)", read(unlinked)
+    assert_equal "“#{user}” signed out: unlinked from single sign-on", read(sentence_for(ended("sso_unlinked", count: 1, actor_type: "User", actor_id: @me.id)))
+
+    assert_equal "“#{user}” signed out after 24 hours of single sign-on", read(sentence_for(ended("expired_sso", user_id: nil)))
+    assert_equal "“#{user}” signed out after 26 hours of single sign-on",
+      read(sentence_for(ended("expired_sso", timeout: { "after_hours" => 26 }, user_id: nil)))
+    assert_equal "3 sessions signed out after 24 hours of single sign-on", read(sentence_for(ended("expired_sso", count: 3, user: nil, user_id: nil)))
   end
 end

@@ -48,6 +48,15 @@ Rails.application.routes.draw do
       post "sign-in/second-step/passkey", to: "second_factors#passkey", as: :second_factor_passkey
       post "sign-in/second-step/code", to: "second_factors#code", as: :second_factor_code
       delete "sign-in/second-step", to: "second_factors#destroy"
+      # Single sign-on (`Admin::SsoSessionsController`): the button's POST,
+      # which sends the person to the site's provider, and the provider's
+      # way back. Inside this host constraint, so with ADMIN_HOST set the
+      # callback answers on the admin host alone, and the provider sends the
+      # person back there (`SignIn::Oidc.callback_origin`). Under
+      # `sign-in/` too, which `Setup::RedirectConstraint` lets through; the
+      # state's cookie is pathed to `sign-in/sso` (`SsoStarts`).
+      post "sign-in/sso", to: "sso_sessions#create", as: :sso
+      get "sign-in/sso/callback", to: "sso_sessions#callback", as: :sso_callback
       delete "sign-out", to: "sessions#destroy", as: :sign_out
 
       # ⌘K "Jump to..." results: a layout-less HTML
@@ -68,6 +77,9 @@ Rails.application.routes.draw do
       get "invitation", to: "/invitations#show", as: :invitation
       post "invitation", to: "/invitations#update", as: :accept_invitation
       post "invitation/check", to: "/invitations#check", as: :check_invitation
+      # "Continue with <provider>" on the same page: the token in the body,
+      # never an address; an open invitation is sent to the provider.
+      post "invitation/sso", to: "/invitations#sso", as: :invitation_sso
       # The password reset. The token of the mailed link is in NO address a
       # server sees: the link is `password/edit#<token>`, a browser keeps what
       # follows the "#" to itself, and the form sends the token in its body,
@@ -301,6 +313,8 @@ Rails.application.routes.draw do
         # "End all sessions…": an owner signs another user out everywhere
         # (`Sessions::EndAll`, which refuses a non-owner and your own account).
         member { delete :sessions }
+        # "Unlink…" in the Single sign-on zone (`Sso::Unlink`, owner only).
+        member { delete :sso_link, to: "sso_links#destroy" }
       end
 
       # Invites (`Admin::InvitesController`): "Invite

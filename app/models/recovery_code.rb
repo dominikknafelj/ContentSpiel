@@ -60,5 +60,16 @@ class RecoveryCode < ApplicationRecord
 
       unused.where(digest: digest).update_all(used_at: at) == 1 # version: none (recovery codes are on no public page)
     end
+
+    # Whether `text` is one of the account's unused codes, using none: the
+    # same digest and an indexed read where `redeem` would write, for a proof
+    # that is checked but may not let its person in (`SignIn::Proof`, a
+    # refusal by rule).
+    def unused_code?(text)
+      digest = RecoveryCode.digest(text)
+      return false unless digest
+
+      unused.exists?(digest: digest)
+    end
   end
 end

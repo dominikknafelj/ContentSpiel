@@ -17,10 +17,18 @@ module Passkeys
   #   that enrolled goes on into CS Studio;
   # - `passkey.added`, and `recovery_codes.generated` when codes were made.
   #
+  # A linked account (single sign-on) is refused (`denied`), as a stranger's
+  # is: its provider is its second factor, and a passkey would be a way in
+  # that never asks it (`SignInRules`). Asked again under the row lock, the
+  # one `Sso::Link` takes to delete the passkeys, so a link and an add at
+  # once never leave a passkey on a linked account.
+  #
   # The account mail goes after the commit, to `origin` (the caller's; a
   # service reads no request), and only when mail is ready.
   class Add < ApplicationService
     # authorize: none (the whole rule is "the actor is the user itself", checked in #call; AccessControl has no permission for it, and nobody else may, not even a users.manage holder)
+
+    LINKED = :linked
 
     def initialize(user, registration:, name:, actor: Current.actor, origin: nil)
       @user = user
@@ -34,6 +42,7 @@ module Passkeys
       # Never a token: it acts for its user within a group and has no
       # business with the account's sign-in.
       return denied("users.manage", @user) unless actor.is_a?(User) && actor == @user
+      return denied("users.manage", @user) if @user.sso_linked?
 
       passkey = Passkey.new(user: @user, name: @name)
       return failure(passkey, [ self.class.failed ]) unless @registration&.ok
@@ -46,7 +55,8 @@ module Passkeys
       # A savepoint of its own (`requires_new`), so the unique index's refusal
       # below leaves a caller's own transaction usable.
       codes = Passkey.transaction(requires_new: true) do
-        User.lock.find(@user.id)
+        next LINKED if User.lock.find(@user.id).sso_linked?
+
         passkey.save!
         codes = RecoveryCodes::Generate.new(@user, actor: actor).write_codes(@user, at: added_at) unless @user.recovery_codes.unused.exists?
         @user.sessions.update_all(enrolment_due: false) # version: none (a session is on no public page)
@@ -55,6 +65,8 @@ module Passkeys
         record_event("recovery_codes.generated", subject: @user, metadata: { "count" => codes.size, "replaced" => 0 }, snapshot: nil) if codes
         codes
       end
+
+      return denied("users.manage", @user) if codes == LINKED
 
       ActiveRecord.after_all_transactions_commit do
         SignInMailer.queue_alert(:passkey_added, @user, name: passkey.name, added_at: added_at, origin: @origin)

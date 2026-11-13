@@ -137,10 +137,16 @@ module Admin
     # only where a passkey can be made: not at an IP address
     # (`PasskeyChallenges#passkey_relying_party`).
     def load_passkeys
+      return if Current.user.sso_linked?
+
       @passkeys_card = AccountScreen::PasskeysCardComponent.for(Current.user, addable: passkey_relying_party.present?, recovery_left: flash[:recovery_code_left]&.to_i, url_options: admin_url_options)
       @recovery_card = AccountScreen::RecoveryCardComponent.for(Current.user, url_options: admin_url_options)
       @confirm_with_passkey = Current.user.passkeys.exists?
     end
+
+    # The provider's name for the Sign-in card of a linked person.
+    def sso_provider_name = SignInRules.provider_name(Current.user)
+    helper_method :sso_provider_name
 
     # A switch as the form sends it: "1" on, anything else off, absent nil.
     def switch(name) = params.key?(name) ? params[name] == "1" : nil

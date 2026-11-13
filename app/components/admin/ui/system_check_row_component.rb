@@ -2,7 +2,7 @@ module Admin
   module Ui
     # One `Setup::SystemCheck::Result` as a row, for CS Studio's System status
     # page and the setup wizard's system-check step, which shares its rows
-    # with System status: a state chip (ok or warn) -- a dot and the word, so
+    # with System status: a state chip (ok, warn or, for a check with nothing to check, off) -- a dot and the word, so
     # the state is never colour alone -- then the check's name, its message
     # and, when the result has one, the console command in the copy box
     # (`Admin::Ui::CopyValueComponent`), its Copy named for the check.
@@ -42,8 +42,8 @@ module Admin
         limits: [
           "Without copyable (the setup wizard) the command is selectable text with no Copy button."
         ],
-        states: %i[ok warning hover focus],
-        keys: %w[ok warning copy_label open_mail_settings open_image_settings open_forms learn_more],
+        states: %i[ok warning off hover focus],
+        keys: %w[ok warning off copy_label open_mail_settings open_image_settings open_forms learn_more],
         slots: [],
         controller: nil,
         keyboard: [ "test/system/admin/keyboard_feedback_test.rb", "a system check's Copy is the Tab stop after its command, and Enter on it copies the command and says so" ]
@@ -78,7 +78,8 @@ module Admin
       end
 
       def state_chip
-        Admin::Ui::StateChipComponent.new(tone: result.ok? ? :ok : :warn, label: result.ok? ? t(".ok") : t(".warning"))
+        tone = { ok: :ok, off: :off }.fetch(result.status, :warn)
+        Admin::Ui::StateChipComponent.new(tone: tone, label: t({ ok: ".ok", off: ".off" }.fetch(result.status, ".warning")))
       end
     end
   end
