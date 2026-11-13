@@ -203,6 +203,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/users_screen/owner_zone_component.html.erb
     app/components/admin/users_screen/sessions_zone_component.rb
     app/components/admin/users_screen/sessions_zone_component.html.erb
+    app/components/admin/users_screen/sso_zone_component.rb
+    app/components/admin/users_screen/sso_zone_component.html.erb
     app/components/admin/users_screen/group_cards_component.rb
     app/components/admin/users_screen/group_cards_component.html.erb
     app/views/admin/users/index.html.erb

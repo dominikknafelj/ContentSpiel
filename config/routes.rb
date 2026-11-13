@@ -313,6 +313,8 @@ Rails.application.routes.draw do
         # "End all sessions…": an owner signs another user out everywhere
         # (`Sessions::EndAll`, which refuses a non-owner and your own account).
         member { delete :sessions }
+        # "Unlink…" in the Single sign-on zone (`Sso::Unlink`, owner only).
+        member { delete :sso_link, to: "sso_links#destroy" }
       end
 
       # Invites (`Admin::InvitesController`): "Invite

@@ -75,6 +75,16 @@ en:
           confirm_body: "%{name} is signed out on every browser and must sign in again. Their saved work stays; text they were still typing may be lost."
           confirm: "End all sessions"
           ended: "%{name} is signed out everywhere."
+        sso_zone:
+          badge: "Signs in with %{provider}"
+          heading: "Single sign-on"
+          body: "%{name} signs in with %{provider} and has no password here."
+          trigger: "Unlink…"
+          title: "Unlink %{name} from %{provider}?"
+          confirm_body: "%{name} can no longer sign in with %{provider}, and is signed out everywhere. They get a mail to set a password here."
+          confirm: "Unlink"
+          unlinked: "%{name} is unlinked from %{provider}. A mail to set a password is on its way."
+          provider_fallback: "your sign-in provider"
     invites:
       sent: "Invite sent to %{email}."
       resent: "New invite sent to %{email}."

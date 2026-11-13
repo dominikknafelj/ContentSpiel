@@ -182,6 +182,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/users
       app/controllers/admin/users_controller.rb
       app/controllers/admin/invites_controller.rb
+      app/controllers/admin/sso_links_controller.rb
       app/controllers/concerns/admin/users_list.rb
     ],
     shared: %w[
