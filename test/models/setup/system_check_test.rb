@@ -595,12 +595,12 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     end
   end
 
-  test "with a provider that answers the row is ok and names the provider and the issuer host" do
+  test "with a provider that answers the row is ok and names the provider and the full issuer URL" do
     with_fake_idp do |idp|
       check = result("Single sign-on", run_check)
 
       assert check.ok?
-      assert_equal "#{OidcHelper::NAME} (127.0.0.1) answers.", check.message
+      assert_equal "#{OidcHelper::NAME} (#{idp.issuer}) answers.", check.message
       assert_no_match(/#{OidcHelper::CLIENT_SECRET}/, check.message)
       assert_equal 1, idp.requests.count { |request| request.path.end_with?("openid-configuration") }
       result("Single sign-on", run_check)
@@ -609,8 +609,8 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   end
 
   test "required adds its sentence" do
-    with_fake_idp(required: true) do
-      assert_equal "#{OidcHelper::NAME} (127.0.0.1) answers. Required for everyone but owners.", result("Single sign-on", run_check).message
+    with_fake_idp(required: true) do |idp|
+      assert_equal "#{OidcHelper::NAME} (#{idp.issuer}) answers. Required for everyone but owners.", result("Single sign-on", run_check).message
     end
   end
 
@@ -620,7 +620,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       check = result("Single sign-on", run_check)
 
       assert_equal :warning, check.status
-      assert_equal "#{OidcHelper::NAME} (127.0.0.1) didn't answer: it could not be reached. Nobody can sign in with it until it does.", check.message
+      assert_equal "#{OidcHelper::NAME} (#{idp.issuer}) didn't answer: it could not be reached. Nobody can sign in with it until it does.", check.message
       assert_no_match(/unreachable|#{OidcHelper::CLIENT_SECRET}/, check.message)
     end
   end

@@ -219,14 +219,15 @@ module Setup
       # (`SignIn::Oidc::Provider#configuration`, cached for its CACHE_FOR), so
       # System status calls the provider only when the cache is empty, and
       # then through `SignIn::OutsideCall`'s timeouts. The row names the
-      # provider and the issuer's host, never the client secret or any token;
+      # provider and the issuer URL as configured (a host may hold several
+      # tenants told apart by path; the URL is no secret), never the client secret or any token;
       # a failure is said by a sentence for its reason word, never the
       # message of the answer.
       def single_sign_on
         label = I18n.t("admin.system_status.sso.label")
         return Result.new(label:, status: :off, message: I18n.t("admin.system_status.sso.off")) if @sso_provider.nil?
 
-        facts = { provider: @sso_provider.name, issuer: @sso_provider.issuer_host }
+        facts = { provider: @sso_provider.name, issuer: @sso_provider.issuer }
         begin
           @sso_provider.configuration
         rescue SignIn::Oidc::Unavailable => error
