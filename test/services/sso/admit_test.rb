@@ -127,6 +127,7 @@ class Sso::AdmitTest < ActiveSupport::TestCase
     assert_equal [ "dana@example.com", "Dana from the provider", ISSUER, "sub-dana" ], user.values_at(:email_address, :name, :sso_issuer, :sso_subject)
     assert_equal [ access_control_groups(:read_only) ], user.groups.to_a
     assert invitation.reload.accepted?
+    assert result.accepted_invitation?, "the answer says an invitation was accepted"
     assert_equal "invitation", Audit::Event.find_by!(action: "sso.linked").metadata["via"]
     assert_empty refusals
   end

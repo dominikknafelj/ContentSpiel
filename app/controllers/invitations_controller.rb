@@ -32,8 +32,8 @@
 # the form's is (the script copies it in when the button is pressed).
 #
 # COMING BACK WITH NO TOKEN. The provider's mismatch (`flash[:sso_mismatch]`,
-# both addresses) and a start that could not reach it (`flash[:alert]` on
-# a GET) redirect here, and the redirect lost the token: `show` draws the
+# both addresses) and a start that could not reach it or was
+# limited (`flash[:sso_unfinished]` and `flash[:sso_limited]`, set only by the SSO start) redirect here, and the redirect lost the token: `show` draws the
 # notice alone, with no form and no script (any form would be dead), and the
 # sentence says to open the mail's link again.
 #
@@ -56,7 +56,11 @@ class InvitationsController < ApplicationController
   rate_limit to: 10, within: 3.minutes, only: :check, name: "check", with: -> { head :too_many_requests }
   # A start asks the provider's discovery and writes a cookie, so it is
   # counted too, on a count of its own.
-  rate_limit to: 20, within: 3.minutes, only: :sso, name: "sso", with: -> { head :too_many_requests }
+  # Keyed as sign-in keys an address (an IPv6 one by its /64), and answered
+  # on the page, which is drawn with no form.
+  rate_limit to: 20, within: 3.minutes, only: :sso, name: "sso", store: SignIn.store,
+    by: -> { VisitorAddress.key(request.remote_ip, purpose: Admin::SessionsController::RATE_LIMIT_PURPOSE) },
+    with: -> { redirect_to admin_invitation_path, status: :see_other, flash: { sso_limited: t("invitations.sso_limited") } }
 
   helper_method :sso_provider
 
@@ -66,7 +70,10 @@ class InvitationsController < ApplicationController
   def show
     mismatch = flash[:sso_mismatch]
     @sso_mismatch = mismatch.slice("got", "email") if mismatch.is_a?(Hash) && sso_provider
-    @sso_unfinished = flash[:alert].presence if sso_provider && @sso_mismatch.nil?
+    return unless sso_provider && @sso_mismatch.nil?
+
+    @sso_limited = flash[:sso_limited].presence
+    @sso_unfinished = flash[:sso_unfinished].presence
   end
 
   # "Continue with <provider>": an open invitation goes to the provider, any

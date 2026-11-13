@@ -30,6 +30,12 @@ class InvitationSsoSystemTest < ApplicationSystemTestCase
       assert user.sso_linked?
       assert_equal [ user.id, "sso" ], Session.sole.values_at(:user_id, :authenticated_with)
       assert idp.requests.any? { |request| request.path == "/idp/authorize" }, "the browser went to the provider"
+
+      # Back through the history (the browser's own cache may restore the
+      # page): no token is left in the document.
+      page.go_back
+      assert_selector "body"
+      assert_equal 0, page.evaluate_script("Array.from(document.querySelectorAll('input[name=token]')).filter((field) => field.value).length")
     end
   end
 

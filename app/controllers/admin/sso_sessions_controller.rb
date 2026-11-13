@@ -81,13 +81,12 @@ module Admin
 
     def callback
       Telemetry.in_span("auth.sso.callback", attributes: { "auth.sso.issuer_host" => sso_provider.issuer_host.to_s }) do |span|
-        started_at = Time.current
         kept = take_sso_state
         result = SignIn::Oidc::Callback.new(provider: sso_provider, redirect_uri: sso_redirect_uri)
           .call(params: callback_params, kept: kept)
         next unfinished(span, result.reason) unless result.ok
 
-        admit(span, result.identity, invitation: kept_invitation(kept), started_at: started_at)
+        admit(span, result.identity, invitation: kept_invitation(kept))
       end
     end
 
@@ -111,7 +110,7 @@ module Admin
       invitation unless invitation.nil? || invitation.expired?
     end
 
-    def admit(span, identity, invitation:, started_at:)
+    def admit(span, identity, invitation:)
       result = Sso::Admit.call(identity, invitation: invitation)
       return mismatch(span, invitation, result.errors.last) if result.errors.first == Sso::Admit::MISMATCH
       return refused(span, result.errors.first) unless result.ok?
@@ -129,14 +128,8 @@ module Admin
       Telemetry.record(span, "auth.outcome" => "ok")
       # An account made by this very callback says so with the toast a
       # password acceptance shows (`InvitationsController#update`).
-      notice = t("invitations.update.ready") if accepted_now?(user, since: started_at)
+      notice = t("invitations.update.ready") if result.accepted_invitation?
       redirect_to after_authentication_url, notice: notice
-    end
-
-    # Whether `user` is the account an invitation made during this callback
-    # (an existing account signing in, or one linked by its email, is not).
-    def accepted_now?(user, since:)
-      Invitation.accepted.exists?(user_id: user.id, accepted_at: since..)
     end
 
     def unfinished(span, reason)

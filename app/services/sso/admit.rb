@@ -42,6 +42,10 @@ module Sso
   # an existing link records nothing here (the session's `session.created`
   # is the controller's).
   #
+  # THE ANSWER says whether this call made the account from an invitation
+  # (`accepted_invitation?`), which is what the callback's "Your account is
+  # ready." toast reads.
+  #
   # RACES. Two callbacks of one person at once, or a subject linked by
   # another request between step 1 and a link: `Sso::Link` locks the
   # account's row and the unique index on (issuer, subject) refuses a second
@@ -114,7 +118,7 @@ module Sso
     # lapsed or was withdrawn meanwhile is no invitation.
     def accept(invitation)
       result = Invitations::AcceptWithSso.call(invitation, identity: @identity)
-      return success(result.record) if result.ok?
+      return success(result.record, accepted_invitation: true) if result.ok?
 
       result.errors == [ Invitations::Acceptance::USED ] ? AGAIN : refuse(NO_ACCOUNT)
     end

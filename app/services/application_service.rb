@@ -14,10 +14,16 @@ class ApplicationService
   # `notice` is one sentence a SUCCESS has to say beyond "done" (a discard
   # that could not put everything back): nil for every other result. It is
   # not an error: `ok?` does not read it.
-  Result = Data.define(:record, :errors, :denied, :notice) do
-    def initialize(record:, errors:, denied: false, notice: nil) = super
+  #
+  # `accepted_invitation` is true on the one success that made an account
+  # from an open invitation (`Sso::Admit`), so a caller says "Your account is
+  # ready." from the answer and not from the clock: false for every other.
+  Result = Data.define(:record, :errors, :denied, :notice, :accepted_invitation) do
+    def initialize(record:, errors:, denied: false, notice: nil, accepted_invitation: false) = super
 
-    def self.success(record, notice: nil) = new(record:, errors: [], notice: notice)
+    def self.success(record, notice: nil, accepted_invitation: false)
+      new(record:, errors: [], notice: notice, accepted_invitation: accepted_invitation)
+    end
 
     # `errors` defaults to `record.errors.full_messages` (see
     # `ApplicationService#failure` below), which is only non-empty when the
@@ -43,6 +49,8 @@ class ApplicationService
     def ok? = errors.empty?
 
     def denied? = denied
+
+    def accepted_invitation? = accepted_invitation
   end
 
   def self.call(...) = new(...).call
@@ -129,7 +137,7 @@ class ApplicationService
     Current.set(actor: actor, &block)
   end
 
-  def success(record, notice: nil) = Result.success(record, notice: notice)
+  def success(record, notice: nil, accepted_invitation: false) = Result.success(record, notice: notice, accepted_invitation: accepted_invitation)
   def failure(record, errors = record.errors.full_messages) = Result.failure(record, errors)
 
   # The refusal of a key under a language that a save would drop (#147), or nil

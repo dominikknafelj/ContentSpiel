@@ -47,6 +47,20 @@ class InvitationSsoTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "past the start's limit the page says so, alone, and the start goes nowhere" do
+    with_fake_idp do |idp|
+      20.times { start }
+      assert_response :see_other
+      assert response.location.start_with?(idp.issuer)
+
+      start
+      assert_redirected_to admin_invitation_path
+      follow_redirect!
+      assert_select "#alert", text: "Too many tries. Wait a few minutes, then open the link in your invitation mail again."
+      assert_select "form", count: 0
+    end
+  end
+
   test "another verified email comes back to the page naming both addresses, and the page draws only that notice" do
     with_fake_idp(email: "someone-else@example.com") do |idp|
       start

@@ -31,7 +31,7 @@
 <% sso_required = sso_provider.present? && SignIn::Oidc.required? %>
 <%# Back from the provider with no token: the notice alone (see the
     controller). %>
-<% sso_notice = @sso_mismatch || @sso_unfinished %>
+<% sso_notice = @sso_mismatch || @sso_unfinished || @sso_limited %>
 <% name_value = @invitation && (params[:name].is_a?(String) ? params[:name] : @invitation.name) %>
 <%= tag.div class: "flex flex-col gap-[18px]", data: ((@state || sso_notice) ? {} : { controller: "invitation-token", "invitation-token-check-url-value": admin_check_invitation_path }) do %>
   <%= render "admin/shared/auth_heading", title: t(".title", site: site_name) %>
@@ -40,6 +40,8 @@
     <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: "alert") do %>
       <% if @sso_mismatch %>
         <p><%= t(".sso_mismatch", provider: provider_name, got: @sso_mismatch["got"], email: @sso_mismatch["email"]) %></p>
+      <% elsif @sso_limited %>
+        <p><%= @sso_limited %></p>
       <% else %>
         <p><%= @sso_unfinished %></p>
         <p><%= t(".sso_unfinished_again") %></p>

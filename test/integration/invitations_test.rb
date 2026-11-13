@@ -207,7 +207,7 @@ class InvitationsTest < ActionDispatch::IntegrationTest
       idp.answer_discovery_with(status: 500, body: { "error" => "down" })
       accept
       assert_redirected_to PAGE, "back to the invitation page, not the sign-in page"
-      assert_equal I18n.t("admin.sessions.sso_unfinished", provider: OidcHelper::NAME), flash[:alert], "the unfinished sentence"
+      assert_equal I18n.t("admin.sessions.sso_unfinished", provider: OidcHelper::NAME), flash[:sso_unfinished], "the unfinished sentence"
       assert_not Array(response.headers["Set-Cookie"]).join("\n").include?("cs_sso_state="), "no state is kept"
       assert_not @dana.reload.accepted?, "the invitation stays open"
     end

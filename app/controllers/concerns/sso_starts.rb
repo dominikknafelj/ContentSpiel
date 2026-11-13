@@ -72,7 +72,13 @@ module SsoStarts
     rescue SignIn::Oidc::Unavailable => error
       Telemetry.record(span, "error.type" => SignIn::Oidc.error_type(error))
       unfinished = t("admin.sessions.sso_unfinished", provider: sso_provider.name)
-      redirect_to intent == "invitation" ? admin_invitation_path : admin_sign_in_path, alert: unfinished, status: :see_other
+      if intent == "invitation"
+        # The invitation page draws it alone (`flash[:sso_unfinished]`).
+        flash[:sso_unfinished] = unfinished
+        redirect_to admin_invitation_path, status: :see_other
+      else
+        redirect_to admin_sign_in_path, alert: unfinished, status: :see_other
+      end
     end
   end
 
