@@ -25,7 +25,7 @@ module Sessions
         if row
           row.destroy!
           # No snapshot: the user did not change.
-          record_event("session.ended", subject: row.user, metadata: { "reason" => @reason, "count" => 1, **Session.timeout_metadata(@reason) }, snapshot: nil)
+          record_event("session.ended", subject: row.user, metadata: { "reason" => @reason, "count" => 1, **Session.timeout_metadata(@reason, row) }, snapshot: nil)
         end
       end
       success(@session)

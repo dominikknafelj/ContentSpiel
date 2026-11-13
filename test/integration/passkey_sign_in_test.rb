@@ -170,7 +170,7 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
           refused_to_sign_in_page(send_passkey(credential))
         end
       end
-      assert_equal [ "[passkey] a challenge could not be spent (#{error}), so it is refused" ], log.lines.map(&:strip).grep(/\[passkey\]/)
+      assert_equal [ "[sign-in] a value could not be spent (#{error}), so it is refused" ], log.lines.map(&:strip).grep(/\[sign-in\]/)
       assert_not_includes log, "the insert failed"
       travel PACE
     end

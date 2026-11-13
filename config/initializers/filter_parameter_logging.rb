@@ -20,7 +20,11 @@ Rails.application.config.filter_parameters += [
   /\Acredential\z/,
   # A recovery code typed at the second step or shown once when made: a one-time password that no entry above
   # matches (not :passw, not :token).
-  :recovery_code
+  :recovery_code,
+  # The single sign-on callback's query (`code`, `state`): an authorization code and the state it answers, both
+  # one-time secrets. Whole names only, since a bare :code would mask every parameter that contains "code".
+  /\Acode\z/,
+  /\Astate\z/
 ]
 
 # A visitor's answers to a form (personal data reaches no log). The endpoint (`FormSendsController`, controller

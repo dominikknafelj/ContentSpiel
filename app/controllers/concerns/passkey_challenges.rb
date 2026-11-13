@@ -46,7 +46,6 @@ module PasskeyChallenges
 
   LIFETIME = 5.minutes
   PURPOSES = %w[sign_in second_factor confirm register].freeze
-  SPENT_PURPOSE = "content_spiel passkey challenge".freeze
   COOKIE_PREFIX = "cs_passkey_".freeze
 
   # The cookie of every purpose, which a sign-out deletes
@@ -85,12 +84,7 @@ module PasskeyChallenges
 
   # True for the one take that inserted the challenge's digest.
   def spend_passkey_challenge(purpose, challenge, expires_at)
-    digest = VisitorAddress.digest("#{purpose}:#{challenge}", purpose: SPENT_PURPOSE)
-    SignIn::SpentChallenge.spend!(digest, expires_at: expires_at + 1.second)
-  rescue ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished => error
-    # Refused, never let through: only the class of the error is logged.
-    Rails.logger.warn("[passkey] a challenge could not be spent (#{error.class}), so it is refused")
-    false
+    SignIn::SpentChallenge.take(purpose: purpose, value: challenge, expires_at: expires_at + 1.second)
   end
 
   # The relying party this request's passkeys belong to (`SignIn::RelyingParty`),

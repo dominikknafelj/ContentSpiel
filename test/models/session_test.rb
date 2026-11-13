@@ -206,4 +206,88 @@ class SessionTest < ActiveSupport::TestCase
     assert_not Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil).enrolment_due
     assert Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil, enrolment_due: true).reload.enrolment_due
   end
+
+  # The ending the session has when it is met at `at` (a session met is seen, so idleness is not in the way).
+  def expiry_at(session, at) = session.tap { |row| row.last_seen_at = at }.expiry(at)
+
+  def sso_session(token:, at:)
+    Session.start(user: @user, method: "sso", user_agent: nil, ip_address: nil, provider_token: token, at: at)
+  end
+
+  test "an sso session with no token expires at 24 hours and one with a token at 26, as expired_sso" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    bare = sso_session(token: nil, at: t)
+    held = sso_session(token: "refresh-token", at: t)
+
+    assert_equal t, bare.provider_checked_at
+    assert_nil expiry_at(bare, t + 24.hours - 1.second)
+    assert_equal "expired_sso", expiry_at(bare, t + 24.hours)
+    assert_nil expiry_at(held, t + 26.hours - 1.second)
+    assert_equal "expired_sso", expiry_at(held, t + 26.hours)
+
+    assert_equal [ bare ], Session.expired_sso(t + 24.hours).to_a
+    assert_equal [ bare, held ].sort_by(&:id), Session.expired_sso(t + 26.hours).sort_by(&:id)
+    assert_empty Session.expired_sso(t + 23.hours)
+    assert_equal({ "after_hours" => 24 }, Session.timeout_metadata("expired_sso"))
+    assert_equal({ "after_hours" => 24 }, Session.timeout_metadata("expired_sso", bare))
+    assert_equal({ "after_hours" => 26 }, Session.timeout_metadata("expired_sso", held))
+  end
+
+  test "a session of another method with a check date ends at 26 hours, token or not, and one with none is left alone" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    gem_session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, at: t)
+    gem_session.update_columns(provider_checked_at: t) # version: none (a test's own row)
+
+    assert_nil expiry_at(gem_session, t + 25.hours)
+    assert_equal "expired_sso", expiry_at(gem_session, t + 26.hours)
+    assert_equal [ gem_session ], Session.expired_sso(t + 26.hours).to_a
+    assert_empty Session.expired_sso(t + 25.hours)
+
+    plain = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, at: t)
+    assert_nil plain.provider_checked_at
+    assert_not_includes Session.expired_sso(t + 13.days), plain
+  end
+
+  test "provider_check_due holds the sessions checked 24 hours ago or more" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    held = sso_session(token: "refresh-token", at: t)
+
+    assert_includes Session.provider_check_due(t + 24.hours), held
+    assert_not_includes Session.provider_check_due(t + 24.hours - 1.second), held
+  end
+
+  test "the absolute timeout wins over expired_sso" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    session = sso_session(token: nil, at: t)
+
+    assert_equal "expired_sso", expiry_at(session, t + 30.hours)
+    assert_equal "expired_absolute", expiry_at(session, t + 14.days)
+  end
+
+  test "from_cookies ends an expired sso session as expired_sso" do
+    t = Time.current
+    session = sso_session(token: nil, at: t - 25.hours)
+    session.update_columns(last_seen_at: t) # version: none (a test's own row)
+
+    assert_nil Session.from_cookies(cookie_jar(session), at: t)
+    assert_nil Session.find_by(id: session.id)
+    assert_equal "expired_sso", Audit::Event.where(action: "session.ended").order(:id).last.metadata["reason"]
+  end
+
+  test "without encryption keys an sso session starts with no token" do
+    without_encryption_keys do
+      session = sso_session(token: "refresh-token", at: Time.current)
+      assert_nil session.reload.provider_token
+      assert_not_nil session.provider_checked_at
+    end
+  end
+
+  test "the provider token is stored encrypted" do
+    session = sso_session(token: "refresh-token-plain", at: Time.current)
+    raw = Session.connection.select_value("SELECT provider_token FROM sessions WHERE id = #{session.id.to_i}") # sql: a test reads the raw column
+
+    assert_not_nil raw
+    assert_not_includes raw, "refresh-token-plain"
+    assert_equal "refresh-token-plain", session.reload.provider_token
+  end
 end

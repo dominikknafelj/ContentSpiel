@@ -1,5 +1,6 @@
 # One signed-in browser. The signed cookie holds its id; ending it (sign-out,
-# a password change, the user's deletion, an expiry) destroys the row.
+# a password change, the user's deletion, an expiry, the sign-in provider's
+# re-check failing, an account unlinked from its provider) destroys the row.
 class Session < ApplicationRecord
   belongs_to :user
 
@@ -21,17 +22,34 @@ class Session < ApplicationRecord
 
   # Why a session ended other than by signing out (`session.destroyed`):
   # `metadata["reason"]` of every `session.ended` (`Sessions::End`).
-  END_REASONS = %w[expired_idle expired_absolute ended_by_self ended_by_owner password_changed].freeze
+  END_REASONS = %w[expired_idle expired_absolute ended_by_self ended_by_owner password_changed
+    sso_revoked sso_unlinked expired_sso].freeze
+
+  # A session made by an outside provider is asked of it again every
+  # PROVIDER_CHECK_EVERY (`provider_checked_at` is the last time it answered).
+  # A provider that cannot be reached is given PROVIDER_CHECK_GRACE more before
+  # the session ends as `expired_sso`. A session of SSO with no refresh token
+  # cannot be asked at all, so it ends at the first figure, with no grace.
+  PROVIDER_CHECK_EVERY = 24.hours
+  PROVIDER_CHECK_GRACE = 2.hours
+
+  # The refresh token, kept only while the site has encryption keys
+  # (`Session.start` drops it otherwise). Never rendered, logged or audited.
+  encrypts :provider_token
 
   validates :authenticated_with, inclusion: { in: METHODS }
 
   # What a `session.ended` for an expiry stores of the timeout it ended by
   # (`Sessions::End`, `Sessions::SweepJob`): the event's sentence reads it
   # from there, so an old event keeps its words when a timeout changes.
-  def self.timeout_metadata(reason)
+  #
+  # `expired_sso` ends at 24 hours or at 26 (`#expiry`): given the session it
+  # says its own figure, and without one the base 24.
+  def self.timeout_metadata(reason, session = nil)
     case reason
     when "expired_idle" then { "after_hours" => (IDLE_TIMEOUT / 1.hour).to_i }
     when "expired_absolute" then { "after_days" => (ABSOLUTE_TIMEOUT / 1.day).to_i }
+    when "expired_sso" then { "after_hours" => (session&.provider_check_limit || PROVIDER_CHECK_EVERY) / 1.hour }
     else {}
     end
   end
@@ -62,10 +80,21 @@ class Session < ApplicationRecord
   # The one way a session is made: seen now, confirmed by the sign-in that
   # made it, and ending ABSOLUTE_TIMEOUT on. `enrolment_due` is decided once,
   # here, so a policy changed later reaches a person at their next session.
-  def self.start(user:, method:, user_agent:, ip_address:, enrolment_due: false, at: Time.current)
+  #
+  # A session of a provider that can be asked again starts with
+  # `provider_checked_at` set (the sign-in is the first check); `provider_token`
+  # is its refresh token, dropped when the site cannot encrypt it.
+  def self.start(user:, method:, user_agent:, ip_address:, enrolment_due: false, provider_token: nil, at: Time.current)
+    token = provider_token.presence if Forms::Encryption.available?
     create!(user: user, authenticated_with: method, user_agent: user_agent, ip_address: ip_address,
-      last_seen_at: at, expires_at: at + ABSOLUTE_TIMEOUT, confirmed_at: at, enrolment_due: enrolment_due)
+      last_seen_at: at, expires_at: at + ABSOLUTE_TIMEOUT, confirmed_at: at, enrolment_due: enrolment_due,
+      provider_token: token, provider_checked_at: (at if rechecked_method?(method)))
   end
+
+  # Whether a method's provider is asked again. SSO is; a gem's method that
+  # registers a re-check joins here.
+  def self.rechecked_method?(method) = method == "sso"
+  private_class_method :rechecked_method?
 
   # The sessions past their absolute timeout at `at`.
   scope :expired_absolute, ->(at) { where(expires_at: ..at) }
@@ -74,6 +103,20 @@ class Session < ApplicationRecord
   # ones are gone (`Sessions::SweepJob`), it holds only sessions that are
   # idle alone.
   scope :expired_idle, ->(at) { where(last_seen_at: ..(at - IDLE_TIMEOUT)) }
+
+  # The sessions whose provider has not confirmed the person for too long at
+  # `at`: an SSO session with no token past PROVIDER_CHECK_EVERY, any other
+  # session with a check date past EVERY + GRACE (`#expiry` says the same).
+  scope :expired_sso, ->(at) {
+    checked = arel_table[:provider_checked_at]
+    tokenless_sso = arel_table[:authenticated_with].eq("sso").and(arel_table[:provider_token].eq(nil))
+      .and(checked.lteq(at - PROVIDER_CHECK_EVERY))
+    where(tokenless_sso.or(checked.lteq(at - PROVIDER_CHECK_EVERY - PROVIDER_CHECK_GRACE)))
+  }
+
+  # The sessions due their daily ask of the provider at `at`: the one place
+  # the figure is applied, for the job that asks.
+  scope :provider_check_due, ->(at) { where(provider_checked_at: ..(at - PROVIDER_CHECK_EVERY)) }
 
   # The sessions past neither timeout at `at`: what a person is shown as
   # signed in (an expired row stands until a request meets it or the sweep
@@ -115,9 +158,11 @@ class Session < ApplicationRecord
   end
 
   # Why the session is over at `at`, or nil while it lives. The absolute
-  # timeout wins when both hold: it is the one the cookie carries.
+  # timeout wins when both hold: it is the one the cookie carries; the
+  # provider's re-check comes before idleness.
   def expiry(at = Time.current)
     if at >= expires_at then "expired_absolute"
+    elsif provider_check_lapsed?(at) then "expired_sso"
     elsif at >= last_seen_at + IDLE_TIMEOUT then "expired_idle"
     end
   end
@@ -140,7 +185,15 @@ class Session < ApplicationRecord
     update_column(:confirmed_at, at) # version: none (a session is on no public page)
   end
 
+  # How long after `provider_checked_at` the session may stand: EVERY for an
+  # SSO session with no token to ask with, EVERY + GRACE for any other.
+  def provider_check_limit
+    authenticated_with == "sso" && provider_token.blank? ? PROVIDER_CHECK_EVERY : PROVIDER_CHECK_EVERY + PROVIDER_CHECK_GRACE
+  end
+
   private
+
+  def provider_check_lapsed?(at) = provider_checked_at.present? && at >= provider_checked_at + provider_check_limit
 
   # A user that is only its id: the user's row may be gone with the session
   # (`Users::Destroy`), and Action Cable needs nothing but the id to name
