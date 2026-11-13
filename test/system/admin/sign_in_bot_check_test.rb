@@ -116,7 +116,7 @@ class Admin::SignInBotCheckSystemTest < ApplicationSystemTestCase
       assert_empty page.evaluate_script("window.cspViolations"), "the document's policy lets Cloudflare's frame in"
       options = renders.sole
       assert_equal SignInHelper::BOT_CHECK_KEYS["TURNSTILE_SITE_KEY"], options["sitekey"]
-      assert_equal SignIn::BotCheck::ACTION, options["action"]
+      assert_equal SignIn::Protection::BotCheck::ACTION, options["action"]
       assert_equal "flexible", options["size"]
       assert_equal "en", options["language"]
       assert_includes %w[light dark], options["theme"]

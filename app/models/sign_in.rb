@@ -1,6 +1,6 @@
 # What any kind of sign-in calls to decide an attempt: plain objects that
 # count attempts, close buckets and say when a check is due
-# (`SignIn::Throttle`), and that make and check passkeys
+# (`SignIn::Protection::Throttle`), and that make and check passkeys
 # (`SignIn::PasskeyRegistration`, `SignIn::PasskeyCheck`, over the one
 # relying party `SignIn::RelyingParty` decides: the one place the domain a
 # passkey belongs to is decided), and that speak to the site's single

@@ -5,10 +5,10 @@ require "test_helper"
 # lock-out notice's hour. An attempt is a `reserve`; one whose password was
 # wrong is told nothing more, one whose password was right is followed by
 # `record_success`.
-class SignIn::ThrottleTest < ActiveSupport::TestCase
+class SignIn::Protection::ThrottleTest < ActiveSupport::TestCase
   EMAIL = "ann@example.org".freeze
   ADDRESS = "203.0.113.7".freeze
-  Trip = SignIn::Throttle::Trip
+  Trip = SignIn::Protection::Throttle::Trip
 
   # A store whose every count fails as Solid Cache's failsafe answers one.
   class FailingCounts < ActiveSupport::Cache::MemoryStore
@@ -30,7 +30,7 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
   setup do
     freeze_time
     @store = ActiveSupport::Cache::MemoryStore.new
-    @throttle = SignIn::Throttle.new(store: @store)
+    @throttle = SignIn::Protection::Throttle.new(store: @store)
   end
 
   def attempt(identifier: EMAIL, address: ADDRESS, throttle: @throttle, device: nil)
@@ -43,11 +43,11 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
   def count_of(counter, store = @store) = store.read(keys(store).find { |key| key.include?(":#{counter}:") })
 
   test "lock_seconds is nil below five failures, then 60, 120, 240 … and 3600 from the eleventh" do
-    assert_equal [ nil ] * 4 + [ 60, 120, 240, 480, 960, 1920, 3600, 3600 ], (1..12).map { |count| SignIn::Throttle.lock_seconds(count) }
+    assert_equal [ nil ] * 4 + [ 60, 120, 240, 480, 960, 1920, 3600, 3600 ], (1..12).map { |count| SignIn::Protection::Throttle.lock_seconds(count) }
   end
 
   test "the fifth attempt goes on and closes the account for a minute, and the bucket opens again after it" do
-    4.times { assert_equal SignIn::Throttle::Reservation.new(refused_by: nil, closes: []), attempt }
+    4.times { assert_equal SignIn::Protection::Throttle::Reservation.new(refused_by: nil, closes: []), attempt }
 
     fifth = attempt
     assert fifth.ok?
@@ -102,7 +102,7 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
 
   test "a lock that outlives its run's count keeps its level" do
     start = Time.current
-    10.times { |index| attempt; travel SignIn::Throttle.lock_seconds(index + 1).to_i + 1 }
+    10.times { |index| attempt; travel SignIn::Protection::Throttle.lock_seconds(index + 1).to_i + 1 }
 
     travel_to start + 23.hours + 59.minutes
     assert_equal [ Trip.new(bucket: :account, level: 6, seconds: 3600) ], attempt.closes, "the eleventh, inside the run"
@@ -224,7 +224,7 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     assert_equal :account, attempt.refused_by.bucket
 
     reservation = @throttle.reserve_address(address: ADDRESS)
-    assert_equal SignIn::Throttle::Reservation.new(refused_by: nil, closes: []), reservation
+    assert_equal SignIn::Protection::Throttle::Reservation.new(refused_by: nil, closes: []), reservation
     assert_equal 6, count_of(:wide)
     assert_equal 5, count_of(:account), "the account's run is not counted"
 
@@ -254,7 +254,7 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
 
   test "take-backs at once of more than was counted leave the count at 0" do
     store = Interleaving.new
-    throttle = SignIn::Throttle.new(store: store)
+    throttle = SignIn::Protection::Throttle.new(store: store)
     throttle.reserve_address(address: ADDRESS)
 
     Array.new(6) { Thread.new { throttle.release_address(address: ADDRESS) } }.each(&:join)
@@ -302,7 +302,7 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
   end
 
   test "two scopes count apart, and the store holds neither the address nor the IP" do
-    members = SignIn::Throttle.new(scope: "members", store: @store)
+    members = SignIn::Protection::Throttle.new(scope: "members", store: @store)
     attempts(5)
     assert attempt(throttle: members).ok?
     @throttle.bot_check_due?(address: ADDRESS)
@@ -316,16 +316,16 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
   end
 
   test "a count the store cannot make opens every bucket, and nothing raises" do
-    throttle = SignIn::Throttle.new(store: FailingCounts.new)
+    throttle = SignIn::Protection::Throttle.new(store: FailingCounts.new)
 
-    60.times { assert_equal SignIn::Throttle::Reservation.new(refused_by: nil, closes: []), attempt(throttle: throttle) }
+    60.times { assert_equal SignIn::Protection::Throttle::Reservation.new(refused_by: nil, closes: []), attempt(throttle: throttle) }
     assert_not throttle.bot_check_due?(address: ADDRESS, identifier: EMAIL)
     assert_nil throttle.record_success(identifier: EMAIL, address: ADDRESS)
   end
 
   test "attempts at once on one account let exactly five through before the lock" do
     store = Interleaving.new
-    throttle = SignIn::Throttle.new(store: store)
+    throttle = SignIn::Protection::Throttle.new(store: store)
 
     reservations = Array.new(24) { |index| Thread.new { throttle.reserve(identifier: EMAIL, address: "198.51.100.#{index + 1}") } }.map(&:value)
 
@@ -337,7 +337,7 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
 
   test "attempts at once from one address let exactly fifty through" do
     store = Interleaving.new
-    throttle = SignIn::Throttle.new(store: store)
+    throttle = SignIn::Protection::Throttle.new(store: store)
 
     reservations = Array.new(70) { |index| Thread.new { throttle.reserve(identifier: "person#{index}@example.org", address: ADDRESS) } }.map(&:value)
 

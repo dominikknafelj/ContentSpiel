@@ -37,7 +37,7 @@ class Admin::ConfirmationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def account_count
-    digest = VisitorAddress.digest(User.normalize_value_for(:email_address, @user.email_address), purpose: SignIn::Throttle::KEY_PURPOSE)
+    digest = VisitorAddress.digest(User.normalize_value_for(:email_address, @user.email_address), purpose: SignIn::Protection::Throttle::KEY_PURPOSE)
     SignIn.store.read("sign_in:studio:account:#{digest}").to_i
   end
 
@@ -73,7 +73,7 @@ class Admin::ConfirmationsControllerTest < ActionDispatch::IntegrationTest
     assert_error :too_many_requests, :limited
     locked = Audit::Event.where(action: "session.locked").sole
     assert_equal "account", locked.metadata["bucket"]
-    assert_enqueued_jobs 1, only: SignIn::LockoutMailJob
+    assert_enqueued_jobs 1, only: SignIn::Protection::LockoutMailJob
 
     confirm_with_password(PASSWORD)
     assert_error :too_many_requests, :limited

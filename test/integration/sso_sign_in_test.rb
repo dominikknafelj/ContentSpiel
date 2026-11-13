@@ -413,7 +413,7 @@ class SsoSignInTest < ActionDispatch::IntegrationTest
     post admin_sign_in_passkey_path, params: { credential: passkey_assertion(client, challenge: challenge, user_handle: user.webauthn_id) }, as: :json
     assert_response :success
     yield response.parsed_body.fetch("location")
-    wide = VisitorAddress.key("127.0.0.1", purpose: SignIn::Throttle::KEY_PURPOSE)
+    wide = VisitorAddress.key("127.0.0.1", purpose: SignIn::Protection::Throttle::KEY_PURPOSE)
     SignIn.store.read("sign_in:studio:wide:#{wide}").to_i
   end
 

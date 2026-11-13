@@ -3,7 +3,7 @@ module Admin
   # who they are, however they proved it: the session, the known device,
   # `session.created`, and forgetting the bot check's flag.
   #
-  # THE KNOWN DEVICE (`SignIn::KnownDevice`) is written here and nowhere
+  # THE KNOWN DEVICE (`SignIn::Protection::KnownDevice`) is written here and nowhere
   # else, so only a whole sign-in earns one: never a password step that
   # still owes its second proof, or a stolen password would earn its own
   # device bucket beside the account's lock. A bot never holds one, and it
@@ -50,7 +50,7 @@ module Admin
       true
     end
 
-    def known_device = SignIn::KnownDevice.read(cookies.encrypted[DEVICE_COOKIE])
+    def known_device = SignIn::Protection::KnownDevice.read(cookies.encrypted[DEVICE_COOKIE])
 
     def remember_device(identifier)
       cookies.encrypted[DEVICE_COOKIE] = {

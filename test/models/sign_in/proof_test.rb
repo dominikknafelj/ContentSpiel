@@ -8,7 +8,7 @@ class SignIn::ProofTest < ActiveSupport::TestCase
   EMAIL = "ann@example.org".freeze
   PASSWORD = "password12345".freeze
   ADDRESS = "203.0.113.7".freeze
-  Trip = SignIn::Throttle::Trip
+  Trip = SignIn::Protection::Throttle::Trip
 
   setup do
     freeze_time
@@ -16,7 +16,7 @@ class SignIn::ProofTest < ActiveSupport::TestCase
     @codes = RecoveryCode.texts
     @codes.each { |code| @user.recovery_codes.create!(digest: RecoveryCode.digest(code), generated_at: Time.current) }
     @store = ActiveSupport::Cache::MemoryStore.new
-    @throttle = SignIn::Throttle.new(store: @store)
+    @throttle = SignIn::Protection::Throttle.new(store: @store)
   end
 
   def proof(span: "auth.second_factor", device: nil)
@@ -29,7 +29,7 @@ class SignIn::ProofTest < ActiveSupport::TestCase
   end
 
   def count_of(counter)
-    digest = counter == :account ? VisitorAddress.digest(EMAIL, purpose: SignIn::Throttle::KEY_PURPOSE) : VisitorAddress.key(ADDRESS, purpose: SignIn::Throttle::KEY_PURPOSE)
+    digest = counter == :account ? VisitorAddress.digest(EMAIL, purpose: SignIn::Protection::Throttle::KEY_PURPOSE) : VisitorAddress.key(ADDRESS, purpose: SignIn::Protection::Throttle::KEY_PURPOSE)
     @store.read("sign_in:studio:#{counter}:#{digest}")
   end
 
@@ -134,13 +134,13 @@ class SignIn::ProofTest < ActiveSupport::TestCase
   test "from a known device the proof counts in the device's bucket and the account's lock does not refuse it" do
     5.times { password_step(password: "wrong") }
     assert_equal :locked, password_step.status
-    device = SignIn::KnownDevice.new.remember(EMAIL)
+    device = SignIn::Protection::KnownDevice.new.remember(EMAIL)
 
     assert_equal refused, proof(device: device).recovery_code("0000-0000")
     assert_equal 5, count_of(:account), "the device's failure is not the account's"
     assert proof(device: device).recovery_code(@codes.first).ok?
     assert_equal :locked, proof.recovery_code(@codes.second).status, "the account's lock stands for any other browser"
-    assert_equal :locked, proof(device: SignIn::KnownDevice.new).recovery_code(@codes.second).status, "a device that does not know the account is the account's"
+    assert_equal :locked, proof(device: SignIn::Protection::KnownDevice.new).recovery_code(@codes.second).status, "a device that does not know the account is the account's"
   end
 
   test "a passkey proof finds only the account's own passkeys" do

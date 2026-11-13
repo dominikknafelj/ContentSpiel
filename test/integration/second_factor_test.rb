@@ -57,7 +57,7 @@ class SecondFactorTest < ActionDispatch::IntegrationTest
   end
 
   def count_of(counter)
-    digest = counter == :account ? VisitorAddress.digest(EMAIL, purpose: SignIn::Throttle::KEY_PURPOSE) : VisitorAddress.key(ADDRESS, purpose: SignIn::Throttle::KEY_PURPOSE)
+    digest = counter == :account ? VisitorAddress.digest(EMAIL, purpose: SignIn::Protection::Throttle::KEY_PURPOSE) : VisitorAddress.key(ADDRESS, purpose: SignIn::Protection::Throttle::KEY_PURPOSE)
     SignIn.store.read("sign_in:studio:#{counter}:#{digest}").to_i
   end
 
@@ -183,7 +183,7 @@ class SecondFactorTest < ActionDispatch::IntegrationTest
     assert_equal 1, count_of(:account), "the password's count stands"
 
     3.times { send_code("0000-0000") }
-    assert_enqueued_with(job: SignIn::LockoutMailJob, args: [ EMAIL, { locked_at: Time.current, from_address: ADDRESS, minutes: 1, origin: "http://www.example.com" } ]) do
+    assert_enqueued_with(job: SignIn::Protection::LockoutMailJob, args: [ EMAIL, { locked_at: Time.current, from_address: ADDRESS, minutes: 1, origin: "http://www.example.com" } ]) do
       send_code("0000-0000")
     end
     assert_equal I18n.t("admin.sessions.locked"), flash[:alert], "the code that closed the account says the pause"

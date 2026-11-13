@@ -28,7 +28,7 @@ module Users
   # to be signed in in the same browser goes with the rest.
   #
   # A change opens sign-in for the account in every browser
-  # (`SignIn::Throttle#clear`: the account's bucket and every known
+  # (`SignIn::Protection::Throttle#clear`: the account's bucket and every known
   # device's), after the commit: whoever set the password proved the
   # account (the reset's token, the current password, the console; a
   # manager's set is `Users::Save`'s, which clears the same way), and a bot
@@ -60,7 +60,7 @@ module Users
   # there is no blank check and no leak lookup, and the sentence is the
   # ordinary change's (`user.updated` with its credentials marker, the
   # sessions ended as for any change). Sign-in is not opened afterwards
-  # (`SignIn::Throttle#clear`): nobody can type the new password, so a bucket
+  # (`SignIn::Protection::Throttle#clear`): nobody can type the new password, so a bucket
   # held closed keeps out nobody who could otherwise get in.
   #
   # A linked account's password is refused otherwise, its own included
@@ -117,7 +117,7 @@ module Users
       return sso_linked_password_refusal(issuer: linked_issuer) if linked_issuer
       return failure(@user) unless saved
 
-      SignIn::Throttle.new.clear(identifier: @user.email_address) unless @clear
+      SignIn::Protection::Throttle.new.clear(identifier: @user.email_address) unless @clear
       success(@user)
     end
 

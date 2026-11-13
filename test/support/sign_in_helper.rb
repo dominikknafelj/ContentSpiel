@@ -3,7 +3,7 @@ require "socket"
 # The sign-in checks' outside calls, answered without the network.
 #
 # - `with_bot_check(answer) { … }`: Turnstile configured with Cloudflare's
-#   documented always-pass test keys, and `SignIn::BotCheck.siteverify`
+#   documented always-pass test keys, and `SignIn::Protection::BotCheck.siteverify`
 #   answering `:passed` (for `hostname`, an integration test's host unless
 #   named, and the sign-in action), `:failed` or `:unavailable` (a refused
 #   connection).
@@ -29,7 +29,7 @@ module SignInHelper
   BOT_CHECK_HOSTNAME = "www.example.com".freeze
 
   BOT_CHECK_ANSWERS = {
-    passed: { "success" => true, "action" => SignIn::BotCheck::ACTION },
+    passed: { "success" => true, "action" => SignIn::Protection::BotCheck::ACTION },
     failed: { "success" => false, "error-codes" => [ "invalid-input-response" ] }
   }.freeze
 
@@ -57,7 +57,7 @@ module SignInHelper
 
       BOT_CHECK_ANSWERS.fetch(answer).merge("hostname" => hostname)
     end
-    with_sign_in_env(BOT_CHECK_KEYS) { with_singleton_override(SignIn::BotCheck, :siteverify, siteverify, &block) }
+    with_sign_in_env(BOT_CHECK_KEYS) { with_singleton_override(SignIn::Protection::BotCheck, :siteverify, siteverify, &block) }
   end
 
   def leaked_password_requests = (@leaked_password_requests ||= [])

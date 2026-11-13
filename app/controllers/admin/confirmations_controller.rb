@@ -82,7 +82,7 @@ module Admin
 
     def proof
       SignIn::Proof.new(account: Current.user, identifier: identifier, address: request.remote_ip,
-        device: SignIn::KnownDevice.read(cookies.encrypted[SignInCompletion::DEVICE_COOKIE]), span: "auth.confirmation")
+        device: SignIn::Protection::KnownDevice.read(cookies.encrypted[SignInCompletion::DEVICE_COOKIE]), span: "auth.confirmation")
     end
 
     def answer(outcome, method:, failed:)

@@ -2,7 +2,7 @@ require "test_helper"
 
 # The lock-out mail's job: it finds the account the request did not look
 # up, and mails it only when there is one and mail is ready.
-class SignIn::LockoutMailJobTest < ActiveJob::TestCase
+class SignIn::Protection::LockoutMailJobTest < ActiveJob::TestCase
   include ActionMailer::TestHelper
   include LogCapture
 
@@ -16,7 +16,7 @@ class SignIn::LockoutMailJobTest < ActiveJob::TestCase
   end
 
   def perform(email, **)
-    SignIn::LockoutMailJob.perform_now(email, locked_at: Time.current, from_address: "203.0.113.7", minutes: 1, **)
+    SignIn::Protection::LockoutMailJob.perform_now(email, locked_at: Time.current, from_address: "203.0.113.7", minutes: 1, **)
   end
 
   test "the job mails the account through ApplicationMailer.queue when mail is ready" do
@@ -52,11 +52,11 @@ class SignIn::LockoutMailJobTest < ActiveJob::TestCase
   test "the job's arguments are not logged" do
     with_mail_state(:working) do
       log = capture_log do
-        SignIn::LockoutMailJob.perform_later(@user.email_address, locked_at: Time.current, from_address: "203.0.113.7", minutes: 1)
-        perform_enqueued_jobs(only: SignIn::LockoutMailJob)
+        SignIn::Protection::LockoutMailJob.perform_later(@user.email_address, locked_at: Time.current, from_address: "203.0.113.7", minutes: 1)
+        perform_enqueued_jobs(only: SignIn::Protection::LockoutMailJob)
       end
 
-      assert_includes log, "SignIn::LockoutMailJob", "the job's own lines are in the capture"
+      assert_includes log, "SignIn::Protection::LockoutMailJob", "the job's own lines are in the capture"
       assert_enqueued_jobs 1, only: MailDeliveryJob
       assert_not_includes log, @user.email_address
     end

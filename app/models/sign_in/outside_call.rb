@@ -2,7 +2,7 @@ require "net/http"
 
 module SignIn
   # The one HTTPS request a sign-in check makes to an outside service
-  # (`SignIn::BotCheck.siteverify`, `SignIn::LeakedPassword.range`), and how
+  # (`SignIn::Protection::BotCheck.siteverify`, `SignIn::LeakedPassword.range`), and how
   # its failure is named in a log line and a span.
   #
   # UNTRACED. The request runs inside `OpenTelemetry::Common::Utilities.untraced`,

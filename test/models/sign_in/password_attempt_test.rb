@@ -8,7 +8,7 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
   PASSWORD = "password12345".freeze
   ADDRESS = "203.0.113.7".freeze
   HOSTNAME = SignInHelper::BOT_CHECK_HOSTNAME
-  Trip = SignIn::Throttle::Trip
+  Trip = SignIn::Protection::Throttle::Trip
 
   # A store that yields the thread around every call, so attempts on
   # several threads interleave between their reads and writes.
@@ -25,10 +25,10 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
     freeze_time
     @user = User.create!(email_address: EMAIL, password: PASSWORD)
     @store = ActiveSupport::Cache::MemoryStore.new
-    @throttle = SignIn::Throttle.new(store: @store)
+    @throttle = SignIn::Protection::Throttle.new(store: @store)
   end
 
-  def attempt(email: EMAIL, password: "wrong", address: ADDRESS, token: nil, throttle: @throttle, bot_check: SignIn::BotCheck.current, allowed: nil)
+  def attempt(email: EMAIL, password: "wrong", address: ADDRESS, token: nil, throttle: @throttle, bot_check: SignIn::Protection::BotCheck.current, allowed: nil)
     options = { allowed: allowed }.compact
     SignIn::PasswordAttempt.new(email: email, password: password, address: address, hostname: HOSTNAME,
       bot_check_token: token, throttle: throttle, bot_check: bot_check, **options).call
@@ -47,7 +47,7 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
 
   # Ann's count in the account bucket, or this address's in the wide one.
   def count_of(counter)
-    digest = counter == :account ? VisitorAddress.digest(EMAIL, purpose: SignIn::Throttle::KEY_PURPOSE) : VisitorAddress.key(ADDRESS, purpose: SignIn::Throttle::KEY_PURPOSE)
+    digest = counter == :account ? VisitorAddress.digest(EMAIL, purpose: SignIn::Protection::Throttle::KEY_PURPOSE) : VisitorAddress.key(ADDRESS, purpose: SignIn::Protection::Throttle::KEY_PURPOSE)
     @store.read("sign_in:studio:#{counter}:#{digest}")
   end
 
@@ -150,7 +150,7 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
   end
 
   test "attempts at once on one account check five passwords before the lock" do
-    throttle = SignIn::Throttle.new(store: Interleaving.new)
+    throttle = SignIn::Protection::Throttle.new(store: Interleaving.new)
     outcomes = nil
     checked = hashes do
       outcomes = Array.new(16) { |index| Thread.new { attempt(address: "198.51.100.#{index + 1}", throttle: throttle) } }.map(&:value)
@@ -203,7 +203,7 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
   end
 
   test "without Turnstile configured no check is ever due and the throttles still stand" do
-    assert_nil SignIn::BotCheck.current
+    assert_nil SignIn::Protection::BotCheck.current
 
     4.times { assert_not attempt.bot_check_due }
     assert_equal [ :account ], attempt.trips.map(&:bucket)

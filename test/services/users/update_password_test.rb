@@ -115,9 +115,9 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
   end
 
   test "clear does not open sign-in: nobody can type the password it writes" do
-    throttle = SignIn::Throttle.new
+    throttle = SignIn::Protection::Throttle.new
     cleared = []
-    with_singleton_override(SignIn::Throttle, :new, ->(**) { throttle }) do
+    with_singleton_override(SignIn::Protection::Throttle, :new, ->(**) { throttle }) do
       with_singleton_override(throttle, :clear, ->(identifier:) { cleared << identifier }) do
         as(nil) { Users::UpdatePassword.call(users(:reader), clear: true, keep_acting_session: false, actor: users(:reader)) }
         assert_empty cleared

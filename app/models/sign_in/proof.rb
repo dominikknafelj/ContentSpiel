@@ -41,7 +41,7 @@ module SignIn
     # `identifier`: the account bucket's key, the email as the accounts
     # store it. `device`: the `KnownDevice` the browser carries, or nil.
     # `allowed`: whether the account may be let in by a right proof.
-    def initialize(account:, identifier:, address:, span:, device: nil, throttle: SignIn::Throttle.new, allowed: ->(_account) { true })
+    def initialize(account:, identifier:, address:, span:, device: nil, throttle: SignIn::Protection::Throttle.new, allowed: ->(_account) { true })
       raise ArgumentError, "#{span.inspect} is not among #{SPANS}" unless SPANS.include?(span)
 
       @allowed = allowed

@@ -3,7 +3,7 @@ require "test_helper"
 # Turnstile's verification on the server: on only with both keys, junk
 # refused without a call, Cloudflare's answer read, and its outage failing
 # open with one line that names a class and nothing sent.
-class SignIn::BotCheckTest < ActiveSupport::TestCase
+class SignIn::Protection::BotCheckTest < ActiveSupport::TestCase
   include LogCapture
 
   TOKEN = "XXXX.DUMMY.TOKEN.XXXX-planted-token".freeze
@@ -16,10 +16,10 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
   setup do
     @exporter = Rails.application.config.x.otel_test_exporter
     @exporter.reset
-    @siteverify = SignIn::BotCheck.method(:siteverify)
+    @siteverify = SignIn::Protection::BotCheck.method(:siteverify)
   end
 
-  def check = SignIn::BotCheck.current
+  def check = SignIn::Protection::BotCheck.current
 
   # What a span says: its name, its attributes and its events', as text
   # (its ids and timestamps are figures that could hold any digits).
@@ -36,23 +36,23 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
 
   test "one key without the other is no bot check, and the boot line names the missing variable" do
     both = { "TURNSTILE_SITE_KEY" => SITE_KEY, "TURNSTILE_SECRET_KEY" => SECRET_KEY }
-    assert_equal SITE_KEY, SignIn::BotCheck.current(both).site_key
-    assert_nil SignIn::BotCheck.missing_variable(both)
+    assert_equal SITE_KEY, SignIn::Protection::BotCheck.current(both).site_key
+    assert_nil SignIn::Protection::BotCheck.missing_variable(both)
 
-    assert_nil SignIn::BotCheck.current({})
-    assert_nil SignIn::BotCheck.missing_variable({}), "a site that set neither asked for no check"
+    assert_nil SignIn::Protection::BotCheck.current({})
+    assert_nil SignIn::Protection::BotCheck.missing_variable({}), "a site that set neither asked for no check"
 
     [ nil, "", "  " ].each do |unset|
       site_only = { "TURNSTILE_SITE_KEY" => SITE_KEY, "TURNSTILE_SECRET_KEY" => unset }
-      assert_nil SignIn::BotCheck.current(site_only)
-      assert_equal "TURNSTILE_SECRET_KEY", SignIn::BotCheck.missing_variable(site_only)
+      assert_nil SignIn::Protection::BotCheck.current(site_only)
+      assert_equal "TURNSTILE_SECRET_KEY", SignIn::Protection::BotCheck.missing_variable(site_only)
 
       secret_only = { "TURNSTILE_SITE_KEY" => unset, "TURNSTILE_SECRET_KEY" => SECRET_KEY }
-      assert_nil SignIn::BotCheck.current(secret_only)
-      assert_equal "TURNSTILE_SITE_KEY", SignIn::BotCheck.missing_variable(secret_only)
+      assert_nil SignIn::Protection::BotCheck.current(secret_only)
+      assert_equal "TURNSTILE_SITE_KEY", SignIn::Protection::BotCheck.missing_variable(secret_only)
     end
 
-    assert_nil SignIn::BotCheck.current, "the suite runs with neither key"
+    assert_nil SignIn::Protection::BotCheck.current, "the suite runs with neither key"
   end
 
   test "a token that is no String or is over 2,048 characters is refused without asking Cloudflare" do
@@ -81,7 +81,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
       internal = ->(_form, url: nil) { { "success" => false, "error-codes" => [ "internal-error" ] } }
       log = capture_log do
         with_bot_check do
-          with_singleton_override(SignIn::BotCheck, :siteverify, internal) do
+          with_singleton_override(SignIn::Protection::BotCheck, :siteverify, internal) do
             assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST)
           end
         end
@@ -91,7 +91,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
       with_http_stub(status: 503, body: "busy") do |base|
         log = capture_log do
           with_bot_check do
-            with_singleton_override(SignIn::BotCheck, :siteverify, siteverify_at(base)) do
+            with_singleton_override(SignIn::Protection::BotCheck, :siteverify, siteverify_at(base)) do
               assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST)
             end
           end
@@ -102,7 +102,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
       with_http_stub(body: "<html>a captive portal</html>", content_type: "text/html") do |base|
         log = capture_log do
           with_bot_check do
-            with_singleton_override(SignIn::BotCheck, :siteverify, siteverify_at(base)) do
+            with_singleton_override(SignIn::Protection::BotCheck, :siteverify, siteverify_at(base)) do
               assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST)
             end
           end
@@ -137,7 +137,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
     Telemetry.tracer.in_span("probe", kind: :server) do
       with_bot_check do
         answers.each do |answer, expected|
-          with_singleton_override(SignIn::BotCheck, :siteverify, ->(_form, url: nil) { answer }) do
+          with_singleton_override(SignIn::Protection::BotCheck, :siteverify, ->(_form, url: nil) { answer }) do
             assert_equal expected, check.verify(TOKEN, address: ADDRESS, hostname: HOST), answer.inspect
           end
         end
@@ -162,7 +162,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
       answer = { "success" => false, "error-codes" => [ "invalid-input-response", code ] }
       log = capture_log do
         with_bot_check do
-          with_singleton_override(SignIn::BotCheck, :siteverify, ->(_form, url: nil) { answer }) do
+          with_singleton_override(SignIn::Protection::BotCheck, :siteverify, ->(_form, url: nil) { answer }) do
             assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST), code
           end
         end
@@ -175,7 +175,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
       answer = { "success" => false, "error-codes" => codes }
       log = capture_log do
         with_bot_check do
-          with_singleton_override(SignIn::BotCheck, :siteverify, ->(_form, url: nil) { answer }) do
+          with_singleton_override(SignIn::Protection::BotCheck, :siteverify, ->(_form, url: nil) { answer }) do
             assert_equal :failed, check.verify(TOKEN, address: ADDRESS, hostname: HOST), codes.inspect
           end
         end
@@ -188,7 +188,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
     with_http_stub(body: "") do |base|
       log = capture_log do
         with_bot_check do
-          with_singleton_override(SignIn::BotCheck, :siteverify, siteverify_at(base)) do
+          with_singleton_override(SignIn::Protection::BotCheck, :siteverify, siteverify_at(base)) do
             assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST)
           end
         end
@@ -202,7 +202,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
     assert_equal [ { "secret" => SECRET_KEY, "response" => TOKEN, "remoteip" => ADDRESS } ], bot_check_requests
 
     with_http_stub(body: YES, content_type: "application/json") do |base, requests|
-      SignIn::BotCheck.siteverify({ "secret" => SECRET_KEY, "response" => TOKEN, "remoteip" => ADDRESS }, url: "#{base}/turnstile/v0/siteverify")
+      SignIn::Protection::BotCheck.siteverify({ "secret" => SECRET_KEY, "response" => TOKEN, "remoteip" => ADDRESS }, url: "#{base}/turnstile/v0/siteverify")
 
       assert_equal [ "POST /turnstile/v0/siteverify HTTP/1.1" ], requests.map(&:line)
       assert_equal "application/x-www-form-urlencoded", requests.first.headers["content-type"]
@@ -222,7 +222,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
       @exporter.reset
 
       with_bot_check do
-        with_singleton_override(SignIn::BotCheck, :siteverify, siteverify_at(base)) do
+        with_singleton_override(SignIn::Protection::BotCheck, :siteverify, siteverify_at(base)) do
           Telemetry.tracer.in_span("probe", kind: :server) { assert_equal :passed, check.verify(TOKEN, address: ADDRESS, hostname: HOST) }
         end
       end

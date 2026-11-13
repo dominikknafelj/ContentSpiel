@@ -11,7 +11,7 @@ Rails.application.config.filter_parameters += [
   # The mail login's username (docs/reference/mail.md): a credential for several providers (Postmark's
   # server token, SES's access key id). Its password is :passw's.
   :mail_username,
-  # The bot check's answer, posted by the Turnstile widget as `cf-turnstile-response` (`SignIn::BotCheck`):
+  # The bot check's answer, posted by the Turnstile widget as `cf-turnstile-response` (`SignIn::Protection::BotCheck`):
   # a one-time pass that must reach no log, and whose name no entry above matches.
   :turnstile,
   # A passkey's answer to a ceremony, posted as `credential` (the WebAuthn JSON: its credential id, and at

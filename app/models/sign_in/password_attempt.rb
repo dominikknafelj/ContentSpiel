@@ -7,7 +7,7 @@ module SignIn
   #
   # THE ORDER, and why each step stands where it does:
   #
-  # 1. The bot check, when the site has one (`SignIn::BotCheck.current`)
+  # 1. The bot check, when the site has one (`SignIn::Protection::BotCheck.current`)
   #    and the address or the email is due (`Throttle#bot_check_due?`). A
   #    missing or junk token is `:bot_check_required`, a token Cloudflare
   #    refuses `:bot_check_failed`. It comes before the reservation, so an
@@ -63,8 +63,8 @@ module SignIn
 
     # `device`: the `KnownDevice` the browser carries, or nil. `allowed`:
     # whether an account whose password is right may sign in with it.
-    def initialize(email:, password:, address:, hostname:, bot_check_token:, device: nil, accounts: User, throttle: SignIn::Throttle.new,
-      bot_check: SignIn::BotCheck.current, allowed: ->(_account) { true })
+    def initialize(email:, password:, address:, hostname:, bot_check_token:, device: nil, accounts: User, throttle: SignIn::Protection::Throttle.new,
+      bot_check: SignIn::Protection::BotCheck.current, allowed: ->(_account) { true })
       @email = email
       @device = device
       @password = password
@@ -102,7 +102,7 @@ module SignIn
         due = @throttle.bot_check_due?(address: address, identifier: identifier)
         Telemetry.record(span, "auth.bot_check.required" => due)
         if due
-          return outcome(:bot_check_required, bot_check_due: true) unless BotCheck.usable_token?(@bot_check_token)
+          return outcome(:bot_check_required, bot_check_due: true) unless Protection::BotCheck.usable_token?(@bot_check_token)
           return outcome(:bot_check_failed, bot_check_due: true) if @bot_check.verify(@bot_check_token, address: address, hostname: @hostname) == :failed
         end
       end

@@ -1,6 +1,6 @@
 # The mail to an account whose sign-in a run of failed attempts paused, sent
-# by `SignIn::LockoutMailJob` at most once an hour per account
-# (`SignIn::Throttle#notice_due?`): how long the pause is, when the attempt
+# by `SignIn::Protection::LockoutMailJob` at most once an hour per account
+# (`SignIn::Protection::Throttle#notice_due?`): how long the pause is, when the attempt
 # that paused it came (in the site's zone) and from which address, and a
 # button to the reset request.
 #

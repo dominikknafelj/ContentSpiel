@@ -64,7 +64,7 @@ module Admin
   # cost more than for an unknown one), so both carry the email that was
   # tried in `metadata`, never the password. For the same reason the
   # account's pause mail is a job queued for any email, known or not
-  # (`SignIn::LockoutMailJob`, which looks the account up); a known
+  # (`SignIn::Protection::LockoutMailJob`, which looks the account up); a known
   # device's lock is the person's own and mails nothing. Nor a password
   # typed into the email box by mistake: a value without an "@" isn't an address, so
   # nothing is kept; an address is cut to the 254 characters an email
@@ -103,7 +103,7 @@ module Admin
     # carries a policy that lets the widget in (`allow_bot_check_origin`).
     # Declared before the rate limit's before_action, so a limited POST's
     # answer carries it too.
-    before_action :allow_bot_check_origin, only: %i[ new create ], if: -> { SignIn::BotCheck.current }
+    before_action :allow_bot_check_origin, only: %i[ new create ], if: -> { SignIn::Protection::BotCheck.current }
     # The per-address bucket, Rails' `rate_limit`: it counts every POST to
     # `create` and `passkey`, one count shared by both, a success and a
     # refusal alike, not failures alone. Its
@@ -129,9 +129,9 @@ module Admin
       @sso_provider = SignIn::Oidc::Provider.current
       @sso_required = @sso_provider.present? && SignIn::Oidc.required?
       @owner_path = owner_path?
-      bot_check = SignIn::BotCheck.current
+      bot_check = SignIn::Protection::BotCheck.current
       @bot_check_configured = bot_check.present?
-      @bot_check = bot_check if bot_check && (session[:sign_in_bot_check] || SignIn::Throttle.new.bot_check_due?(address: request.remote_ip))
+      @bot_check = bot_check if bot_check && (session[:sign_in_bot_check] || SignIn::Protection::Throttle.new.bot_check_due?(address: request.remote_ip))
     end
 
     def create
@@ -177,7 +177,7 @@ module Admin
     # is taken before the assertion is read, so a refused or a late answer
     # spends it too.
     def passkey
-      throttle = SignIn::Throttle.new
+      throttle = SignIn::Protection::Throttle.new
       reservation = throttle.reserve_address(address: request.remote_ip)
       return answer_passkey_refused(t("admin.sessions.limited")) unless reservation.ok?
 

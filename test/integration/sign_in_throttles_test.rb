@@ -159,7 +159,7 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
 
     assert_equal(*fifth)
     assert_equal I18n.t("admin.sessions.locked"), fifth.first[:flash]
-    assert_equal [ "SignIn::LockoutMailJob" ], fifth.first[:jobs], "the pause mail's job, for an email with no account too"
+    assert_equal [ "SignIn::Protection::LockoutMailJob" ], fifth.first[:jobs], "the pause mail's job, for an email with no account too"
     assert_equal(*sixth)
     assert_equal I18n.t("admin.sessions.locked"), sixth.first[:flash]
     assert_equal 0, sixth.first[:hashes]
@@ -186,13 +186,13 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
   test "the fifth failure enqueues one lock-out job for a known and an unknown address alike, and the next lock within the hour enqueues none" do
     [ EMAIL, UNKNOWN ].each do |email|
       wrong_attempts(4, email)
-      assert_enqueued_with(job: SignIn::LockoutMailJob, args: [ email, { locked_at: Time.current, from_address: "127.0.0.1", minutes: 1, origin: "http://www.example.com" } ]) do
+      assert_enqueued_with(job: SignIn::Protection::LockoutMailJob, args: [ email, { locked_at: Time.current, from_address: "127.0.0.1", minutes: 1, origin: "http://www.example.com" } ]) do
         attempt(email)
       end
 
       travel 1.minute
       assert_difference -> { locked_events.count }, 1 do
-        assert_no_enqueued_jobs(only: SignIn::LockoutMailJob) { attempt(email) }
+        assert_no_enqueued_jobs(only: SignIn::Protection::LockoutMailJob) { attempt(email) }
       end
       assert_equal 1, locked_events.last.metadata["level"], "the sixth failure is the next lock, two minutes"
     end
@@ -286,7 +286,7 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
       attempt(EMAIL)
       assert_equal true, session[:sign_in_bot_check]
       get admin_sign_in_path
-      assert_kind_of SignIn::BotCheck, controller.instance_variable_get(:@bot_check)
+      assert_kind_of SignIn::Protection::BotCheck, controller.instance_variable_get(:@bot_check)
 
       assert_no_difference -> { Audit::Event.count } do
         attempt(EMAIL, password: PASSWORD)
@@ -313,11 +313,11 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
       assert_equal I18n.t("admin.sessions.bot_check"), flash[:alert]
       assert_equal true, session[:sign_in_bot_check]
       get admin_sign_in_path
-      assert_kind_of SignIn::BotCheck, controller.instance_variable_get(:@bot_check)
+      assert_kind_of SignIn::Protection::BotCheck, controller.instance_variable_get(:@bot_check)
 
       reset!
       get admin_sign_in_path, headers: { "X-Forwarded-For" => "203.0.113.1" }, env: { "REMOTE_ADDR" => "10.0.0.2" }
-      assert_kind_of SignIn::BotCheck, controller.instance_variable_get(:@bot_check)
+      assert_kind_of SignIn::Protection::BotCheck, controller.instance_variable_get(:@bot_check)
     end
   end
 
