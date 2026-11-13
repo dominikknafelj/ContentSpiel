@@ -2,7 +2,7 @@ require "test_helper"
 
 # The daily re-check of the sessions an outside provider made: SSO's through
 # its refresh token, a gem's through its entry's `recheck`.
-class Sso::RecheckJobTest < ActiveJob::TestCase
+class SignIn::Sso::RecheckJobTest < ActiveJob::TestCase
   include LogCapture
 
   setup do
@@ -27,7 +27,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
   def run_at(at)
     Session.update_all(last_seen_at: at) # version: none (a test's own rows)
     @exporter.reset
-    Telemetry.tracer.in_span("job", kind: :consumer) { Sso::RecheckJob.perform_now(at: at) }
+    Telemetry.tracer.in_span("job", kind: :consumer) { SignIn::Sso::RecheckJob.perform_now(at: at) }
     @exporter.finished_spans
   end
 
@@ -130,7 +130,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
       gem_session = start(token: nil, at: @t, method: "acme/saml")
 
       without_encryption_keys do
-        report = assert_error_reported(Sso::RecheckJob::RecheckFailed) do
+        report = assert_error_reported(SignIn::Sso::RecheckJob::RecheckFailed) do
           assert_equal counted(checked: 2, ok: 1, unavailable: 1), counts(run_at(@t + 24.hours))
         end
         assert_equal "ActiveRecord::Encryption::Errors::Configuration", report.error.message
@@ -178,7 +178,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
 
     spans = nil
     log = capture_log do
-      report = assert_error_reported(Sso::RecheckJob::RecheckFailed) { spans = run_at(@t + 24.hours) }
+      report = assert_error_reported(SignIn::Sso::RecheckJob::RecheckFailed) { spans = run_at(@t + 24.hours) }
       assert_equal "IOError", report.error.message, "the class alone, never the gem's message"
     end
 
@@ -201,18 +201,18 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
   test "a gem's recheck past its limit is unavailable" do
     SignIn::Methods.register("acme/slow", label: "acme.sign_in.slow", path: :admin_root_path, recheck: ->(_session) { sleep 2; :revoked })
     session = start(token: nil, at: @t, method: "acme/slow")
-    stub = Sso::RecheckJob.const_get(:GEM_RECHECK_LIMIT)
-    Sso::RecheckJob.send(:remove_const, :GEM_RECHECK_LIMIT)
-    Sso::RecheckJob.const_set(:GEM_RECHECK_LIMIT, 0.05)
+    stub = SignIn::Sso::RecheckJob.const_get(:GEM_RECHECK_LIMIT)
+    SignIn::Sso::RecheckJob.send(:remove_const, :GEM_RECHECK_LIMIT)
+    SignIn::Sso::RecheckJob.const_set(:GEM_RECHECK_LIMIT, 0.05)
 
-    report = assert_error_reported(Sso::RecheckJob::RecheckFailed) do
+    report = assert_error_reported(SignIn::Sso::RecheckJob::RecheckFailed) do
       assert_equal counted(checked: 1, unavailable: 1), counts(run_at(@t + 24.hours))
     end
     assert_equal "Timeout::Error", report.error.message
     assert Session.exists?(session.id)
   ensure
-    Sso::RecheckJob.send(:remove_const, :GEM_RECHECK_LIMIT)
-    Sso::RecheckJob.const_set(:GEM_RECHECK_LIMIT, stub)
+    SignIn::Sso::RecheckJob.send(:remove_const, :GEM_RECHECK_LIMIT)
+    SignIn::Sso::RecheckJob.const_set(:GEM_RECHECK_LIMIT, stub)
   end
 
   # The tests below run on the test's one connection (the fixtures pin it),
@@ -257,7 +257,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
     config = Session.connection_db_config.configuration_hash
     other = PG.connect(host: config[:host], port: config[:port], dbname: config[:database], user: config[:username],
       password: config[:password], gssencmode: "disable")
-    other.exec_params("SELECT pg_advisory_lock($1, $2)", [ Sso::RecheckJob::ADVISORY_NAMESPACE, held.id % Sso::RecheckJob::INT4 ])
+    other.exec_params("SELECT pg_advisory_lock($1, $2)", [ SignIn::Sso::RecheckJob::ADVISORY_NAMESPACE, held.id % SignIn::Sso::RecheckJob::INT4 ])
 
     assert_equal counted(checked: 1, ok: 1), counts(run_at(@t + 24.hours))
     assert_equal [ free.id ], asked
@@ -271,15 +271,15 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
     SignIn::Methods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path,
       recheck: ->(session) { asked << session.id; :unavailable })
     rows = Array.new(3) { start(token: nil, at: @t, method: "acme/saml") }
-    stub = Sso::RecheckJob.const_get(:BATCH)
-    Sso::RecheckJob.send(:remove_const, :BATCH)
-    Sso::RecheckJob.const_set(:BATCH, 2)
+    stub = SignIn::Sso::RecheckJob.const_get(:BATCH)
+    SignIn::Sso::RecheckJob.send(:remove_const, :BATCH)
+    SignIn::Sso::RecheckJob.const_set(:BATCH, 2)
 
     assert_equal counted(checked: 3, unavailable: 3), counts(run_at(@t + 24.hours))
     assert_equal rows.map(&:id).sort, asked.sort
   ensure
-    Sso::RecheckJob.send(:remove_const, :BATCH)
-    Sso::RecheckJob.const_set(:BATCH, stub)
+    SignIn::Sso::RecheckJob.send(:remove_const, :BATCH)
+    SignIn::Sso::RecheckJob.const_set(:BATCH, stub)
   end
 
   test "no token reaches a log line, a span or an audit event" do
@@ -314,7 +314,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
   test "it is scheduled in every environment, hourly on default" do
     %w[production development test].each do |environment|
       schedule = YAML.load_file(Rails.root.join("config/recurring.yml")).dig(environment, "sso_recheck")
-      assert_equal({ "class" => "Sso::RecheckJob", "queue" => "default", "schedule" => "every hour at minute 25" }, schedule, environment)
+      assert_equal({ "class" => "SignIn::Sso::RecheckJob", "queue" => "default", "schedule" => "every hour at minute 25" }, schedule, environment)
     end
   end
 end

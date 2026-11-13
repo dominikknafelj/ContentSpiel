@@ -21,7 +21,7 @@ module SignIn
     # A linked account (single sign-on) is refused (`denied`), as a stranger's
     # is: its provider is its second factor, and a passkey would be a way in
     # that never asks it (`SignIn::Rules`). Asked again under the row lock, the
-    # one `Sso::Link` takes to delete the passkeys, so a link and an add at
+    # one `SignIn::Sso::Link` takes to delete the passkeys, so a link and an add at
     # once never leave a passkey on a linked account.
     #
     # The account mail goes after the commit, to `origin` (the caller's; a

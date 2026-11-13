@@ -46,7 +46,7 @@ production:
     queue: default
     schedule: every hour at minute 40
   sso_recheck:
-    class: Sso::RecheckJob
+    class: SignIn::Sso::RecheckJob
     queue: default
     schedule: every hour at minute 25
 
@@ -84,7 +84,7 @@ development:
     queue: default
     schedule: every hour at minute 40
   sso_recheck:
-    class: Sso::RecheckJob
+    class: SignIn::Sso::RecheckJob
     queue: default
     schedule: every hour at minute 25
 
@@ -118,6 +118,6 @@ test:
     queue: default
     schedule: every hour at minute 40
   sso_recheck:
-    class: Sso::RecheckJob
+    class: SignIn::Sso::RecheckJob
     queue: default
     schedule: every hour at minute 25

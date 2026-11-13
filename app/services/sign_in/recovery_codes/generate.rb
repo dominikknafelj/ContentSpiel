@@ -15,7 +15,7 @@ module SignIn
     # so a passkey removed at the same moment cannot leave a fresh set behind.
     #
     # Never for a linked account (single sign-on): its provider is its second
-    # factor (`SignIn::Rules`), and `Sso::Link` deleted its passkeys and codes.
+    # factor (`SignIn::Rules`), and `SignIn::Sso::Link` deleted its passkeys and codes.
     # Refused as a stranger's is; a link landing meanwhile is caught by the
     # passkey check under the lock, since the link deletes the passkeys under
     # the same row lock.

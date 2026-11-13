@@ -163,7 +163,7 @@ module Audit
       sso.linked sso.refused sso.unlinked
     ].freeze
 
-    # `sso.refused`'s reasons (`SignIn::Oidc::ACCOUNT_REASONS`) in words. A
+    # `sso.refused`'s reasons (`SignIn::Sso::ACCOUNT_REASONS`) in words. A
     # reason this code doesn't know says none.
     SSO_REFUSALS = {
       "no_account" => "no invited account",

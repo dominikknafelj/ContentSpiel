@@ -1,9 +1,9 @@
 require "test_helper"
 
-# `Sso::Unlink`: an owner (or the console) takes a link away. The person is
+# `SignIn::Sso::Unlink`: an owner (or the console) takes a link away. The person is
 # signed out everywhere, and is mailed a reset link, since the password the
 # link left is one nobody holds.
-class Sso::UnlinkTest < ActiveSupport::TestCase
+class SignIn::Sso::UnlinkTest < ActiveSupport::TestCase
   include ActionMailer::TestHelper
   ISSUER = "https://id.example.com/oauth2/default".freeze
 
@@ -18,7 +18,7 @@ class Sso::UnlinkTest < ActiveSupport::TestCase
 
   # The result and the service, which says whether it queued the mail.
   def unlinking(actor:, user: @user, channel: :admin)
-    service = Sso::Unlink.new(user, actor:, origin: "http://localhost:3000")
+    service = SignIn::Sso::Unlink.new(user, actor:, origin: "http://localhost:3000")
     [ as(actor, channel:) { service.call }, service ]
   end
 

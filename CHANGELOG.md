@@ -51,7 +51,6 @@
 - A new top-level name, `HostRouteConstraint` (`app/constraints/host_route_constraint.rb`): a gem whose hook owner has that name is refused at boot.
 - A new top-level name, `SignInMethods` (`app/models/sign_in_methods.rb`): a gem whose hook owner is `sign_in_methods` is refused at boot.
 - A new top-level name, `SignInRules` (`app/models/sign_in_rules.rb`): a gem whose hook owner is `sign_in_rules` is refused at boot.
-- A new top-level name, `Sso` (`app/services/sso/`, `app/jobs/sso/`): a gem whose hook owner is `sso` is refused at boot.
 - Sign-in classes released in 0.3.0 moved under `SignIn::`, with no alias:
   - `SignIn::Throttle`, `SignIn::BotCheck`, `SignIn::KnownDevice` and `SignIn::LockoutMailJob` are `SignIn::Protection::Throttle`, `BotCheck`, `KnownDevice` and `LockoutMailJob`.
   - `SignIn::PasswordAttempt` is `SignIn::Password::Attempt`.

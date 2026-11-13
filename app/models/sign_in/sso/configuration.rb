@@ -1,5 +1,5 @@
 module SignIn
-  module Oidc
+  module Sso
     # What the provider's discovery document says, as far as sign-in uses
     # it: the endpoints, the scopes it lists and how the client proves itself
     # at the token endpoint (`["client_secret_basic"]` when the document says

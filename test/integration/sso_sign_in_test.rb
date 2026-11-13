@@ -98,7 +98,7 @@ class SsoSignInTest < ActionDispatch::IntegrationTest
 
       kept = kept_state
       assert_equal query.values_at("state", "nonce"), kept.values_at("state", "nonce")
-      assert_equal query["code_challenge"], SignIn::Oidc::Authorization.challenge(kept["verifier"])
+      assert_equal query["code_challenge"], SignIn::Sso::Authorization.challenge(kept["verifier"])
       assert_equal [ "sign_in", nil, Time.current.to_i ], kept.values_at("intent", "invitation_id", "at")
 
       redirect = @exporter.finished_spans.find { |span| span.name == "auth.sso.redirect" }
@@ -188,7 +188,7 @@ class SsoSignInTest < ActionDispatch::IntegrationTest
 
       # A state older than ten minutes, its cookie still sent.
       callback = through_provider(idp)
-      plant_state(kept_state.merge("at" => (Time.current - SignIn::Oidc::STATE_LIFETIME - 1.second).to_i))
+      plant_state(kept_state.merge("at" => (Time.current - SignIn::Sso::STATE_LIFETIME - 1.second).to_i))
       get callback
       assert_unfinished "bad_state", "a late state"
     end
@@ -226,7 +226,7 @@ class SsoSignInTest < ActionDispatch::IntegrationTest
   end
 
   test "with no provider both actions are 404" do
-    with_sign_in_env(SignIn::Oidc::VARIABLES.index_with { nil }.merge("SSO_REQUIRED" => nil)) do
+    with_sign_in_env(SignIn::Sso::VARIABLES.index_with { nil }.merge("SSO_REQUIRED" => nil)) do
       post admin_sso_path
       assert_response :not_found
       get admin_sso_callback_path(code: "x", state: "y")

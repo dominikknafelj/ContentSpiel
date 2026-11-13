@@ -11,7 +11,7 @@ class Invitations::AcceptWithSsoTest < ActiveSupport::TestCase
   end
 
   def identity(subject: "sub-dana", email: "dana@example.com", email_verified: true, name: "Dana Example")
-    SignIn::Oidc::Identity.new(issuer: ISSUER, subject:, email:, email_verified:, name:, refresh_token: nil)
+    SignIn::Sso::Identity.new(issuer: ISSUER, subject:, email:, email_verified:, name:, refresh_token: nil)
   end
 
   def accept(invitation = @invitation, identity: self.identity) = as(nil) { Invitations::AcceptWithSso.call(invitation, identity:) }

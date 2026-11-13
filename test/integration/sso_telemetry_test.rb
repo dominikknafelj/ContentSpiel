@@ -12,7 +12,7 @@ require "test_helper"
 #   span, with one CLIENT `auth.sso.recheck` under it per session asked;
 # - every key those spans write is in `Telemetry::ATTRIBUTES`, and each key
 #   WORDS names carries one of its words; `auth.sso.reason` carries each
-#   span's own (SPAN_WORDS): the callback's `SignIn::Oidc::SPAN_REASONS`,
+#   span's own (SPAN_WORDS): the callback's `SignIn::Sso::SPAN_REASONS`,
 #   discovery's `DISCOVERY_REASONS` or an `http_<status>`, the re-check's
 #   `RECHECK_REASONS`;
 # - no span or event holds the code, the state, the nonce, the PKCE
@@ -44,9 +44,9 @@ class SsoTelemetryTest < ActionDispatch::IntegrationTest
   # sign-in's, discovery's System status's, the re-check's an answer's. A
   # callable is asked of the value.
   SPAN_WORDS = {
-    "auth.sso.callback" => { "auth.sso.reason" => SignIn::Oidc::SPAN_REASONS },
-    "auth.sso.discovery" => { "auth.sso.reason" => SignIn::Oidc.method(:discovery_reason?) },
-    "auth.sso.recheck" => { "auth.sso.reason" => SignIn::Oidc::RECHECK_REASONS }
+    "auth.sso.callback" => { "auth.sso.reason" => SignIn::Sso::SPAN_REASONS },
+    "auth.sso.discovery" => { "auth.sso.reason" => SignIn::Sso.method(:discovery_reason?) },
+    "auth.sso.recheck" => { "auth.sso.reason" => SignIn::Sso::RECHECK_REASONS }
   }.freeze
 
   setup do
@@ -217,7 +217,7 @@ class SsoTelemetryTest < ActionDispatch::IntegrationTest
       run = lambda do
         travel Session::PROVIDER_CHECK_EVERY + 1.minute
         Session.update_all(last_seen_at: Time.current) # version: none (a test's own rows)
-        spans_of { Sso::RecheckJob.perform_now }
+        spans_of { SignIn::Sso::RecheckJob.perform_now }
       end
 
       answered = [ [ run.call, "ok", 0 ] ]
@@ -282,7 +282,7 @@ class SsoTelemetryTest < ActionDispatch::IntegrationTest
       idp.rotate_refresh_token(rotated)
       travel Session::PROVIDER_CHECK_EVERY + 1.minute
       Session.update_all(last_seen_at: Time.current) # version: none (a test's own rows)
-      recheck = spans_of { Sso::RecheckJob.perform_now }
+      recheck = spans_of { SignIn::Sso::RecheckJob.perform_now }
       assert_equal rotated, Session.sole.provider_token, "the re-check was answered"
 
       local, domain = @email.split("@")

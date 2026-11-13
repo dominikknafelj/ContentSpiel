@@ -126,8 +126,8 @@ module Admin
     # (`admin/sessions/new`): the provider, whether it is required, and the
     # owner path, which is drawn only while it is.
     def new
-      @sso_provider = SignIn::Oidc::Provider.current
-      @sso_required = @sso_provider.present? && SignIn::Oidc.required?
+      @sso_provider = SignIn::Sso::Provider.current
+      @sso_required = @sso_provider.present? && SignIn::Sso.required?
       @owner_path = owner_path?
       bot_check = SignIn::Protection::BotCheck.current
       @bot_check_configured = bot_check.present?
@@ -244,7 +244,7 @@ module Admin
     # parameter, and a refusal answered there goes back there, whoever
     # tried, so an owner who mistyped is not sent to the panel with no form,
     # and the answer says nothing of who is an owner.
-    def owner_path? = params[:owner] == "1" && SignIn::Oidc.required?
+    def owner_path? = params[:owner] == "1" && SignIn::Sso.required?
 
     def sign_in_page_path = owner_path? ? admin_sign_in_path(owner: 1) : admin_sign_in_path
 

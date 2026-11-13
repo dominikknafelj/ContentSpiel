@@ -1,9 +1,9 @@
 module Admin
   # Signing in to CS Studio through the site's single sign-on provider
-  # (OpenID Connect, `SignIn::Oidc`): `create`, the sign-in page's button,
+  # (OpenID Connect, `SignIn::Sso`): `create`, the sign-in page's button,
   # sends the person to the provider (`SsoStarts#start_sso`), and
   # `callback` takes the provider's answer, decides whose account it is
-  # (`Sso::Admit`) and signs that person in. Outside `Admin::BaseController`,
+  # (`SignIn::Sso::Admit`) and signs that person in. Outside `Admin::BaseController`,
   # on the product layout, before any session exists, as sign-in itself is.
   # With no provider configured both actions are 404.
   #
@@ -11,10 +11,10 @@ module Admin
   #
   # 1. the kept state is taken from its cookie, once (`take_sso_state`:
   #    its age, and its spend; the cookie goes whatever the answer);
-  # 2. `SignIn::Oidc::Callback` compares the provider's `state` with the
+  # 2. `SignIn::Sso::Callback` compares the provider's `state` with the
   #    kept one, exchanges the code with the kept PKCE verifier and checks
   #    the ID token against the kept nonce;
-  # 3. `Sso::Admit` finds the account the identity signs into, with the
+  # 3. `SignIn::Sso::Admit` finds the account the identity signs into, with the
   #    invitation the start was made from when it is still open;
   # 4. `complete_sign_in` signs the person in, by the `sso` method, with the
   #    provider's refresh token on the session.
@@ -33,7 +33,7 @@ module Admin
   #                   in to this site. Ask an owner to invite you.": one
   #                   sentence for no account, an unverified email, an
   #                   owner's address and a linked account's address under
-  #                   another subject. `Sso::Admit` records `sso.refused`.
+  #                   another subject. `SignIn::Sso::Admit` records `sso.refused`.
   #   mismatch        a start from an invitation whose verified email is not
   #                   the invitation's: the invitation page, with
   #                   `flash[:sso_mismatch]` holding both addresses for the
@@ -82,7 +82,7 @@ module Admin
     def callback
       Telemetry.in_span("auth.sso.callback", attributes: { "auth.sso.issuer_host" => sso_provider.issuer_host.to_s }) do |span|
         kept = take_sso_state
-        result = SignIn::Oidc::Callback.new(provider: sso_provider, redirect_uri: sso_redirect_uri)
+        result = SignIn::Sso::Callback.new(provider: sso_provider, redirect_uri: sso_redirect_uri)
           .call(params: callback_params, kept: kept)
         next unfinished(span, result.reason) unless result.ok
 
@@ -111,12 +111,12 @@ module Admin
     end
 
     def admit(span, identity, invitation:)
-      result = Sso::Admit.call(identity, invitation: invitation)
-      return mismatch(span, invitation, result.errors.last) if result.errors.first == Sso::Admit::MISMATCH
+      result = SignIn::Sso::Admit.call(identity, invitation: invitation)
+      return mismatch(span, invitation, result.errors.last) if result.errors.first == SignIn::Sso::Admit::MISMATCH
       return refused(span, result.errors.first) unless result.ok?
 
       user = result.record
-      # `Sso::Admit` never answers an owner; were one answered, it is refused
+      # `SignIn::Sso::Admit` never answers an owner; were one answered, it is refused
       # here, before anyone signed in in this browser is signed out, and
       # recorded by Admit's own writer. `complete_sign_in` refuses it
       # too, for every outside method.
@@ -142,23 +142,23 @@ module Admin
     # sentences, which reach no span.
     def refused(span, reason)
       reason = reason.to_s
-      Telemetry.record(span, { "auth.outcome" => "refused", "auth.sso.reason" => (reason if SignIn::Oidc::ACCOUNT_REASONS.include?(reason)) }.compact)
+      Telemetry.record(span, { "auth.outcome" => "refused", "auth.sso.reason" => (reason if SignIn::Sso::ACCOUNT_REASONS.include?(reason)) }.compact)
       redirect_to admin_sign_in_path, alert: t("admin.sessions.sso_refused", provider: sso_provider.name)
     end
 
-    # `sso.refused` through its one writer, `Sso::Admit.refuse`. Unreachable
-    # while `Sso::Admit`, `Sso::Link` and `Users::Save` hold the owner rule
+    # `sso.refused` through its one writer, `SignIn::Sso::Admit.refuse`. Unreachable
+    # while `SignIn::Sso::Admit`, `SignIn::Sso::Link` and `Users::Save` hold the owner rule
     # under the account's lock; kept as the last defence before anyone is
     # signed out.
     def refused_owner(span, identity)
-      Sso::Admit.refuse(identity, Sso::Admit::OWNER)
-      refused(span, Sso::Admit::OWNER)
+      SignIn::Sso::Admit.refuse(identity, SignIn::Sso::Admit::OWNER)
+      refused(span, SignIn::Sso::Admit::OWNER)
     end
 
     # The invitation page draws both addresses (`flash[:sso_mismatch]`): the
     # one the provider signed in and the one invited.
     def mismatch(span, invitation, email)
-      Telemetry.record(span, "auth.outcome" => "refused", "auth.sso.reason" => SignIn::Oidc::MISMATCH_REASON)
+      Telemetry.record(span, "auth.outcome" => "refused", "auth.sso.reason" => SignIn::Sso::MISMATCH_REASON)
       flash[:sso_mismatch] = { "got" => email, "email" => invitation.email_address }
       redirect_to admin_invitation_path
     end

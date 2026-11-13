@@ -2,72 +2,72 @@ require "test_helper"
 
 # The site's one provider, from five variables: whole or nothing, and a host
 # whose variables would open what it meant to close does not boot.
-class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
+class SignIn::Sso::ProviderTest < ActiveSupport::TestCase
   WHOLE = {
     "SSO_ISSUER" => "https://example.okta.com/oauth2/default", "SSO_CLIENT_ID" => "client-1",
     "SSO_CLIENT_SECRET" => "s3cret-value-of-the-client", "SSO_NAME" => "Okta"
   }.freeze
 
   test "all four variables make a provider, and any three make none" do
-    provider = SignIn::Oidc::Provider.current(WHOLE)
+    provider = SignIn::Sso::Provider.current(WHOLE)
     assert_equal [ "https://example.okta.com/oauth2/default", "client-1", "Okta", "example.okta.com" ],
       [ provider.issuer, provider.client_id, provider.name, provider.issuer_host ]
 
     WHOLE.each_key do |left_out|
-      assert_nil SignIn::Oidc::Provider.current(WHOLE.except(left_out)), "without #{left_out}"
-      assert_nil SignIn::Oidc::Provider.current(WHOLE.merge(left_out => "  ")), "blank #{left_out}"
+      assert_nil SignIn::Sso::Provider.current(WHOLE.except(left_out)), "without #{left_out}"
+      assert_nil SignIn::Sso::Provider.current(WHOLE.merge(left_out => "  ")), "blank #{left_out}"
     end
-    assert_nil SignIn::Oidc::Provider.current({})
+    assert_nil SignIn::Sso::Provider.current({})
   end
 
   test "missing_variables names the missing ones and is empty with none set" do
-    assert_empty SignIn::Oidc::Provider.missing_variables({})
-    assert_empty SignIn::Oidc::Provider.missing_variables(WHOLE)
-    assert_equal [ "SSO_CLIENT_SECRET" ], SignIn::Oidc::Provider.missing_variables(WHOLE.except("SSO_CLIENT_SECRET"))
-    assert_equal %w[SSO_CLIENT_ID SSO_CLIENT_SECRET SSO_NAME], SignIn::Oidc::Provider.missing_variables(WHOLE.slice("SSO_ISSUER"))
+    assert_empty SignIn::Sso::Provider.missing_variables({})
+    assert_empty SignIn::Sso::Provider.missing_variables(WHOLE)
+    assert_equal [ "SSO_CLIENT_SECRET" ], SignIn::Sso::Provider.missing_variables(WHOLE.except("SSO_CLIENT_SECRET"))
+    assert_equal %w[SSO_CLIENT_ID SSO_CLIENT_SECRET SSO_NAME], SignIn::Sso::Provider.missing_variables(WHOLE.slice("SSO_ISSUER"))
   end
 
-  test "required? is SSO_REQUIRED=1 with a whole provider, and SignIn::Oidc.required? agrees" do
-    assert SignIn::Oidc::Provider.required?(WHOLE.merge("SSO_REQUIRED" => "1"))
-    assert SignIn::Oidc.required?(WHOLE.merge("SSO_REQUIRED" => "1"))
-    assert_not SignIn::Oidc::Provider.required?(WHOLE)
-    assert_not SignIn::Oidc::Provider.required?({ "SSO_REQUIRED" => "1" })
-    assert_not SignIn::Oidc::Provider.required?(WHOLE.merge("SSO_REQUIRED" => "yes"))
+  test "required? is SSO_REQUIRED=1 with a whole provider, and SignIn::Sso.required? agrees" do
+    assert SignIn::Sso::Provider.required?(WHOLE.merge("SSO_REQUIRED" => "1"))
+    assert SignIn::Sso.required?(WHOLE.merge("SSO_REQUIRED" => "1"))
+    assert_not SignIn::Sso::Provider.required?(WHOLE)
+    assert_not SignIn::Sso::Provider.required?({ "SSO_REQUIRED" => "1" })
+    assert_not SignIn::Sso::Provider.required?(WHOLE.merge("SSO_REQUIRED" => "yes"))
   end
 
   test "SSO_REQUIRED without a provider, SSO_REQUIRED=yes and an http issuer to another host each refuse, naming the variable and not the value" do
-    error = assert_raises(SignIn::Oidc::Misconfigured) { SignIn::Oidc::Provider.check!({ "SSO_REQUIRED" => "1" }) }
+    error = assert_raises(SignIn::Sso::Misconfigured) { SignIn::Sso::Provider.check!({ "SSO_REQUIRED" => "1" }) }
     assert_equal "SSO_REQUIRED is set, but single sign-on is not: set SSO_ISSUER, SSO_CLIENT_ID, SSO_CLIENT_SECRET and SSO_NAME.", error.message
 
-    error = assert_raises(SignIn::Oidc::Misconfigured) { SignIn::Oidc::Provider.check!(WHOLE.merge("SSO_REQUIRED" => "planted-yes")) }
+    error = assert_raises(SignIn::Sso::Misconfigured) { SignIn::Sso::Provider.check!(WHOLE.merge("SSO_REQUIRED" => "planted-yes")) }
     assert_includes error.message, "SSO_REQUIRED"
     assert_not_includes error.message, "planted-yes"
 
-    error = assert_raises(SignIn::Oidc::Misconfigured) { SignIn::Oidc::Provider.check!(WHOLE.merge("SSO_ISSUER" => "http://planted.example.org/path")) }
+    error = assert_raises(SignIn::Sso::Misconfigured) { SignIn::Sso::Provider.check!(WHOLE.merge("SSO_ISSUER" => "http://planted.example.org/path")) }
     assert_includes error.message, "SSO_ISSUER"
     assert_not_includes error.message, "planted"
 
     [ "example.org", "ftp://example.org", "https://", "https://exa mple.org" ].each do |value|
-      assert_raises(SignIn::Oidc::Misconfigured, value) { SignIn::Oidc::Provider.check!(WHOLE.merge("SSO_ISSUER" => value)) }
+      assert_raises(SignIn::Sso::Misconfigured, value) { SignIn::Sso::Provider.check!(WHOLE.merge("SSO_ISSUER" => value)) }
     end
   end
 
   test "a half-set provider never stops the boot, and a whole one passes" do
-    assert_nil SignIn::Oidc::Provider.check!({})
-    assert_nil SignIn::Oidc::Provider.check!(WHOLE.slice("SSO_ISSUER").merge("SSO_ISSUER" => "http://planted.example.org"))
-    assert_nil SignIn::Oidc::Provider.check!(WHOLE.merge("SSO_REQUIRED" => "1"))
+    assert_nil SignIn::Sso::Provider.check!({})
+    assert_nil SignIn::Sso::Provider.check!(WHOLE.slice("SSO_ISSUER").merge("SSO_ISSUER" => "http://planted.example.org"))
+    assert_nil SignIn::Sso::Provider.check!(WHOLE.merge("SSO_REQUIRED" => "1"))
   end
 
   test "an http issuer to 127.0.0.1 is allowed outside production and refused in production" do
     local = WHOLE.merge("SSO_ISSUER" => "http://127.0.0.1:4567")
-    assert_nil SignIn::Oidc::Provider.check!(local, production: false)
-    assert_nil SignIn::Oidc::Provider.check!(WHOLE.merge("SSO_ISSUER" => "http://localhost:4567"), production: false)
-    assert_nil SignIn::Oidc::Provider.check!(WHOLE.merge("SSO_ISSUER" => "http://[::1]:4567"), production: false)
-    assert_raises(SignIn::Oidc::Misconfigured) { SignIn::Oidc::Provider.check!(local, production: true) }
+    assert_nil SignIn::Sso::Provider.check!(local, production: false)
+    assert_nil SignIn::Sso::Provider.check!(WHOLE.merge("SSO_ISSUER" => "http://localhost:4567"), production: false)
+    assert_nil SignIn::Sso::Provider.check!(WHOLE.merge("SSO_ISSUER" => "http://[::1]:4567"), production: false)
+    assert_raises(SignIn::Sso::Misconfigured) { SignIn::Sso::Provider.check!(local, production: true) }
   end
 
   test "inspect never holds the client secret" do
-    provider = SignIn::Oidc::Provider.current(WHOLE)
+    provider = SignIn::Sso::Provider.current(WHOLE)
     [ provider.inspect, provider.to_s, "#{provider}" ].each do |text|
       assert_not_includes text, WHOLE["SSO_CLIENT_SECRET"]
       assert_includes text, "example.okta.com"
@@ -76,7 +76,7 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
   end
 
   test "to_json and as_json hold no client secret" do
-    provider = SignIn::Oidc::Provider.current(WHOLE)
+    provider = SignIn::Sso::Provider.current(WHOLE)
     [ provider.to_json, provider.as_json.to_s, { provider: provider }.to_json, provider.inspect ].each do |text|
       assert_not_includes text, WHOLE["SSO_CLIENT_SECRET"]
     end
@@ -84,20 +84,20 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
 
   test "an issuer with a user or password in it is refused without naming it" do
     [ "https://planted-user:planted-pw@sso.example.org", "https://planted-user@sso.example.org" ].each do |value|
-      error = assert_raises(SignIn::Oidc::Misconfigured) { SignIn::Oidc::Provider.check!(WHOLE.merge("SSO_ISSUER" => value)) }
+      error = assert_raises(SignIn::Sso::Misconfigured) { SignIn::Sso::Provider.check!(WHOLE.merge("SSO_ISSUER" => value)) }
       assert_not_includes error.message, "planted"
     end
   end
 
   test "callback_origin is the admin address, then the public address, then the request's" do
     request = "http://www.example.com"
-    assert_equal({ host: "www.example.com", protocol: "http" }, SignIn::Oidc.callback_origin(request_origin: request))
-    assert_equal({ host: "127.0.0.1", protocol: "http", port: 3000 }, SignIn::Oidc.callback_origin(request_origin: "http://127.0.0.1:3000"))
+    assert_equal({ host: "www.example.com", protocol: "http" }, SignIn::Sso.callback_origin(request_origin: request))
+    assert_equal({ host: "127.0.0.1", protocol: "http", port: 3000 }, SignIn::Sso.callback_origin(request_origin: "http://127.0.0.1:3000"))
 
     with_site_address("https://docs.example.org") do
-      assert_equal({ host: "docs.example.org", protocol: "https" }, SignIn::Oidc.callback_origin(request_origin: request))
+      assert_equal({ host: "docs.example.org", protocol: "https" }, SignIn::Sso.callback_origin(request_origin: request))
       with_admin_address("https://studio.example.net") do
-        assert_equal({ host: "studio.example.net", protocol: "https" }, SignIn::Oidc.callback_origin(request_origin: request))
+        assert_equal({ host: "studio.example.net", protocol: "https" }, SignIn::Sso.callback_origin(request_origin: request))
       end
     end
   end
@@ -126,7 +126,7 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
         assert_equal configuration, idp.provider.configuration
         assert_equal 1, discovery_reads(idp)
 
-        travel SignIn::Oidc::CACHE_FOR - 1.second
+        travel SignIn::Sso::CACHE_FOR - 1.second
         idp.provider.configuration
         assert_equal 1, discovery_reads(idp)
 
@@ -174,11 +174,11 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
     with_fake_idp do |idp|
       idp.answer_discovery_with(body: idp.discovery_document.merge("issuer" => "https://planted.example.org"))
       spans = discovery_spans do
-        error = assert_raises(SignIn::Oidc::Unavailable) { idp.provider.configuration }
+        error = assert_raises(SignIn::Sso::Unavailable) { idp.provider.configuration }
         assert_equal "issuer_mismatch", error.reason
 
         idp.down!
-        error = assert_raises(SignIn::Oidc::Unavailable) { idp.provider.configuration }
+        error = assert_raises(SignIn::Sso::Unavailable) { idp.provider.configuration }
         assert_equal "unreachable", error.reason
       end
 
@@ -195,12 +195,12 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
         "http_503" => { status: 503, body: "down" },
         "not_json" => { body: "<html>" },
         "not_json " => { body: "[1, 2]" },
-        "not_json  " => { body: { "padding" => "x" * SignIn::Oidc::MAX_BODY } },
+        "not_json  " => { body: { "padding" => "x" * SignIn::Sso::MAX_BODY } },
         "missing_endpoint" => { body: document.except("token_endpoint") },
         "missing_endpoint " => { body: document.except("jwks_uri") }
       }.each do |reason, answer|
         idp.answer_discovery_with(**answer)
-        error = assert_raises(SignIn::Oidc::Unavailable, reason) { idp.provider.configuration }
+        error = assert_raises(SignIn::Sso::Unavailable, reason) { idp.provider.configuration }
         assert_equal reason.strip, error.reason
       end
 
@@ -214,7 +214,7 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
   def with_https_document(document)
     answer = Struct.new(:code, :body).new("200", document.to_json)
     with_singleton_override(SignIn::OutsideCall, :perform, ->(*, **) { answer }) do
-      yield SignIn::Oidc::Provider.new(issuer: "https://idp.example.org", client_id: "client-1", secret: "s", name: "Example")
+      yield SignIn::Sso::Provider.new(issuer: "https://idp.example.org", client_id: "client-1", secret: "s", name: "Example")
     end
   end
 
@@ -232,30 +232,30 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
 
     %w[token_endpoint jwks_uri authorization_endpoint].each do |member|
       with_https_document(https_document.merge(member => "http://idp.example.org/#{member}")) do |provider|
-        error = assert_raises(SignIn::Oidc::Unavailable, member) { provider.configuration }
+        error = assert_raises(SignIn::Sso::Unavailable, member) { provider.configuration }
         assert_equal "missing_endpoint", error.reason
       end
     end
   end
 
   test "http to the loopback is an endpoint only outside production, as for the issuer" do
-    assert SignIn::Oidc::Provider.secure_address?(URI("http://127.0.0.1:9/token"), production: false)
-    assert_not SignIn::Oidc::Provider.secure_address?(URI("http://127.0.0.1:9/token"), production: true)
-    assert_not SignIn::Oidc::Provider.secure_address?(URI("http://idp.example.org/token"), production: false)
-    assert SignIn::Oidc::Provider.secure_address?(URI("https://idp.example.org/token"), production: true)
-    assert_not SignIn::Oidc::Provider.secure_address?(URI("/token"), production: false)
+    assert SignIn::Sso::Provider.secure_address?(URI("http://127.0.0.1:9/token"), production: false)
+    assert_not SignIn::Sso::Provider.secure_address?(URI("http://127.0.0.1:9/token"), production: true)
+    assert_not SignIn::Sso::Provider.secure_address?(URI("http://idp.example.org/token"), production: false)
+    assert SignIn::Sso::Provider.secure_address?(URI("https://idp.example.org/token"), production: true)
+    assert_not SignIn::Sso::Provider.secure_address?(URI("/token"), production: false)
   end
 
   test "another issuer, a blank one and none are refused even with the gem's own issuer check turned off" do
     was = OpenIDConnect.validate_discovery_issuer
     OpenIDConnect.validate_discovery_issuer = false
     with_https_document(https_document.merge("issuer" => "https://planted.example.org")) do |provider|
-      error = assert_raises(SignIn::Oidc::Unavailable) { provider.configuration }
+      error = assert_raises(SignIn::Sso::Unavailable) { provider.configuration }
       assert_equal "issuer_mismatch", error.reason
     end
     [ https_document.except("issuer"), https_document.merge("issuer" => "") ].each do |document|
       with_https_document(document) do |provider|
-        assert_equal "issuer_mismatch", assert_raises(SignIn::Oidc::Unavailable) { provider.configuration }.reason
+        assert_equal "issuer_mismatch", assert_raises(SignIn::Sso::Unavailable) { provider.configuration }.reason
       end
     end
   ensure
@@ -264,10 +264,10 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
 
   test "a document missing a required member is missing_endpoint, and one whose endpoint is no URL is not_json" do
     with_https_document(https_document.except("subject_types_supported")) do |provider|
-      assert_equal "missing_endpoint", assert_raises(SignIn::Oidc::Unavailable) { provider.configuration }.reason
+      assert_equal "missing_endpoint", assert_raises(SignIn::Sso::Unavailable) { provider.configuration }.reason
     end
     with_https_document(https_document.merge("token_endpoint" => "not a url")) do |provider|
-      assert_equal "not_json", assert_raises(SignIn::Oidc::Unavailable) { provider.configuration }.reason
+      assert_equal "not_json", assert_raises(SignIn::Sso::Unavailable) { provider.configuration }.reason
     end
   end
 
@@ -275,7 +275,7 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
     with_fake_idp do |idp|
       idp.provider.configuration
       digest = Digest::SHA256.hexdigest(idp.issuer)
-      assert Rails.cache.exist?("content_spiel/oidc/discovery/#{digest}/v#{SignIn::Oidc::Configuration::CACHE_VERSION}")
+      assert Rails.cache.exist?("content_spiel/oidc/discovery/#{digest}/v#{SignIn::Sso::Configuration::CACHE_VERSION}")
       assert_not Rails.cache.exist?("content_spiel/oidc/discovery/#{digest}")
     end
   end

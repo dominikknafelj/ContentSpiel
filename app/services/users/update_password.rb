@@ -52,7 +52,7 @@ module Users
   # since a second factor that someone else could clear protects nothing.
   #
   # `clear: true` writes a password nobody holds (`User.unusable_password`):
-  # the link to a sign-in provider (`Sso::Link`), after which the account
+  # the link to a sign-in provider (`SignIn::Sso::Link`), after which the account
   # signs in through the provider alone. Only the user's own actor (the
   # account the provider just proved) or the trusted nil actor (the console)
   # may ask it: from anyone else, an owner included, it is refused, since
@@ -65,7 +65,7 @@ module Users
   #
   # A linked account's password is refused otherwise, its own included
   # (`OwnerProtection#sso_linked_password_refusal`): it signs in through its
-  # provider alone, and the console's way back is `Sso::Unlink`.
+  # provider alone, and the console's way back is `SignIn::Sso::Unlink`.
   class UpdatePassword < ApplicationService
     include OwnerProtection
     include SignIn::Password::LeakedRule

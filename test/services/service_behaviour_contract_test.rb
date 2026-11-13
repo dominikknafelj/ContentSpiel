@@ -52,7 +52,7 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
     ContentBlocks::Save Editing::TakeOver Forms::DeleteSubmissions Forms::Resend Forms::Save Forms::Submit Groups::Destroy Groups::EnsureBuiltIns Groups::Save Invitations::Accept Invitations::AcceptWithSso Invitations::Invite Invitations::Resend Invitations::Withdraw Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Regenerate Media::Save
     Media::Upload Notes::DeleteMessage Notes::EditMessage Notes::MarkRead Notes::Pin Notes::React Notes::Remove Notes::Reopen Notes::Reply
     Notes::Resolve Notes::SetFollowing Notes::Start Notes::Unpin Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Publishing::CancelScheduledChange Publishing::DiscardChanges Publishing::PublishChanges SignIn::RecoveryCodes::Generate SignIn::Sessions::End SignIn::Sessions::EndAll SignIn::Sessions::EndOthers Settings::Save SignIn::Passkeys::Add SignIn::Passkeys::Remove SignIn::Passkeys::Rename
-    Sso::Admit Sso::Link Sso::Unlink
+    SignIn::Sso::Admit SignIn::Sso::Link SignIn::Sso::Unlink
     StarterContents::Add StarterContents::EnsureHome Tags::Destroy Tags::Merge Tags::Rename Translations::Confirm
     Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::Destroy Users::Save Users::UpdatePassword Users::UpdateProfile
   ].freeze

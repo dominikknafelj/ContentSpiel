@@ -28,7 +28,7 @@
     answer fills it, so no parameter of an address reaches the page. %>
 <% field_errors = @field_errors || {} %>
 <% provider_name = sso_provider&.name %>
-<% sso_required = sso_provider.present? && SignIn::Oidc.required? %>
+<% sso_required = sso_provider.present? && SignIn::Sso.required? %>
 <%# Back from the provider with no token: the notice alone (see the
     controller). %>
 <% sso_notice = @sso_mismatch || @sso_unfinished || @sso_limited %>

@@ -11,10 +11,10 @@ module SignIn
     #
     # SINGLE SIGN-ON. A linked account is never covered: it signs in through
     # its provider alone, which is its second factor, and it holds no passkey
-    # (`Sso::Link` deletes them). A session made by a method whose provider is
+    # (`SignIn::Sso::Link` deletes them). A session made by a method whose provider is
     # the second factor (`SignIn::Methods.exempt?`: SSO, or a gem's method
     # registered `passkey_policy: :exempt`) is never due for enrolment, linked
-    # or not. And while single sign-on is required (`SignIn::Oidc.required?`)
+    # or not. And while single sign-on is required (`SignIn::Sso.required?`)
     # an owner is covered whatever the stored policy: the owners are then the
     # only people who sign in with a password, and an owner never links, so
     # their own way in must not be a password alone.
@@ -64,7 +64,7 @@ module SignIn
 
       private
 
-      def sso_required? = SignIn::Oidc.required?
+      def sso_required? = SignIn::Sso.required?
     end
   end
 end

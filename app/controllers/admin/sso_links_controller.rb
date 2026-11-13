@@ -1,6 +1,6 @@
 module Admin
   # "Unlink…" in the user editor's Single sign-on zone: `DELETE
-  # users/:id/sso_link`, answered by `Sso::Unlink` alone (the owner rule, the
+  # users/:id/sso_link`, answered by `SignIn::Sso::Unlink` alone (the owner rule, the
   # refusal of an account with no link, the sessions ended, the event and the
   # password-setting mail are its, and whether that mail was queued, which the
   # toast says). A refusal of the owner rule is the 403 page;
@@ -20,7 +20,7 @@ module Admin
     def destroy
       user = User.find(params[:id])
       provider = Admin::UsersScreen::SsoZoneComponent.provider_words(SignIn::Rules.provider_name(user))
-      unlink = Sso::Unlink.new(user, actor: Current.actor, origin: mail_link_origin[:origin])
+      unlink = SignIn::Sso::Unlink.new(user, actor: Current.actor, origin: mail_link_origin[:origin])
       result = unlink.call
 
       if result.ok?

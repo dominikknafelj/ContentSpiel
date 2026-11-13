@@ -1,5 +1,5 @@
 module SignIn
-  module Oidc
+  module Sso
     # The site's one OpenID Connect provider, from five variables.
     #
     # WHOLE OR NOTHING. `current` is a provider only when SSO_ISSUER,
@@ -27,7 +27,7 @@ module SignIn
     # from the cache. Each is cached for CACHE_FOR under a key of the
     # issuer's digest, as JSON's own types (`Configuration#to_h`, the key
     # set's hash), so a changed issuer never reads another's entry. An answer
-    # that cannot be used raises `SignIn::Oidc::Unavailable` with the System
+    # that cannot be used raises `SignIn::Sso::Unavailable` with the System
     # status row's reason (`unreachable`, `http_<status>`, `not_json`,
     # `issuer_mismatch`, `missing_endpoint`) and is never cached, so the next
     # sign-in asks again. A body over MAX_BODY is `not_json`, unread: the
@@ -198,8 +198,8 @@ module SignIn
             yield(document_at(uri)).tap { |fresh| Rails.cache.write(key, fresh, expires_in: CACHE_FOR) }
           rescue Unavailable => error
             # A reason outside the span's words (none today) stays out of it.
-            Telemetry.record(span, { "auth.sso.reason" => (error.reason if Oidc.discovery_reason?(error.reason)),
-              "error.type" => Oidc.error_type(error) }.compact)
+            Telemetry.record(span, { "auth.sso.reason" => (error.reason if Sso.discovery_reason?(error.reason)),
+              "error.type" => Sso.error_type(error) }.compact)
             raise
           end
         end
@@ -288,7 +288,7 @@ module SignIn
         # set the provider got wrong refuses its tokens (no key by that `kid`)
         # and never raises. A key with no `kid` is left out too: an ID token
         # is checked only against the key its `kid` names
-        # (`SignIn::Oidc::IdToken`).
+        # (`SignIn::Sso::IdToken`).
         def key_set(document)
           keys = document["keys"]
           raise Unavailable.new("a key set with no keys", reason: "not_json") unless keys.is_a?(Array) && keys.all?(Hash)

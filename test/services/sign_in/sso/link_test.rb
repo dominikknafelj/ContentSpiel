@@ -1,18 +1,18 @@
 require "test_helper"
 
-# `Sso::Link`: an account linked to a provider's subject
+# `SignIn::Sso::Link`: an account linked to a provider's subject
 # signs in through the provider alone, so its password becomes one nobody
 # holds, its sessions end, and its passkeys and recovery codes go.
-class Sso::LinkTest < ActiveSupport::TestCase
+class SignIn::Sso::LinkTest < ActiveSupport::TestCase
   ISSUER = "https://id.example.com/oauth2/default".freeze
 
   setup { @user = users(:reader) }
 
   def identity(subject: "sub-1", email: "reader@example.com")
-    SignIn::Oidc::Identity.new(issuer: ISSUER, subject:, email:, email_verified: true, name: nil, refresh_token: nil)
+    SignIn::Sso::Identity.new(issuer: ISSUER, subject:, email:, email_verified: true, name: nil, refresh_token: nil)
   end
 
-  def link(user = @user, identity: self.identity) = as(nil) { Sso::Link.call(user, identity:) }
+  def link(user = @user, identity: self.identity) = as(nil) { SignIn::Sso::Link.call(user, identity:) }
 
   test "linking stores the subject, makes the password unusable, ends every session, deletes passkeys and codes and records sso.linked" do
     2.times { Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil) }
@@ -93,7 +93,7 @@ class Sso::LinkTest < ActiveSupport::TestCase
 
   test "a password that cannot be cleared raises, rolls back whole, and leaves the caller's account unlinked in memory" do
     with_singleton_override(Users::UpdatePassword, :call, ->(*, **) { ApplicationService::Result.failure(nil, [ "Password could not be saved" ]) }) do
-      assert_raises(Sso::Link::NotCleared) { link }
+      assert_raises(SignIn::Sso::Link::NotCleared) { link }
     end
 
     assert_not @user.sso_linked?, "the object the caller holds was read again"

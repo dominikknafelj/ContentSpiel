@@ -4,7 +4,7 @@ require "test_helper"
 # endpoint, the ID token checked against the provider's keys and the kept
 # nonce, and every refusal a reason word, never an exception, whatever the
 # provider or the browser sent.
-class SignIn::Oidc::CallbackTest < ActiveSupport::TestCase
+class SignIn::Sso::CallbackTest < ActiveSupport::TestCase
   include LogCapture
 
   REDIRECT = "http://www.example.com/cs-studio/sign-in/sso/callback".freeze
@@ -13,13 +13,13 @@ class SignIn::Oidc::CallbackTest < ActiveSupport::TestCase
     { "state" => state, "nonce" => nonce, "verifier" => verifier, "at" => Time.current.to_i, "intent" => "sign_in", "invitation_id" => nil }
   end
 
-  def callback(idp) = SignIn::Oidc::Callback.new(provider: idp.provider, redirect_uri: REDIRECT)
+  def callback(idp) = SignIn::Sso::Callback.new(provider: idp.provider, redirect_uri: REDIRECT)
 
   # A code the fake provider answers once, bound to the kept nonce, the
   # verifier's challenge and the redirect URI, so a request missing any of
   # them is refused by the fake as a real provider would.
   def code(idp, kept)
-    idp.code_for(nonce: kept["nonce"], challenge: SignIn::Oidc::Authorization.challenge(kept["verifier"]), redirect_uri: REDIRECT)
+    idp.code_for(nonce: kept["nonce"], challenge: SignIn::Sso::Authorization.challenge(kept["verifier"]), redirect_uri: REDIRECT)
   end
 
   def token_posts(idp) = idp.requests.select { |request| request.path == "/idp/token" }
@@ -159,7 +159,7 @@ class SignIn::Oidc::CallbackTest < ActiveSupport::TestCase
       idp.answer_token_with(status: 500, body: "planted")
       assert_equal "unavailable", callback(idp).call(params: params, kept: kept).reason
 
-      idp.answer_token_with(body: { "id_token" => "x" * SignIn::Oidc::MAX_BODY })
+      idp.answer_token_with(body: { "id_token" => "x" * SignIn::Sso::MAX_BODY })
       finished = spans { assert_equal "unavailable", callback(idp).call(params: params, kept: kept).reason }
       assert_equal "not_json", finished.select { |span| span.name == "auth.sso.token" }.sole.attributes["error.type"],
         "a body over the limit is not_json, as at discovery"
@@ -218,7 +218,7 @@ class SignIn::Oidc::CallbackTest < ActiveSupport::TestCase
       refuse.call("a subject that is no string", good.call({ "sub" => 12 }))
       refuse.call("a subject over 255 characters", good.call({ "sub" => "s" * 256 }))
 
-      refuse.call("expired", good.call({ "exp" => now - SignIn::Oidc::IdToken::LEEWAY.to_i - 1 }))
+      refuse.call("expired", good.call({ "exp" => now - SignIn::Sso::IdToken::LEEWAY.to_i - 1 }))
       refuse.call("no exp", good.call({ "exp" => nil }))
       claims = JSON.parse(Base64.urlsafe_decode64(payload))
       answer_with_token(idp, hand_signed(idp, claims))
@@ -231,8 +231,8 @@ class SignIn::Oidc::CallbackTest < ActiveSupport::TestCase
       answer_with_token(idp, good.call({ "exp" => now - 5 }))
       assert callback(idp).call(params: params, kept: kept).ok, "an exp a few seconds past is within the leeway"
       refuse.call("no iat", good.call({ "iat" => nil }))
-      refuse.call("iat in the future", good.call({ "iat" => now + SignIn::Oidc::IdToken::LEEWAY.to_i + 5 }))
-      oldest = now - (SignIn::Oidc::IdToken::MAX_AGE + SignIn::Oidc::IdToken::LEEWAY).to_i
+      refuse.call("iat in the future", good.call({ "iat" => now + SignIn::Sso::IdToken::LEEWAY.to_i + 5 }))
+      oldest = now - (SignIn::Sso::IdToken::MAX_AGE + SignIn::Sso::IdToken::LEEWAY).to_i
       refuse.call("iat older than ten minutes and the leeway", good.call({ "iat" => oldest - 5, "exp" => now + 3600 }))
       answer_with_token(idp, good.call({ "iat" => oldest + 5, "exp" => now + 3600 }))
       assert callback(idp).call(params: params, kept: kept).ok, "an iat just inside ten minutes and the leeway"
@@ -255,7 +255,7 @@ class SignIn::Oidc::CallbackTest < ActiveSupport::TestCase
       refuse.call("no id_token", body: { "access_token" => "at" })
       refuse.call("a body that is no object", body: "[1, 2]")
       refuse.call("a body that is no JSON", body: "<html>planted</html>")
-      refuse.call("an oversized body", body: { "id_token" => good.call, "padding" => "x" * SignIn::Oidc::MAX_BODY }, reason: "unavailable")
+      refuse.call("an oversized body", body: { "id_token" => good.call, "padding" => "x" * SignIn::Sso::MAX_BODY }, reason: "unavailable")
     end
   end
 

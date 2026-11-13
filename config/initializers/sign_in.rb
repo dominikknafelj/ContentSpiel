@@ -1,10 +1,10 @@
 # A host's single sign-on variables that would silently open what it meant to
 # close or point sign-in at the wrong place stop the boot in every
-# environment (`SignIn::Oidc::Provider.check!`, which names the variable and
+# environment (`SignIn::Sso::Provider.check!`, which names the variable and
 # never a value). Raised from `after_initialize`, so every test and task that
 # loads the application meets it too.
 Rails.application.config.after_initialize do
-  SignIn::Oidc::Provider.check!
+  SignIn::Sso::Provider.check!
 end
 
 # A production site with one Turnstile key and not the other has no bot
@@ -17,6 +17,6 @@ Rails.application.config.after_initialize do
   missing = SignIn::Protection::BotCheck.missing_variable
   Rails.logger.warn("[ContentSpiel] The bot check is off: #{missing} is not set.") if missing
 
-  unset = SignIn::Oidc::Provider.missing_variables
+  unset = SignIn::Sso::Provider.missing_variables
   Rails.logger.warn("[ContentSpiel] Single sign-on is off: #{unset.to_sentence(last_word_connector: " and ", two_words_connector: " and ")} #{unset.one? ? "is" : "are"} not set.") if unset.any?
 end

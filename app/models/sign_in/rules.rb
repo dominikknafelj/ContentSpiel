@@ -1,8 +1,8 @@
 # Who may sign in with what, by rule rather than by credential: a linked
 # account (`User#sso_linked?`) signs in through its provider alone, with
 # single sign-on on or off (the link, not the provider, decides: the way
-# back is `Sso::Unlink`), and while `SSO_REQUIRED` is set
-# (`SignIn::Oidc.required?`) so does every non-owner. An owner keeps a
+# back is `SignIn::Sso::Unlink`), and while `SSO_REQUIRED` is set
+# (`SignIn::Sso.required?`) so does every non-owner. An owner keeps a
 # password and a passkey always: owners never link, and no outside service
 # stands in for them.
 #
@@ -33,7 +33,7 @@
 # It names no controller, route or request: the controllers ask it.
 module SignIn
   module Rules
-    def self.password_allowed?(user) = !user.sso_linked? && (user.owner? || !SignIn::Oidc.required?)
+    def self.password_allowed?(user) = !user.sso_linked? && (user.owner? || !SignIn::Sso.required?)
 
     # The same rule: a passkey is a second way in that never asks the provider.
     def self.passkey_allowed?(user) = password_allowed?(user)
@@ -46,6 +46,6 @@ module SignIn
     # configured `SSO_NAME`, else (single sign-on off, the account still
     # linked) the host the account was linked under: `issuer`, when the caller
     # read the link under the row lock, or the account's own.
-    def self.provider_name(user, issuer: user.sso_issuer) = SignIn::Oidc::Provider.current&.name || SignIn::Oidc.issuer_host(issuer)
+    def self.provider_name(user, issuer: user.sso_issuer) = SignIn::Sso::Provider.current&.name || SignIn::Sso.issuer_host(issuer)
   end
 end

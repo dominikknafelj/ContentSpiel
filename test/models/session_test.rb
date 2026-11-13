@@ -160,7 +160,7 @@ class SessionTest < ActiveSupport::TestCase
   test "unlinking a user from single sign-on disconnects them, keeping nobody else's" do
     @user.update_columns(sso_issuer: "https://id.example.com", sso_subject: "sub-1", sso_linked_at: Time.current) # version: none (a test's setup)
 
-    assert as(nil, channel: :console) { Sso::Unlink.call(@user, actor: nil) }.ok?
+    assert as(nil, channel: :console) { SignIn::Sso::Unlink.call(@user, actor: nil) }.ok?
 
     assert_equal 0, @user.sessions.count
     assert_equal [ DISCONNECT ] * 2, disconnects(@user)

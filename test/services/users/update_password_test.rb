@@ -85,7 +85,7 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     assert users(:reader).reload.authenticate("reset-pass-1")
   end
 
-  # --- clear: a password nobody holds (Sso::Link) -----------------------------
+  # --- clear: a password nobody holds (SignIn::Sso::Link) -----------------------------
 
   test "clear needs the user's own actor or the console, and never asks the leak lookup" do
     clear = ->(user, actor:) { Users::UpdatePassword.call(user, clear: true, keep_acting_session: false, actor: actor) }

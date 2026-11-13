@@ -23,7 +23,7 @@ module Invitations
   #               whose address has had an account made for it since (the
   #               New user form): either way the person signs in. `record` is
   #               the invitation.
-  #   [:sso_required]  SSO_REQUIRED is set (`SignIn::Oidc.required?`): an
+  #   [:sso_required]  SSO_REQUIRED is set (`SignIn::Sso.required?`): an
   #               invited person accepts through the provider
   #               (`Invitations::AcceptWithSso`), never with a password.
   #               Answered before the token is read, so it is the one answer
@@ -65,7 +65,7 @@ module Invitations
     end
 
     def call
-      return failure(nil, [ SSO_REQUIRED ]) if SignIn::Oidc.required?
+      return failure(nil, [ SSO_REQUIRED ]) if SignIn::Sso.required?
 
       @invitation = Invitation.find_by_token_for(:accept, @token)
       return failure(nil, [ EXPIRED ]) if @invitation.nil?

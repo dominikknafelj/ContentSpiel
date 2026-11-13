@@ -1,5 +1,5 @@
 module SignIn
-  module Oidc
+  module Sso
     # Who the provider says signed in: its issuer and subject (the pair an
     # account is linked by), the email and whether the provider verified it,
     # the name, and the refresh token it gave, if any.
@@ -13,7 +13,7 @@ module SignIn
 
       def as_json(*) = { "issuer" => issuer, "subject" => subject }
 
-      def issuer_host = SignIn::Oidc.issuer_host(issuer)
+      def issuer_host = SignIn::Sso.issuer_host(issuer)
     end
   end
 end

@@ -52,7 +52,7 @@ Rails.application.routes.draw do
       # which sends the person to the site's provider, and the provider's
       # way back. Inside this host constraint, so with ADMIN_HOST set the
       # callback answers on the admin host alone, and the provider sends the
-      # person back there (`SignIn::Oidc.callback_origin`). Under
+      # person back there (`SignIn::Sso.callback_origin`). Under
       # `sign-in/` too, which `Setup::RedirectConstraint` lets through; the
       # state's cookie is pathed to `sign-in/sso` (`SsoStarts`).
       post "sign-in/sso", to: "sso_sessions#create", as: :sso
@@ -313,7 +313,7 @@ Rails.application.routes.draw do
         # "End all sessions…": an owner signs another user out everywhere
         # (`SignIn::Sessions::EndAll`, which refuses a non-owner and your own account).
         member { delete :sessions }
-        # "Unlink…" in the Single sign-on zone (`Sso::Unlink`, owner only).
+        # "Unlink…" in the Single sign-on zone (`SignIn::Sso::Unlink`, owner only).
         member { delete :sso_link, to: "sso_links#destroy" }
       end
 

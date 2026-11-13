@@ -1,8 +1,8 @@
 module SignIn
-  module Oidc
+  module Sso
     # The provider's answer to a sign-in: the callback's parameters checked
     # against the state kept in the browser's cookie, the code exchanged at
-    # the token endpoint, and the ID token verified (`SignIn::Oidc::IdToken`),
+    # the token endpoint, and the ID token verified (`SignIn::Sso::IdToken`),
     # answering who the provider says signed in.
     #
     # `call(params:, kept:)` answers a `Result`: `ok` with the `Identity`, or
@@ -95,7 +95,7 @@ module SignIn
             Telemetry.record(span, "auth.sso.refresh_token" => !refresh_token(answer.body).nil?)
             answer
           rescue Unavailable => error
-            Telemetry.record(span, "error.type" => Oidc.error_type(error))
+            Telemetry.record(span, "error.type" => Sso.error_type(error))
             "unavailable"
           end
         end
@@ -111,7 +111,7 @@ module SignIn
             email: (email if email.is_a?(String) && email.length <= MAX_EMAIL),
             # Literally `true`: a provider that sends the string "true" has
             # not said it verified the address. Whether an unverified email
-            # may match an account is `Sso::Admit`'s to decide.
+            # may match an account is `SignIn::Sso::Admit`'s to decide.
             email_verified: claims["email_verified"] == true,
             name: (claims["name"] if claims["name"].is_a?(String)),
             refresh_token: refresh_token(body)

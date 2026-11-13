@@ -1,6 +1,6 @@
 module SignIn
-  module Oidc
-    # The daily re-check of an SSO session (`Sso::RecheckJob`): its refresh
+  module Sso
+    # The daily re-check of an SSO session (`SignIn::Sso::RecheckJob`): its refresh
     # token sent back to the token endpoint, under an `auth.sso.recheck`
     # CLIENT span whose `auth.outcome` is the answer's status.
     #
@@ -82,7 +82,7 @@ module SignIn
 
           Result.new(status: :ok, refresh_token: rotated || refresh_token)
         rescue Unavailable => error
-          Telemetry.record(span, "error.type" => Oidc.error_type(error))
+          Telemetry.record(span, "error.type" => Sso.error_type(error))
           unavailable
         rescue IdToken::Refused
           unavailable(span, "bad_token")

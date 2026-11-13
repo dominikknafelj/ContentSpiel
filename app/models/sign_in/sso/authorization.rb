@@ -1,5 +1,5 @@
 module SignIn
-  module Oidc
+  module Sso
     # The request that sends a person to the provider: the authorization
     # URL, and the three values the callback is checked against.
     #
@@ -22,7 +22,7 @@ module SignIn
 
       attr_reader :url, :state, :nonce, :verifier
 
-      # Raises `SignIn::Oidc::Unavailable` when the discovery document
+      # Raises `SignIn::Sso::Unavailable` when the discovery document
       # cannot be read.
       def self.start(provider:, redirect_uri:)
         configuration = provider.configuration

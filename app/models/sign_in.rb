@@ -4,7 +4,7 @@
 # (`SignIn::Passkeys::Registration`, `SignIn::Passkeys::Check`, over the one
 # relying party `SignIn::Passkeys::RelyingParty` decides: the one place the domain a
 # passkey belongs to is decided), and that speak to the site's single
-# sign-on provider (`SignIn::Oidc`: its discovery, keys, authorization
+# sign-on provider (`SignIn::Sso`: its discovery, keys, authorization
 # request and tokens). Nothing here knows a session, a cookie, a
 # route, a controller or a mail: a controller asks and answers (and keeps a
 # passkey's challenge), a job mails. CS Studio's sign-in is one caller; a

@@ -11,7 +11,7 @@ module SignIn
   # and named by class, status or fixed reason, never by message. And NOTHING
   # HERE KNOWS A USER: it speaks to the provider and answers what the provider
   # said; matching an identity to an account is a service's.
-  module Oidc
+  module Sso
     VARIABLES = %w[SSO_ISSUER SSO_CLIENT_ID SSO_CLIENT_SECRET SSO_NAME].freeze
     STATE_LIFETIME = 10.minutes
     CACHE_FOR = 1.hour

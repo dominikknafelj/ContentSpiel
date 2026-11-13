@@ -71,7 +71,7 @@ class Session < ApplicationRecord
   # and none may use `delete_all`, which would skip it: sign-out
   # (`Authentication#terminate_session`, `destroy`), `Users::UpdatePassword`
   # and `Users::Save` (`OwnerProtection#end_sessions_after_password_change`),
-  # `SignIn::Sessions::EndOthers`, `SignIn::Sessions::EndAll` and `Sso::Unlink` (all four
+  # `SignIn::Sessions::EndOthers`, `SignIn::Sessions::EndAll` and `SignIn::Sso::Unlink` (all four
   # through `.destroy_each_locked`), `Users::Destroy` (`User`'s `dependent: :destroy`),
   # an expiry (`SignIn::Sessions::End`, `destroy!`).
   # `test/models/session_test.rb` has each.

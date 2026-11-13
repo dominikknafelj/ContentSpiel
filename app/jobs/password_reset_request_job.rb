@@ -21,7 +21,7 @@
 # anyone. A linked account while single sign-on is off gets nothing (its
 # provider has no name to give, and no sign-in button would be drawn) and
 # the job logs one line naming nobody: the console's way back is
-# `Sso::Unlink`.
+# `SignIn::Sso::Unlink`.
 #
 # A NUL byte is no address of an account, and Postgres refuses one in a
 # query's text, so the lookup is skipped for it rather than failing the job.
@@ -38,7 +38,7 @@ class PasswordResetRequestJob < ApplicationJob
     return unless user
 
     if SignIn::Rules.reminder_instead_of_reset?(user)
-      provider = SignIn::Oidc::Provider.current
+      provider = SignIn::Sso::Provider.current
       return Rails.logger.info(SSO_OFF) unless provider
 
       ApplicationMailer.queue(PasswordsMailer, :sso_reminder, user, provider: provider.name, **{ origin: origin }.compact)

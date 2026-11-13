@@ -3,7 +3,7 @@ require "test_helper"
 # The request that sends a person to the provider: a fresh state, nonce and
 # PKCE verifier each time, the URL built by the openid_connect gem, and
 # nothing of the three in what the object says of itself.
-class SignIn::Oidc::AuthorizationTest < ActiveSupport::TestCase
+class SignIn::Sso::AuthorizationTest < ActiveSupport::TestCase
   REDIRECT = "http://www.example.com/cs-studio/sign-in/sso/callback".freeze
 
   def query(url) = Rack::Utils.parse_query(URI(url).query)
@@ -12,7 +12,7 @@ class SignIn::Oidc::AuthorizationTest < ActiveSupport::TestCase
 
   test "the authorization URL carries the state, the nonce, an S256 challenge and the redirect URI, and asks offline_access only when listed" do
     with_fake_idp do |idp|
-      authorization = SignIn::Oidc::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
+      authorization = SignIn::Sso::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
       assert authorization.url.start_with?("#{idp.issuer}/authorize?")
 
       params = query(authorization.url)
@@ -29,12 +29,12 @@ class SignIn::Oidc::AuthorizationTest < ActiveSupport::TestCase
       assert_equal 3, [ authorization.state, authorization.nonce, authorization.verifier ].uniq.size
       assert_not_includes authorization.url, authorization.verifier
 
-      again = SignIn::Oidc::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
+      again = SignIn::Sso::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
       assert_empty [ again.state, again.nonce, again.verifier ] & [ authorization.state, authorization.nonce, authorization.verifier ]
     end
 
     with_fake_idp(offline_access: false) do |idp|
-      authorization = SignIn::Oidc::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
+      authorization = SignIn::Sso::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
       assert_equal "openid email profile", query(authorization.url)["scope"]
     end
   end
@@ -42,14 +42,14 @@ class SignIn::Oidc::AuthorizationTest < ActiveSupport::TestCase
   test "a provider that cannot be reached raises Unavailable from start" do
     with_fake_idp do |idp|
       idp.down!
-      error = assert_raises(SignIn::Oidc::Unavailable) { SignIn::Oidc::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT) }
+      error = assert_raises(SignIn::Sso::Unavailable) { SignIn::Sso::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT) }
       assert_equal "unreachable", error.reason
     end
   end
 
   test "inspect, to_s and as_json hold no state, nonce or verifier" do
     with_fake_idp do |idp|
-      authorization = SignIn::Oidc::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
+      authorization = SignIn::Sso::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
       [ authorization.inspect, authorization.to_s, "#{authorization}", authorization.to_json, { a: authorization }.to_json ].each do |text|
         [ authorization.state, authorization.nonce, authorization.verifier ].each { |secret| assert_not_includes text, secret }
       end
@@ -58,7 +58,7 @@ class SignIn::Oidc::AuthorizationTest < ActiveSupport::TestCase
   end
 
   test "an identity's inspect and as_json hold no refresh token or email" do
-    identity = SignIn::Oidc::Identity.new(issuer: "https://idp.example.org", subject: "sub-1", email: "planted@example.org",
+    identity = SignIn::Sso::Identity.new(issuer: "https://idp.example.org", subject: "sub-1", email: "planted@example.org",
       email_verified: true, name: "Rea Der", refresh_token: "planted-refresh-token")
     [ identity.inspect, identity.to_s, identity.to_json, { a: identity }.to_json ].each do |text|
       assert_not_includes text, "planted"
@@ -74,7 +74,7 @@ class SignIn::Oidc::AuthorizationTest < ActiveSupport::TestCase
   # alone.
   test "the fake provider redirects back with a code bound to the nonce, or access_denied after deny!" do
     with_fake_idp do |idp|
-      authorization = SignIn::Oidc::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
+      authorization = SignIn::Sso::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT)
       back = idp.authorize(authorization.url)
       assert back.start_with?("#{REDIRECT}?")
       params = query(back)
@@ -91,7 +91,7 @@ class SignIn::Oidc::AuthorizationTest < ActiveSupport::TestCase
       assert_equal 400, exchange.call(authorization.verifier).first, "a code is answered once"
 
       idp.deny!
-      params = query(idp.authorize(SignIn::Oidc::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT).url))
+      params = query(idp.authorize(SignIn::Sso::Authorization.start(provider: idp.provider, redirect_uri: REDIRECT).url))
       assert_equal "access_denied", params["error"]
       assert_nil params["code"]
     end

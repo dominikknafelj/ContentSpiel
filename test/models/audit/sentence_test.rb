@@ -780,7 +780,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   end
 
   test "every account reason of single sign-on has its words, and no other" do
-    assert_equal SignIn::Oidc::ACCOUNT_REASONS.sort, Audit::Sentence::SSO_REFUSALS.keys.sort
+    assert_equal SignIn::Sso::ACCOUNT_REASONS.sort, Audit::Sentence::SSO_REFUSALS.keys.sort
   end
 
   test "sso.unlinked names the person unlinked" do

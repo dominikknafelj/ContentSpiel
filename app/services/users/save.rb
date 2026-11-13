@@ -53,7 +53,7 @@ module Users
   # first. A typed password and a promotion each ask the link twice: before
   # anything is built, for the sentence, and again under the account's row
   # lock in the saving transaction (`OwnerProtection#linked_issuer_under_lock`),
-  # the lock `Sso::Link` takes before it reads the owner flag and clears the
+  # the lock `SignIn::Sso::Link` takes before it reads the owner flag and clears the
   # password, so of a link and a save at once one always sees the other.
   class Save < ApplicationService
     include OwnerProtection

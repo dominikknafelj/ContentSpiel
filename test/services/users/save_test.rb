@@ -454,7 +454,7 @@ class Users::SaveTest < ActiveSupport::TestCase
 
   # Link-then-promote: the link commits after the editor read the account
   # and before the promotion. The flag is asked again under the account's row
-  # lock, the one `Sso::Link` takes, so one of the two always sees the other.
+  # lock, the one `SignIn::Sso::Link` takes, so one of the two always sees the other.
   test "a link that lands between the read and the promotion is seen under the row lock" do
     user = User.find(users(:reader).id)
     link_to_sso(User.find(user.id))

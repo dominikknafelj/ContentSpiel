@@ -37,7 +37,7 @@ class SignIn::MethodsTest < ActiveSupport::TestCase
     assert_not SignIn::Methods.exempt?("acme/unknown")
   end
 
-  # `Sso::RecheckJob` calls `recheck.call(session)`; the entry's shape is its contract.
+  # `SignIn::Sso::RecheckJob` calls `recheck.call(session)`; the entry's shape is its contract.
   test "a recheck is called as call(session) and answers ok, revoked or unavailable" do
     recheck = ->(session) { session.is_a?(Session) ? :ok : :unavailable }
     entry = register(recheck: recheck)

@@ -19,10 +19,10 @@ module Users
   #   in through its provider alone (`SignIn::Rules`), so a password set for
   #   it is refused in words (`#sso_linked_password_refusal`), after the
   #   authorization, so only someone who may manage the account learns of
-  #   the link. Clearing it (`Sso::Link`) is the one write it takes. The
+  #   the link. Clearing it (`SignIn::Sso::Link`) is the one write it takes. The
   #   in-memory account is asked first, for the sentence, and the row again
   #   under its lock in the saving transaction (`#linked_issuer_under_lock`),
-  #   the lock `Sso::Link` takes before it clears the password: a link that
+  #   the lock `SignIn::Sso::Link` takes before it clears the password: a link that
   #   commits between the read and the save is seen, so no typed password
   #   lands on a linked account.
   # - A password change ends that user's sessions

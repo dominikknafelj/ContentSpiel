@@ -4,10 +4,10 @@ require "test_helper"
 # provider, which answers that the person is still there (`:ok`, with the
 # token it rotated to), is gone (`:revoked`) or could not be asked
 # (`:unavailable`).
-class SignIn::Oidc::RefreshTest < ActiveSupport::TestCase
+class SignIn::Sso::RefreshTest < ActiveSupport::TestCase
   include LogCapture
 
-  def refresh(idp) = SignIn::Oidc::Refresh.new(provider: idp.provider)
+  def refresh(idp) = SignIn::Sso::Refresh.new(provider: idp.provider)
 
   def spans(&block)
     exporter = Rails.application.config.x.otel_test_exporter
@@ -76,7 +76,7 @@ class SignIn::Oidc::RefreshTest < ActiveSupport::TestCase
         { status: 400, body: "invalid_grant" },
         { body: "<html>planted</html>" },
         { body: "[1, 2]" },
-        { body: { "padding" => "x" * SignIn::Oidc::MAX_BODY } },
+        { body: { "padding" => "x" * SignIn::Sso::MAX_BODY } },
         { body: { "refresh_token" => { "a" => "b" } } },
         { body: { "refresh_token" => "" } },
         { body: { "id_token" => [ "x" ] } },

@@ -23,7 +23,7 @@ en:
       # `SignIn::Sessions::EndAll`'s refusal on the owner's own account.
       sessions:
         own: "End your own sessions from Your account."
-      # `Sso::Unlink`'s refusal of an account with no link.
+      # `SignIn::Sso::Unlink`'s refusal of an account with no link.
       sso:
         not_linked: "%{name} is not linked to single sign-on."
       index:

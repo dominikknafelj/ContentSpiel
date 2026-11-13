@@ -1,17 +1,17 @@
 require "test_helper"
 
-# `Sso::Admit`: which account a provider's identity signs into, in
+# `SignIn::Sso::Admit`: which account a provider's identity signs into, in
 # one order -- the link, then a verified email (an invitation's first, when
 # the start came from one), then an open invitation -- and nothing else.
-class Sso::AdmitTest < ActiveSupport::TestCase
+class SignIn::Sso::AdmitTest < ActiveSupport::TestCase
   include LogCapture
   ISSUER = "https://id.example.com/oauth2/default".freeze
 
   def identity(subject: "sub-1", email: "reader@example.com", email_verified: true, name: "Rea Der", issuer: ISSUER)
-    SignIn::Oidc::Identity.new(issuer:, subject:, email:, email_verified:, name:, refresh_token: nil)
+    SignIn::Sso::Identity.new(issuer:, subject:, email:, email_verified:, name:, refresh_token: nil)
   end
 
-  def admit(identity, invitation: nil) = as(nil) { Sso::Admit.call(identity, invitation:) }
+  def admit(identity, invitation: nil) = as(nil) { SignIn::Sso::Admit.call(identity, invitation:) }
 
   def refusals = Audit::Event.where(action: "sso.refused")
 
@@ -85,8 +85,8 @@ class Sso::AdmitTest < ActiveSupport::TestCase
     assert_equal "owner", refusals.sole.metadata["reason"]
   end
 
-  test "Sso::Admit.refuse, the callback's owner defence, writes the same refusal as #call, as nobody, whoever is signed in" do
-    result = as(users(:two)) { Sso::Admit.refuse(identity(email: "One@Example.com"), Sso::Admit::OWNER) }
+  test "SignIn::Sso::Admit.refuse, the callback's owner defence, writes the same refusal as #call, as nobody, whoever is signed in" do
+    result = as(users(:two)) { SignIn::Sso::Admit.refuse(identity(email: "One@Example.com"), SignIn::Sso::Admit::OWNER) }
 
     assert_equal [ "owner" ], result.errors
     refusal = refusals.sole
@@ -219,7 +219,7 @@ class Sso::AdmitTest < ActiveSupport::TestCase
 
   test "a password that cannot be cleared is no refusal: it raises, nothing is linked and nothing is refused" do
     with_singleton_override(Users::UpdatePassword, :call, ->(*, **) { ApplicationService::Result.failure(nil, [ "Password could not be saved" ]) }) do
-      assert_raises(Sso::Link::NotCleared) { admit(identity) }
+      assert_raises(SignIn::Sso::Link::NotCleared) { admit(identity) }
     end
 
     assert_not users(:reader).reload.sso_linked?

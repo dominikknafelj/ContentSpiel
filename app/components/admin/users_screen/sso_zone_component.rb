@@ -2,11 +2,11 @@ module Admin
   module UsersScreen
     # The user editor's Single sign-on zone: the shared action zone after the
     # Owner zone, offering "Unlink…", which takes a linked account's link to the
-    # sign-in provider away (`Sso::Unlink`: the person is signed out everywhere
+    # sign-in provider away (`SignIn::Sso::Unlink`: the person is signed out everywhere
     # and mailed the ordinary password-setting link).
     #
     # - It is for a LINKED user only, and the editor draws it only for an owner
-    #   viewer (the component takes no viewer: `Sso::Unlink` and
+    #   viewer (the component takes no viewer: `SignIn::Sso::Unlink` and
     #   `Admin::SsoLinksController` ask the owner rule again on the request).
     #   Owners never link, so it is never drawn for an owner either.
     # - `provider_name` is the caller's: the configured name, or the host the
@@ -16,7 +16,7 @@ module Admin
     #   owner zone's): the person regains a way in with the mail. Its form DELETEs
     #   `users/:id/sso_link`.
     # - `mail_ready` is the caller's `MailSettings#ready?`: without mail the
-    #   dialog promises no mail (`confirm_body_no_mail`), as `Sso::Unlink` then
+    #   dialog promises no mail (`confirm_body_no_mail`), as `SignIn::Sso::Unlink` then
     #   queues none.
     #
     # Like the owner zone, the trigger is an `admin--saving--pending-lock`

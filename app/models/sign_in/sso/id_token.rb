@@ -1,5 +1,5 @@
 module SignIn
-  module Oidc
+  module Sso
     # An ID token's claims, once its signature and its claims are checked:
     # the one check of an ID token, for the sign-in's code exchange
     # (`Callback`) and the daily re-check's refresh (`Refresh`).
