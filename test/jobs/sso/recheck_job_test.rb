@@ -111,6 +111,40 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
 
     assert_equal counted, counts(run_at(@t + 24.hours))
     assert_equal @t, session.reload.provider_checked_at
+
+    Sessions::SweepJob.perform_now(at: @t + 26.hours - 1.second)
+    assert Session.exists?(session.id)
+    Sessions::SweepJob.perform_now(at: @t + 26.hours)
+    assert_nil Session.find_by(id: session.id)
+    assert_equal({ "reason" => "expired_sso", "count" => 1, "after_hours" => 26 }, ended_events.last.metadata)
+  end
+
+  # The token cannot be decrypted without the keys, so its session cannot be
+  # asked: that session is unavailable, the gems are still asked, and the
+  # session ends by expiry at 26 hours, which reads no token.
+  test "without encryption keys an SSO session is unavailable, the run goes on, and the sweep ends it at 26 hours" do
+    with_fake_idp(refresh_token: "rt-1") do |idp|
+      session = start(token: "rt-1", at: @t)
+      asked = []
+      SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path, recheck: ->(row) { asked << row.id; :ok })
+      gem_session = start(token: nil, at: @t, method: "acme/saml")
+
+      without_encryption_keys do
+        report = assert_error_reported(Sso::RecheckJob::RecheckFailed) do
+          assert_equal counted(checked: 2, ok: 1, unavailable: 1), counts(run_at(@t + 24.hours))
+        end
+        assert_equal "ActiveRecord::Encryption::Errors::Configuration", report.error.message
+        assert_equal 0, token_posts(idp)
+        assert_equal [ gem_session.id ], asked
+        assert_equal @t, session.reload.provider_checked_at
+
+        Session.update_all(last_seen_at: @t + 26.hours) # version: none (a test's own rows)
+        assert_nil session.reload.expiry(@t + 26.hours - 1.second)
+        Sessions::SweepJob.perform_now(at: @t + 26.hours)
+      end
+      assert_nil Session.find_by(id: session.id)
+      assert_equal({ "reason" => "expired_sso", "count" => 1, "after_hours" => 26 }, ended_events.last.metadata)
+    end
   end
 
   test "a session whose account was unlinked is ended as revoked without asking" do
@@ -129,7 +163,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
     SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path,
       recheck: ->(session) { asked << session.id; session.ip_address == "192.0.2.9" ? :revoked : :ok })
     SignInMethods.register("acme/broken", label: "acme.sign_in.broken", path: :admin_root_path,
-      recheck: ->(_session) { raise IOError, "the gem's provider is down" })
+      recheck: ->(_session) { raise IOError, "planted-gem-message" })
     SignInMethods.register("acme/odd", label: "acme.sign_in.odd", path: :admin_root_path,
       recheck: ->(_session) { "planted-odd-answer" })
     SignInMethods.register("acme/never", label: "acme.sign_in.never", path: :admin_root_path)
@@ -144,7 +178,8 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
 
     spans = nil
     log = capture_log do
-      assert_error_reported(IOError) { spans = run_at(@t + 24.hours) }
+      report = assert_error_reported(Sso::RecheckJob::RecheckFailed) { spans = run_at(@t + 24.hours) }
+      assert_equal "IOError", report.error.message, "the class alone, never the gem's message"
     end
 
     assert_equal [ kept.id, gone.id ].sort, asked.sort, "its own due sessions alone"
@@ -160,8 +195,29 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
     assert_includes log, "acme/odd"
     assert_includes log, "String"
     assert_not_includes log, "planted-odd-answer"
+    assert_not_includes log, "planted-gem-message"
   end
 
+  test "a gem's recheck past its limit is unavailable" do
+    SignInMethods.register("acme/slow", label: "acme.sign_in.slow", path: :admin_root_path, recheck: ->(_session) { sleep 2; :revoked })
+    session = start(token: nil, at: @t, method: "acme/slow")
+    stub = Sso::RecheckJob.const_get(:GEM_RECHECK_LIMIT)
+    Sso::RecheckJob.send(:remove_const, :GEM_RECHECK_LIMIT)
+    Sso::RecheckJob.const_set(:GEM_RECHECK_LIMIT, 0.05)
+
+    report = assert_error_reported(Sso::RecheckJob::RecheckFailed) do
+      assert_equal counted(checked: 1, unavailable: 1), counts(run_at(@t + 24.hours))
+    end
+    assert_equal "Timeout::Error", report.error.message
+    assert Session.exists?(session.id)
+  ensure
+    Sso::RecheckJob.send(:remove_const, :GEM_RECHECK_LIMIT)
+    Sso::RecheckJob.const_set(:GEM_RECHECK_LIMIT, stub)
+  end
+
+  # The tests below run on the test's one connection (the fixtures pin it),
+  # so they show the re-reads, not two runs racing on two connections; the
+  # advisory lock's skip is shown with a second connection of libpq's own.
   test "a session signed out after its batch was read is skipped, and a second run asks nothing again" do
     asked = []
     first = nil
@@ -177,6 +233,37 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
 
     assert_equal counted, counts(run_at(@t + 24.hours))
     assert_equal [ first.id ], asked
+  end
+
+  test "an answer for a session signed out or checked again during its ask writes nothing" do
+    SignInMethods.register("acme/gone", label: "acme.sign_in.gone", path: :admin_root_path, recheck: ->(row) { row.destroy!; :ok })
+    SignInMethods.register("acme/moved", label: "acme.sign_in.moved", path: :admin_root_path,
+      recheck: ->(row) { row.update_columns(provider_checked_at: @t + 24.hours); :revoked }) # version: none (a test's stand-in for another run)
+    gone = start(token: nil, at: @t, method: "acme/gone")
+    moved = start(token: nil, at: @t, method: "acme/moved")
+
+    assert_no_difference -> { ended_events.count } do
+      assert_equal counted(checked: 2, ok: 1, revoked: 1), counts(run_at(@t + 24.hours))
+    end
+    assert_nil Session.find_by(id: gone.id), "not written back"
+    assert_equal @t + 24.hours, moved.reload.provider_checked_at, "the other run's check stands"
+  end
+
+  test "a session whose lock another run holds is skipped" do
+    asked = []
+    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path, recheck: ->(row) { asked << row.id; :ok })
+    held = start(token: nil, at: @t, method: "acme/saml")
+    free = start(token: nil, at: @t, method: "acme/saml")
+    config = Session.connection_db_config.configuration_hash
+    other = PG.connect(host: config[:host], port: config[:port], dbname: config[:database], user: config[:username],
+      password: config[:password], gssencmode: "disable")
+    other.exec_params("SELECT pg_advisory_lock($1, $2)", [ Sso::RecheckJob::ADVISORY_NAMESPACE, held.id % Sso::RecheckJob::INT4 ])
+
+    assert_equal counted(checked: 1, ok: 1), counts(run_at(@t + 24.hours))
+    assert_equal [ free.id ], asked
+    assert_equal @t, held.reload.provider_checked_at
+  ensure
+    other&.close
   end
 
   test "more than a batch is checked, each session once" do

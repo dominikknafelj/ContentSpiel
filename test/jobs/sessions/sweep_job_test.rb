@@ -66,6 +66,17 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     assert_equal 4, span.attributes["auth.session.count"], "the expired_sso sessions are counted with the others"
   end
 
+  test "without encryption keys the sweep still ends SSO sessions with a token at 26 hours, and the idle ones after them" do
+    held = sso_start(token: "rt", at: @now - 26.hours)
+    idle = start(seen: @now - 13.hours)
+
+    without_encryption_keys { Sessions::SweepJob.perform_now(at: @now) }
+
+    assert_nil Session.find_by(id: held.id)
+    assert_nil Session.find_by(id: idle.id)
+    assert_equal [ [ "expired_sso", 26 ], [ "expired_idle", 12 ] ], ended_events.map { |e| [ e.metadata["reason"], e.metadata["after_hours"] ] }
+  end
+
   test "an SSO session past both its check and its absolute timeout is counted once, as absolute" do
     sso_start(token: nil, at: @now - 15.days)
     Sessions::SweepJob.perform_now(at: @now)

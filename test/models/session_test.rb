@@ -323,6 +323,17 @@ class SessionTest < ActiveSupport::TestCase
     end
   end
 
+  test "without encryption keys an SSO session with a token still expires at 26 hours, read without decrypting" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    held = sso_session(token: "refresh-token", at: t)
+    without_encryption_keys do
+      row = Session.find(held.id)
+      assert_nil expiry_at(row, t + 26.hours - 1.second)
+      assert_equal "expired_sso", expiry_at(row, t + 26.hours)
+      assert_equal({ "after_hours" => 26 }, Session.timeout_metadata("expired_sso", row))
+    end
+  end
+
   test "the provider token is stored encrypted" do
     session = sso_session(token: "refresh-token-plain", at: Time.current)
     raw = Session.connection.select_value("SELECT provider_token FROM sessions WHERE id = #{session.id.to_i}") # sql: a test reads the raw column

@@ -192,8 +192,14 @@ class Session < ApplicationRecord
 
   # How long after `provider_checked_at` the session may stand: EVERY for an
   # SSO session with no token to ask with, EVERY + GRACE for any other.
+  #
+  # Whether there is a token is read from the stored column, never decrypted,
+  # as `expired_sso`'s `provider_token IS NULL` reads it: a site whose
+  # encryption keys are gone must still end its sessions by expiry (a request,
+  # the sweep), and decrypting here would raise in each of them instead.
   def provider_check_limit
-    authenticated_with == "sso" && provider_token.blank? ? PROVIDER_CHECK_EVERY : PROVIDER_CHECK_EVERY + PROVIDER_CHECK_GRACE
+    tokenless = read_attribute_before_type_cast(:provider_token).nil?
+    authenticated_with == "sso" && tokenless ? PROVIDER_CHECK_EVERY : PROVIDER_CHECK_EVERY + PROVIDER_CHECK_GRACE
   end
 
   private
