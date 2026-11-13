@@ -224,9 +224,14 @@ module Audit
     end
 
     # Built per call rather than memoised: `filter_parameters` is plain
-    # mutable config, and a stale copy here would be a silent leak.
+    # mutable config, and a stale copy here would be a silent leak. The
+    # request-only names (`config.x.request_only_filter_parameters`: the single
+    # sign-on's `code`, `state` and `nonce`, which mask a request's log) are left
+    # out, so a record's `state` column is kept as any other
+    # (config/initializers/filter_parameter_logging.rb says why).
     def parameter_filter
-      ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters, mask: FILTER_MASK)
+      config = Rails.application.config
+      ActiveSupport::ParameterFilter.new(config.filter_parameters - config.x.request_only_filter_parameters, mask: FILTER_MASK)
     end
 
     # One serializer per subject type (spec §4.2).

@@ -20,16 +20,28 @@ Rails.application.config.filter_parameters += [
   /\Acredential\z/,
   # A recovery code typed at the second step or shown once when made: a one-time password that no entry above
   # matches (not :passw, not :token).
-  :recovery_code,
-  # The single sign-on callback's query (`code`, `state`): an authorization code and the state it answers, both
-  # one-time secrets. Whole names only, since a bare :code would mask every parameter that contains "code".
-  /\Acode\z/,
-  /\Astate\z/,
-  # The nonce in the provider's authorization address, which the start's "Redirected to" line logs with this list
-  # over its query (`ActionDispatch::Http::FilterRedirect`): it ties the ID token to this start, and is a secret
-  # until the callback spends it. The whole name, as the two above.
-  /\Anonce\z/
+  :recovery_code
 ]
+
+# The single sign-on's one-time secrets in a request: the callback's query (`code`, an authorization code, and
+# `state`, the state it answers) and the nonce in the provider's authorization address, which the start's
+# "Redirected to" line logs with this list over its query (`ActionDispatch::Http::FilterRedirect`); the nonce ties
+# the ID token to this start and is a secret until the callback spends it. Whole names only, since a bare :code
+# would mask every parameter that contains "code".
+#
+# REQUEST LOGS ONLY. This list reaches two more readers, which must not take these three: Active Record's
+# `filter_attributes` (its railtie adds `filter_parameters` to it on load, and it masks `inspect` and a logged
+# bind), and `Audit::Snapshot.keep?`, which drops a snapshot or changes key the list matches. Models have columns
+# called `state` (a note thread's, a form delivery's, a presence mark's, a translation state's) that are no
+# secret, and none holds a provider's code, state or nonce. So the names are kept in
+# `config.x.request_only_filter_parameters`: taken off `filter_attributes` below, after the railtie's hook (a hook
+# runs in the order it was registered, and runs at once if Active Record is already loaded), and left out by the
+# snapshot.
+Rails.application.config.x.request_only_filter_parameters = [ /\Acode\z/, /\Astate\z/, /\Anonce\z/ ].freeze
+Rails.application.config.filter_parameters += Rails.application.config.x.request_only_filter_parameters
+ActiveSupport.on_load(:active_record) do
+  self.filter_attributes -= Rails.application.config.x.request_only_filter_parameters
+end
 
 # A visitor's answers to a form (personal data reaches no log). The endpoint (`FormSendsController`, controller
 # `form_sends`) takes them as `answers[<field key>]`. Not a bare `:answers`
