@@ -1,3 +1,5 @@
+require "net/http"
+
 module SignIn
   # Single sign-on through one OpenID Connect provider per site.
   #
@@ -16,6 +18,12 @@ module SignIn
     MAX_BODY = 65_536
     OPEN_TIMEOUT = 3
     READ_TIMEOUT = 5
+    # What a call to the provider may raise when the provider is out of
+    # reach or answers no HTTP (`Net::OpenTimeout` and `Net::ReadTimeout`
+    # are `Timeout::Error`s): `unreachable`.
+    NETWORK_ERRORS = [
+      Timeout::Error, SocketError, SystemCallError, OpenSSL::SSL::SSLError, EOFError, IOError, Net::HTTPBadResponse
+    ].freeze
 
     # How a sign-in that did not finish is named in a span (it is not audited:
     # no one is named, and a bot's run would bury the log).

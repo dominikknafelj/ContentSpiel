@@ -101,4 +101,97 @@ class SignIn::Oidc::ProviderTest < ActiveSupport::TestCase
       end
     end
   end
+
+  # The provider's discovery and keys, read from the fake provider on
+  # 127.0.0.1 (test/support/oidc_helper.rb), under a server span as a request
+  # would make them: a CLIENT span with no recording parent is dropped.
+  def discovery_spans(&block)
+    exporter = Rails.application.config.x.otel_test_exporter
+    exporter.reset
+    Telemetry.tracer.in_span("probe", kind: :server, &block)
+    exporter.finished_spans.select { |span| span.name == "auth.sso.discovery" }
+  end
+
+  def discovery_reads(idp) = idp.requests.count { |request| request.path == "/idp/.well-known/openid-configuration" }
+
+  test "discovery is read once, then from the cache for an hour, and its span says cached" do
+    with_fake_idp do |idp|
+      spans = discovery_spans do
+        configuration = idp.provider.configuration
+        assert_equal [ idp.issuer, "#{idp.issuer}/authorize", "#{idp.issuer}/token", "#{idp.issuer}/keys" ],
+          [ configuration.issuer, configuration.authorization_endpoint, configuration.token_endpoint, configuration.jwks_uri ]
+        assert_includes configuration.scopes_supported, "offline_access"
+        assert_equal [ "client_secret_basic" ], configuration.token_auth_methods
+
+        assert_equal configuration, idp.provider.configuration
+        assert_equal 1, discovery_reads(idp)
+
+        travel SignIn::Oidc::CACHE_FOR - 1.second
+        idp.provider.configuration
+        assert_equal 1, discovery_reads(idp)
+
+        travel 2.seconds
+        idp.provider.configuration
+        assert_equal 2, discovery_reads(idp)
+      end
+
+      assert_equal [ false, true, true, false ], spans.map { |span| span.attributes["auth.sso.cached"] }
+      assert spans.all? { |span| span.kind == :client && span.attributes["server.address"] == "127.0.0.1" }
+    end
+  end
+
+  test "the keys are read once and cached, and refresh: reads them again" do
+    with_fake_idp do |idp|
+      key_reads = -> { idp.requests.count { |request| request.path == "/idp/keys" } }
+      keys = idp.provider.keys
+      assert_instance_of JSON::JWK::Set, keys
+      assert_equal [ idp.key_id ], keys.map { |key| key[:kid] }
+
+      idp.provider.keys
+      assert_equal 1, key_reads.call
+      idp.provider.keys(refresh: true)
+      assert_equal 2, key_reads.call
+      idp.provider.keys
+      assert_equal 2, key_reads.call
+    end
+  end
+
+  test "a discovery document naming another issuer is issuer_mismatch, and a refused socket is unreachable" do
+    with_fake_idp do |idp|
+      idp.answer_discovery_with(body: idp.discovery_document.merge("issuer" => "https://planted.example.org"))
+      spans = discovery_spans do
+        error = assert_raises(SignIn::Oidc::Unavailable) { idp.provider.configuration }
+        assert_equal "issuer_mismatch", error.reason
+
+        idp.down!
+        error = assert_raises(SignIn::Oidc::Unavailable) { idp.provider.configuration }
+        assert_equal "unreachable", error.reason
+      end
+
+      assert_equal [ "issuer_mismatch", "unreachable" ], spans.map { |span| span.attributes["auth.sso.reason"] }
+      assert_equal [ "issuer_mismatch", "Errno::ECONNREFUSED" ], spans.map { |span| span.attributes["error.type"] }
+      assert spans.none? { |span| span.attributes.values.join(" ").include?("planted") }
+    end
+  end
+
+  test "a status, a body that is no JSON object, a body over the limit and a missing endpoint each name their reason, and nothing is cached" do
+    with_fake_idp do |idp|
+      document = idp.discovery_document
+      {
+        "http_503" => { status: 503, body: "down" },
+        "not_json" => { body: "<html>" },
+        "not_json " => { body: "[1, 2]" },
+        "not_json  " => { body: { "padding" => "x" * SignIn::Oidc::MAX_BODY } },
+        "missing_endpoint" => { body: document.except("token_endpoint") },
+        "missing_endpoint " => { body: document.except("jwks_uri") }
+      }.each do |reason, answer|
+        idp.answer_discovery_with(**answer)
+        error = assert_raises(SignIn::Oidc::Unavailable, reason) { idp.provider.configuration }
+        assert_equal reason.strip, error.reason
+      end
+
+      assert_equal idp.issuer, idp.provider.configuration.issuer
+      assert_equal 7, discovery_reads(idp)
+    end
+  end
 end

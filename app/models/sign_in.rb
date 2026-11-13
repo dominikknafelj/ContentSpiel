@@ -3,15 +3,20 @@
 # (`SignIn::Throttle`), and that make and check passkeys
 # (`SignIn::PasskeyRegistration`, `SignIn::PasskeyCheck`, over the one
 # relying party `SignIn::RelyingParty` decides: the one place the domain a
-# passkey belongs to is decided). Nothing here knows a session, a cookie, a
+# passkey belongs to is decided), and that speak to the site's single
+# sign-on provider (`SignIn::Oidc`: its discovery, keys, authorization
+# request and tokens). Nothing here knows a session, a cookie, a
 # route, a controller or a mail: a controller asks and answers (and keeps a
 # passkey's challenge), a job mails. CS Studio's sign-in is one caller; a
 # later members' sign-in is another, and counts apart under a scope of its
 # own.
 module SignIn
   # What a sign-in attempt can come to (`SignIn::Outcome#status`), and the
-  # words its span's `auth.outcome` may carry.
-  OUTCOMES = %i[ok refused locked bot_check_required bot_check_failed second_factor_required].freeze
+  # words its span's `auth.outcome` may carry. The last three are single
+  # sign-on's alone: a callback that did not finish (`auth.sso.callback`),
+  # and a session's daily re-check that the provider refused or could not
+  # answer (`auth.sso.recheck`).
+  OUTCOMES = %i[ok refused locked bot_check_required bot_check_failed second_factor_required unfinished revoked unavailable].freeze
 
   # How long a right password waits for its second proof (a passkey or a
   # recovery code) before the person starts over.

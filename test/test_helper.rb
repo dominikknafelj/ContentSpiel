@@ -70,6 +70,7 @@ require_relative "support/contrast_measure"
 require_relative "support/theme_test_helper"
 require_relative "support/sign_in_helper"
 require_relative "support/passkey_helper"
+require_relative "support/oidc_helper"
 
 # What tests themselves print -- the statements a migration test runs
 # ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise
@@ -160,6 +161,11 @@ module ActiveSupport
     # gem's fake authenticator, never a browser -- see
     # test/support/passkey_helper.rb.
     include PasskeyHelper
+
+    # `with_fake_idp { |idp| … }`: an OpenID Connect provider on 127.0.0.1,
+    # the SSO variables pointed at it and a cache that keeps, never the
+    # network -- see test/support/oidc_helper.rb.
+    include OidcHelper
 
     # Setup.required? memoizes "setup is done" per process, reset by
     # SiteSetting after every commit -- but a test that clears the table with

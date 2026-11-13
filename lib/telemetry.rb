@@ -65,6 +65,12 @@ module Telemetry
     auth.second_factor
     auth.confirmation
     auth.account_mail
+    auth.sso.redirect
+    auth.sso.callback
+    auth.sso.discovery
+    auth.sso.token
+    auth.sso.recheck
+    auth.sso.recheck_run
   ].freeze
 
   ATTRIBUTES = %w[
@@ -84,6 +90,11 @@ module Telemetry
     auth.policy
     auth.second_factor.required
     auth.mail.kind
+    auth.sso.intent
+    auth.sso.reason
+    auth.sso.cached
+    auth.sso.refresh_token
+    auth.sso.issuer_host
     server.address
     http.response.status_code
     error.type
