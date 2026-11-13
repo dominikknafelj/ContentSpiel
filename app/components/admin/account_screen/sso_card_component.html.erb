@@ -1,0 +1,6 @@
+<%# The id is the Password card's (`#password`): the anchor a redirect of the
+    account screen names, so it still lands on the card that stands there. %>
+<%= render Admin::Ui::SettingsCardComponent.new(heading_id: HEADING_ID, heading: t(".title"), icon: :key_round, family: :neutral,
+      intro: t(".intro", provider: provider), id: ID, class: "scroll-mt-6") do %>
+  <p class="px-4 py-3 text-small text-dim"><%= t(".body", provider: provider) %></p>
+<% end %>
