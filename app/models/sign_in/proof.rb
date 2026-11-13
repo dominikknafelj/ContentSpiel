@@ -12,7 +12,7 @@ module SignIn
   #   the one the password step began included, and is `:ok`;
   # - a wrong one is `:refused` with the buckets its reservation closed;
   # - a right one for an account the caller's rule refuses (`allowed:`,
-  #   `SignInRules.passkey_allowed?`: a linked account, a non-owner under
+  #   `SignIn::Rules.passkey_allowed?`: a linked account, a non-owner under
   #   SSO_REQUIRED) is a wrong one: `:refused`, with the count its
   #   reservation made left standing and the run not forgotten. So a second
   #   step held from before the rule applied (SSO_REQUIRED switched on, or

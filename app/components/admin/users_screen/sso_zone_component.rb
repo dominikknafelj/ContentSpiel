@@ -10,7 +10,7 @@ module Admin
     #   `Admin::SsoLinksController` ask the owner rule again on the request).
     #   Owners never link, so it is never drawn for an owner either.
     # - `provider_name` is the caller's: the configured name, or the host the
-    #   account was linked under when single sign-on is off (`SignInRules
+    #   account was linked under when single sign-on is off (`SignIn::Rules
     #   .provider_name`); only if that says nothing is it the fallback words.
     # - The dialog is not destructive (the confirm is the primary button, as the
     #   owner zone's): the person regains a way in with the mail. Its form DELETEs

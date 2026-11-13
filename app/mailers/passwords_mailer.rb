@@ -14,7 +14,7 @@ class PasswordsMailer < ApplicationMailer
   end
 
   # The reset request's answer for an account that signs in through the
-  # provider alone (`SignInRules.reminder_instead_of_reset?`, decided by
+  # provider alone (`SignIn::Rules.reminder_instead_of_reset?`, decided by
   # `PasswordResetRequestJob`): to sign in with `provider` (its name, as a
   # job's argument holds it; never the provider itself, whose secret would
   # sit in the queue's row), with one button to the sign-in page. THE MAIL

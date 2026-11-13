@@ -75,7 +75,7 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
     assert_equal 1, known[:hashes]
   end
 
-  # A refusal by rule (`SignInRules`): a linked account, or a non-owner
+  # A refusal by rule (`SignIn::Rules`): a linked account, or a non-owner
   # under SSO_REQUIRED, typing its right password is answered as another
   # account typing a wrong one, with the same work.
   test "a refused-by-rule right password answers as a wrong one: status, body, redirect and the same authenticate_by" do

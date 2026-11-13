@@ -16,7 +16,7 @@ module Users
   #   instead -- a key no `filter_parameters` entry matches, with no value
   #   derived from the password.
   # - A linked account (`User#sso_linked?`) has no password here: it signs
-  #   in through its provider alone (`SignInRules`), so a password set for
+  #   in through its provider alone (`SignIn::Rules`), so a password set for
   #   it is refused in words (`#sso_linked_password_refusal`), after the
   #   authorization, so only someone who may manage the account learns of
   #   the link. Clearing it (`Sso::Link`) is the one write it takes. The
@@ -46,7 +46,7 @@ module Users
     def outranked? = Manageability.outranked?(actor, @user)
 
     def sso_linked_password_refusal(issuer: @user.sso_issuer)
-      @user.errors.add(:base, I18n.t("admin.users.sso_linked_password", provider: SignInRules.provider_name(@user, issuer: issuer), raise: true))
+      @user.errors.add(:base, I18n.t("admin.users.sso_linked_password", provider: SignIn::Rules.provider_name(@user, issuer: issuer), raise: true))
       failure(@user)
     end
 

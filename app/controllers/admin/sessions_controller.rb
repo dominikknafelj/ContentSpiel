@@ -41,7 +41,7 @@ module Admin
   # used, late or issued for another purpose) the sign-in page with "That
   # passkey didn't work. Try again, or sign in with your password."; past
   # the wide bucket or the rate limit, the sign-in page with "Try again
-  # later.". A verified passkey of an account `SignInRules.passkey_allowed?`
+  # later.". A verified passkey of an account `SignIn::Rules.passkey_allowed?`
   # refuses (linked to its provider, or a non-owner under SSO_REQUIRED) is
   # the wrong passkey's refusal, its count left in the wide bucket. At an IP
   # address there is no relying party (`SignIn::
@@ -139,7 +139,7 @@ module Admin
         email: params[:email_address], password: params[:password],
         address: request.remote_ip, hostname: request.host,
         bot_check_token: params["cf-turnstile-response"],
-        device: known_device, allowed: SignInRules.method(:password_allowed?)
+        device: known_device, allowed: SignIn::Rules.method(:password_allowed?)
       )
       outcome = attempt.call
 
@@ -187,7 +187,7 @@ module Admin
 
       # A passkey of an account the rule keeps to its provider is a wrong
       # passkey, asked after the verify so it takes a verify's work.
-      if result.ok && SignInRules.passkey_allowed?(result.credential.user)
+      if result.ok && SignIn::Rules.passkey_allowed?(result.credential.user)
         throttle.release_address(address: request.remote_ip)
         complete_sign_in(result.credential.user, method: "passkey")
         render json: { location: after_authentication_url }

@@ -31,19 +31,21 @@
 # after their own authorization, so their answer tells nobody outside.
 #
 # It names no controller, route or request: the controllers ask it.
-module SignInRules
-  def self.password_allowed?(user) = !user.sso_linked? && (user.owner? || !SignIn::Oidc.required?)
+module SignIn
+  module Rules
+    def self.password_allowed?(user) = !user.sso_linked? && (user.owner? || !SignIn::Oidc.required?)
 
-  # The same rule: a passkey is a second way in that never asks the provider.
-  def self.passkey_allowed?(user) = password_allowed?(user)
+    # The same rule: a passkey is a second way in that never asks the provider.
+    def self.passkey_allowed?(user) = password_allowed?(user)
 
-  # Whether a reset request for `user` is answered with the reminder to sign
-  # in with the provider: linked, or a non-owner while SSO is required.
-  def self.reminder_instead_of_reset?(user) = !password_allowed?(user)
+    # Whether a reset request for `user` is answered with the reminder to sign
+    # in with the provider: linked, or a non-owner while SSO is required.
+    def self.reminder_instead_of_reset?(user) = !password_allowed?(user)
 
-  # The provider's name as a sentence says it to someone signed in: the
-  # configured `SSO_NAME`, else (single sign-on off, the account still
-  # linked) the host the account was linked under: `issuer`, when the caller
-  # read the link under the row lock, or the account's own.
-  def self.provider_name(user, issuer: user.sso_issuer) = SignIn::Oidc::Provider.current&.name || SignIn::Oidc.issuer_host(issuer)
+    # The provider's name as a sentence says it to someone signed in: the
+    # configured `SSO_NAME`, else (single sign-on off, the account still
+    # linked) the host the account was linked under: `issuer`, when the caller
+    # read the link under the row lock, or the account's own.
+    def self.provider_name(user, issuer: user.sso_issuer) = SignIn::Oidc::Provider.current&.name || SignIn::Oidc.issuer_host(issuer)
+  end
 end

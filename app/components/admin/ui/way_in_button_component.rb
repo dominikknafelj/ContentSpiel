@@ -1,7 +1,7 @@
 module Admin
   module Ui
     # A way in that leaves this site: the single sign-on provider's start, a
-    # gem's sign-in method (`SignInMethods`), the owner path's "Sign in with
+    # gem's sign-in method (`SignIn::Methods`), the owner path's "Sign in with
     # %{provider} instead", and the invitation page's "Continue with
     # %{provider}". One `ButtonComponent` in a POST form of its own, carrying
     # the form's token, and sent WITHOUT TURBO (`data-turbo="false"`): the

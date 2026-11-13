@@ -10,7 +10,7 @@ module Sso
   #   with its account's `sso_subject` (Refresh draws the `auth.sso.recheck`
   #   CLIENT span of each, so none is drawn here). While no provider is
   #   configured nothing is asked, and the sessions end by `Session#expiry`;
-  # - a session of a gem's method whose `SignInMethods` entry has a `recheck`,
+  # - a session of a gem's method whose `SignIn::Methods` entry has a `recheck`,
   #   through `entry.recheck.call(session)`, given GEM_RECHECK_LIMIT.
   #
   # Each answer is acted on:
@@ -95,7 +95,7 @@ module Sso
       Telemetry.in_span("auth.sso.recheck_run") do |span|
         @tally = Hash.new(0)
         recheck_sso(at)
-        SignInMethods.entries.select(&:recheck).each { |entry| recheck_method(entry, at) }
+        SignIn::Methods.entries.select(&:recheck).each { |entry| recheck_method(entry, at) }
         Telemetry.record(span, "auth.sso.recheck.checked" => @tally[:checked], "auth.sso.recheck.ok" => @tally[:ok],
           "auth.sso.recheck.revoked" => @tally[:revoked], "auth.sso.recheck.unavailable" => @tally[:unavailable],
           "auth.session.count" => @tally[:ended])

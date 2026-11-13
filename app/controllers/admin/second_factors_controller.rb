@@ -21,7 +21,7 @@ module Admin
   # the run. So a stolen password earns no session, no known device and no
   # fresh guesses here. A wrong code and a used one are one sentence.
   #
-  # THE RULE (`SignInRules.passkey_allowed?`) is asked of a right proof,
+  # THE RULE (`SignIn::Rules.passkey_allowed?`) is asked of a right proof,
   # passkey and code alike, by the proof itself: a step held from before the
   # rule applied to its account (SSO_REQUIRED switched on, or the account
   # linked to its provider, within the step's five minutes) is answered as a
@@ -161,7 +161,7 @@ module Admin
 
     def proof_for(user)
       SignIn::Proof.new(account: user, identifier: User.normalize_value_for(:email_address, user.email_address),
-        address: request.remote_ip, device: known_device, span: "auth.second_factor", allowed: SignInRules.method(:passkey_allowed?))
+        address: request.remote_ip, device: known_device, span: "auth.second_factor", allowed: SignIn::Rules.method(:passkey_allowed?))
     end
 
     def finish(user, method:)

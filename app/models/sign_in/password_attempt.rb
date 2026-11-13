@@ -33,7 +33,7 @@ module SignIn
   #    until the second proof (`SignIn::Proof`) succeeds, so the password
   #    alone never clears a run nor signs anyone in.
   # 5. A right password for an account the caller's rule refuses (`allowed:`,
-  #    `SignInRules.password_allowed?`: a linked account, a non-owner under
+  #    `SignIn::Rules.password_allowed?`: a linked account, a non-owner under
   #    SSO_REQUIRED) is a wrong one: `:refused`, its count left standing in
   #    the account's bucket as the reservation made it, after the same
   #    `authenticate_by`. The account is dropped before `auth.account_exists`

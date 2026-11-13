@@ -8,7 +8,7 @@ module Admin
     # the provider's. It holds no form and no control; an owner is never
     # linked, so an owner's screen never draws it.
     #
-    # `provider_name` is the caller's (`SignInRules.provider_name`); only
+    # `provider_name` is the caller's (`SignIn::Rules.provider_name`); only
     # when that says nothing are the fallback words used.
     class SsoCardComponent < AdminComponent
       ID = "password".freeze

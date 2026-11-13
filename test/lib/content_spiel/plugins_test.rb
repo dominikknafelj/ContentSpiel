@@ -189,7 +189,7 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
     ContentSpiel::Plugins.remove(modules)
 
     methods = ContentSpiel::Plugins.sign_in_methods { |list| saml_method(list, "session/saml") }
-    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignInMethods) }.message, "the CMS's own Session"
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignIn::Methods) }.message, "the CMS's own Session"
   ensure
     [ fields, destinations, modules, methods ].compact.each { |hook| ContentSpiel::Plugins.remove(hook) }
     Rails.application.reloader.prepare!
@@ -515,13 +515,13 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
   test "a sign-in method from outside is replayed after every reset, and a reload keeps it" do
     hook = ContentSpiel::Plugins.sign_in_methods { |methods| saml_method(methods, passkey_policy: :exempt) }
     Rails.application.reloader.prepare!
-    assert_equal %w[acme/saml], SignInMethods.names
+    assert_equal %w[acme/saml], SignIn::Methods.names
     Rails.application.reloader.prepare!
-    assert_equal %w[acme/saml], SignInMethods.names, "a reload resets the registry and replays the hook"
-    assert SignInMethods.exempt?("acme/saml")
+    assert_equal %w[acme/saml], SignIn::Methods.names, "a reload resets the registry and replays the hook"
+    assert SignIn::Methods.exempt?("acme/saml")
     ContentSpiel::Plugins.remove(hook)
     Rails.application.reloader.prepare!
-    assert_empty SignInMethods.names
+    assert_empty SignIn::Methods.names
   ensure
     ContentSpiel::Plugins.remove(hook) if hook
     Rails.application.reloader.prepare!
@@ -532,7 +532,7 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
 
     seen = nil
     hook = ContentSpiel::Plugins.sign_in_methods { |methods| seen = methods }
-    ContentSpiel::Plugins.register_sign_in_methods(SignInMethods)
+    ContentSpiel::Plugins.register_sign_in_methods(SignIn::Methods)
     assert_respond_to seen, :register
     assert_not_respond_to seen, :reset!
     assert_not_respond_to seen, :entries
@@ -540,7 +540,7 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
 
     line = __LINE__ + 1
     bare = ContentSpiel::Plugins.sign_in_methods { |methods| saml_method(methods, "saml") }
-    error = assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignInMethods) }
+    error = assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignIn::Methods) }
     assert_includes error.message, "a sign-in method from outside is named owner/name"
     assert_includes error.message, "#{ContentSpiel::Plugins::REPLAYED_SIGN_IN_METHODS} #{__FILE__}:#{line}"
     ContentSpiel::Plugins.remove(bare)
@@ -550,18 +550,18 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
       saml_method(methods, "acme/saml")
       saml_method(methods, "other/saml")
     end
-    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignInMethods) }.message, "one owner"
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignIn::Methods) }.message, "one owner"
     ContentSpiel::Plugins.remove(two)
     Rails.application.reloader.prepare!
 
     blocked = ContentSpiel::Plugins.sign_in_methods { |methods| methods.register("acme/saml", label: "k", path: :admin_root_path) { } }
-    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignInMethods) }.message, "takes no block"
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignIn::Methods) }.message, "takes no block"
     ContentSpiel::Plugins.remove(blocked)
     Rails.application.reloader.prepare!
 
     one = ContentSpiel::Plugins.sign_in_methods { |methods| saml_method(methods, "acme/saml") }
     other = ContentSpiel::Plugins.sign_in_methods { |methods| saml_method(methods, "acme/ldap") }
-    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignInMethods) }.message, "another hook's"
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_sign_in_methods(SignIn::Methods) }.message, "another hook's"
   ensure
     [ hook, bare, two, blocked, one, other ].compact.each { |each| ContentSpiel::Plugins.remove(each) }
     Rails.application.reloader.prepare!

@@ -75,9 +75,9 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
     assert_equal SignIn::Outcome.new(status: :locked, account: nil, trips: [ Trip.new(bucket: :account, level: 0, seconds: 60) ], bot_check_due: false), attempt
   end
 
-  # REFUSALS BY RULE (`SignInRules`): a right password for an account the
+  # REFUSALS BY RULE (`SignIn::Rules`): a right password for an account the
   # rule refuses is a wrong one in every way the attempt shows.
-  def by_rule(**options) = attempt(allowed: SignInRules.method(:password_allowed?), **options)
+  def by_rule(**options) = attempt(allowed: SignIn::Rules.method(:password_allowed?), **options)
 
   test "under SSO_REQUIRED a non-owner's right password is refused like a wrong one, and counts in the account's bucket" do
     with_sso(required: true) do

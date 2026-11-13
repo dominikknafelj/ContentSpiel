@@ -86,14 +86,14 @@ class Passkeys::PolicyTest < ActiveSupport::TestCase
   end
 
   test "a registered method with passkey_policy exempt is spared, one that applies is not" do
-    SignInMethods.register("acme/saml", label: "acme.saml", path: :root_path, passkey_policy: :exempt)
-    SignInMethods.register("acme/ldap", label: "acme.ldap", path: :root_path)
+    SignIn::Methods.register("acme/saml", label: "acme.saml", path: :root_path, passkey_policy: :exempt)
+    SignIn::Methods.register("acme/ldap", label: "acme.ldap", path: :root_path)
     everyone = policy("everyone")
 
     assert_not everyone.enrolment_due?(users(:reader), method: "acme/saml")
     assert everyone.enrolment_due?(users(:reader), method: "acme/ldap")
   ensure
-    SignInMethods.reset!
+    SignIn::Methods.reset!
   end
 
   test "while single sign-on is required an owner is covered whatever the policy" do

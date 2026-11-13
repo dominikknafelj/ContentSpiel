@@ -64,9 +64,9 @@
             <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: t(".password_confirmation")) %>
           </div>
         <% elsif user.sso_linked? %>
-          <%# A linked account has no password here (`SignInRules`): a line in place of the fields, the zone's own words. %>
+          <%# A linked account has no password here (`SignIn::Rules`): a line in place of the fields, the zone's own words. %>
           <p class="text-small text-meta" data-sso-no-password><%= t("admin.components.users_screen.sso_zone.body", name: user.name_in_database.presence || user.email_address_in_database,
-                provider: Admin::UsersScreen::SsoZoneComponent.provider_words(SignInRules.provider_name(user))) %></p>
+                provider: Admin::UsersScreen::SsoZoneComponent.provider_words(SignIn::Rules.provider_name(user))) %></p>
         <% elsif !read_only %>
           <%# No `data-password-submit` on this form's button: a blank password means "keep the current one"
               (Users::Save), so the meter must not hold the submit back; the server still enforces the

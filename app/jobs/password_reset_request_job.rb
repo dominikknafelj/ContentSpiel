@@ -14,7 +14,7 @@
 # lines. The queue's row still holds it.
 #
 # An account that signs in through the provider alone
-# (`SignInRules.reminder_instead_of_reset?`: linked, or a non-owner under
+# (`SignIn::Rules.reminder_instead_of_reset?`: linked, or a non-owner under
 # SSO_REQUIRED) gets `PasswordsMailer#sso_reminder` instead, which says to
 # sign in with the provider and carries no reset link: the request's answer
 # was given before this job ran, so the page is the same for it as for
@@ -37,7 +37,7 @@ class PasswordResetRequestJob < ApplicationJob
     user = User.find_by(email_address: email_address)
     return unless user
 
-    if SignInRules.reminder_instead_of_reset?(user)
+    if SignIn::Rules.reminder_instead_of_reset?(user)
       provider = SignIn::Oidc::Provider.current
       return Rails.logger.info(SSO_OFF) unless provider
 

@@ -126,7 +126,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
     with_fake_idp(refresh_token: "rt-1") do |idp|
       session = start(token: "rt-1", at: @t)
       asked = []
-      SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path, recheck: ->(row) { asked << row.id; :ok })
+      SignIn::Methods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path, recheck: ->(row) { asked << row.id; :ok })
       gem_session = start(token: nil, at: @t, method: "acme/saml")
 
       without_encryption_keys do
@@ -160,13 +160,13 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
 
   test "a gem's recheck is called for its own sessions, and one that raises ends nothing and stops nothing" do
     asked = []
-    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path,
+    SignIn::Methods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path,
       recheck: ->(session) { asked << session.id; session.ip_address == "192.0.2.9" ? :revoked : :ok })
-    SignInMethods.register("acme/broken", label: "acme.sign_in.broken", path: :admin_root_path,
+    SignIn::Methods.register("acme/broken", label: "acme.sign_in.broken", path: :admin_root_path,
       recheck: ->(_session) { raise IOError, "planted-gem-message" })
-    SignInMethods.register("acme/odd", label: "acme.sign_in.odd", path: :admin_root_path,
+    SignIn::Methods.register("acme/odd", label: "acme.sign_in.odd", path: :admin_root_path,
       recheck: ->(_session) { "planted-odd-answer" })
-    SignInMethods.register("acme/never", label: "acme.sign_in.never", path: :admin_root_path)
+    SignIn::Methods.register("acme/never", label: "acme.sign_in.never", path: :admin_root_path)
 
     broken = start(token: nil, at: @t, method: "acme/broken")
     kept = start(token: nil, at: @t, method: "acme/saml")
@@ -199,7 +199,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
   end
 
   test "a gem's recheck past its limit is unavailable" do
-    SignInMethods.register("acme/slow", label: "acme.sign_in.slow", path: :admin_root_path, recheck: ->(_session) { sleep 2; :revoked })
+    SignIn::Methods.register("acme/slow", label: "acme.sign_in.slow", path: :admin_root_path, recheck: ->(_session) { sleep 2; :revoked })
     session = start(token: nil, at: @t, method: "acme/slow")
     stub = Sso::RecheckJob.const_get(:GEM_RECHECK_LIMIT)
     Sso::RecheckJob.send(:remove_const, :GEM_RECHECK_LIMIT)
@@ -222,7 +222,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
     asked = []
     first = nil
     second = nil
-    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path,
+    SignIn::Methods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path,
       recheck: ->(session) { asked << session.id; second.destroy! if session.id == first.id; :ok })
     first = start(token: nil, at: @t, method: "acme/saml")
     second = start(token: nil, at: @t, method: "acme/saml")
@@ -236,8 +236,8 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
   end
 
   test "an answer for a session signed out or checked again during its ask writes nothing" do
-    SignInMethods.register("acme/gone", label: "acme.sign_in.gone", path: :admin_root_path, recheck: ->(row) { row.destroy!; :ok })
-    SignInMethods.register("acme/moved", label: "acme.sign_in.moved", path: :admin_root_path,
+    SignIn::Methods.register("acme/gone", label: "acme.sign_in.gone", path: :admin_root_path, recheck: ->(row) { row.destroy!; :ok })
+    SignIn::Methods.register("acme/moved", label: "acme.sign_in.moved", path: :admin_root_path,
       recheck: ->(row) { row.update_columns(provider_checked_at: @t + 24.hours); :revoked }) # version: none (a test's stand-in for another run)
     gone = start(token: nil, at: @t, method: "acme/gone")
     moved = start(token: nil, at: @t, method: "acme/moved")
@@ -251,7 +251,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
 
   test "a session whose lock another run holds is skipped" do
     asked = []
-    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path, recheck: ->(row) { asked << row.id; :ok })
+    SignIn::Methods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path, recheck: ->(row) { asked << row.id; :ok })
     held = start(token: nil, at: @t, method: "acme/saml")
     free = start(token: nil, at: @t, method: "acme/saml")
     config = Session.connection_db_config.configuration_hash
@@ -268,7 +268,7 @@ class Sso::RecheckJobTest < ActiveJob::TestCase
 
   test "more than a batch is checked, each session once" do
     asked = []
-    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path,
+    SignIn::Methods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path,
       recheck: ->(session) { asked << session.id; :unavailable })
     rows = Array.new(3) { start(token: nil, at: @t, method: "acme/saml") }
     stub = Sso::RecheckJob.const_get(:BATCH)

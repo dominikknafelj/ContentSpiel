@@ -125,7 +125,7 @@ class SsoSignInPageTest < ActionDispatch::IntegrationTest
 
   test "a gem's sign-in method is a button on the page" do
     I18n.backend.store_translations(:en, acme: { sign_in: { saml: "Sign in with Acme" } })
-    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path)
+    SignIn::Methods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path)
     get admin_sign_in_path
     assert_select "form[action='#{admin_root_path}'][method=post][data-turbo=false] button[type=submit]", text: "Sign in with Acme" do |button|
       assert_look button.first, :secondary

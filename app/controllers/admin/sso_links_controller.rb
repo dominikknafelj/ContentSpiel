@@ -19,7 +19,7 @@ module Admin
     # `Admin::UsersController`'s): an unknown id is the 404.
     def destroy
       user = User.find(params[:id])
-      provider = Admin::UsersScreen::SsoZoneComponent.provider_words(SignInRules.provider_name(user))
+      provider = Admin::UsersScreen::SsoZoneComponent.provider_words(SignIn::Rules.provider_name(user))
       unlink = Sso::Unlink.new(user, actor: Current.actor, origin: mail_link_origin[:origin])
       result = unlink.call
 

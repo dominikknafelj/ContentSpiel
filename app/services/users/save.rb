@@ -195,7 +195,7 @@ module Users
     end
 
     def sso_linked_owner_refusal(issuer: @user.sso_issuer)
-      failure(@user, [ I18n.t("admin.users.owner.sso_linked", name: @user.name_or_email, provider: SignInRules.provider_name(@user, issuer: issuer), raise: true) ])
+      failure(@user, [ I18n.t("admin.users.owner.sso_linked", name: @user.name_or_email, provider: SignIn::Rules.provider_name(@user, issuer: issuer), raise: true) ])
     end
 
     # Final fix wave (C, P17): a typed password needs a typed confirmation.

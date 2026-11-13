@@ -11,7 +11,7 @@ module Passkeys
   # SINGLE SIGN-ON. A linked account is never covered: it signs in through
   # its provider alone, which is its second factor, and it holds no passkey
   # (`Sso::Link` deletes them). A session made by a method whose provider is
-  # the second factor (`SignInMethods.exempt?`: SSO, or a gem's method
+  # the second factor (`SignIn::Methods.exempt?`: SSO, or a gem's method
   # registered `passkey_policy: :exempt`) is never due for enrolment, linked
   # or not. And while single sign-on is required (`SignIn::Oidc.required?`)
   # an owner is covered whatever the stored policy: the owners are then the
@@ -50,7 +50,7 @@ module Passkeys
     def covers_owners? = name != "nobody" || sso_required?
 
     # `method` is how the session being started proved its person.
-    def enrolment_due?(user, method:) = !SignInMethods.exempt?(method) && covers?(user) && !user.passkeys.exists?
+    def enrolment_due?(user, method:) = !SignIn::Methods.exempt?(method) && covers?(user) && !user.passkeys.exists?
 
     # The covered people who hold no passkey. Counted in Ruby over the
     # passkey-less users, since whether someone is an admin is a rights

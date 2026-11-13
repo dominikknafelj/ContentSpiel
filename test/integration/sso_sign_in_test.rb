@@ -382,7 +382,7 @@ class SsoSignInTest < ActionDispatch::IntegrationTest
     assert_includes error.message, "acme/unknown"
     assert_equal 0, Session.count, "an unknown method writes nothing"
 
-    SignInMethods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path)
+    SignIn::Methods.register("acme/saml", label: "acme.sign_in.saml", path: :admin_root_path)
     begin
       assert_equal false, completion_probe.complete_sign_in(owner, method: "acme/saml"), "an owner by a gem's method"
       assert_equal 0, Session.count, "an owner by a gem's method writes nothing"
