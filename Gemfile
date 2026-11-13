@@ -33,7 +33,7 @@ gem "useragent", "~> 0.16"
 gem "webauthn", "~> 3.5"
 
 # Single sign-on (OIDC): the discovery document's shape and issuer check, the authorization URL and the ID token's
-# signature and claims, used as a library with no OmniAuth middleware (`SignIn::Oidc`).
+# signature and claims, used as a library with no OmniAuth middleware (`SignIn::Sso`).
 gem "openid_connect", "~> 2.3"
 
 # webauthn asks only for openssl >= 2.2, which would take openssl 4, a major version above the 3.3 Ruby 3.4 ships,

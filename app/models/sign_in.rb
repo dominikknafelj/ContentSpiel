@@ -1,15 +1,46 @@
-# What any kind of sign-in calls to decide an attempt: plain objects that
-# count attempts, close buckets and say when a check is due
-# (`SignIn::Protection::Throttle`), and that make and check passkeys
-# (`SignIn::Passkeys::Registration`, `SignIn::Passkeys::Check`, over the one
-# relying party `SignIn::Passkeys::RelyingParty` decides: the one place the domain a
-# passkey belongs to is decided), and that speak to the site's single
-# sign-on provider (`SignIn::Sso`: its discovery, keys, authorization
-# request and tokens). Nothing here knows a session, a cookie, a
-# route, a controller or a mail: a controller asks and answers (and keeps a
-# passkey's challenge), a job mails. CS Studio's sign-in is one caller; a
-# later members' sign-in is another, and counts apart under a scope of its
-# own.
+# The sign-in domain: everything that signs a person in, one namespace across
+# the layer folders (app/models/sign_in/, app/services/sign_in/,
+# app/jobs/sign_in/), two levels deep and no deeper.
+#
+# The root holds the shared core:
+#
+# - `SignIn::Rules`: who may sign in how (a linked account never by password
+#   or passkey; a non-owner never while single sign-on is required).
+# - `SignIn::Methods`: the registry of ways in, filled by the gem hook.
+# - `SignIn::Proof`: the second proof of the second step, and Confirm it's you.
+# - `SignIn::Outcome`: what an attempt came to, one of `OUTCOMES`.
+# - `SignIn::SpentChallenge`: a challenge or a state spent once.
+# - `SignIn::OutsideCall`: a call to another service, timed and spanned.
+#
+# And six sub-namespaces:
+#
+# - `SignIn::Protection`: the throttle, the bot check, the known device and
+#   the lockout mail's job.
+# - `SignIn::Password`: the password attempt, the leaked-password check and
+#   the rule the services that set a password include.
+# - `SignIn::Passkeys`: the ceremonies (registration, check, credential) over
+#   the one relying party (the one place a passkey's domain is decided), the
+#   passkey policy, and the add, remove and rename services.
+# - `SignIn::RecoveryCodes`: making a set of recovery codes.
+# - `SignIn::Sessions`: ending sessions, and the hourly sweep.
+# - `SignIn::Sso`: single sign-on, its protocol objects (provider,
+#   authorization, callback, ID token, refresh), the services that admit, link
+#   and unlink an account, and the daily re-check's job.
+#
+# Two kinds live here. The root, Protection, Password, the passkey ceremonies
+# and Sso's protocol objects are plain objects that know no session, cookie,
+# route, controller or mail: CS Studio's sign-in is one caller, and a later
+# members' sign-in is another that counts apart under a scope of its own. The
+# services and jobs (`SignIn::Passkeys::Add`, `Remove` and `Rename`,
+# `SignIn::RecoveryCodes`, `SignIn::Sessions`, and `SignIn::Sso::Admit`,
+# `Link`, `Unlink` and `RecheckJob`) act on CS Studio's `User` and `Session`. The screens that ask the domain stay CS Studio's own,
+# under `Admin::`: a controller asks and answers (and keeps a passkey's
+# challenge), and the domain names none of them.
+#
+# Two guards hold the shape: `test/lib/sign_in_namespace_shadow_test.rb` (no
+# name under `SignIn` is a top-level constant's, nothing deeper than two
+# levels) and `test/lib/sign_in_boundary_test.rb` (code outside reaches the
+# domain only through its named entry points, and the domain names no screen).
 module SignIn
   # What a sign-in attempt can come to (`SignIn::Outcome#status`), and the
   # words its span's `auth.outcome` may carry. The last three are single

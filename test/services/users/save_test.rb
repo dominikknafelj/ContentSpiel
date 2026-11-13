@@ -38,7 +38,7 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_not User.exists?(email_address: "fresh@example.com")
   end
 
-  # --- Leaked passwords (SignIn::Password::LeakedRule) ---------------------------
+  # --- Leaked passwords (SignIn::Password::LeakedRule) ------------------------
 
   LEAKED = "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one.".freeze
 

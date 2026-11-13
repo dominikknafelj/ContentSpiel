@@ -70,7 +70,7 @@ module SignIn
     end
 
     # An assertion of one of the account's passkeys, over the challenge the
-    # caller kept (`Passkeys::Check#verify`, which records the use).
+    # caller kept (`SignIn::Passkeys::Check#verify`, which records the use).
     def passkey(credential_json, challenge:, check:, ceremony:)
       prove("passkey") { check.verify(credential_json, challenge: challenge, credentials: @account.passkeys, ceremony: ceremony).ok }
     end
