@@ -664,7 +664,7 @@ module ServiceCalls
     "Sso::Link" => lambda {
       target = stranger_target
       identity = SignIn::Oidc::Identity.new(issuer: "https://id.example.com", subject: "sub-1", email: target.email_address, email_verified: true, name: nil, refresh_token: nil)
-      { call: -> { Sso::Link.call(target, identity:, via: "sign_in") } }
+      { call: -> { Sso::Link.call(target, identity:) } }
     },
 
     # Owner-only, as Sessions::EndAll.

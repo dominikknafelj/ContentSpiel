@@ -88,6 +88,20 @@ module Sso
       Answer.new(outcome, accepted_invitation: @accepted_invitation == true)
     end
 
+    # The one writer of `sso.refused`: every refusal of `#call`, and the
+    # callback's owner defence (`Admin::SsoSessionsController#refused_owner`),
+    # which calls it as `Sso::Admit.refuse(identity, reason)`. Answers the
+    # failure the refusal is.
+    def self.refuse(identity, reason) = new(identity).refuse(reason)
+
+    def refuse(reason)
+      metadata = { "reason" => reason, "issuer_host" => @identity.issuer_host }
+      email = User.normalize_value_for(:email_address, @identity.email.to_s)
+      metadata["email"] = email.first(EMAIL_LIMIT) if email.present?
+      record_event("sso.refused", metadata: metadata, snapshot: nil)
+      failure(nil, [ reason ])
+    end
+
     private
 
     def match
@@ -112,9 +126,10 @@ module Sso
       return refuse(OWNER) if account.owner?
       return refuse(NO_ACCOUNT) if account.sso_linked?
 
-      # An email's link is a sign-in's, a start from an invitation's too: only
-      # an accepted invitation is linked `via: "invitation"`.
-      result = Link.call(account, identity: @identity, via: "sign_in")
+      # An email's link is a sign-in's (`via: "sign_in"`), a start from an
+      # invitation's too: only an accepted invitation is linked `via:
+      # "invitation"` (`Invitations::AcceptWithSso`).
+      result = Link.call(account, identity: @identity)
       return success(result.record) if result.ok?
 
       case result.errors
@@ -133,14 +148,6 @@ module Sso
       return success(result.record).tap { @accepted_invitation = true } if result.ok?
 
       result.errors == [ Invitations::Acceptance::USED ] ? AGAIN : refuse(NO_ACCOUNT)
-    end
-
-    def refuse(reason)
-      metadata = { "reason" => reason, "issuer_host" => @identity.issuer_host }
-      email = User.normalize_value_for(:email_address, @identity.email.to_s)
-      metadata["email"] = email.first(EMAIL_LIMIT) if email.present?
-      record_event("sso.refused", metadata: metadata, snapshot: nil)
-      failure(nil, [ reason ])
     end
   end
 end

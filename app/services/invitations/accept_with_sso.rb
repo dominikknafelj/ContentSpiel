@@ -6,7 +6,8 @@ module Invitations
   # from the start: the provider's issuer and subject, a password nobody
   # holds (`User.unusable_password`, never shown or kept) and the name the
   # provider gave, cut to a user's limit, or none. `invitation.accepted` and
-  # `sso.linked` (`via: "invitation"`) are recorded in the one transaction,
+  # `sso.linked` (`via: "invitation"`, through `Sso::LinkedEvent`, the event's
+  # one writer, which says why this is not `Sso::Link`) are recorded in the one transaction,
   # both as the new account. Nothing is typed, so nothing is looked up in
   # the list of leaked passwords.
   #
@@ -23,6 +24,7 @@ module Invitations
   # looks again finds the account that won.
   class AcceptWithSso < ApplicationService
     include Acceptance
+    include Sso::LinkedEvent
 
     # authorize: none (the provider's verified identity is the credential, as an invitation's token is Accept's: an identity whose verified email is an open invitation's is the right to make that one account, and the service acts as the account it makes)
 
@@ -41,9 +43,7 @@ module Invitations
       user = build_user
       outcome = accept_into(user) do |group_ids|
         record_event("invitation.accepted", subject: @user, field_changes: accepted_changes(group_ids), metadata: { "invitation_id" => @invitation.id })
-        record_event("sso.linked", subject: user, snapshot: nil, metadata: {
-          "via" => "invitation", "issuer_host" => @identity.issuer_host, "passkeys_removed" => 0, "recovery_codes_removed" => 0
-        })
+        record_linked(user, identity: @identity, via: "invitation")
       end
 
       case outcome

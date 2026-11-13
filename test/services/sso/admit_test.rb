@@ -85,6 +85,16 @@ class Sso::AdmitTest < ActiveSupport::TestCase
     assert_equal "owner", refusals.sole.metadata["reason"]
   end
 
+  test "Sso::Admit.refuse, the callback's owner defence, writes the same refusal as #call, as nobody, whoever is signed in" do
+    result = as(users(:two)) { Sso::Admit.refuse(identity(email: "One@Example.com"), Sso::Admit::OWNER) }
+
+    assert_equal [ "owner" ], result.errors
+    refusal = refusals.sole
+    assert_nil refusal.actor_id
+    assert_nil refusal.subject_id
+    assert_equal({ "reason" => "owner", "issuer_host" => "id.example.com", "email" => "one@example.com" }, refusal.metadata)
+  end
+
   test "an owner is never signed in by a link, however it came to be" do
     users(:one).update_columns(sso_issuer: ISSUER, sso_subject: "sub-1", sso_linked_at: 1.day.ago) # version: none (a test's setup)
 

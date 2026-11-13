@@ -12,7 +12,7 @@ class Sso::LinkTest < ActiveSupport::TestCase
     SignIn::Oidc::Identity.new(issuer: ISSUER, subject:, email:, email_verified: true, name: nil, refresh_token: nil)
   end
 
-  def link(user = @user, identity: self.identity, via: "sign_in") = as(nil) { Sso::Link.call(user, identity:, via:) }
+  def link(user = @user, identity: self.identity) = as(nil) { Sso::Link.call(user, identity:) }
 
   test "linking stores the subject, makes the password unusable, ends every session, deletes passkeys and codes and records sso.linked" do
     2.times { Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil) }
@@ -100,9 +100,5 @@ class Sso::LinkTest < ActiveSupport::TestCase
     assert_nil @user.sso_issuer
     assert_not @user.reload.sso_linked?
     assert_empty Audit::Event.where(action: "sso.linked")
-  end
-
-  test "an unknown via is a mistake of the caller's" do
-    assert_raises(ArgumentError) { link(via: "console") }
   end
 end

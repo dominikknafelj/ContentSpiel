@@ -13,7 +13,8 @@ module Sso
   # - the passkeys and the recovery codes are deleted: the provider is the
   #   account's second factor now, and a passkey left behind would be a way
   #   in that never asks the provider;
-  # - `sso.linked` is recorded, with how many of each went.
+  # - `sso.linked` is recorded (`Sso::LinkedEvent`, `via: "sign_in"`), with
+  #   how many of each went.
   #
   # Called by `Sso::Admit` alone, once the provider's verified identity has
   # matched this account; the actor is the account itself, whom the
@@ -35,9 +36,10 @@ module Sso
   # "no invited account". Either way the account object the caller holds is
   # read again, holding no link that was rolled back.
   class Link < ApplicationService
-    # authorize: none (called by Sso::Admit once the provider's verified identity matched this account; the identity is the credential and the service acts as the account it proves)
+    include LinkedEvent
 
-    VIA = %w[sign_in invitation].freeze
+    # audit: none (it audits: `sso.linked` through `Sso::LinkedEvent#record_linked`, the event's one writer, and `user.updated` and `session.ended` through `Users::UpdatePassword`)
+    # authorize: none (called by Sso::Admit once the provider's verified identity matched this account; the identity is the credential and the service acts as the account it proves)
 
     OWNER = :owner
     LINKED = :linked
@@ -45,12 +47,9 @@ module Sso
 
     class NotCleared < StandardError; end
 
-    def initialize(user, identity:, via:, actor: user)
-      raise ArgumentError, "via is one of #{VIA.join(", ")}, not #{via.inspect}" unless VIA.include?(via)
-
+    def initialize(user, identity:, actor: user)
       @user = user
       @identity = identity
-      @via = via
       @actor = actor
     end
 
@@ -69,9 +68,7 @@ module Sso
 
         passkeys = Passkey.where(user_id: @user.id).delete_all # version: none (passkeys are on no public page)
         codes = RecoveryCode.where(user_id: @user.id).delete_all # version: none (recovery codes are on no public page)
-        record_event("sso.linked", subject: @user, snapshot: nil, metadata: {
-          "via" => @via, "issuer_host" => @identity.issuer_host, "passkeys_removed" => passkeys, "recovery_codes_removed" => codes
-        })
+        record_linked(@user, identity: @identity, via: "sign_in", passkeys_removed: passkeys, recovery_codes_removed: codes)
         :done
       end
 

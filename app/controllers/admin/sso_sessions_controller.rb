@@ -118,7 +118,7 @@ module Admin
       user = result.record
       # `Sso::Admit` never answers an owner; were one answered, it is refused
       # here, before anyone signed in in this browser is signed out, and
-      # recorded as Admit records an owner. `complete_sign_in` refuses it
+      # recorded by Admit's own writer. `complete_sign_in` refuses it
       # too, for every outside method.
       return refused_owner(span, identity) if user.owner?
 
@@ -146,14 +146,12 @@ module Admin
       redirect_to admin_sign_in_path, alert: t("admin.sessions.sso_refused", provider: sso_provider.name)
     end
 
-    # `sso.refused` as `Sso::Admit` writes it: nobody's, the provider's email
-    # cut to an address's length and only when it gave one.
+    # `sso.refused` through its one writer, `Sso::Admit.refuse`. Unreachable
+    # while `Sso::Admit`, `Sso::Link` and `Users::Save` hold the owner rule
+    # under the account's lock; kept as the last defence before anyone is
+    # signed out.
     def refused_owner(span, identity)
-      email = User.normalize_value_for(:email_address, identity.email.to_s)
-      metadata = { "reason" => Sso::Admit::OWNER, "issuer_host" => identity.issuer_host }
-      metadata["email"] = email.first(Sso::Admit::EMAIL_LIMIT) if email.present?
-      Current.actor = nil
-      Audit.record("sso.refused", metadata: metadata)
+      Sso::Admit.refuse(identity, Sso::Admit::OWNER)
       refused(span, Sso::Admit::OWNER)
     end
 
