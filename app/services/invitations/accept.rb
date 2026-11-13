@@ -35,7 +35,7 @@ module Invitations
   # each under its own field. The invitation is not saved with them.
   #
   # A password in the list of leaked passwords is refused as the model's own
-  # rules are (`Users::LeakedPasswordRule`), with its sentence on the
+  # rules are (`SignIn::Password::LeakedRule`), with its sentence on the
   # password.
   #
   # THE ORDER. The account is built and judged first, outside the
@@ -51,7 +51,7 @@ module Invitations
   # address has already been taken", and the next press reads `:used`.
   class Accept < ApplicationService
     include Acceptance
-    include Users::LeakedPasswordRule
+    include SignIn::Password::LeakedRule
 
     # authorize: none (the invitation token is the credential: a token that finds an open invitation is the right to make that one account, and the service acts as the account it makes, as the reset flow does)
 

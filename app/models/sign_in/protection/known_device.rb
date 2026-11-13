@@ -5,7 +5,7 @@ module SignIn
     # the normalised email, never the email). The caller keeps it where only
     # that browser has it (CS Studio: an encrypted cookie, written only after
     # a right password, so a bot never holds one) and hands it to
-    # `PasswordAttempt` as `device:`; an attempt for an account the device
+    # `Password::Attempt` as `device:`; an attempt for an account the device
     # knows is counted in that device's bucket (`Throttle`, "A KNOWN DEVICE").
     #
     # `from` takes whatever the caller read back and trusts nothing in it: a

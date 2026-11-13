@@ -24,7 +24,7 @@ class SignIn::ProofTest < ActiveSupport::TestCase
   end
 
   def password_step(password: PASSWORD)
-    SignIn::PasswordAttempt.new(email: EMAIL, password: password, address: ADDRESS, hostname: SignInHelper::BOT_CHECK_HOSTNAME,
+    SignIn::Password::Attempt.new(email: EMAIL, password: password, address: ADDRESS, hostname: SignInHelper::BOT_CHECK_HOSTNAME,
       bot_check_token: nil, throttle: @throttle, bot_check: nil).call
   end
 

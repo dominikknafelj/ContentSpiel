@@ -10,7 +10,7 @@
 # so the rule tells nobody which accounts are linked, or that an address has
 # an account at all. The places:
 #
-# - the password's answer: `SignIn::PasswordAttempt` (`allowed:`) checks the
+# - the password's answer: `SignIn::Password::Attempt` (`allowed:`) checks the
 #   right password through the same `authenticate_by`, then answers
 #   `:refused` as for a wrong one, with the count its reservation already
 #   made in the account's bucket, the same statements (the account is

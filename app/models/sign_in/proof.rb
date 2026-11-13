@@ -2,7 +2,7 @@ module SignIn
   # A second proof of an account the caller already holds: a recovery code
   # or a passkey for the second step of a sign-in, a passkey or the
   # password again for Confirm it's you. Each is decided as a password
-  # attempt is (`PasswordAttempt`), counted in the account's bucket, or the
+  # attempt is (`Password::Attempt`), counted in the account's bucket, or the
   # known device's, BEFORE anything is checked (`Throttle`, "A SECOND
   # PROOF"), and answered as a `SignIn::Outcome`:
   #

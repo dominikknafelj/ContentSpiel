@@ -3,7 +3,7 @@ require "test_helper"
 # The one sign-in decision, on a throttle store of the test's own: the bot
 # check before the reservation, the reservation before the password, and
 # what each outcome carries.
-class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
+class SignIn::Password::AttemptTest < ActiveSupport::TestCase
   EMAIL = "ann@example.org".freeze
   PASSWORD = "password12345".freeze
   ADDRESS = "203.0.113.7".freeze
@@ -30,7 +30,7 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
 
   def attempt(email: EMAIL, password: "wrong", address: ADDRESS, token: nil, throttle: @throttle, bot_check: SignIn::Protection::BotCheck.current, allowed: nil)
     options = { allowed: allowed }.compact
-    SignIn::PasswordAttempt.new(email: email, password: password, address: address, hostname: HOSTNAME,
+    SignIn::Password::Attempt.new(email: email, password: password, address: address, hostname: HOSTNAME,
       bot_check_token: token, throttle: throttle, bot_check: bot_check, **options).call
   end
 
@@ -221,9 +221,9 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
   end
 
   test "the identifier is the email as User normalises it, and a list or a hash is the empty one" do
-    assert_equal EMAIL, SignIn::PasswordAttempt.new(email: " Ann@Example.ORG ", password: "", address: ADDRESS, hostname: HOSTNAME, bot_check_token: nil).identifier
+    assert_equal EMAIL, SignIn::Password::Attempt.new(email: " Ann@Example.ORG ", password: "", address: ADDRESS, hostname: HOSTNAME, bot_check_token: nil).identifier
     [ [ EMAIL ], { "a" => EMAIL }, nil, "ann\0@example.org", "\xFF@example.org".b.force_encoding("UTF-8") ].each do |junk|
-      assert_equal "", SignIn::PasswordAttempt.new(email: junk, password: "", address: ADDRESS, hostname: HOSTNAME, bot_check_token: nil).identifier
+      assert_equal "", SignIn::Password::Attempt.new(email: junk, password: "", address: ADDRESS, hostname: HOSTNAME, bot_check_token: nil).identifier
     end
   end
 end

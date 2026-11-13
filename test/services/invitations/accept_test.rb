@@ -108,9 +108,9 @@ class Invitations::AcceptTest < ActiveSupport::TestCase
     order_of = lambda do |&block|
       order = []
       with_leaked_password_check(leaked: [ leaked ]) do
-        looked_up = SignIn::LeakedPassword.method(:range)
+        looked_up = SignIn::Password::Leaked.method(:range)
         range = ->(prefix, url: nil) { order << :looked_up; looked_up.call(prefix) }
-        with_singleton_override(SignIn::LeakedPassword, :range, range) do
+        with_singleton_override(SignIn::Password::Leaked, :range, range) do
           callback = ->(*, payload) { order << :locked if payload[:sql].include?("FOR UPDATE") }
           ActiveSupport::Notifications.subscribed(callback, "sql.active_record", &block)
         end

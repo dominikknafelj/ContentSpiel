@@ -1,5 +1,5 @@
 module SignIn
-  # What one sign-in attempt came to (`SignIn::PasswordAttempt#call`), or
+  # What one sign-in attempt came to (`SignIn::Password::Attempt#call`), or
   # one second proof (`SignIn::Proof`).
   #
   #   status         one of SignIn::OUTCOMES

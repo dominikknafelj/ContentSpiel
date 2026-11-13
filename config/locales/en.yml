@@ -172,7 +172,7 @@ en:
             # `password` carry no "Password " prefix in `full_messages`. The
             # two other messages that can land on it are spelled out with
             # the prefix they would otherwise have had. `leaked` is
-            # `Users::LeakedPasswordRule`'s, a whole sentence too.
+            # `SignIn::Password::LeakedRule`'s, a whole sentence too.
             password:
               format: "%{message}"
               blank: "Password can't be blank"

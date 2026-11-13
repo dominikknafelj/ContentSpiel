@@ -127,7 +127,7 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     end
   end
 
-  # --- Leaked passwords (Users::LeakedPasswordRule) ---------------------------
+  # --- Leaked passwords (SignIn::Password::LeakedRule) ---------------------------
 
   test "a leaked password is refused and the user's sessions all stay" do
     leaked = "correct horse battery"

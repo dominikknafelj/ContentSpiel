@@ -4,7 +4,7 @@ require "test_helper"
 # the hash's five-character prefix is sent, the answer's suffixes are
 # compared here, the switch defaults by environment, and a misbehaving
 # service fails open with one line that holds no part of the password.
-class SignIn::LeakedPasswordTest < ActiveSupport::TestCase
+class SignIn::Password::LeakedTest < ActiveSupport::TestCase
   include LogCapture
 
   LEAKED = "planted-Leaked-password-1".freeze
@@ -14,7 +14,7 @@ class SignIn::LeakedPasswordTest < ActiveSupport::TestCase
   setup do
     @exporter = Rails.application.config.x.otel_test_exporter
     @exporter.reset
-    @range = SignIn::LeakedPassword.method(:range)
+    @range = SignIn::Password::Leaked.method(:range)
   end
 
   def digest(password) = Digest::SHA1.hexdigest(password).upcase
@@ -27,7 +27,7 @@ class SignIn::LeakedPasswordTest < ActiveSupport::TestCase
   end
 
   def check_at(base, password, env: ON)
-    with_singleton_override(SignIn::LeakedPassword, :range, range_at(base)) { SignIn::LeakedPassword.check(password, env: env) }
+    with_singleton_override(SignIn::Password::Leaked, :range, range_at(base)) { SignIn::Password::Leaked.check(password, env: env) }
   end
 
   # What a span says: its name, its attributes and its events', as text.
@@ -47,8 +47,8 @@ class SignIn::LeakedPasswordTest < ActiveSupport::TestCase
     end
 
     with_leaked_password_check(leaked: [ LEAKED ]) do
-      assert_equal :leaked, SignIn::LeakedPassword.check(LEAKED)
-      assert_equal :clean, SignIn::LeakedPassword.check(CLEAN)
+      assert_equal :leaked, SignIn::Password::Leaked.check(LEAKED)
+      assert_equal :clean, SignIn::Password::Leaked.check(CLEAN)
     end
     assert_equal [ digest(LEAKED)[0, 5], digest(CLEAN)[0, 5] ], leaked_password_requests
 
@@ -58,24 +58,24 @@ class SignIn::LeakedPasswordTest < ActiveSupport::TestCase
 
   test "off, exactly, turns the check off and sends nothing; any other value leaves it on, and unset it follows the environment" do
     with_leaked_password_check(leaked: [ LEAKED ]) do
-      assert_equal :off, SignIn::LeakedPassword.check(LEAKED, env: { "LEAKED_PASSWORD_CHECK" => "off" })
+      assert_equal :off, SignIn::Password::Leaked.check(LEAKED, env: { "LEAKED_PASSWORD_CHECK" => "off" })
       assert_empty leaked_password_requests
 
       [ "on", "OFF", "0", "of", "yes" ].each do |value|
-        assert_equal :leaked, SignIn::LeakedPassword.check(LEAKED, env: { "LEAKED_PASSWORD_CHECK" => value }), value
+        assert_equal :leaked, SignIn::Password::Leaked.check(LEAKED, env: { "LEAKED_PASSWORD_CHECK" => value }), value
       end
       assert_equal 5, leaked_password_requests.size
 
       [ {}, { "LEAKED_PASSWORD_CHECK" => "" }, { "LEAKED_PASSWORD_CHECK" => " " } ].each do |unset|
-        assert_equal :off, SignIn::LeakedPassword.check(LEAKED, env: unset), "unset is off outside production: #{unset}"
+        assert_equal :off, SignIn::Password::Leaked.check(LEAKED, env: unset), "unset is off outside production: #{unset}"
         production = ActiveSupport::EnvironmentInquirer.new("production")
         with_singleton_override(Rails, :env, -> { production }) do
-          assert_equal :leaked, SignIn::LeakedPassword.check(LEAKED, env: unset), "unset is on in production: #{unset}"
+          assert_equal :leaked, SignIn::Password::Leaked.check(LEAKED, env: unset), "unset is on in production: #{unset}"
         end
       end
     end
 
-    assert_equal :off, SignIn::LeakedPassword.check(LEAKED), "the suite runs with the variable unset"
+    assert_equal :off, SignIn::Password::Leaked.check(LEAKED), "the suite runs with the variable unset"
   end
 
   test "a 503, a timeout, a refused connection and an HTML page at 200 are each unavailable, and the line names the class or the status" do
@@ -88,7 +88,7 @@ class SignIn::LeakedPasswordTest < ActiveSupport::TestCase
       end
 
       logs << capture_log do
-        with_leaked_password_check(unavailable: Net::ReadTimeout.new) { assert_equal :unavailable, SignIn::LeakedPassword.check(LEAKED) }
+        with_leaked_password_check(unavailable: Net::ReadTimeout.new) { assert_equal :unavailable, SignIn::Password::Leaked.check(LEAKED) }
       end
 
       logs << capture_log { assert_equal :unavailable, check_at("http://127.0.0.1:#{SmtpStub.closed_port}", LEAKED) }
@@ -102,7 +102,7 @@ class SignIn::LeakedPasswordTest < ActiveSupport::TestCase
       [ "[ContentSpiel] The leaked-password check could not be made: HTTP 503" ],
       [ "[ContentSpiel] The leaked-password check could not be made: Net::ReadTimeout" ],
       [ "[ContentSpiel] The leaked-password check could not be made: Errno::ECONNREFUSED" ],
-      [ "[ContentSpiel] The leaked-password check could not be made: SignIn::LeakedPassword::Unavailable (an answer that is not the range's lines)" ]
+      [ "[ContentSpiel] The leaked-password check could not be made: SignIn::Password::Leaked::Unavailable (an answer that is not the range's lines)" ]
     ], logs.map { |log| log.lines(chomp: true) }
 
     spans = @exporter.finished_spans.select { |span| span.name == "auth.leaked_password" }
@@ -110,7 +110,7 @@ class SignIn::LeakedPasswordTest < ActiveSupport::TestCase
       { "server.address" => "api.pwnedpasswords.com", "auth.leaked_password.result" => "unavailable", "error.type" => "503", "http.response.status_code" => 503 },
       { "server.address" => "api.pwnedpasswords.com", "auth.leaked_password.result" => "unavailable", "error.type" => "Net::ReadTimeout" },
       { "server.address" => "api.pwnedpasswords.com", "auth.leaked_password.result" => "unavailable", "error.type" => "Errno::ECONNREFUSED" },
-      { "server.address" => "api.pwnedpasswords.com", "auth.leaked_password.result" => "unavailable", "error.type" => "SignIn::LeakedPassword::Unavailable" }
+      { "server.address" => "api.pwnedpasswords.com", "auth.leaked_password.result" => "unavailable", "error.type" => "SignIn::Password::Leaked::Unavailable" }
     ], spans.map { |span| span.attributes.to_h }
     assert spans.all? { |span| span.kind == :client }
 

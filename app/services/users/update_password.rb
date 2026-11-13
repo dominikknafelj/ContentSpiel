@@ -36,7 +36,7 @@ module Users
   # The reset mail and the lock-out mail send a person here.
   #
   # A password in the list of leaked passwords is refused
-  # (`Users::LeakedPasswordRule`), asked only once the user is otherwise
+  # (`SignIn::Password::LeakedRule`), asked only once the user is otherwise
   # valid and before the transaction; a refusal ends no session.
   #
   # The password itself never reaches the log (Review Focus 5): the event
@@ -68,7 +68,7 @@ module Users
   # provider alone, and the console's way back is `Sso::Unlink`.
   class UpdatePassword < ApplicationService
     include OwnerProtection
-    include LeakedPasswordRule
+    include SignIn::Password::LeakedRule
 
     def initialize(user, password: nil, password_confirmation: nil, current_password: nil, keep_acting_session: true, remove_passkeys: false,
       clear: false, actor: Current.actor)

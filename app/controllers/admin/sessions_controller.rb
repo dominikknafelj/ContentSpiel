@@ -6,7 +6,7 @@ module Admin
   # must render *before* a session exists, in the shared product layout the
   # setup wizard also uses.
   #
-  # The decision is `SignIn::PasswordAttempt`'s (the bot check, the account
+  # The decision is `SignIn::Password::Attempt`'s (the bot check, the account
   # and wide address buckets, the password); this controller answers it,
   # signs the account in, and audits.
   #
@@ -135,7 +135,7 @@ module Admin
     end
 
     def create
-      attempt = SignIn::PasswordAttempt.new(
+      attempt = SignIn::Password::Attempt.new(
         email: params[:email_address], password: params[:password],
         address: request.remote_ip, hostname: request.host,
         bot_check_token: params["cf-turnstile-response"],
