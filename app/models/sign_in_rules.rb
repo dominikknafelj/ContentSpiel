@@ -43,6 +43,7 @@ module SignInRules
 
   # The provider's name as a sentence says it to someone signed in: the
   # configured `SSO_NAME`, else (single sign-on off, the account still
-  # linked) the host the account was linked under.
-  def self.provider_name(user) = SignIn::Oidc::Provider.current&.name || SignIn::Oidc.issuer_host(user.sso_issuer)
+  # linked) the host the account was linked under: `issuer`, when the caller
+  # read the link under the row lock, or the account's own.
+  def self.provider_name(user, issuer: user.sso_issuer) = SignIn::Oidc::Provider.current&.name || SignIn::Oidc.issuer_host(issuer)
 end

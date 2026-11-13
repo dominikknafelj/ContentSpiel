@@ -19,7 +19,12 @@ module Users
   #   in through its provider alone (`SignInRules`), so a password set for
   #   it is refused in words (`#sso_linked_password_refusal`), after the
   #   authorization, so only someone who may manage the account learns of
-  #   the link. Clearing it (`Sso::Link`) is the one write it takes.
+  #   the link. Clearing it (`Sso::Link`) is the one write it takes. The
+  #   in-memory account is asked first, for the sentence, and the row again
+  #   under its lock in the saving transaction (`#linked_issuer_under_lock`),
+  #   the lock `Sso::Link` takes before it clears the password: a link that
+  #   commits between the read and the save is seen, so no typed password
+  #   lands on a linked account.
   # - A password change ends that user's sessions
   #   (`#end_sessions_after_password_change`), in the transaction that
   #   writes the password -- here rather than in a controller, so no path
@@ -40,9 +45,18 @@ module Users
     # stand (fix round 1, I1); see Manageability#outranked?.
     def outranked? = Manageability.outranked?(actor, @user)
 
-    def sso_linked_password_refusal
-      @user.errors.add(:base, I18n.t("admin.users.sso_linked_password", provider: SignInRules.provider_name(@user), raise: true))
+    def sso_linked_password_refusal(issuer: @user.sso_issuer)
+      @user.errors.add(:base, I18n.t("admin.users.sso_linked_password", provider: SignInRules.provider_name(@user, issuer: issuer), raise: true))
       failure(@user)
+    end
+
+    # The issuer the account's row is linked under, read under the row's
+    # lock, or nil: inside the saving transaction, before the save.
+    def linked_issuer_under_lock
+      return unless @user.persisted?
+
+      issuer, subject = User.lock.where(id: @user.id).pick(:sso_issuer, :sso_subject)
+      issuer if subject.present?
     end
 
     def owner_only_denial

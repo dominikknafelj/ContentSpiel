@@ -317,4 +317,17 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
 
     assert result.denied?
   end
+
+  test "a link that lands between the read and the change is seen under the row lock" do
+    user = User.find(users(:reader).id)
+    digest = user.password_digest
+    link_to_sso(User.find(user.id))
+
+    result = as(user) { change(user, actor: user) }
+
+    assert_not result.ok?
+    assert_equal [ "This account signs in with id.example.com and has no password here." ], result.errors
+    assert_equal digest, users(:reader).reload.password_digest
+    assert_not Audit::Event.exists?(action: "user.updated")
+  end
 end

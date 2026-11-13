@@ -103,7 +103,10 @@ module Users
         return leaked_password_failure(@user) if leaked_password?(@user, @password)
       end
 
+      linked_issuer = nil
       saved = User.transaction do
+        next false if !@clear && (linked_issuer = linked_issuer_under_lock)
+
         @user.save || raise(ActiveRecord::Rollback)
         end_sessions_after_password_change(keep_acting_session: @keep_acting_session)
         remove_passkeys if @remove_passkeys
@@ -111,6 +114,7 @@ module Users
         record_event("user.updated", subject: @user, field_changes: user_field_changes(@user))
         true
       end
+      return sso_linked_password_refusal(issuer: linked_issuer) if linked_issuer
       return failure(@user) unless saved
 
       SignIn::Throttle.new.clear(identifier: @user.email_address) unless @clear

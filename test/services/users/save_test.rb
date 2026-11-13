@@ -466,4 +466,17 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_not users(:reader).reload.owner?
     assert_not Audit::Event.exists?(action: "user.owner_changed")
   end
+
+  test "a link that lands between the read and a manager's typed password is seen under the row lock" do
+    user = User.find(users(:reader).id)
+    digest = user.password_digest
+    link_to_sso(User.find(user.id))
+
+    result = as_owner { Users::Save.call(user, attributes: { password: "a-new-long-password-2", password_confirmation: "a-new-long-password-2" }) }
+
+    assert_not result.ok?
+    assert_equal [ "This account signs in with id.example.com and has no password here." ], result.errors
+    assert_equal digest, users(:reader).reload.password_digest
+    assert_not Audit::Event.exists?(action: "user.updated")
+  end
 end

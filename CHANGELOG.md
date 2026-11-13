@@ -59,8 +59,6 @@
 - `20261112090200_create_sign_in_spent_challenges`: the table `sign_in_spent_challenges` (the HMAC of each answered passkey challenge, unique, and when it expires, indexed), which the hourly session sweep empties of expired rows.
 - `20261113090000_add_sso_link_to_users`: `users.sso_issuer`, `sso_subject` and `sso_linked_at` (null: not linked to a single sign-on provider), a unique index on the issuer and subject together, and a CHECK that the two are both null or both set.
 - `20261113090100_add_provider_check_to_sessions`: `sessions.provider_token` (the provider's refresh token, encrypted, null) and `provider_checked_at` (null: no provider to ask again).
-- `20261113090000_add_sso_link_to_users`: `users.sso_issuer`, `sso_subject` and `sso_linked_at` (null: not linked to a single sign-on provider), a unique index on the issuer and subject together, and a CHECK that the two are both null or both set.
-- `20261113090100_add_provider_check_to_sessions`: `sessions.provider_token` (the provider's refresh token, encrypted, null) and `provider_checked_at` (null: no provider to ask again).
 
 ### For a gem or an outside caller
 
