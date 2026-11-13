@@ -58,6 +58,7 @@ class Admin::SsoLinksControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :forbidden
+    assert_equal 1, Audit::Event.where(action: "access.denied", subject_type: "User", subject_id: @user.id).count
     assert @user.reload.sso_linked?
     assert_equal 2, @user.sessions.count
   end

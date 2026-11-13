@@ -12,12 +12,12 @@
 <div class="max-w-[880px]">
   <p class="mb-1 text-label text-meta"><%= link_to t(".breadcrumb"), admin_users_path(**admin_url_options), class: "text-meta" %> /</p>
   <div class="mb-1 flex items-center justify-between gap-3">
-    <div class="flex min-w-0 items-center gap-3">
-    <h1 class="text-h1 text-ink"><%= heading %></h1>
-    <%# Who signs in through the provider, beside the name; the zone below is the owner's. %>
-    <% if @user.sso_linked? %>
-      <%= render Admin::Ui::BadgeComponent.new(label: t("admin.components.users_screen.sso_zone.badge", provider: Admin::UsersScreen::SsoZoneComponent.provider_words(SignInRules.provider_name(@user))), data: { sso_badge: true }) %>
-    <% end %>
+    <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      <h1 class="text-h1 text-ink"><%= heading %></h1>
+      <%# Who signs in through the provider, beside the name; the zone below is the owner's. %>
+      <% if @user.sso_linked? %>
+        <%= render Admin::Ui::BadgeComponent.new(label: t("admin.components.users_screen.sso_zone.badge", provider: Admin::UsersScreen::SsoZoneComponent.provider_words(SignInRules.provider_name(@user))), data: { sso_badge: true }) %>
+      <% end %>
     </div>
     <%# Opens the audit log filtered to this user, with `audit.view` only.
         `_top`, not the content frame it sits in. %>
