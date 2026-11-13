@@ -8,6 +8,8 @@ class Admin::UserSsoSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     @target = link_to_sso(users(:reader))
+    # The toast promises the mail only when mail is ready.
+    put_mail_state(:working)
     sign_in_via_form(users(:one))
   end
 
