@@ -407,6 +407,21 @@ html[data-surface="studio"] .content-block--diagram {
   --th-diagram-series-6: color-mix(in srgb, var(--cs-ic-lists) 35%, var(--cs-ic-lists-bg));
 }
 
+/* The Diagram block's picture on its tile (`.admin-block-tile__picture`,
+   112×72): the drawing's shape at a glance, never its words. The rules are
+   the tile's alone, after the block's own (`diagram.css`, which the site and
+   the renderer frame read unchanged), and each outweighs the rule it
+   overrides there by the box's class. Fitted whole, never cropped, it is
+   scaled far down, so a stroke stays 1px at any scale; its words and its
+   arrowheads, unreadable that small, are not drawn; and a node's or a
+   participant's box is filled sunken, so it reads as a solid shape. A pie's
+   slices and a gantt's bars keep their series colours. */
+.admin-block-tile__picture .content-block--diagram :is(path, line, rect, circle, polygon) { vector-effect: non-scaling-stroke; }
+.admin-block-tile__picture .content-block--diagram :is(text, foreignObject) { display: none; }
+.admin-block-tile__picture .content-block--diagram * { marker-start: none; marker-end: none; }
+.admin-block-tile__picture .content-block--diagram :is(.node rect, rect.actor) { fill: var(--cs-sunken); }
+.admin-block-tile__picture .content-block--diagram .node .label rect { fill: none; }
+
 /* The theme switch's cross-fade: the browser's own fade-out of the old
    snapshot and fade-in of the new, at the fade's length and easing. Only the
    duration and the timing function are set, never the `animation` shorthand,

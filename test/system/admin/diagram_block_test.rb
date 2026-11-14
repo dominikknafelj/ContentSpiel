@@ -592,12 +592,36 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
       assert_operator drawn, :>, inside[fills] * 0.8, "#{block.id}'s drawing is scaled to the box's #{fills}, not shrunk or cropped"
     end
 
-    tile = ".admin-block-tile:has(#block-#{wide.id}-tile-summary)"
+    # The shape at a glance: no words, no arrowheads, 1px strokes at any
+    # scale, and a node's box solid in the sunken colour.
+    look = page.evaluate_script(<<~JS, "#block-#{wide.id}-tile-summary .admin-block-tile__picture")
+      (() => {
+        const box = document.querySelector(arguments[0])
+        const style = (selector) => { const found = box.querySelector(selector); return found && getComputedStyle(found) }
+        const probe = document.createElement("span")
+        probe.style.color = "var(--cs-sunken)"
+        box.append(probe)
+        const sunken = getComputedStyle(probe).color
+        probe.remove()
+        return {
+          text: style("text")?.display, marker: style("[marker-end]")?.markerEnd,
+          stroke: style(".node rect")?.vectorEffect, fill: style(".node rect")?.fill, sunken: sunken
+        }
+      })()
+    JS
+    assert_equal "none", look["text"], "no words"
+    assert_equal "none", look["marker"], "no arrowheads"
+    assert_equal "non-scaling-stroke", look["stroke"]
+    assert_equal look["sunken"], look["fill"], "a node is solid sunken"
+
     FileUtils.mkdir_p(SHOTS)
+    shots = { "tile" => wide, "tile-wide" => wide, "tile-tall" => tall }
     %w[light dark].each do |theme|
       page.execute_script("document.documentElement.setAttribute('data-theme', arguments[0])", theme)
       assert_selector "html[data-theme='#{theme}']"
-      page.save_screenshot(SHOTS.join("tile-#{theme}.png").to_s, selector: tile)
+      shots.each do |name, block|
+        page.save_screenshot(SHOTS.join("#{name}-#{theme}.png").to_s, selector: ".admin-block-tile:has(#block-#{block.id}-tile-summary)")
+      end
     end
   end
 end
