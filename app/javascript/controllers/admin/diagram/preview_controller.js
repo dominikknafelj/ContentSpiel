@@ -60,13 +60,21 @@ import { digest } from "diagram/digest"
 // listener, the timers and everything this script showed, so a copy Turbo
 // keeps holds the server's markup as drawn, and a page shown again from it
 // builds a frame of its own at `connect`.
+// The fields whose card was disconnected while a person's edit was still to
+// be drawn (inside its debounce, or posted and not yet answered): a block
+// moved in the document (a drop, Move up/down) disconnects and connects the
+// same element, and the edit must not be dropped on the way. Kept with the
+// element, as the autosave keeps its save state (`autosave_controller.js`),
+// so the next `connect` draws it and writes what comes back.
+const unwritten = new WeakSet()
+
 const DRAW_DEBOUNCE = 300
 const BUSY_AFTER = 300
 const FRAME_MIN = 200
 const FRAME_MAX = 640
 // A sentence's coded word is put in as this mark and then cut out as a
 // `<code>`: no locale string holds it.
-const CODED = ""
+const CODED = "\uE000"
 // The line rules whose sentence is the server's, by name.
 const REFUSED = [ "colours", "links", "directive", "front_matter", "maths" ]
 
@@ -85,7 +93,8 @@ export default class extends Controller {
   }
 
   connect() {
-    this.edited = false
+    this.edited = unwritten.delete(this.element)
+    this.unwritten = this.edited
     this.pictured = false
     this.spoken = ""
     this.marked = 0
@@ -126,6 +135,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    if (this.unwritten) unwritten.add(this.element)
     this.close()
   }
 
@@ -136,6 +146,7 @@ export default class extends Controller {
       this.drawingInput.name = this.drawingNameValue
     }
     this.edited = true
+    this.unwritten = true
     clearTimeout(this.drawTimer)
     this.drawTimer = setTimeout(() => this.draw(), DRAW_DEBOUNCE)
   }
@@ -154,7 +165,12 @@ export default class extends Controller {
     if (answer.shown) return
     clearTimeout(this.busyTimer)
     this.busyTarget.hidden = true
+    // The answer for the source as it stands ends the edit it was drawn for:
+    // at once for a failure, which writes nothing, and once written for a
+    // success.
+    const settles = this.posted.writes && this.posted.source === this.sourceTarget.value
     if (answer.error) {
+      if (settles) this.unwritten = false
       this.failed(answer.error)
       return
     }
@@ -168,7 +184,9 @@ export default class extends Controller {
     const { id, source, writes } = this.posted
     if (!writes || this.sourceTarget.readOnly) return
     const value = answer.svg === "" ? "" : JSON.stringify({ svg: answer.svg, from: await digest(source) })
-    if (this.frame?.current(id)) this.write(value)
+    if (!this.frame?.current(id)) return
+    this.write(value)
+    if (settles) this.unwritten = false
   }
 
   write(value) {
@@ -179,8 +197,12 @@ export default class extends Controller {
     field.dispatchEvent(new Event("input", { bubbles: true }))
   }
 
+  // The badge says the picture is the drawing the site keeps, so it stands
+  // only while the hidden field holds one (as the notice's last line asks)
+  // and the frame shows a picture: a picture drawn at `connect` that the site
+  // does not have is shown with no badge, beside "Nothing is drawn yet.".
   failed(error) {
-    this.keptTarget.hidden = !this.pictured
+    this.keptTarget.hidden = !(this.pictured && this.kept)
     this.showBlank(this.pictured ? null : "nothing_yet")
     this.say(this.notice(error))
     this.mark([ "refused", "parse" ].includes(error.kind) ? error.line : 0)
@@ -233,7 +255,7 @@ export default class extends Controller {
   // long to draw, a drawing too large to keep and a type the site can't draw
   // say nothing is drawn yet (as the frame does).
   siteSays(error) {
-    if (this.drawingInput.value !== "") return this.text("components.fields.mermaid_field.kept")
+    if (this.kept) return this.text("components.fields.mermaid_field.kept")
     const nothing = [ "parse", "too_large", "too_long", "type" ].includes(error.kind) || (error.kind === "refused" && !REFUSED.includes(error.rule))
     return nothing ? this.text("components.fields.mermaid_field.nothing_yet") : ""
   }
@@ -335,6 +357,10 @@ export default class extends Controller {
     this.busyTarget.hidden = true
     this.lineTarget.hidden = true
     this.lineTarget.removeAttribute("style")
+  }
+
+  get kept() {
+    return this.drawingInput.value !== ""
   }
 
   get drawingInput() {

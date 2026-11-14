@@ -256,6 +256,46 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
     assert_equal drawing["from"], stored(block).dig("drawing", "from"), "opening the card wrote nothing"
   end
 
+  # The badge and the notice's last line both follow what the site keeps:
+  # a picture drawn at connect that was never stored is not "the last
+  # drawing that worked".
+  test "a source with no stored drawing whose first edit fails says nothing is drawn yet, with no badge" do
+    block = diagram_of("en" => { "source" => FLOW })
+    visit_editor(@page)
+    await_frame_text(block, "Review")
+
+    paste_source(block, BROKEN)
+    assert_selector "#{field_selector(block)} [data-admin--diagram--preview-target='status']", text: "This diagram doesn't draw:", wait: 10
+    assert_includes status_text(block), "Nothing is drawn yet."
+    assert_not_includes status_text(block), "The site keeps"
+    assert_no_selector "#{field_selector(block)} [data-admin--diagram--preview-target='kept']"
+    assert_writes_settled
+    assert_nil stored(block)["drawing"]
+  end
+
+  # A card moved in the document disconnects and connects the same element
+  # (a drop, Move up/down): an edit still inside its debounce is drawn and
+  # written after it, not dropped. The field is taken out and put back by
+  # script, which is the same disconnect and connect without a move's
+  # requests.
+  test "an edit pending when the card reconnects is drawn and written after it" do
+    block = diagram_of
+    visit_editor(@page)
+    page.execute_script(<<~JS, field_selector(block), source_id(block), FLOW)
+      const [selector, id, source] = arguments
+      const element = document.querySelector(selector)
+      const field = document.getElementById(id)
+      field.value = source
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+      const [parent, next] = [element.parentNode, element.nextSibling]
+      element.remove()
+      setTimeout(() => parent.insertBefore(element, next), 50)
+    JS
+
+    await_frame_text(block, "Review")
+    await_stored_drawing(block, FLOW)
+  end
+
   test "while the description is blank a note under the preview says the site shows nothing" do
     block = diagram_of("en" => { "source" => FLOW })
     visit_editor(@page)

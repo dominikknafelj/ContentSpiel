@@ -179,7 +179,7 @@ module Admin
         end
       end
 
-      def below_pair =(tag.div(preview, class: "admin-mermaid-field__below mt-4") if paired?)
+      def below_pair = (tag.div(preview, class: "admin-mermaid-field__below mt-4") if paired?)
 
       def target(name) = { "#{CONTROLLER}-target": name }
 
