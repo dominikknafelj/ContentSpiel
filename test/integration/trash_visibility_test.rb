@@ -1388,4 +1388,16 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   def create_note_for_reader(subject)
     as(users(:one)) { Notes::Start.call(subject, body: "For @[#{users(:two).id}]") }.record
   end
+
+  test "the search index's whole build indexes kept pages and posts and never a trashed one" do
+    SiteSearch::Entry.delete_all
+
+    SiteSearch::Rebuild.new.call
+
+    indexed = SiteSearch::Entry.distinct.pluck(:record_type, :record_id)
+    assert_includes indexed, [ "Page", @kept_page.id ]
+    assert_includes indexed, [ "Post", @kept_post.id ]
+    assert_not_includes indexed, [ "Page", @gone_page.id ]
+    assert_not_includes indexed, [ "Post", @gone_post.id ]
+  end
 end

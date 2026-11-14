@@ -14,6 +14,9 @@ module SiteSearch
   #                                       changes, `Pages::Move`, `Trash::Move`,
   #                                       `Trash::Restore`
   #   a record is purged                  `Trash::Purge` (and so `Trash::Empty`)           `record_purged(type, id)`
+  #   the languages change                `Locales::Enable`, `Disable`, `Configure`,       `languages_changed`
+  #                                       `MakeDefault`, when the enabled set or a
+  #                                       fallback chain moved (`IndexState.languages`)
   #
   # THE BUILT-IN (`Backends.inline?`) is written here, in the caller's
   # transaction, so its entries stand or fall with the copy. It needs only
@@ -106,6 +109,22 @@ module SiteSearch
       return nil if inline?
 
       enqueue_sync(record_type, record_id) { true }
+      nil
+    end
+
+    # Every document of every record is read through the languages, so the
+    # whole index is built again, by `ReindexJob` after the commit of the
+    # outermost transaction for every backend: built in the settings
+    # transaction, it would hold the settings row's lock for the length of
+    # the build (spec §6.5). Until it has run, a language just enabled finds
+    # nothing and the others answer from their old fallback text. An
+    # enqueue that raises is reported, never raised, as `enqueue_sync`'s.
+    def languages_changed
+      ActiveRecord.after_all_transactions_commit do
+        ReindexJob.perform_later(Backends.current_name)
+      rescue StandardError => error
+        Reports.report(backend: Backends.current_name, error: error)
+      end
       nil
     end
 

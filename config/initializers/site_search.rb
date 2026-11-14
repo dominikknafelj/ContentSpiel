@@ -26,3 +26,17 @@ Rails.application.config.to_prepare do
       "and a search its backend cannot answer is unavailable. A gem's own files are not reloaded: restart the server after correcting it.")
   end
 end
+
+# The boot names the chosen backend, and in a process that serves requests
+# enqueues the index check, which builds the index when it is empty or stale
+# (`SiteSearch::BootCheck`, spec §6.6). After the `to_prepare` above, which
+# filled the registry. A boot never fails because of search: `run` rescues
+# its own enqueue, and the line is skipped if it cannot be written.
+Rails.application.config.after_initialize do
+  begin
+    Rails.logger.info(SiteSearch::BootCheck.log_line)
+  rescue StandardError
+    nil
+  end
+  SiteSearch::BootCheck.run
+end

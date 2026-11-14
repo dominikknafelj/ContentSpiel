@@ -10,7 +10,8 @@ class SiteSearchGuardsTest < ActiveSupport::TestCase
   # path => why it may ask a backend to index, remove or prune.
   INDEXERS = {
     "app/models/site_search/indexing.rb" => "the entry point, for the built-in in the caller's transaction",
-    "app/jobs/site_search/sync_job.rb" => "the job Indexing enqueues for an outside backend after the commit"
+    "app/jobs/site_search/sync_job.rb" => "the job Indexing enqueues for an outside backend after the commit",
+    "app/models/site_search/rebuild.rb" => "the whole build, which ReindexJob and search:reindex run when the index is empty or stale"
   }.freeze
 
   # An index or a remove asked of a backend: a receiver named like one, or the
