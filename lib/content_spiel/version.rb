@@ -5,6 +5,6 @@
 # VERSION 0.0.0 means never released: the first `release:prepare[0.1.0]` is the
 # first release.
 module ContentSpiel
-  VERSION = "0.4.0"
+  VERSION = "0.5.0"
   IMAGE = "ghcr.io/dominikknafelj/content_spiel"
 end
