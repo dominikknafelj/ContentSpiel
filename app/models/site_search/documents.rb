@@ -55,10 +55,12 @@ module SiteSearch
 
     # `text` as one line of plain words: invalid bytes, markup, the snippet's
     # two marker characters (spec §6.4) and control characters taken out,
-    # whitespace collapsed.
-    def plain(text)
+    # whitespace collapsed. `markup: false` keeps angle brackets and
+    # entities as typed: a Code block's code is plain text whatever it looks
+    # like (`<div class="note">` is a listing's words, not markup).
+    def plain(text, markup: true)
       text = text.to_s.dup.force_encoding(Encoding::UTF_8).scrub("")
-      text = Loofah.html5_fragment(text).text(encode_special_chars: false) if text.include?("<") || text.include?("&")
+      text = Loofah.html5_fragment(text).text(encode_special_chars: false) if markup && (text.include?("<") || text.include?("&"))
       text.gsub(MARKERS, "").gsub(CONTROL, " ").squish
     end
 
@@ -70,7 +72,7 @@ module SiteSearch
       ]
       fields << Field.new(name: "tags", weight: :b, text: joined(view.tags.map(&:name))) if view.is_a?(Post)
       fields << Field.new(name: "body", weight: :c, text: joined(post_text(view, locale) + block_texts(blocks, :body, locale)))
-      fields << Field.new(name: "code", weight: :d, text: joined(block_texts(blocks, :code, locale)))
+      fields << Field.new(name: "code", weight: :d, text: joined(block_texts(blocks, :code, locale), markup: false))
     end
     private_class_method :fields_of
 
@@ -101,7 +103,7 @@ module SiteSearch
     end
     private_class_method :block_texts
 
-    def joined(texts) = texts.map { |text| plain(text) }.reject(&:empty?).join(" ")
+    def joined(texts, markup: true) = texts.map { |text| plain(text, markup: markup) }.reject(&:empty?).join(" ")
     private_class_method :joined
   end
 end

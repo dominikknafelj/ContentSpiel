@@ -72,10 +72,6 @@ module BlockTypes
       end
     end
 
-    # The tile's preview: the editor's title, else the kind's word, over the
-    # note's text as plain text. The kind's word is a fallback, not the
-    # block's content: a note with no title and no text has no preview, and
-    # its tile says "Empty" on its summary line.
     # The heading as drawn (the title, or the kind's word under none) and
     # the body; nothing for an empty body, which is not drawn
     # (`Blocks::NoteComponent`).
@@ -88,6 +84,10 @@ module BlockTypes
       [ title || PublicStrings.read("public.blocks.note.kinds.#{kind_of(settings&.kind)}", locale: locale), *SiteSearch.paragraphs(body) ]
     end
 
+    # The tile's preview: the editor's title, else the kind's word, over the
+    # note's text as plain text. The kind's word is a fallback, not the
+    # block's content: a note with no title and no text has no preview, and
+    # its tile says "Empty" on its summary line.
     def self.preview(block, locale:)
       settings = block.settings_object(locale: locale)
       text = block.body_document(locale: locale).plain_paragraphs.join(" ")

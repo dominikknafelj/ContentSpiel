@@ -41,7 +41,6 @@ module BlockTypes
       end
     end
 
-    # The tile's preview: the caption over the first row's cells.
     # Every cell, row by row (`RichText::Document#plain_paragraphs` reads a
     # table one entry per cell), then the caption; nothing for an empty
     # table, which is not drawn.
@@ -52,6 +51,7 @@ module BlockTypes
       SiteSearch.paragraphs(document) + [ ::Locales.read(block, :caption, locale: locale) ]
     end
 
+    # The tile's preview: the caption over the first row's cells.
     def self.preview(block, locale:)
       body = TableBody.new(block.body_document(locale: locale))
       first = body.rows.first.to_a.map { |cell| cell.text.strip }.reject(&:empty?).join(" · ")

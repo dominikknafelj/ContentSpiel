@@ -74,6 +74,16 @@ class SiteSearch::BlockTextTest < ActiveSupport::TestCase
     assert_equal :d, field(doc, "code").weight
   end
 
+  test "a Code block's code keeps its angle brackets and entities, which the body field never holds" do
+    add_block("code", settings: { "filename" => "note.html", "code" => %(<div class="note">x &amp; y</div>) })
+
+    doc = document
+    assert_equal %(<div class="note">x &amp; y</div>), field(doc, "code").text
+    assert_not_includes field(doc, "body").text, "<div"
+    assert_not_includes field(doc, "body").text, "&amp;"
+    assert_equal "a b", SiteSearch::Documents.plain("a\u{E000} \u0001  b", markup: false)
+  end
+
   test "a Note without a title gives its kind's word, as drawn" do
     add_block("note", settings: { "kind" => "warning" }, translations: { "en" => { body: rich_doc("Mind the gap.") } })
 

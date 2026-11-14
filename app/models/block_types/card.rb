@@ -49,7 +49,6 @@ module BlockTypes
       end
     end
 
-    # The tile's preview: the card's title over its text.
     # The title, the text and the block's own alt override of its image; the
     # library image's alt is the asset's, in no copy, as the Image block's
     # (`BlockTypes::Image.search_text`). The link's target is another record,
@@ -60,6 +59,7 @@ module BlockTypes
       [ settings&.title, settings&.text, alt ]
     end
 
+    # The tile's preview: the card's title over its text.
     def self.preview(block, locale:)
       settings = block.settings_object(locale: locale)
       ContentModel::Preview.new(heading: settings&.title, text: settings&.text)

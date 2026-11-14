@@ -157,8 +157,6 @@ module BlockTypes
     end
     private_class_method :hints
 
-    # The tile's words: the description's opening words over the source's
-    # first three lines in the monospace face. Nil with no source.
     # The description and the caption, as the public page draws them: only
     # with a drawing that passes on read and a description
     # (`Blocks::DiagramComponent`). Never the source, which is syntax
@@ -171,6 +169,8 @@ module BlockTypes
       [ shown.description, ::Locales.read(block, :caption, locale: locale) ]
     end
 
+    # The tile's words: the description's opening words over the source's
+    # first three lines in the monospace face. Nil with no source.
     def self.preview(block, locale:)
       shown = Shown.for(block, locale: locale)
       return unless shown

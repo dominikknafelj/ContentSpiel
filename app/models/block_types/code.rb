@@ -58,10 +58,6 @@ module BlockTypes
       end
     end
 
-    # The tile's preview: the file name, else the language's label, over the
-    # first three lines of the code in the monospace face. The language is a
-    # fallback, not the block's content: a block with no file name and no
-    # code has no preview, and its tile says "Empty" on its summary line.
     # The file name and caption, drawn only with code (`Blocks::CodeComponent`):
     # prose around a listing, found above the code itself.
     def self.search_text(block, locale:)
@@ -71,6 +67,10 @@ module BlockTypes
       [ settings.filename, ::Locales.read(block, :caption, locale: locale) ]
     end
 
+    # The tile's preview: the file name, else the language's label, over the
+    # first three lines of the code in the monospace face. The language is a
+    # fallback, not the block's content: a block with no file name and no
+    # code has no preview, and its tile says "Empty" on its summary line.
     def self.preview(block, locale:)
       settings = block.settings_object(locale: locale)
       return if settings&.filename.blank? && settings&.code.blank?
