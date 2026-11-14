@@ -18,6 +18,9 @@ module Translations
   #   (nothing about it is required), and untranslated images would never
   #   surface anywhere. An image without an original alt has nothing to
   #   translate, so it isn't missing anywhere.
+  #   A schema field declared `translation_required: true` follows the same
+  #   rule (a Diagram block's description): missing where the primary
+  #   language has a value and this one has none.
   #   The site settings (Task 5) are missing where the site title is blank:
   #   it's their one required translated field (`SiteSetting#title_present_
   #   in_default_locale`); the tagline is optional.
@@ -137,7 +140,8 @@ module Translations
       case record
       when Page then title_blank_count(record, code) + block_missing_count(blocks, code)
       when Post
-        title_blank_count(record, code) + required_blank_count(record.definition, record.fields(locale: code)) +
+        title_blank_count(record, code) +
+          required_blank_count(record.definition, record.fields(locale: code), record.fields(locale: Translations.primary_locale)) +
           block_missing_count(blocks, code)
       when Media::Asset then image_missing?(record, code) ? 1 : 0
       when SiteSetting then title_blank_count(record, code)
@@ -146,7 +150,9 @@ module Translations
     end
 
     def block_missing_count(blocks, code)
-      blocks.sum { |block| required_blank_count(block.definition, block.settings_object(locale: code)) }
+      blocks.sum do |block|
+        required_blank_count(block.definition, block.settings_object(locale: code), block.settings_object(locale: Translations.primary_locale))
+      end
     end
 
     def outdated_count(record, code)
@@ -160,17 +166,28 @@ module Translations
 
     def title_blank_count(record, code) = record.read_attribute(:title).to_h[code.to_s].blank? ? 1 : 0
 
-    # `definition`/`object` are handed in already resolved (a block's own
+    # A field counts when it is required and translated and blank in `object`,
+    # or `translation_required` (the image alt's rule, `image_missing?`, for a
+    # schema field) and blank in `object` while `primary`, the primary
+    # language's object, has a value. The alt stays a rule of its own: it is
+    # a column of `Media::Asset`, not a schema field, so there is no
+    # definition to declare it in.
+    #
+    # `definition`/`object`/`primary` are handed in already resolved (a block's own
     # `.definition`, `settings_object(locale:)`/`fields(locale:)`) rather than
     # re-derived here, so this one predicate covers both a page's blocks and
     # a post's own schema fields -- both `nil` for the same reason (an
     # unregistered `block_type`/`content_type`, spec §8), which has nothing
     # here to call "missing": there's no schema left to name a required
     # translated field against.
-    def required_blank_count(definition, object)
+    def required_blank_count(definition, object, primary)
       return 0 if definition.nil? || object.nil?
 
-      definition.fields.count { |field| field.required? && field.translated? && object.public_send(field.name).blank? }
+      definition.fields.count do |field|
+        next false unless field.translated? && object.public_send(field.name).blank?
+
+        field.required? || (field.translation_required? && primary&.public_send(field.name).present?)
+      end
     end
 
     private_class_method :record_state, :blocks_by_owner, :owned_blocks, :missing_codes, :outdated_codes, :missing?, :outdated?,

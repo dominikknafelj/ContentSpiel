@@ -1,0 +1,25 @@
+<%# The renderer frame (`Admin::DiagramRenderersController`): no layout, no
+    words, no data of anyone's. `#diagram-paint` is the Diagram block's public
+    stylesheet, which paints the drawing by Mermaid's class names, after the
+    diagram's tokens' light defaults; the colours the card posts in are set
+    on the root and win (`Admin::DiagramRenderersController.paint`). The
+    drawing stands in `#diagram`, which carries the block's class so those
+    rules reach it. The
+    two JSON values are what `public/diagram-renderer.js` reads before it
+    draws. Both scripts are classic scripts (an opaque origin loads no module
+    script of the app's without CORS), Mermaid first. %>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style id="diagram-paint"><%= Admin::DiagramRenderersController.paint.html_safe %></style>
+</head>
+<body>
+<div id="diagram" class="content-block--diagram"></div>
+<script type="application/json" id="diagram-rules"><%= json_escape(Diagrams::Source.rules_json).html_safe %></script>
+<script type="application/json" id="diagram-frame"><%= json_escape(JSON.generate(@frame)).html_safe %></script>
+<script src="<%= asset_path("mermaid.js") %>"></script>
+<script src="<%= @script_url %>"></script>
+</body>
+</html>

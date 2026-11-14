@@ -228,9 +228,14 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     end
     # And in the two other languages, a sample's own words in that language
     # (the Code block's caption, written in all three; block types review
-    # I2), so the comparison of those pages is of something too.
+    # I2), so the comparison of those pages is of something too. A field
+    # whose type is never offered for translation as prose (a Diagram
+    # block's Mermaid source, drawn and not printed) has no words to find.
     (LOCALES - [ "en" ]).each do |locale|
-      words = sampled_types.flat_map { |definition| definition.sample.translations.fetch(locale, {}).values.grep(String) }
+      words = sampled_types.flat_map do |definition|
+        fields = definition.fields.index_by(&:name)
+        definition.sample.translations.fetch(locale, {}).filter_map { |key, value| value if value.is_a?(String) && fields[key.to_s]&.field_type&.translatable != false }
+      end
       assert_includes words, "Code caption #{locale}", "the Code block's sample carries its caption in #{locale}"
       words.each { |text| assert_includes before.fetch(PublicSite::Urls.new.path_for(@samples, locale)).join, text, "the #{locale} samples page draws #{text.inspect}" }
     end

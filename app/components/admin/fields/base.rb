@@ -11,6 +11,12 @@ module Admin
     # whichever one it dispatches to without a type-by-type special case.
     # `placeholder:` is what the caller hands a field that shows one
     # (`Admin::Fields::StringField`); every other type ignores it.
+    # `importable:` true is a caller that can take a file into the field
+    # now: one that may change it (not held by someone else, not drawn for a
+    # reader) and draws what an import needs outside the form
+    # (`outside_form`). Only then does an input draw its import control
+    # (`label_end`); it is false unless asked for, so no other caller draws
+    # a control with nothing behind it.
     class Base < Admin::AdminComponent
       # How a value of this type reads where it cannot be edited (a
       # translation tab's "Shared fields", `EditorScreen::SharedFieldsComponent`):
@@ -23,11 +29,43 @@ module Admin
       # of buttons with its legend), so `Ui::FieldComponent` draws none.
       def self.own_label?(_field) = false
 
+      # Whether a translation tab draws the original beside this input (the
+      # reference card, with its Translate and Suggest update buttons). An
+      # input nobody types in (a drawing the preview script writes) has
+      # nothing a translator compares, so it answers false.
+      def self.reference?(_field) = true
+
+      # Whether the input is a hidden one nobody types in (a drawing the
+      # preview script writes): `Ui::FieldComponent` then draws the input and
+      # its error slot alone, in a wrapper that takes no room in the form (no
+      # box, no gap in its column) until the slot holds an error.
+      def self.hidden?(_field) = false
+
+      # Data for the field's wrapper (`Ui::FieldComponent`'s `.admin-field`),
+      # for an input whose script reaches beyond the input (the Mermaid
+      # source's preview, drawn under a translation pair). Read after the
+      # input is rendered.
+      def field_data = {}
+
+      # What the field draws under a translation pair, the pair's width, or
+      # nil. Read after the input is rendered.
+      def below_pair = nil
+
+      # What the input needs drawn after its form, as a component, or nil: a
+      # confirmation dialog, whose `<form method="dialog">` cannot stand
+      # inside the form (the Mermaid source's "Replace the source?"). The
+      # block card asks it only where its fields can be changed now.
+      def self.outside_form(_field, _input_id) = nil
+
+      # A control at the end of the label's row (the Mermaid source's Import
+      # file…), or nil. Read after the input is rendered.
+      def label_end = nil
+
       # `id_prefix:` mirrors `Ui::FieldComponent`'s own (see its comment) --
       # forwarded here unchanged so `input_id` agrees with the wrapping
       # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a
       # caller supplied.
-      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil, placeholder: nil)
+      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil, placeholder: nil, importable: false)
         @field = field
         @form_name = form_name
         @value = value
@@ -36,11 +74,14 @@ module Admin
         @errors = errors
         @id_prefix = id_prefix || Admin::Ui::FieldComponent.dom_id_prefix(form_name)
         @placeholder = placeholder
+        @importable = importable
       end
 
       private
 
       attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :placeholder
+
+      def importable? = @importable
 
       def input_name = "#{form_name}[#{field.name}]"
 

@@ -625,4 +625,139 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     render_summary block("image")
     assert_selector attention
   end
+
+  # -- The Diagram block's tile: a small picture of its stored drawing beside
+  # its line (label · first line in mono, then the hints in the meta colour)
+  # and the description's opening words. --
+
+  DIAGRAM_SOURCE = "flowchart LR\n  A --> B\n  B --> C\n  C --> D".freeze
+
+  # The sample's cleaned drawing, marked as drawn from `from`'s digest.
+  def diagram_drawing(from = DIAGRAM_SOURCE) = { "svg" => BlockTypes::Diagram.sample_drawing("en")["svg"], "from" => Diagrams::Drawing.digest(from) }
+
+  def diagram(translations) = block("diagram", translated_settings: translations)
+
+  def diagram_line(block) = "##{Admin::EditorScreen::TileSummaryComponent.part_ids(block)[1]}"
+  def diagram_words(block) = "##{Admin::EditorScreen::TileSummaryComponent.text_id(block)}"
+  def picture = ".admin-block-tile__picture"
+
+  test "the tile reads Flowchart · A --> B, Empty with no source, and the two hints" do
+    drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Four boxes in a row, each pointing to the next." })
+    render_summary drawn
+    assert_selector diagram_line(drawn), exact_text: "Flowchart · A --> B"
+    assert_selector "#{diagram_line(drawn)} .font-cs-mono", exact_text: "A --> B"
+    assert_no_selector "#{diagram_line(drawn)} .text-meta"
+    assert_selector diagram_words(drawn), exact_text: "Four boxes in a row, each pointing to the next."
+    assert_selector picture
+
+    empty = diagram({})
+    render_summary empty
+    assert_selector "#{diagram_line(empty)} .text-meta", exact_text: "Empty"
+    assert_no_selector picture
+    assert_no_selector diagram_words(empty)
+
+    undescribed = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing })
+    render_summary undescribed
+    assert_selector diagram_line(undescribed), exact_text: "Flowchart · A --> B · No description"
+    assert_selector "#{diagram_line(undescribed)} .text-meta", exact_text: "No description"
+    assert_no_selector ".text-danger, .text-danger-ink"
+
+    kept = diagram("en" => { "source" => "#{DIAGRAM_SOURCE}\n  D --> A", "drawing" => diagram_drawing, "description" => "Boxes." })
+    render_summary kept
+    assert_selector diagram_line(kept), exact_text: "Flowchart · A --> B · Last drawing kept"
+    assert_selector "#{diagram_line(kept)} .text-meta", exact_text: "Last drawing kept"
+    assert_selector "#{picture} svg", count: 1, visible: :all
+    assert_no_selector ".text-danger, .text-danger-ink, [class*='opacity']"
+
+    undrawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "description" => "Boxes." })
+    render_summary undrawn
+    assert_selector diagram_line(undrawn), exact_text: "Flowchart · A --> B · Not drawn yet"
+    assert_selector "#{diagram_line(undrawn)} .text-meta", exact_text: "Not drawn yet"
+    assert_no_selector picture
+    assert_selector "#{diagram_words(undrawn)} .font-cs-mono", text: "flowchart LR\n  A --> B\n  B --> C", normalize_ws: false
+    assert_no_text "C --> D"
+  end
+
+  # The picture follows the site's fallback: a language with no source of its
+  # own shows the default language's source and drawing, named by that
+  # language's description unless it has one of its own.
+  test "a language with no source of its own shows the default language's line, picture and description" do
+    fallback = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes." })
+    render_summary fallback, locale: "de"
+    assert_selector diagram_line(fallback), exact_text: "Flowchart · A --> B"
+    assert_selector diagram_words(fallback), exact_text: "Boxes."
+    assert_selector picture
+
+    own = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes." },
+                  "de" => { "source" => "sequenceDiagram\n  Alice ->> Bob: Hallo", "description" => "Eine Nachricht." })
+    render_summary own, locale: "de"
+    assert_selector diagram_line(own), exact_text: "Sequence · Alice ->> Bob: Hallo · Not drawn yet"
+    # A language with a source of its own never shows another language's drawing.
+    assert_no_selector picture
+  end
+
+  test "the sample's tile reads its type and its first drawing line, past its accessibility lines" do
+    sample = diagram("en" => { "source" => BlockTypes::Diagram::SAMPLE_SOURCES["en"].strip, "drawing" => BlockTypes::Diagram.sample_drawing("en"), "description" => "A flow." })
+    render_summary sample
+    assert_selector diagram_line(sample), exact_text: "Flowchart · A[Draft] --> B{Review}"
+  end
+
+  # One tile reads its drawing once: the hints, the picture and its markup
+  # share one parse.
+  test "a tile parses its drawing once" do
+    drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes." })
+    parses = 0
+    read = Diagrams::Drawing.method(:read)
+    with_singleton_override(Diagrams::Drawing, :read, ->(svg) { parses += 1; read.call(svg) }) { render_summary drawn }
+    assert_selector picture
+    assert_equal 1, parses
+  end
+
+  # The read is kept for one render, never by the block's contents: a
+  # block changed in memory (a save's answer draws the object it saved) is
+  # read again by the next render, and nothing is kept outside one.
+  test "a block changed in memory between two renders is read again, and nothing is kept outside a render" do
+    drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes." })
+    render_summary drawn
+    assert_selector diagram_line(drawn), text: "A --> B"
+
+    drawn.translated_settings["en"]["source"] = "flowchart LR\n  X --> Y"
+    render_summary drawn
+    assert_selector diagram_line(drawn), text: "X --> Y"
+
+    first = BlockTypes::Diagram::Shown.for(drawn, locale: "en")
+    assert_not_same first, BlockTypes::Diagram::Shown.for(drawn, locale: "en"), "outside a render each call reads"
+  end
+
+  test "the tile's picture is the stored drawing with tile ids, no title and no script" do
+    drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes <b>in</b> a row." })
+    render_summary drawn
+
+    box = page.find(picture, visible: :all)
+    assert_equal "true", box["aria-hidden"]
+    assert_selector "#{picture} > .content-block--diagram[aria-hidden='true'] > svg[role='img']", visible: :all
+    prefix = "diagram-tile-#{drawn.id}-en-"
+    ids = page.all("#{picture} [id]", visible: :all).map { |element| element["id"] }
+    assert_operator ids.size, :>, 1
+    assert ids.all? { |id| id.start_with?(prefix) }, ids.reject { |id| id.start_with?(prefix) }.inspect
+    assert_includes ids, "#{prefix}d-1"
+    # No title: hidden from a screen reader, the picture needs no name, and a
+    # title would be a tooltip over the tile's face.
+    assert_no_selector "#{picture} title", visible: :all
+    assert_no_selector "#{picture} [aria-labelledby]", visible: :all
+    html = page.native.to_html
+    assert_no_match(/<script|\son\w+=|href=|<b>in/i, html)
+
+    gone = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => { "svg" => "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'><script/></svg>", "from" => Diagrams::Drawing.digest(DIAGRAM_SOURCE) }, "description" => "Boxes." })
+    render_summary gone
+    assert_no_selector picture, visible: :all
+    assert_selector diagram_line(gone), exact_text: "Flowchart · A --> B · Not drawn yet"
+  end
+
+  test "a diagram tile that was refused says Needs fixing after its line" do
+    drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes." })
+    render_summary drawn, invalid: true
+    assert_selector diagram_line(drawn), exact_text: "Flowchart · A --> B · Needs fixing"
+    assert_selector attention
+  end
 end

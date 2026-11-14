@@ -115,9 +115,10 @@ module ActiveSupport
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical
     # order. `test/fixtures/themes` holds theme folders, whose theme.yml is a
-    # theme's declarations and no fixture set: `fixtures :all` would read it
-    # as one and fail.
-    fixtures(*Dir[Rails.root.join("test/fixtures/**/*.yml")].map { |file| file.delete_prefix("#{Rails.root.join("test/fixtures")}/").delete_suffix(".yml") }.reject { |name| name.start_with?("themes/") }.sort)
+    # theme's declarations, and `test/fixtures/diagrams` the Diagram block's
+    # sample sources (`sources.yml`): neither is a fixture set, and
+    # `fixtures :all` would read each as one and fail.
+    fixtures(*Dir[Rails.root.join("test/fixtures/**/*.yml")].map { |file| file.delete_prefix("#{Rails.root.join("test/fixtures")}/").delete_suffix(".yml") }.reject { |name| name.start_with?("themes/", "diagrams/") }.sort)
 
     # Builds pages/posts through the write-path services instead of
     # fixtures -- see test/support/content_helper.rb.

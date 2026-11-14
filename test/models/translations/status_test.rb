@@ -215,6 +215,71 @@ class Translations::StatusTest < ActiveSupport::TestCase
     end
   end
 
+  # `translation_required:` is the image alt's rule for
+  # a schema field, required in a language only where the original has one.
+  test "a translation_required field blank in a language is missing only when the primary language has a value" do
+    saved = BlockTypes.all.dup
+    BlockTypes.register("test/described") do |t|
+      TestTypes.declare(t)
+      t.label "Described"
+      t.field :description, :text, translated: true, translation_required: true
+      t.component TestQuoteComponent
+    end
+    with_locales(%w[en de es], default: "en") do
+      page = create_page(title: "About", translations: { "de" => { title: "Über uns" }, "es" => { title: "Sobre" } })
+      result = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "test/described" })
+      assert result.ok?, result.errors.to_sentence
+      assert_empty Translations::Status.missing_locales(page), "no original, nothing to translate"
+
+      block = result.record
+      assert ContentBlocks::Save.call(block, attributes: { settings: { description: "A diagram" } },
+        translations: { "de" => { settings: { description: "Ein Diagramm" } } }).ok?
+      assert_equal %w[es], Translations::Status.missing_locales(page)
+      assert_equal({ "de" => :complete, "es" => :missing }, Translations::Status.for([ page ])[page])
+      assert_equal 1, Translations::Status.counts([ page ])[page]["es"][:missing]
+    end
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
+  # The drawing is derived from the source: the source's change is what
+  # makes a translation outdated, and a re-draw of the same source changes
+  # no language's state.
+  test "changing only the default language's drawing leaves the other languages' states unchanged" do
+    saved = BlockTypes.all.dup
+    BlockTypes.register("test_drawn") do |t|
+      TestTypes.declare(t)
+      t.label "Drawn"
+      t.field :source, :mermaid, translated: true, drawing: :drawing
+      t.field :drawing, :diagram_drawing, translated: true
+      t.component TestQuoteComponent
+    end
+    with_locales(%w[en de], default: "en") do
+      svg = Diagrams::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg
+      source = "flowchart LR\n  A --> B"
+      drawing = ->(from) { JSON.generate(svg: svg, from: from) }
+      page = create_page(title: "About", translations: { "de" => { title: "Über uns" } })
+      result = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "test_drawn", settings: { source: source, drawing: drawing.(Diagrams::Drawing.digest(source)) } })
+      assert result.ok?, result.errors.to_sentence
+      block = result.record
+      assert ContentBlocks::Save.call(block, translations: { "de" => { settings: { source: "flowchart LR\n  A --> C", drawing: drawing.(Diagrams::Drawing.digest("flowchart LR\n  A --> C")) } } }).ok?
+      assert_not_includes ContentBlock.translation_tracked_fields(block.reload), "drawing"
+      assert_includes ContentBlock.translation_tracked_fields(block), "source"
+      before = Translations::Status.for([ page ])[page]
+
+      assert ContentBlocks::Save.call(block.reload, attributes: { settings: { drawing: drawing.(Diagrams::Drawing.digest("a re-draw of the same source")) } }).ok?
+      assert_equal before, Translations::Status.for([ page.reload ])[page]
+      assert_equal({ "de" => :complete }, before)
+
+      assert ContentBlocks::Save.call(block.reload, attributes: { settings: { source: "flowchart LR\n  A --> D" } }).ok?
+      assert_equal({ "de" => :outdated }, Translations::Status.for([ page.reload ])[page], "the source's change is what outdates")
+    end
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
   test "an unavailable block type is never treated as missing" do
     with_locales(%w[de en], default: "de") do
       page = create_page(title: "Über uns", translations: { "en" => { title: "About" } })

@@ -760,6 +760,46 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_select "section.plain-note", count: 0
   end
 
+  test "a theme replaces the Diagram block's template from the reference's section alone, and a theme that does not is drawn the default one" do
+    flows = create_page(title: "Flows")
+    sample = BlockTypes.fetch(:diagram).sample.translations.fetch("en")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: flows), attributes: { block_type: "diagram" },
+      translations: { "en" => { settings: { "source" => sample[:source], "drawing" => sample[:drawing], "description" => "A draft <b>goes</b> to review." }, caption: "How it <i>flows</i>" } })
+    assert result.ok?, result.errors.to_sentence
+    block = result.record
+    publish_changes(flows)
+
+    with_diagram_theme { get "/flows" }
+
+    assert_response :success
+    assert_select "div.plain-diagram[data-block='#{block.id}'][data-page='#{flows.id}']" do
+      assert_select "div.plain-diagram__drawing > svg[role=img][aria-labelledby='diagram-#{block.id}-en-title']", count: 1
+      assert_select "svg > title#diagram-#{block.id}-en-title", text: "A draft <b>goes</b> to review."
+      assert_select "p.plain-diagram__caption", text: "How it <i>flows</i>"
+    end
+    assert_select "figure.content-block--diagram", count: 0
+    assert_select ".plain-diagram b, .plain-diagram i", count: 0
+
+    with_plain_theme { get "/flows" }
+
+    assert_response :success
+    assert_select "div.plain-frame figure.content-block--diagram .content-block--diagram__scroll > svg[role=img]"
+    assert_select "div.plain-diagram", count: 0
+  end
+
+  test "the tenth theme is sound, checked deeply too: a Diagram template of the contract's names and a stylesheet of its tokens for both schemes" do
+    folder = ThemeFolder.new(ThemeTestHelper::DIAGRAM)
+
+    assert_empty Theme::Check.problems(folder, deep: true)
+    assert_equal %w[assets/stylesheets/theme.css components/blocks/diagram_component.html.erb], folder.files
+    template = folder.read("components/blocks/diagram_component.html.erb")
+    Theme::Contract.components.fetch("blocks/diagram_component").each { |name| assert_match(/#{Regexp.escape(name)}/, template, "the template calls #{name}") }
+    assert_no_match(/settings|I18n|\bt\(|html_safe|raw\b|<%==/, template, "nothing the contract does not name, and no string marked safe")
+    css = folder.read("assets/stylesheets/theme.css")
+    assert_match(/:root, \[data-theme="light"\]\s*\{[^}]*--th-diagram-fill/m, css)
+    assert_match(/\[data-theme="dark"\]\s*\{[^}]*--th-diagram-fill/m, css)
+  end
+
   test "the fourth theme is sound, checked deeply too: a Note template of the contract's names" do
     folder = ThemeFolder.new(ThemeTestHelper::NOTE)
 

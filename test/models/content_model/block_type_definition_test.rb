@@ -40,6 +40,17 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_equal [ "A caption" ], d.sample.shows
   end
 
+  test "a translated value of a sample may be a callable, called once when the sample is first read and never at registration" do
+    calls = 0
+    d = ContentModel::BlockTypeDefinition.new("x")
+    d.sample translations: { "en" => { caption: "A caption", drawing: -> { calls += 1; { "svg" => "<svg/>" } } } }, shows: [ "A caption" ]
+    assert_equal 0, calls, "nothing is read while the type registers"
+
+    assert_equal({ "en" => { caption: "A caption", drawing: { "svg" => "<svg/>" } } }, d.sample.translations)
+    d.sample
+    assert_equal 1, calls
+  end
+
   test "a declaration of the wrong shape is refused when it is written, and the message says the shape" do
     assert_match(/a method's name/, assert_raises(ArgumentError) { definition.theme_methods "Block" }.message)
     assert_match(/without the --th- prefix/, assert_raises(ArgumentError) { definition.tokens themed: %w[--th-x] }.message)
@@ -298,7 +309,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
   end
 
   test "every built-in block type declares the family the design gives it" do
-    families = { "rich_text" => :text, "note" => :text, "image" => :media, "card" => :media, "code" => :code, "table" => :code,
+    families = { "rich_text" => :text, "note" => :text, "image" => :media, "card" => :media, "code" => :code, "diagram" => :code, "table" => :code,
                  "form" => :form, "post_list" => :lists, "section" => :structure }
     assert_equal families, BlockTypes.all.to_h { |type| [ type.name, type.family ] }.slice(*BuiltInBlockTypes.names)
   end
@@ -310,7 +321,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     definition.icon :pilcrow
     assert_equal "pilcrow", definition.icon
     error = assert_raises(ArgumentError) { ContentModel::BlockTypeDefinition.new("x").icon "rocket" }
-    assert_match(/\Ax: icon is one of pilcrow, image, code_xml, posts, columns_2, info, lightbulb, circle_alert, triangle_alert/, error.message)
+    assert_match(/\Ax: icon is one of pilcrow, image, code_xml, diagram, posts, columns_2, info, lightbulb, circle_alert, triangle_alert/, error.message)
   end
 
   # Note block plan, ruling 12: the Note's icon in the picker is its type's
@@ -383,6 +394,29 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
       error = assert_raises(ArgumentError) { definition.preview bad }
       assert_match(/\Atest_shape: `preview` is a callable taking the block and `locale:`/, error.message)
     end
+  end
+
+  test "tile_picture is a callable taking the block and locale:, and anything else is refused, the type's name first" do
+    d = definition
+    assert_nil d.tile_picture
+    picture = ->(_block, locale:) { nil }
+    d.tile_picture picture
+    assert_same picture, d.tile_picture
+
+    [ "<svg/>", ->(block) { block }, ->(locale:) { locale } ].each do |bad|
+      error = assert_raises(ArgumentError) { definition.tile_picture bad }
+      assert_match(/\Atest_shape: `tile_picture` is a callable taking the block and `locale:`/, error.message)
+    end
+  end
+
+  # The tile prints a picture as the markup it is handed: a gem's would be
+  # markup nobody at the CMS reviewed, on every editor page.
+  test "a block type from outside draws no tile picture: tile_picture is refused at registration" do
+    definition = ContentModel::BlockTypeDefinition.new("gallery/flag")
+    definition.tile_picture ->(_block, locale:) { nil }
+
+    error = assert_raises(ArgumentError) { definition.finalize! }
+    assert_match(/\Agallery\/flag: a block type from outside draws no tile picture/, error.message)
   end
 
   test "a type that declares no preview answers nil" do

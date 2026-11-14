@@ -1,0 +1,8 @@
+<%# A theme's own Diagram block, written from what `Theme::Contract` gives the template (`block`, `page`,
+    `svg`, `description`, `caption`; docs/reference/theming.md, "The Diagram block"): the drawing printed as
+    given in a box that scrolls, which is a keyboard stop named by the description, and the caption through
+    ERB's own escaping. %>
+<div class="plain-diagram" data-block="<%= block.id %>" data-page="<%= page.id %>">
+  <div class="plain-diagram__drawing" tabindex="0" role="group" aria-label="<%= description %>"><%= svg %></div>
+  <% if caption.present? %><p class="plain-diagram__caption"><%= caption %></p><% end %>
+</div>

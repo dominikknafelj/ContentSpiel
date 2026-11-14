@@ -5,12 +5,41 @@ require "test_helper"
 class DesignTokensTest < ActionDispatch::IntegrationTest
   include ContrastMeasure
 
+  # But one rule: CS Studio's values of the Diagram block's themed tokens,
+  # on the public diagram's class, which the block card reads off its colour
+  # probe and posts to the renderer frame (content-spiel.css). They define
+  # those names from `--cs-*` tokens alone and nothing reads a theme token.
+  STUDIO_DIAGRAM = /html\[data-surface="?studio"?\]\s*\.content-block--diagram\s*\{([^}]*)\}/
+
   test "the product build carries product tokens and no theme tokens" do
     css = stylesheet("tailwind.css")
 
     assert_includes css, "--cs-paper"
-    assert_not_includes css, "--th-"
+    # The build writes a `color-mix()` value twice, a fallback and the mix
+    # under `@supports`, each in a rule of the same selector.
+    diagram = css.scan(STUDIO_DIAGRAM).flatten.join(";")
+    assert_not_empty diagram, "CS Studio's diagram colours are in the product build"
+    values = diagram.scan(/(--th-[\w-]+):([^;]+)/).to_h
+    diagram = BlockTypes.fetch(:diagram)
+    assert_equal (diagram.themed_tokens + diagram.fixed_tokens).map { |name| "--th-#{name}" }.sort, values.keys.sort
+    assert_equal "var(--cs-font)", values.fetch("--th-diagram-font"), "the drawing's face is CS Studio's sans, the one Mermaid measured in"
+    values.each { |name, value| assert_empty value.scan(/--[\w-]+/).reject { |token| token.start_with?("--cs-") }, "#{name} is made of CS Studio tokens" }
+    # The Diagram block's public stylesheet is in it too, whole, so a tile
+    # paints its small drawing by the site's rules: every rule of it is
+    # under the block's class, and nothing else of the build reads a theme
+    # token.
+    diagram_rules = /[^{}]*\.content-block--diagram[^{}]*\{[^{}]*\}/
+    assert_includes css, ".content-block--diagram .node rect", "the drawing's rules are CS Studio's too"
+    assert_not_includes css.gsub(STUDIO_DIAGRAM, "").gsub(diagram_rules, ""), "--th-"
     assert_not_includes css, "cs-prose"
+  end
+
+  # The tile's drawing and the renderer frame's are painted by one file, the
+  # one the type declares, never a copy.
+  test "CS Studio's build imports the Diagram block's own stylesheet" do
+    entry = Rails.root.join("app/assets/tailwind/application.css")
+    imported = entry.read.scan(/^@import "([^"]+)"/).flatten.map { |path| entry.dirname.join(path).cleanpath }
+    assert_includes imported, BlockTypes.fetch(:diagram).stylesheet_path.cleanpath
   end
 
   # Once deleted by accident in an unrelated commit: SortableJS and the
@@ -759,14 +788,146 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/\.content-section--strong \.content-block--form \{ color-scheme: dark; \}/, sections)
   end
 
+  DIAGRAM_TOKENS = %w[ink fill line edge group note accent series-1 series-2 series-3 series-4 series-5 series-6].map { |name| "--th-diagram-#{name}" }.freeze
+  DIAGRAM_SERIES = DIAGRAM_TOKENS.grep(/series/).freeze
+  DIAGRAM_CSS = Rails.root.join("app/assets/tailwind/themes/default/diagram.css")
+  DIAGRAM_DARK_SERIES = %w[#2d4a78 #6e4521 #2c5a33 #723131 #533a78 #1f5553].freeze
+
+  # The Diagram block's tokens (Diagram block spec §4): every one from the
+  # base but the six series colours, which are literals as the syntax colours
+  # are; the font fixed. A strong band re-values all thirteen, as it does the
+  # Code block's; a tinted band only the group's ground, which would be the
+  # band itself.
+  test "every diagram token is defined in both schemes and re-valued on the strong band" do
+    assert_equal DIAGRAM_TOKENS.map { |name| name.delete_prefix("--th-") }, BlockTypes.fetch(:diagram).themed_tokens
+    assert_equal %w[diagram-font], BlockTypes.fetch(:diagram).fixed_tokens
+    theme_tokens.each do |theme, tokens|
+      DIAGRAM_TOKENS.each do |name|
+        value = tokens.fetch(name) { flunk("#{name} is not defined for #{theme}") }
+        shape = /\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/
+        shape = /\A#\h{6}\z/ if DIAGRAM_SERIES.include?(name) && theme == :light
+        assert_match shape, value, "#{theme} #{name} is #{value}"
+      end
+      { "--th-diagram-ink" => "var(--th-ink)", "--th-diagram-fill" => "var(--th-surface)", "--th-diagram-line" => "var(--th-dim)",
+        "--th-diagram-edge" => "var(--th-dim)", "--th-diagram-group" => "var(--th-sunken)", "--th-diagram-accent" => "var(--th-accent)" }.each do |name, value|
+        assert_equal value, tokens.fetch(name), "#{theme} #{name}"
+      end
+      assert_match(/\Acolor-mix\(in srgb, var\(--th-accent-tint\) \d+%, var\(--th-surface\)\)\z/, tokens.fetch("--th-diagram-note"))
+    end
+    fixed = Rails.root.join("app/assets/tailwind/themes/default/tokens.css").read[/^:root \{(.*?)\}/m, 1]
+    assert_match(/--th-diagram-font:\s*"Archivo"/, fixed, "the face the boxes were measured in")
+    assert_equal DIAGRAM_TOKENS.sort, band_values("strong").keys.grep(/--th-diagram-/).sort
+    assert_equal %w[--th-diagram-group], band_values("tinted").keys.grep(/--th-diagram-/)
+
+    # The six dark series grounds are written once, as the CMS's own
+    # tokens: the dark scheme's series, and a strong band's in both schemes
+    # (it is a dark ground in both), under the band's light ink.
+    strong = band_values("strong")
+    dark = DIAGRAM_DARK_SERIES.each_with_index.to_h { |value, index| [ "--th-diagram-dark-#{index + 1}", value ] }
+    dark.each { |own, value| assert_match(/--th-diagram-dark-\d:\s*#{value};/, fixed, "#{own} is #{value}") }
+    (1..6).each do |k|
+      assert_equal "var(--th-diagram-dark-#{k})", theme_tokens[:dark].fetch("--th-diagram-series-#{k}")
+      assert_equal "var(--th-diagram-dark-#{k})", strong.fetch("--th-diagram-series-#{k}")
+    end
+    %w[fill 10 group 8 note 14 line 55].each_slice(2) do |name, share|
+      assert_equal "color-mix(in srgb, var(--th-on-band-strong) #{share}%, var(--th-band-strong))", strong.fetch("--th-diagram-#{name}"), "the band's #{name} is opaque"
+    end
+  end
+
+  # WCAG 1.4.3 and 1.4.11 for what a diagram draws: its labels (ink) on
+  # every shape they stand on, the node's fill, a group's ground, a note and
+  # each series colour, at 4.5:1; its lines (a node's outline, an edge, the
+  # accent's activation, critical task and today line) at 3:1 on the ground
+  # the drawing stands on and on a group's, and a node's outline on the
+  # node's own fill. On the page, a tinted band and a strong band, in both
+  # schemes: (9 + 6 + 1) x 3 x 2 = 96.
+  test "ink on fill, group and note is 4.5:1; edge and line on every ground are 3:1; ink on each series colour is 4.5:1, in both schemes, on the page, a tinted and a strong band" do
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      { "the page" => [ {}, "--th-paper" ], "a tinted band" => [ band_values("tinted"), "--th-band-tinted" ],
+        "a strong band" => [ band_values("strong"), "--th-band-strong" ] }.each do |place, (inside, around)|
+        outside = resolve_colour(tokens, around, inside: inside)
+        ground = ->(name) { resolve_colour(tokens, name, inside: inside, under: outside) }
+        ink = resolve_colour(tokens, "--th-diagram-ink", inside: inside)
+        (%w[--th-diagram-fill --th-diagram-group --th-diagram-note] + DIAGRAM_SERIES).each do |shape|
+          ratio = contrast(ground.(shape), ink)
+          puts "diagram #{theme} #{place} ink on #{shape}: #{ratio.round(2)}" if ENV["SHOW_RATIOS"]
+          assert_operator ratio, :>=, 4.5, "--th-diagram-ink on #{shape} in #{place} (#{theme}) is #{ratio.round(2)}:1"
+          pairs += 1
+        end
+        { "the ground" => outside, "a group" => ground.("--th-diagram-group") }.each do |under, colour|
+          %w[--th-diagram-line --th-diagram-edge --th-diagram-accent].each do |stroke|
+            ratio = contrast(colour, resolve_colour(tokens, stroke, inside: inside, under: colour))
+            puts "diagram #{theme} #{place} #{stroke} on #{under}: #{ratio.round(2)}" if ENV["SHOW_RATIOS"]
+            assert_operator ratio, :>=, 3.0, "#{stroke} on #{under} in #{place} (#{theme}) is #{ratio.round(2)}:1"
+            pairs += 1
+          end
+        end
+        fill = ground.("--th-diagram-fill")
+        ratio = contrast(fill, resolve_colour(tokens, "--th-diagram-line", inside: inside, under: fill))
+        puts "diagram #{theme} #{place} --th-diagram-line on the node's fill: #{ratio.round(2)}" if ENV["SHOW_RATIOS"]
+        assert_operator ratio, :>=, 3.0, "a node's outline on its own fill in #{place} (#{theme}) is #{ratio.round(2)}:1"
+        pairs += 1
+      end
+    end
+    assert_equal 96, pairs
+  end
+
+  # The stylesheet paints what Mermaid's dropped <style> painted, by the
+  # class names Mermaid writes, and carries the layout that <style> held
+  # (Diagram block spec §4): it is plain CSS, since the renderer frame
+  # inlines the same file.
+  test "diagram.css paints by class, holds no colour literal and scopes text-anchor middle to svg.flowchart" do
+    assert_equal DIAGRAM_CSS, BlockTypes.fetch(:diagram).stylesheet_path
+    text = DIAGRAM_CSS.read
+    css = text.gsub(%r{/\*.*?\*/}m, "")
+    assert_no_match(/Written by bin\/rails generate block_type/, text, "the stylesheet is the type's own")
+    refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(|\bcolor-mix\(/, css, "every colour is a token")
+    assert_no_match(/@apply|@theme|@utility|@import|theme\(|--color-/, css, "plain CSS: no Tailwind, so the frame can inline it")
+    assert_no_match(/data-theme/, css, "nothing names a scheme: the tokens follow it")
+    (DIAGRAM_TOKENS + %w[--th-diagram-font]).each { |name| assert_includes css, "var(#{name})", "diagram.css paints with #{name}" }
+
+    rules = css.scan(/([^{}]+)\{([^{}]*)\}/).map { |selectors, body| [ selectors.split(",").map(&:strip), body ] }
+    middle = rules.select { |_, body| body.match?(/text-anchor:\s*middle/) }
+    assert middle.flat_map(&:first).any? { |selector| selector.match?(/svg\.flowchart .*\.node .*\.label .*text/) }, "a flowchart's node labels are centred"
+    middle.flat_map(&:first).each do |selector|
+      assert_match(/svg\.flowchart |TitleText|\.titleText|\.slice|\.taskText\b|\.vertText|text\.actor|aria-roledescription/, selector, "#{selector}: text-anchor middle on a type's own class only (class, state and ER labels start where they are written)")
+    end
+
+    %w[edge-pattern-dashed edge-pattern-dotted edge-thickness-thick messageLine1 loopLine note-edge actor-line activation0 relationshipLine
+       row-rect-odd row-rect-even edgeTerminals statediagram-cluster statediagram-note state-start relation transition cluster pieOuterCircle
+       today grid].each do |name|
+      assert_match(/\.#{Regexp.escape(name)}\b/, css, "diagram.css paints .#{name}")
+    end
+    (1..6).each do |k|
+      assert_match(/\.pieCircle:nth-of-type\(6n\+#{k}\)\s*\{\s*fill:\s*var\(--th-diagram-series-#{k}\)/, css, "slice #{k}")
+      assert_match(/\.legend:nth-of-type\(6n\+#{(k % 6) + 1}\) rect\s*\{\s*fill:\s*var\(--th-diagram-series-#{k}\)/, css, "legend #{k}")
+    end
+    %w[done active crit].product((0..3).to_a).each { |state, section| assert_includes css, ".#{state}#{section}", "the gantt's #{state} task in section #{section}" }
+    { "16px" => "the root", "18px" => "titles", "17px" => "pie labels and legend", "25px" => "the pie's title", "14px" => "ER edge labels", "11px" => "class terminals and gantt task text" }.each do |size, what|
+      assert_match(/font-size:\s*#{size}/, css, "#{what} at #{size}")
+    end
+    assert_match(/stroke-dasharray/, css, "the dash patterns")
+    assert_match(/max-width:\s*100%/, css)
+    assert_match(/height:\s*auto/, css)
+    assert_match(/min-width:\s*var\(--diagram-min-width/, css, "the smallest width the component writes")
+    assert_match(/overflow-x:\s*auto/, css)
+    assert_match(/overscroll-behavior-x:\s*contain/, css)
+    assert_match(/^figure\.content-block--diagram \{ margin-block/, css, "the figure's margin, which the renderer frame's #diagram (the same class, a div) does not take")
+    assert_no_match(/^\.content-block--diagram \{/, css)
+  end
+
   private
     def helpers = ActionController::Base.helpers
 
-    # `tokens.css`'s two colour blocks as { "--th-name" => "value" }.
+    # `tokens.css`'s two colour blocks as { "--th-name" => "value" }, each
+    # with the fixed `:root` block under it, which holds in both schemes.
     def theme_tokens
       css = Rails.root.join("app/assets/tailwind/themes/default/tokens.css").read
+      values = ->(block) { block.to_s.gsub(%r{/\*.*?\*/}m, "").scan(/(--th-[\w-]+):\s*([^;]+);/).to_h }
+      fixed = values.(css[/^:root \{(.*?)\}/m, 1])
       { light: css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1], dark: css[/\[data-theme="dark"\]\s*\{(.*?)\}/m, 1] }
-        .transform_values { |block| block.scan(/(--th-[\w-]+):\s*([^;]+);/).to_h }
+        .transform_values { |block| fixed.merge(values.(block)) }
     end
 
     # The custom properties a band gives what is inside it

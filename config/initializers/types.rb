@@ -45,6 +45,7 @@ Rails.application.config.to_prepare do
     BlockTypes::RichText.register
     BlockTypes::Image.register
     BlockTypes::Code.register
+    BlockTypes::Diagram.register
     BlockTypes::Note.register
     BlockTypes::Table.register
     BlockTypes::Form.register

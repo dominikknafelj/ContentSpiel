@@ -16,6 +16,10 @@ module ContractLedger
     "blocks/rich_text_component" => %w[block page],
     "blocks/image_component" => %w[block page asset alt caption sizes],
     "blocks/code_component" => %w[block page lines code language language_label filename caption string],
+    # Release note (diagram): added the Diagram block's line, its thirteen
+    # themed tokens and its fixed font below (docs/reference/theming.md,
+    # "The Diagram block").
+    "blocks/diagram_component" => %w[block page svg description caption],
     "blocks/note_component" => %w[block page kind heading titled? word icon body],
     "blocks/table_component" => %w[block page rows header_row? header_column? column_count caption],
     # Release note (forms): added the Form block, its line and the five
@@ -63,6 +67,8 @@ module ContractLedger
     shadow-menu
     band-tinted band-strong on-band-strong on-band-strong-dim on-band-strong-accent
     syn-comment syn-keyword syn-string syn-constant syn-tag syn-attribute syn-embed
+    diagram-ink diagram-fill diagram-line diagram-edge diagram-group diagram-note diagram-accent
+    diagram-series-1 diagram-series-2 diagram-series-3 diagram-series-4 diagram-series-5 diagram-series-6
     note-note-ground note-note-line note-note-ink note-note-border
     note-tip-ground note-tip-line note-tip-ink note-tip-border
     note-important-ground note-important-line note-important-ink note-important-border
@@ -78,6 +84,7 @@ module ContractLedger
     track-mono track-wide
     sp-1 sp-2 sp-3 sp-4 sp-5 sp-6 sp-7
     radius radius-pill ease
+    diagram-font
   ].freeze
 
   # The default theme's icon names (a promise: a theme outside this

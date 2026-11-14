@@ -242,7 +242,8 @@ class Theme::ContractTest < ActiveSupport::TestCase
     differ.(contract_themed, dark, "THEMED_TOKENS", "the dark block")
     differ.(contract_fixed, fixed, "FIXED_TOKENS", "the fixed block")
     assert_equal Theme::Contract.tokens.sort, (prefixed.(Theme::Contract.themed_tokens) + prefixed.(Theme::Contract.fixed_tokens)).sort
-    assert_equal %w[--th-ph-a --th-ph-b --th-preview-bg --th-preview-ink], own.(light + fixed).sort, "the CMS's own tokens"
+    assert_equal %w[--th-diagram-dark-1 --th-diagram-dark-2 --th-diagram-dark-3 --th-diagram-dark-4 --th-diagram-dark-5 --th-diagram-dark-6 --th-ph-a --th-ph-b --th-preview-bg --th-preview-ink],
+      own.(light + fixed).sort, "the CMS's own tokens"
     assert_empty Theme::Contract.tokens.grep(Theme::Contract::OWN_TOKENS)
     assert_equal names.(css).uniq.sort, (light + dark + fixed).uniq.sort, "a --th- token is defined outside the three blocks"
   end

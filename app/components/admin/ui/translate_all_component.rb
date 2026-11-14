@@ -11,7 +11,8 @@ module Admin
     # - **running**: "Suggesting i of n fields", a 4px progress bar and Cancel;
     # - **ready**: "N suggestions ready · Use all · Discard all".
     #
-    # N is counted here, server-side, over the record's tracked fields and, on
+    # N is counted here, server-side, over the record's fields an AI provider
+    # may translate (`ai_translatable_fields`) and, on
     # a page, its blocks': every text field (a string or a rich-text body -- a
     # schema group's raw Hash is never handed to a provider, `AI::Translate`
     # skips it) that is blank in `locale` and has a non-blank original. It is
@@ -111,9 +112,9 @@ module Admin
       def owners = [ record, *(record.content_blocks if record.respond_to?(:content_blocks)) ]
 
       def empty_fields(owner)
-        return 0 unless owner.class.respond_to?(:translation_tracked_fields)
+        return 0 unless owner.class.respond_to?(:ai_translatable_fields)
 
-        owner.class.translation_tracked_fields(owner).count do |field|
+        owner.class.ai_translatable_fields(owner).count do |field|
           original = owner.translation_value(field, ::Locales.default)
           (original.is_a?(String) || original.is_a?(RichText::Document)) && original.present? &&
             owner.translation_value(field, locale).blank?

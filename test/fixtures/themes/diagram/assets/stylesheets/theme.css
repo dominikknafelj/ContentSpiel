@@ -1,0 +1,9 @@
+/* The tenth theme's stylesheet: its own Diagram template's box, and the
+   diagram's node and group grounds re-coloured for both schemes. The
+   default's diagram.css still paints the drawing and keeps its layout. */
+:root, [data-theme="light"] { --th-diagram-fill: var(--th-paper); --th-diagram-group: var(--th-accent-tint); }
+[data-theme="dark"] { --th-diagram-fill: var(--th-paper); --th-diagram-group: var(--th-accent-tint); }
+.plain-diagram { margin-block: var(--th-sp-5); }
+.plain-diagram__drawing { overflow-x: auto; overscroll-behavior-x: contain; }
+.plain-diagram__drawing svg { display: block; max-width: 100%; height: auto; min-width: var(--diagram-min-width, 0); }
+.plain-diagram__caption { color: var(--th-meta); font-size: var(--th-t-small); }

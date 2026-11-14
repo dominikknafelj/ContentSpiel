@@ -1,0 +1,118 @@
+# The Diagram block's sample sources, one per type on the list, each using
+# the type's common parts and an `accDescr`. `bin/rails diagram:fixtures`
+# (RAILS_ENV=test) draws each with the vendored Mermaid and writes the raw
+# drawing to <key>.svg beside this file; `test/lib/diagram_fixtures_test.rb`
+# holds that every type has one and that every source passes the line rules.
+#
+# The `sample_<locale>` sources at the end are the block type's sample
+# (`BlockTypes::Diagram::SAMPLE_SOURCES`, which
+# `test/models/block_types/diagram_test.rb` holds them to): the task writes
+# their drawings CLEANED to db/seeds/diagrams/sample-<locale>.svg.
+flowchart: |
+  flowchart LR
+    accDescr: A request passes the gateway and is served from the backend or refused.
+    A[Request] --> B{Gateway}
+    subgraph backend [Backend]
+      C(Service) ==> D[(Database)]
+    end
+    B -->|allowed| C
+    B -.-> E[Refused]
+    D --> F((Done))
+sequence: |
+  sequenceDiagram
+    accDescr: A person opens a page; the browser asks the server, which refreshes its cache.
+    actor U as Person
+    participant B as Browser
+    participant S as Server
+    U->>B: Opens the page
+    B->>+S: GET /page
+    loop Every minute
+      S-->>S: Refresh the cache
+    end
+    Note right of S: The cache is warm
+    S-->>-B: 200 OK
+    alt found
+      B->>U: Shows the page
+    else missing
+      B-xU: Shows an error
+    end
+class: |
+  classDiagram
+    accDescr: A page holds many blocks; a block is drawn by a component.
+    class Page {
+      +String title
+      +publish() bool
+    }
+    class Block {
+      <<abstract>>
+      +int position
+      +draw()
+    }
+    Page "1" *-- "many" Block : holds
+    Block <|-- Diagram
+    Block ..> Component : drawn by
+    Page o-- Tag
+state: |
+  stateDiagram-v2
+    accDescr: A draft is scheduled, goes live and is changed and published again.
+    [*] --> Draft
+    Draft --> Scheduled : schedule
+    Scheduled --> Live : on time
+    state Live {
+      [*] --> Shown
+      Shown --> Changed : edit
+      Changed --> Shown : publish
+    }
+    Live --> [*]
+    note right of Draft : Only editors see it
+er: |
+  erDiagram
+    accDescr: A page holds blocks, and a block may name an image.
+    PAGE ||--o{ BLOCK : holds
+    BLOCK }o--o| IMAGE : names
+    PAGE {
+      int id PK
+      string title
+      int parent_id FK "the page above"
+    }
+    BLOCK {
+      int id PK
+      string block_type
+    }
+gantt: |
+  gantt
+    accDescr: The release takes design, build and a review before it ships.
+    title Release
+    dateFormat YYYY-MM-DD
+    todayMarker off
+    section Design
+      Cards  :done, d1, 2026-11-02, 3d
+      Review :active, d2, after d1, 2d
+    section Build
+      Code   :crit, b1, after d2, 5d
+      Ship   :milestone, m1, after b1, 0d
+pie: |
+  pie showData
+    accDescr: Most visitors read the site in English.
+    title Visitors by language
+    "English" : 62
+    "German" : 25
+    "Spanish" : 13
+sample_en: |
+  flowchart LR
+    accDescr: A draft goes to review, and is published once approved or sent back with changes.
+    A[Draft] --> B{Review}
+    B -->|approved| C[Published]
+    B -->|changes| A
+sample_de: |
+  flowchart LR
+    accDescr: Ein Entwurf geht zur Prüfung und wird nach der Freigabe veröffentlicht oder mit Änderungen zurückgeschickt.
+    A[Entwurf] --> B{Prüfung}
+    B -->|freigegeben| C[Veröffentlicht]
+    B -->|Änderungen| A
+sample_es: |
+  flowchart LR
+    accDescr: Un borrador pasa a revisión y se publica cuando se aprueba o se devuelve con cambios.
+    A[Borrador] --> B{Revisión}
+    B -->|aprobado| C[Publicado]
+    B -->|cambios| A

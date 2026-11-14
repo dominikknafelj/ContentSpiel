@@ -138,13 +138,14 @@ module Admin
 
       def fields_group_title = "#{definition&.label || post.content_type.to_s.humanize} fields"
 
-      # `[label, value]` for every untranslated field, read from the original
+      # `[label, value]` for every untranslated field but a hidden one
+      # (`SharedFieldsComponent.listed?`), read from the original
       # language (an untranslated field's one value lives there). Empty off a
       # translation tab, where those fields are ordinary inputs.
       def shared_fields
         return [] unless translation_tab?
 
-        (definition&.fields || []).reject(&:translated?).map do |field|
+        (definition&.fields || []).reject(&:translated?).select { |field| Admin::EditorScreen::SharedFieldsComponent.listed?(field) }.map do |field|
           [ field.label, Admin::EditorScreen::SharedFieldsComponent.display(field, default_fields_object&.public_send(field.name)) ]
         end
       end

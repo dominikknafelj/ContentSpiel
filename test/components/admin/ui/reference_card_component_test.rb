@@ -201,6 +201,60 @@ class Admin::Ui::ReferenceCardComponentTest < ViewComponent::TestCase
     assert_no_selector "button"
   end
 
+  # A Diagram block's source, a `:mermaid` field: code, so its original is
+  # drawn in the code frame with its indentation, in the outdated diff as in
+  # the current card a confirmation streams.
+  def outdated_diagram
+    page = create_page(title: "Flow")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "diagram", settings: { "source" => "flowchart LR\n    A --> B" } }).record
+    assert ContentBlocks::Save.call(block, translations: { "de" => { settings: { "source" => "flowchart LR\n    A --> B" } } }).ok?
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "source" => "flowchart LR\n    A --> C" } }).ok?
+    block.reload
+  end
+
+  test "an original's kind is read from its input's class, and no input's display is asked" do
+    link = ContentModel::Definition::Field.new(name: "target", type: :link, options: { translated: true })
+    code = ContentModel::Definition::Field.new(name: "snippet", type: :code, options: {})
+    mermaid = ContentModel::Definition::Field.new(name: "source", type: :mermaid, options: { translated: true, drawing: :drawing })
+    inputs = [ Admin::Fields::Base, Admin::Fields::LinkField, Admin::Fields::CodeField, Admin::Fields::MermaidField ]
+    own = inputs.select { |input| input.singleton_class.instance_methods(false).include?(:display) }
+    saved = own.to_h { |input| [ input, input.singleton_class.instance_method(:display) ] }
+    asked = []
+    own.each { |input| input.define_singleton_method(:display) { |*| asked << input } }
+
+    assert_equal :plain, Admin::Ui::ReferenceCardComponent.kind_for("/about", link)
+    assert_equal :code, Admin::Ui::ReferenceCardComponent.kind_for("puts 1", code)
+    assert_equal :code, Admin::Ui::ReferenceCardComponent.kind_for("flowchart LR", mermaid)
+    assert_empty asked
+  ensure
+    saved&.each { |input, method| input.singleton_class.define_method(:display, method) }
+  end
+
+  test "a diagram's outdated source is a word diff in the code frame, its indentation kept" do
+    block = outdated_diagram
+    field = block.definition.fields.find { |candidate| candidate.name == "source" }
+    assert_equal :code, Admin::Ui::ReferenceCardComponent.kind_for(block.translation_value("source", "en"), field)
+
+    render_outdated(block, field: "source", kind: :code)
+
+    assert_selector "pre.font-cs-mono del", text: "B"
+    assert_selector "pre.font-cs-mono ins", text: "C"
+    assert_match(/flowchart LR\n    A --> /, page.find("pre.font-cs-mono").text(normalize_ws: false))
+    assert_no_selector "p.whitespace-pre-line"
+  end
+
+  test "current_for draws a diagram's source as code, as a confirmation streams it" do
+    block = outdated_diagram
+    block.confirm_translation("source", "de")
+    block.save!
+
+    render_inline Admin::Ui::ReferenceCardComponent.current_for(block, "source", locale: "de")
+
+    assert_selector "##{Admin::Ui::ReferenceCardComponent.dom_id(block, "source", "de")}[data-translation-state='current'] pre.font-cs-mono"
+    assert_equal "flowchart LR\n    A --> C", page.find("pre.font-cs-mono").text(normalize_ws: false).strip
+    assert_no_selector "del, ins, button"
+  end
+
   class StubProvider
     def initialize(api_key:, model:); end
   end

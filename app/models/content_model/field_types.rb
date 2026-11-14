@@ -22,10 +22,18 @@ module ContentModel
     THEME_CHOICE = :theme_choice
     THEME_CHOICE_LISTS = %i[section_styles icons].freeze
 
-    # Types only a built-in block type may declare: choices for posts are not
-    # built, and an outside type's list would need a key of theme.yml, which
-    # the CMS owns.
-    BLOCK_ONLY = [ THEME_CHOICE ].freeze
+    # Types only a built-in block type may declare, each with why a post
+    # type (or a field group) and an outside block type may not: choices for
+    # posts are not built, and an outside type's list would need a key of
+    # theme.yml, which the CMS owns; a Mermaid source and its drawing are
+    # the Diagram block's, whose card makes the drawing (the renderer frame)
+    # and whose component prints it, and no other record has either.
+    DIAGRAM_ONLY = "a drawing is made by the Diagram block's card and printed by its component, and nothing else draws or shows one".freeze
+    BLOCK_ONLY = {
+      THEME_CHOICE => { posts: "choices for posts are not built", outside: "its list would need a key of theme.yml, which the CMS owns" },
+      mermaid: { posts: DIAGRAM_ONLY, outside: DIAGRAM_ONLY },
+      diagram_drawing: { posts: DIAGRAM_ONLY, outside: DIAGRAM_ONLY }
+    }.freeze
 
     # A link longer than this is refused, never cut.
     LINK_MAX = 2048
@@ -51,6 +59,30 @@ module ContentModel
     # The validation of a type with no rules of its own.
     NOTHING = ->(field:, value:, raw:, errors:, stored:, translations:) { }
 
+    # Text kept as typed (code block spec §1), for `:code` and `:mermaid`:
+    # the line endings as one `\n` and the lines of only white space before
+    # the first line and after the last dropped, nil when nothing is left.
+    # Lines, not a regular expression: a run of blank lines in the middle of
+    # 20,000 characters must not be walked once per line.
+    TYPED_TEXT = lambda do |value|
+      lines = value.to_s.gsub(/\r\n?/, "\n").split("\n", -1)
+      lines.shift while lines.any? && lines.first.strip.empty?
+      lines.pop while lines.any? && lines.last.strip.empty?
+      lines.join("\n").presence
+    end
+
+    # What a `:diagram_drawing` cast answers for a value that does not clean:
+    # a mark its validation refuses (`:invalid_drawing`), never a nil, which
+    # `FieldSet#assign` would drop without a word. It is never stored, since
+    # the save it is in is refused.
+    DRAWING_REFUSED = "refused".freeze
+
+    # A drawing's `from`: the SHA-256 of its source in hex, which is all it
+    # is ever compared with (`Diagrams::Drawing#current?`). Anything else,
+    # a hand-posted string of any length among them, is refused as the
+    # drawing's shape, so it never rides along with every later save.
+    DRAWING_FROM = /\A\h{64}\z/
+
     class << self
       def register(type)
         raise ArgumentError, "a field type is a ContentModel::FieldType, not #{type.inspect}" unless type.is_a?(FieldType)
@@ -71,9 +103,9 @@ module ContentModel
 
       def reset! = types.clear
 
-      # The fourteen built-ins, in this order (it is `names`' order).
+      # The sixteen built-ins, in this order (it is `names`' order).
       def register_built_ins
-        [ string, text, code, integer, boolean, date, url, select, content_type, tag, link, theme_choice, email, form ].each { |type| register(type) }
+        [ string, text, code, mermaid, diagram_drawing, integer, boolean, date, url, select, content_type, tag, link, theme_choice, email, form ].each { |type| register(type) }
       end
 
       # The one rule for a link a visitor follows (the Card's address): an
@@ -135,9 +167,11 @@ module ContentModel
           options: lambda { |options, earlier|
             refuse_blank(options)
             refuse_control(options)
+            raise ArgumentError, "`drawing:` is a mermaid field's, naming its diagram_drawing field" if options.key?(:drawing)
+            raise ArgumentError, DESCRIPTION_REFUSAL if options.key?(:description)
             # `help:` is a line under a string field in CS Studio (the Note
             # block's title: what an empty one does).
-            raise ArgumentError, "`help:` is a line under a string field, written as a String" if options.key?(:help) && !(options[:help].is_a?(String) && options[:help].strip != "")
+            check_help(options)
             # `placeholder_from:` names a select declared BEFORE the string,
             # whose chosen label is the string's placeholder.
             if options.key?(:placeholder_from)
@@ -180,12 +214,15 @@ module ContentModel
       # (`Forms::BuiltInFieldTypes`) is limited, and the editors' own text
       # fields are not unless they say so. A translated text's other
       # languages are not looked at: the one caller with a limit is untranslated.
+      # `help:` is a line under it in CS Studio, as under a string (the
+      # Diagram block's description: what it is for).
       def text
         FieldType.new(
           name: :text, cast: STRIPPED, translatable: true, audit: :value,
           options: lambda { |options, _earlier|
             raise ArgumentError, "`max:` on a text field is a number of characters, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
-            refuse_choice_and_string_options(options.except(:max))
+            check_help(options)
+            refuse_choice_and_string_options(options.except(:max, :help))
           },
           validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
             max = field.options[:max]
@@ -245,21 +282,13 @@ module ContentModel
       # indentation, tabs, inner blank lines and trailing spaces. Two things
       # are not content: which line ending the browser sent (a form submits
       # CRLF) and lines of only white space before the first line and after
-      # the last, which a paste brings along. Lines, not a regular
-      # expression: a run of blank lines in the middle of 20,000 characters
-      # must not be walked once per line. Never translated: the code is the
+      # the last, which a paste brings along (`TYPED_TEXT`). Never translated: the code is the
       # same in every language, and a translated field is what is offered to
       # an AI provider. `max:` counts characters. Audited as a digest: an
       # event's changes would hold the source twice beside the snapshot.
       def code
         FieldType.new(
-          name: :code, translatable: false, audit: :digest,
-          cast: lambda { |value|
-            lines = value.to_s.gsub(/\r\n?/, "\n").split("\n", -1)
-            lines.shift while lines.any? && lines.first.strip.empty?
-            lines.pop while lines.any? && lines.last.strip.empty?
-            lines.join("\n").presence
-          },
+          name: :code, translatable: false, audit: :digest, cast: TYPED_TEXT,
           options: lambda { |options, _earlier|
             raise ArgumentError, "code fields can't be translated (the code is the same in every language)" if options[:translated]
             refuse_choice_and_string_options(options)
@@ -273,6 +302,85 @@ module ContentModel
             next unless value && max && value.length > max
 
             errors.add(field.name, :too_long, count: max, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(max))
+          }
+        )
+      end
+
+      # A Diagram block's Mermaid source (Diagram block spec §1 and §5), cast
+      # as `:code` is. The editor's script hashes the same normalised text for
+      # the drawing's `from` (`Diagrams::Drawing.digest`), so a drawing is
+      # current for the source as stored. Unlike code it may be translated,
+      # and like code it is never offered to an AI provider. `max:` counts
+      # characters, and the source's own limit
+      # (`Diagrams::Source::MAX_CHARACTERS`) holds without one; both are
+      # refused in the Code field's words, and the length is all a save is
+      # refused for. A source with a line `Diagrams::Source` refuses (a
+      # `classDef`, a `click`, a type off the list) is stored as typed, as any
+      # half-typed source is: the line rules are the editor's and the frame's,
+      # which say the line's sentence and draw nothing from it, so the drawing
+      # stays the last that worked. Mermaid never runs on the server, the
+      # frame refuses such a source before Mermaid sees it, and what reaches a
+      # page is a drawing `Diagrams::Drawing` cleaned. A block's settings are
+      # validated in the default language alone
+      # (`ContentBlock#settings_are_valid`), so every language the object
+      # holds is read here, each sentence once.
+      #
+      # `drawing:` names the `:diagram_drawing` field its drawing is written
+      # into, translated as the source is.
+      # `description:`, if given, names the string or text field that
+      # describes the drawing, translated as the source is: the card says the
+      # site shows nothing while it is blank.
+      def mermaid
+        FieldType.new(
+          name: :mermaid, translatable: false, audit: :digest, cast: TYPED_TEXT,
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "a mermaid field names its drawing field, `drawing:`" unless options[:drawing].is_a?(Symbol) || options[:drawing].is_a?(String)
+            raise ArgumentError, "`max:` on a mermaid field is a number of characters, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
+            raise ArgumentError, DESCRIPTION_REFUSAL if options.key?(:description) && !(options[:description].is_a?(Symbol) || options[:description].is_a?(String))
+            refuse_choice_and_string_options(options.except(:drawing, :description))
+          },
+          finish: lambda { |field, fields|
+            drawing = fields.find { |candidate| candidate.name == field.options[:drawing].to_s }
+            unless drawing&.type == :diagram_drawing && drawing.translated? == field.translated?
+              raise ArgumentError, "the mermaid field #{field.name} names `drawing: #{field.options[:drawing].inspect}`, which is to be a diagram_drawing field of this definition, translated as the source is"
+            end
+            next unless field.options.key?(:description)
+
+            description = fields.find { |candidate| candidate.name == field.options[:description].to_s }
+            unless %i[string text].include?(description&.type) && description.translated? == field.translated?
+              raise ArgumentError, "the mermaid field #{field.name} names `description: #{field.options[:description].inspect}`, which is to be a string or text field of this definition, translated as the source is"
+            end
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            texts = [ value ]
+            texts += translations.values.map { |values| TYPED_TEXT.call(values.to_h[field.name]) } if field.translated?
+            texts.compact.uniq.each { |text| refuse_long_mermaid(field, text, errors) }
+          }
+        )
+      end
+
+      # The drawing of a Diagram block (spec §1 and §3): `{ "svg", "from" }`,
+      # sent by the editor's script as JSON, read back from jsonb as a Hash.
+      # The cast cleans the SVG (`Diagrams::Drawing.clean`, the security
+      # boundary) and keeps `from`, the digest of the source the frame drew,
+      # as it was given when it is a digest (`DRAWING_FROM`): it cannot see
+      # the source. A value that is no such pair, holds another `from` or
+      # does not clean casts to the `DRAWING_REFUSED` mark, and only
+      # a mark this save was handed is refused (`raw`, and every language of
+      # `translations`): a stored drawing that today's rules refuse reads back
+      # as the mark (no drawing) and stops no save. Translated with its
+      # source, never offered to an AI provider, audited as a digest, and
+      # not tracked for translation state: it is derived from the source,
+      # whose change is what makes a translation outdated.
+      def diagram_drawing
+        FieldType.new(
+          name: :diagram_drawing, translatable: false, audit: :digest, tracked: false,
+          cast: ->(value) { cast_drawing(value) },
+          options: ->(options, _earlier) { refuse_choice_and_string_options(options) },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            sent = [ raw ]
+            sent += translations.values.map { |values| values.to_h[field.name] } if field.translated?
+            errors.add(field.name, :invalid_drawing) if sent.any? { |candidate| candidate.is_a?(Hash) && candidate.key?(DRAWING_REFUSED) }
           }
         )
       end
@@ -429,6 +537,36 @@ module ContentModel
         )
       end
 
+      # One error per refusal of `Diagrams::Source`, said once however many
+      # languages share it. The limit is the smaller of `max:` and the
+      # source's own, in the Code field's sentence.
+      def refuse_long_mermaid(field, text, errors)
+        limit = [ field.options[:max], Diagrams::Source::MAX_CHARACTERS ].compact.min
+        return unless text.length > limit
+
+        add_once(errors, field.name, :too_long, count: limit, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(limit))
+      end
+
+      def add_once(errors, name, type, **options)
+        errors.add(name, type, **options) unless errors.added?(name, type, **options)
+      end
+
+      def cast_drawing(value)
+        pair = value.is_a?(String) ? parse_json(value) : value
+        pair = pair.to_h.stringify_keys if pair.is_a?(Hash)
+        return pair.slice(DRAWING_REFUSED) if pair.is_a?(Hash) && pair.key?(DRAWING_REFUSED)
+        return { DRAWING_REFUSED => "shape" } unless pair.is_a?(Hash) && pair["svg"].is_a?(String) && pair["from"].is_a?(String) && pair["from"].match?(DRAWING_FROM)
+
+        result = Diagrams::Drawing.clean(pair["svg"])
+        result.svg ? { "svg" => result.svg, "from" => pair["from"] } : { DRAWING_REFUSED => result.reason.to_s }
+      end
+
+      def parse_json(text)
+        JSON.parse(text)
+      rescue JSON::ParserError
+        nil
+      end
+
       # -- Option rules several types share ------------------------------
 
       def refuse_blank(options)
@@ -450,11 +588,21 @@ module ContentModel
         raise ArgumentError, "`control: :segmented` draws a select's choices as buttons: it is for a select"
       end
 
+      HELP_REFUSAL = "`help:` is a line under a string or a text field, written as a String".freeze
+
+      def check_help(options)
+        raise ArgumentError, HELP_REFUSAL if options.key?(:help) && !(options[:help].is_a?(String) && options[:help].strip != "")
+      end
+
       def refuse_string_options(options)
-        raise ArgumentError, "`help:` is a line under a string field, written as a String" if options.key?(:help)
+        raise ArgumentError, HELP_REFUSAL if options.key?(:help)
         raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" if options.key?(:placeholder_from)
         raise ArgumentError, "`format:` is for a string field" if options.key?(:format) || options.key?(:format_message)
+        raise ArgumentError, "`drawing:` is a mermaid field's, naming its diagram_drawing field" if options.key?(:drawing)
+        raise ArgumentError, DESCRIPTION_REFUSAL if options.key?(:description)
       end
+
+      DESCRIPTION_REFUSAL = "`description:` is a mermaid field's, naming the text field that describes its drawing".freeze
 
       def url?(value)
         URL_SCHEMES.include?(URI.parse(value).scheme.to_s.downcase)

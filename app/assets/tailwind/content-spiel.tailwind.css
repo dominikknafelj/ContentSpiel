@@ -839,6 +839,44 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-section-lanes { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }
   .admin-section-lane__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
+/* A Diagram block's source and its preview (`Admin::Fields::MermaidField`):
+   two equal columns 1rem apart while the field is at least 40rem wide (two
+   halves of 19.5rem and the gap fit on one line), the preview wrapped under
+   the source below that, each then the field's width. A wrapping row and
+   no container query: no size container may stand inside the post form,
+   whose sources include every field input (`test/lib/admin_design_rules_test.rb`).
+   The frame slot is where the preview script builds its renderer frame. */
+.admin-mermaid-field__pair { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+.admin-mermaid-field__pair > * { flex: 1 1 19.5rem; min-width: min(100%, 19.5rem); }
+.admin-mermaid-field__frame { position: relative; min-height: 200px; border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
+/* The renderer frame is the slot's width and as high as its drawing (the
+   script sets the height, 200px to 640px); the state's words stand over it: the
+   blank frame's line in its middle, the kept drawing's badge at its top
+   left and "Drawing…" at its top right. None takes the pointer. The
+   frame's document declares no colour scheme, and a browser paints an
+   opaque canvas under a frame whose scheme differs from its element's, so
+   the element says the same (`normal`) and the slot's surface shows through
+   in both of CS Studio's schemes. */
+.admin-mermaid-field__renderer { display: block; width: 100%; height: 200px; border: 0; border-radius: inherit; background: transparent; color-scheme: normal; }
+.admin-mermaid-field__blank { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; margin: 0; padding: 1rem; text-align: center; pointer-events: none; }
+.admin-mermaid-field__kept { position: absolute; top: 0.5rem; left: 0.5rem; pointer-events: none; }
+.admin-mermaid-field__busy { position: absolute; top: 0.5rem; right: 0.625rem; pointer-events: none; }
+.admin-mermaid-field__preview > [aria-live]:not(:empty) { margin-top: 0.5rem; }
+/* The source's offending line: a band of the warn tint laid over the well,
+   one line high, where the script puts it. Blended so it tints the well's
+   ground and leaves the text's ink as it is: the darker of the two in
+   light, the lighter in dark. */
+.admin-mermaid-field__well { position: relative; }
+.admin-mermaid-field__line { position: absolute; pointer-events: none; background: var(--cs-warn-tint); mix-blend-mode: darken; }
+[data-theme="dark"] .admin-mermaid-field__line { mix-blend-mode: lighten; }
+/* Import file… only changes the source: a form turned read-only in place
+   (`editing/freeze`, which marks its fieldsets `admin-held`) shows none, as
+   the server draws none in a held form. */
+.admin-held .admin-mermaid-field__import { display: none; }
+/* A hidden field input (`Admin::Ui::FieldComponent#hidden?`, a Diagram
+   block's drawing): no box and no gap in its form's column, until its error
+   slot holds a message (a `p`, `admin/shared/_field_errors`). */
+.admin-field--hidden:not(:has(p)) { display: none; }
 /* The dashboard's heading row: the heading, then New page… and New post…
    at its end. It wraps, so on a narrow screen the buttons go under the
    heading rather than crushing it. */
@@ -1521,6 +1559,14 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-block-tile:where(:hover) { box-shadow: var(--cs-shadow-2); background: var(--cs-tile-raised); }
 .admin-block-tile:where(:has(> .admin-block-tile__face[aria-expanded="true"])),
 .admin-block-tile:where(:has(> .admin-block-tile__face:focus-visible)) { box-shadow: var(--cs-shadow-3), 0 0 0 2px var(--cs-accent); background: var(--cs-tile-raised); }
+/* A type's small picture on its tile (`TileSummaryComponent`, a type's
+   `tile_picture`: the Diagram block's drawing): the drawing fills the box's
+   inside and keeps its aspect (an SVG's viewBox meets its box), whatever the
+   block's own stylesheet sizes it by on a page (its natural width, its
+   smallest width): the wrapper the type writes takes the box's inside, so
+   the drawing's 100% is of a size. Nothing in it moves the tile. */
+.admin-block-tile__picture > .content-block--diagram { display: block; width: 100%; height: 100%; }
+.admin-block-tile .admin-block-tile__picture svg { display: block; width: 100%; height: 100%; min-width: 0; max-width: 100%; }
 /* The tile of the block whose thread is open in the notes
    (`admin--notes--drawer#markActive`) takes the people frame, in the rule
    above. */

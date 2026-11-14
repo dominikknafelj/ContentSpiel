@@ -13,11 +13,15 @@
           <div class="text-ink">
             <% paragraphs.each do |segments| %><p class="mt-2 first:mt-0"><%= diff_html(segments) %></p><% end %>
           </div>
+        <% elsif code? %>
+          <%= helpers.render "admin/shared/code_display", body: diff_html(paragraphs.first) %>
         <% else %>
           <p class="whitespace-pre-line text-ink"><%= diff_html(paragraphs.first) %></p>
         <% end %>
       <% elsif rich? %>
         <div class="admin-rich-text-content text-ink"><%= original_html %></div>
+      <% elsif code? %>
+        <%= helpers.render "admin/shared/code_display", body: original %>
       <% else %>
         <p class="whitespace-pre-line text-ink"><%= original %></p>
       <% end %>

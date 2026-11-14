@@ -62,8 +62,9 @@ class Theme
     ].freeze
 
     # The CMS's own under the same prefix, and not a theme's to rely on: the
-    # preview bar's two colours and the image placeholder's two.
-    OWN_TOKENS = /\A--th-(?:preview|ph)-/
+    # preview bar's two colours, the image placeholder's two and the six dark
+    # series grounds a diagram's tokens point at.
+    OWN_TOKENS = /\A--th-(?:preview|ph|diagram-dark)-/
 
     # The classes a CMS template writes from a choice the theme declared, which
     # the theme's stylesheet may rely on: the name pattern and what it marks.

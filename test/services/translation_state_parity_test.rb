@@ -294,8 +294,9 @@ class TranslationStateParityTest < ActiveSupport::TestCase
 
           # Then changed in the first language, as the default-language card
           # sends it: a translated schema field with the settings, a column
-          # in the language's own translations.
-          changed = ->(value) { "#{value} changed" }
+          # in the language's own translations. A value that is not text (a
+          # Diagram block's drawing) is sent as it was.
+          changed = ->(value) { value.is_a?(String) ? "#{value} changed" : value }
           english_columns = english.except(*own.keys).transform_keys(&:to_sym).transform_values(&changed)
           attributes = own.any? ? { settings: definition.sample.settings.merge(own.transform_values(&changed)) } : {}
           assert ContentBlocks::Save.call(block, attributes: attributes, translations: english_columns.any? ? { "en" => english_columns } : {}).ok?
@@ -329,6 +330,53 @@ class TranslationStateParityTest < ActiveSupport::TestCase
       assert_parity page
       assert_equal "outdated", stored_state(page, "de")
       assert_equal "complete", stored_state(page, "es")
+    end
+  end
+
+  # Diagram block spec §1: the source and the description are tracked, the
+  # drawing is not (it follows its source), and the description is required
+  # for the site to show the diagram, so a language without one is missing.
+  test "a diagram: a change of the description or of the source makes a translation outdated, a re-draw changes no state, a blank description is missing" do
+    source = "flowchart LR\n  A --> B"
+    drawing = ->(from, svg: BlockTypes::Diagram.sample_drawing("en")["svg"]) { JSON.generate(svg: svg, from: Diagrams::Drawing.digest(from)) }
+
+    as_owner do
+      page = create_page(title: "Flow", translations: { "de" => { title: "Ablauf" }, "es" => { title: "Flujo" } })
+      block = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "diagram", settings: { "source" => source, "drawing" => drawing.call(source), "description" => "Two boxes." } }).record
+      assert block.persisted?
+      assert_parity page
+      assert_equal "missing", stored_state(page, "de"), "a blank description where the original has one is missing"
+      assert_equal :missing, block.reload.translation_state(:description, "de")
+
+      assert ContentBlocks::Save.call(block, translations: { "de" => { settings: { "source" => "flowchart LR\n  A --> B2", "description" => "Zwei Kästen." } } }).ok?
+      assert_parity page
+      assert_equal "complete", stored_state(page, "de")
+      assert_equal "missing", stored_state(page, "es")
+
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "description" => "Two boxes in a row." } }).ok?
+      assert_parity page
+      assert_equal "outdated", stored_state(page, "de")
+      assert_equal :outdated, block.reload.translation_state(:description, "de")
+      assert_equal :current, block.translation_state(:source, "de")
+
+      assert Translations::Confirm.call(block, field: :description, locale: "de").ok?
+      assert_parity page
+      assert_equal "complete", stored_state(page, "de")
+
+      # The same source drawn again (Mermaid's markup differs from one run to
+      # the next) is no change a translation follows.
+      redrawn = BlockTypes::Diagram.sample_drawing("de")["svg"]
+      assert ContentBlocks::Save.call(block.reload, attributes: { settings: { "source" => source, "drawing" => drawing.call(source, svg: redrawn) } }).ok?
+      assert_not_equal BlockTypes::Diagram.sample_drawing("en")["svg"], block.reload.translated_settings.dig("en", "drawing", "svg")
+      assert_parity page
+      assert_equal "complete", stored_state(page, "de")
+      assert_equal :current, block.translation_state(:source, "de")
+
+      changed = "#{source}\n  B --> C"
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "source" => changed, "drawing" => drawing.call(changed) } }).ok?
+      assert_parity page
+      assert_equal "outdated", stored_state(page, "de")
+      assert_equal :outdated, block.reload.translation_state(:source, "de")
     end
   end
 end

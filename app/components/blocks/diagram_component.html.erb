@@ -1,0 +1,12 @@
+<%# The figure, the scroll box round the drawing and the caption under it
+    (Diagram block spec §6). `svg` is printed as given: it is already named,
+    sized and its ids are the block's. The box scrolls sideways when the
+    drawing at its smallest width (diagram.css) is wider than the column, and
+    is a keyboard stop, named by the description, whether it scrolls or not:
+    the column's width is the browser's to know. %>
+<figure class="content-block content-block--diagram">
+  <div class="content-block--diagram__scroll" tabindex="0" role="group" aria-label="<%= description %>"><%= svg %></div>
+  <% if caption.present? %>
+    <figcaption><%= caption %></figcaption>
+  <% end %>
+</figure>

@@ -22,7 +22,25 @@ module Admin
     # is deliberate: the caller already knows both facts building the field
     # list for a locale, and a field kept translated: true but with nothing
     # to compare against (a brand new translated field, no default-locale
-    # value yet) simply passes `original: nil` and gets no column.
+    # value yet) simply passes `original: nil` and gets no column. The input
+    # has the last word (`Fields::Base.reference?`): one nobody types in (a
+    # Diagram block's drawing) is never shown beside an original.
+    #
+    # Four more answers of the input shape what is drawn around it:
+    # `hidden?`, a hidden input nobody types in, drawn with its error slot
+    # alone in `.admin-field--hidden`, which takes no room in the form until
+    # the slot holds an error; `field_data`, data on the field's wrapper;
+    # `label_end`, a control at the end of the label's row; and
+    # `below_pair`, what it draws under a translation pair, the pair's width.
+    #
+    # `importable:` true is a caller that can take a file into the field now
+    # (it may change it, nobody else holds it) and draws what the input
+    # needs outside the form (`Fields::Base.outside_form`): the block card
+    # alone. Only then does an input draw its import control (`label_end`);
+    # it is false unless asked for.
+    #
+    # The original is a code frame (`ReferenceCardComponent`'s `:code`) where
+    # the input is the Code field or one built on it (`kind_for`).
     class FieldComponent < AdminComponent
       include Admin::Ui::Contract
 
@@ -31,10 +49,13 @@ module Admin
         motion: :reduced,
         content_edges: %i[none short long],
         widths: :from_container,
-        interface: %i[field form_name value original locale errors id_prefix translation_state translation_confirm translation_record placeholder],
+        interface: %i[field form_name value original locale errors id_prefix translation_state translation_confirm translation_record placeholder importable],
         limits: [
           "It draws the chrome around a field; the input is the Admin::Fields class of the field's type.",
-          "Whether the original is shown is the caller's: it is shown only when an original is handed over."
+          "Whether the original is shown is the caller's and the input's: it is shown only when an original is handed over and the input answers reference? (a drawing nobody types in does not).",
+          "A hidden input (hidden?) is drawn with its error slot alone: no label, help, original or Translate button, and no room in the form until the slot holds an error.",
+          "An input may put data on the field's wrapper (field_data) and draw under the translation pair (below_pair), the Mermaid source's preview.",
+          "An input may draw a control at the end of its label's row (label_end), the Mermaid source's Import file…; it is drawn only with importable: true, which only a caller that may change the field now and draws outside_form passes."
         ],
         states: %i[rest invalid translated outdated hover focus],
         keys: [],
@@ -74,7 +95,7 @@ module Admin
       # changed" note beside the original -- the same contract
       # `Admin::Columns::Base` gives every column field.
       def initialize(field:, form_name:, value:, original: nil, locale:, errors: [], id_prefix: nil,
-        translation_state: nil, translation_confirm: nil, translation_record: nil, placeholder: nil)
+        translation_state: nil, translation_confirm: nil, translation_record: nil, placeholder: nil, importable: false)
         @field = field
         @form_name = form_name
         @value = value
@@ -86,6 +107,7 @@ module Admin
         @translation_confirm = translation_confirm
         @translation_record = translation_record
         @placeholder = placeholder
+        @importable = importable
       end
 
       # The field's own label where its type gives one (`label: "File name"`),
@@ -102,18 +124,32 @@ module Admin
       # already follows (`content_type` -> `ContentTypeField`, `groups` ->
       # `GroupsField`), so adding a field type later means adding one file,
       # not also editing a hand-kept dispatch table here.
+      #
+      # One instance per render: the template draws it once and then asks it
+      # for its wrapper's data and what it draws under the pair.
       def input_component
-        input_class.new(
-          field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix, placeholder: placeholder
+        @input_component ||= input_class.new(
+          field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix, placeholder: placeholder,
+          importable: importable
         )
       end
 
-      def input_class = "Admin::Fields::#{field.type.to_s.camelize}Field".constantize
+      def input_class = self.class.input_class_for(field)
+
+      # The input class of a scalar field (`Admin::Fields::<Type>Field`), for
+      # this component and for a part that asks an input how it reads a value
+      # (`ReferenceCardComponent.kind_for`).
+      def self.input_class_for(field) = "Admin::Fields::#{field.type.to_s.camelize}Field".constantize
 
       # Whether the input draws its own label (a checkbox, a row of buttons),
       # so this component draws none above it: the input's answer, not a
       # question of the field's type name.
       def own_label? = input_class.own_label?(field)
+
+      # A hidden input nobody types in (`Fields::Base.hidden?`): drawn with
+      # its error slot alone, in `.admin-field--hidden`, which takes no room
+      # in the form until the slot holds an error.
+      def hidden? = input_class.hidden?(field)
 
       # A field whose input draws nothing (a theme choice with no choice
       # to make) draws no label or chrome either.
@@ -124,14 +160,15 @@ module Admin
 
       # True once the caller has handed over something to compare against --
       # see the class comment for why that's the caller's call, not this
-      # component re-deriving "non-default locale and translated" itself.
-      def show_original? = original.present?
+      # component re-deriving "non-default locale and translated" itself --
+      # and the input is one a translator compares (`Fields::Base.reference?`).
+      def show_original? = original.present? && input_class.reference?(field)
 
       # The card showing the primary-language original beside (or above) the
       # input -- see `Admin::Columns::Base#reference_card`.
       def reference_card
         Admin::Ui::ReferenceCardComponent.new(
-          field: field.name, locale: locale, original: original, state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
+          field: field.name, locale: locale, original: original, kind: Admin::Ui::ReferenceCardComponent.kind_for(original, field), state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
         )
       end
 
@@ -164,7 +201,7 @@ module Admin
 
       def translatable? = field.field_type&.translatable == true
 
-      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record, :placeholder
+      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record, :placeholder, :importable
     end
   end
 end

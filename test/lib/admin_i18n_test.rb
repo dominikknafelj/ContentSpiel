@@ -475,6 +475,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/editor/section_controller.js
     app/components/admin/fields/code_field.rb
     app/components/admin/fields/code_field.html.erb
+    app/components/admin/fields/mermaid_field.rb
+    app/components/admin/fields/mermaid_field.html.erb
+    app/components/admin/fields/diagram_drawing_field.rb
+    app/components/admin/fields/diagram_drawing_field.html.erb
     app/components/admin/fields/form_field.rb
     app/components/admin/fields/form_field.html.erb
     app/javascript/controllers/admin/editor/code_limit_controller.js

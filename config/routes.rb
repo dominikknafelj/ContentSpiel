@@ -413,6 +413,12 @@ Rails.application.routes.draw do
         get :listed, defaults: { format: :json }
       end
 
+      # The Diagram block's renderer frame: the one document Mermaid runs in,
+      # sandboxed to an opaque origin (`Admin::DiagramRenderersController`).
+      # Inside the backend's host constraint, so with ADMIN_HOST set it is on
+      # the admin host alone, the host of the editor that frames it.
+      get "diagram-renderer", to: "diagram_renderers#show", as: :diagram_renderer
+
       # The audit log:
       # a paginated, filterable list plus one event's own page.
       # `resources` (plural, unlike `system_status`/`mind_graph` above) since

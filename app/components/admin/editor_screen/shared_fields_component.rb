@@ -38,6 +38,12 @@ module Admin
         end
       end
 
+      # Whether a field has a row here: not a hidden input nobody types in
+      # (`Admin::Fields::Base.hidden?`, a drawing), which has nothing to read.
+      def self.listed?(field)
+        field.group? || !Admin::Ui::FieldComponent.input_class_for(field).hidden?(field)
+      end
+
       def initialize(fields:, primary_url: nil)
         @fields = fields
         @primary_url = primary_url

@@ -38,11 +38,13 @@ class ContentModel::FieldOptionsTest < ActiveSupport::TestCase
     assert_includes error.message, ":segmented"
   end
 
-  test "a string's help line is a string with something in it, for a string field" do
-    assert_equal "Empty: the kind's word.", define { |t| t.field :title, :string, help: "Empty: the kind's word." }.fields.sole.help
-    assert_nil define { |t| t.field :title, :string }.fields.sole.help
-    [ "", " ", nil, :word ].each do |help|
-      assert_raises(ArgumentError, help.inspect) { define { |t| t.field :title, :string, help: help } }
+  test "a help line is a string with something in it, for a string or a text field" do
+    %i[string text].each do |type|
+      assert_equal "Empty: the kind's word.", define { |t| t.field :title, type, help: "Empty: the kind's word." }.fields.sole.help, type
+      assert_nil define { |t| t.field :title, type }.fields.sole.help, type
+      [ "", " ", nil, :word ].each do |help|
+        assert_raises(ArgumentError, "#{type} #{help.inspect}") { define { |t| t.field :title, type, help: help } }
+      end
     end
     assert_raises(ArgumentError) { define { |t| t.field :count, :integer, help: "A number." } }
   end
@@ -87,5 +89,15 @@ class ContentModel::FieldOptionsTest < ActiveSupport::TestCase
     assert_not object.valid?
     assert_equal [ "is too long (maximum is 5 characters)" ], object.errors[:title], "said once"
     assert ContentModel::FieldSet.for(definition).new({}, { "en" => { "title" => "short" }, "de" => { "title" => "kurz" } }, locale: "en").valid?
+  end
+
+  test "translation_required without translated is refused at registration" do
+    field = define { |t| t.field :description, :text, translated: true, translation_required: true }.fields.sole
+
+    assert field.translation_required?
+    assert_not define { |t| t.field :description, :text, translated: true }.fields.sole.translation_required?
+    error = assert_raises(ArgumentError) { define { |t| t.field :description, :text, translation_required: true } }
+    assert_includes error.message, "translated: true"
+    assert_raises(ArgumentError) { define { |t| t.field :description, :text, translated: true, translation_required: "yes" } }
   end
 end

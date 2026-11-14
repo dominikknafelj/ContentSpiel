@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<!-- The page the renderer frame's browser test and the fixture task frame it
+     in (`DiagramFixtures::HostApp`, test/support/diagram_fixtures.rb): never a
+     route of the application. It frames the renderer as the block card does,
+     `sandbox="allow-scripts"` and nothing more, keeps every answer by its id
+     in `window.__answers`, and takes an answer only from its own frame at the
+     opaque origin "null". The server writes the frame's address into `frame.src`. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Diagram host</title>
+</head>
+<body>
+<script>
+  window.__ready = false
+  window.__answers = {}
+  window.__foreign = []
+
+  const frame = document.createElement("iframe")
+  frame.id = "renderer"
+  frame.setAttribute("sandbox", "allow-scripts")
+  frame.width = "900"
+  frame.height = "700"
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== frame.contentWindow || event.origin !== "null") {
+      window.__foreign.push(event.origin)
+      return
+    }
+    if (event.data && event.data.ready === true) {
+      window.__ready = true
+      window.__origin = event.origin
+    } else if (event.data && event.data.id !== undefined) {
+      window.__answers[event.data.id] = event.data
+    }
+  })
+
+  window.__draw = (id, source, options = {}) => {
+    frame.contentWindow.postMessage({ id, source, colours: options.colours || {}, raw: options.raw === true }, "*")
+  }
+
+  // What the parent can reach of the frame's document: null at an opaque origin.
+  window.__frameDocument = () => {
+    try { return frame.contentDocument === null ? "null" : "reachable" } catch (error) { return "threw" }
+  }
+
+  frame.src = "{{renderer}}"
+  document.body.append(frame)
+</script>
+</body>
+</html>

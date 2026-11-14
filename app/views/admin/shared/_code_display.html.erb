@@ -1,0 +1,8 @@
+<%# locals: body -- code read-only in its frame (the Code field's look where it cannot be edited: the sunken
+    ground, a line around it, the monospace face, its indentation kept). Shared by a translation tab's
+    "Shared fields" (`Admin::EditorScreen::SharedFieldsComponent`) and a reference card's original
+    (`Admin::Ui::ReferenceCardComponent`, `:code`). `body` is the text, or a word diff's markup.
+    The line break after the opening tag is the one a browser drops, so a value that begins with
+    one keeps it. %>
+<pre tabindex="0" class="max-h-[12lh] overflow-auto rounded-cs border border-line bg-sunken p-2 font-cs-mono text-sm text-ink [tab-size:2]">
+<%= body %></pre>

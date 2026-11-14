@@ -373,6 +373,61 @@ html[data-surface="studio"] {
   scrollbar-gutter: stable;
 }
 
+/* The Diagram block's colours in CS Studio: the `--th-diagram-*` tokens a
+   site's theme defines, defined here once from CS Studio's own, on the
+   public diagram's class. Two readers: the block card's script reads them
+   off an element of that class (its colour probe) and posts them to the
+   renderer frame, which paints the drawing with the site's stylesheet on
+   these values; and the block's tile paints its small drawing with the same
+   stylesheet, which CS Studio's build imports (application.css), on these
+   values directly. Both schemes follow, since every value is a
+   `var()` of a token both schemes define. The font is CS Studio's sans,
+   Archivo, the face Mermaid measured every box in. The fill is the card's surface
+   and the ink its ink; a line a node's outline (the field line, the faintest
+   CS Studio line at 3:1 on the surface) and an edge dim; a group sunken, a
+   note the accent's tint; the six series grounds, a pie's slices or a
+   gantt's tasks, each an icon chip's hue mixed into its ground (35%),
+   starting with the block's own family (code), media and people: the ink
+   reads at 7.9:1 or better on each in light and 4.7:1 in dark, and each is
+   told from the next (`test/lib/admin_contrast_test.rb`). */
+html[data-surface="studio"] .content-block--diagram {
+  --th-diagram-font: var(--cs-font);
+  --th-diagram-ink: var(--cs-ink);
+  --th-diagram-fill: var(--cs-surface);
+  --th-diagram-line: var(--cs-field-line);
+  --th-diagram-edge: var(--cs-dim);
+  --th-diagram-group: var(--cs-sunken);
+  --th-diagram-note: var(--cs-accent-tint);
+  --th-diagram-accent: var(--cs-accent);
+  --th-diagram-series-1: color-mix(in srgb, var(--cs-ic-code) 35%, var(--cs-ic-code-bg));
+  --th-diagram-series-2: color-mix(in srgb, var(--cs-ic-media) 35%, var(--cs-ic-media-bg));
+  --th-diagram-series-3: color-mix(in srgb, var(--cs-ic-people) 35%, var(--cs-ic-people-bg));
+  --th-diagram-series-4: color-mix(in srgb, var(--cs-ic-text) 35%, var(--cs-ic-text-bg));
+  --th-diagram-series-5: color-mix(in srgb, var(--cs-ic-form) 35%, var(--cs-ic-form-bg));
+  --th-diagram-series-6: color-mix(in srgb, var(--cs-ic-lists) 35%, var(--cs-ic-lists-bg));
+}
+
+/* The Diagram block's picture on its tile (`.admin-block-tile__picture`,
+   112×72): the drawing's shape at a glance, never its words. The rules are
+   the tile's alone, after the block's own (`diagram.css`, which the site and
+   the renderer frame read unchanged), and each outweighs the rule it
+   overrides there by the box's class. Fitted whole, never cropped, it is
+   scaled far down, so a stroke stays 1px at any scale; its words and its
+   arrowheads, unreadable that small, are not drawn; and every node reads as
+   a solid block, filled sunken: a flowchart's box, diamond or circle, a
+   class's, state's or entity's box (Mermaid's `.outer-path` and an
+   entity's row stripes), a sequence's participant. Inside a node a label's
+   own box and a divider's line stay unfilled, a start state's dot keeps
+   the block's own rule (it weighs the same and comes later) and so does a
+   state note's fill, which weighs more. Edges, clusters, a pie's slices and
+   a gantt's bars keep the block's look. */
+.admin-block-tile__picture .content-block--diagram :is(path, line, rect, circle, polygon) { vector-effect: non-scaling-stroke; }
+.admin-block-tile__picture .content-block--diagram :is(text, foreignObject) { display: none; }
+.admin-block-tile__picture .content-block--diagram * { marker-start: none; marker-end: none; }
+.admin-block-tile__picture .content-block--diagram :is(.node rect, .node polygon, .node circle, .node ellipse, .node path, rect.actor, .actor-man circle) { fill: var(--cs-sunken); }
+.admin-block-tile__picture .content-block--diagram :is(.row-rect-odd, .row-rect-even) > path:first-child { fill: var(--cs-sunken); }
+.admin-block-tile__picture .content-block--diagram :is(.node .label rect, .node .divider path) { fill: none; }
+
 /* The theme switch's cross-fade: the browser's own fade-out of the old
    snapshot and fade-in of the new, at the fade's length and easing. Only the
    duration and the timing function are set, never the `animation` shorthand,

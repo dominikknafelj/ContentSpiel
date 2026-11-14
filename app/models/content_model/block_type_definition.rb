@@ -17,10 +17,11 @@ module ContentModel
     # What a block type brings beside its fields (block types spec, decision
     # 1). Each declaration is READ by the list that used to repeat it by hand:
     # `theme_methods` and `tokens` by `Theme::Contract`, `stylesheet` by the
-    # public stylesheet's build (`BlockTypes.theme_css_blocks`), `summary` and
-    # `preview` by the editor's tile, `read_only_actions` by the held form's allow-list,
-    # `sample` by the shared tests. A declaration nothing reads would be
-    # documentation in code; none of these is.
+    # public stylesheet's build (`BlockTypes.theme_css_blocks`), `summary`,
+    # `preview` and `tile_picture` by the editor's tile, `read_only_actions`
+    # by the held form's allow-list, `sample` by the shared tests. A
+    # declaration nothing reads would be documentation in code; none of
+    # these is.
 
     # The capabilities something in the CMS asks for (`capability?`): a type
     # claiming another is refused at registration, since nothing would read it.
@@ -42,8 +43,8 @@ module ContentModel
     # one or none; an outside type picks from the same list. The last four
     # are the Note block's kinds (note block plan, rulings 11 and 12), which
     # its blocks' cards and tiles draw through `for_block:`; `table`
-    # is the Table block's.
-    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list].freeze
+    # is the Table block's and `diagram` the Diagram block's.
+    ICONS = %w[pilcrow image code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list].freeze
 
     # The hue families an icon may be drawn in: the chip behind a
     # type's icon takes the family's colour pair
@@ -234,6 +235,20 @@ module ContentModel
       @preview = callable
     end
 
+    # The small picture a closed block's tile draws beside its line, as
+    # markup: a callable taking the block and `locale:` and answering an
+    # `ActiveSupport::SafeBuffer` or nil (nothing to draw). The tile prints
+    # it as it is handed, in a box of its own that it hides from a screen
+    # reader (the line beside it names the block), so what it answers is
+    # markup this repository wrote: the Diagram block's cleaned drawing.
+    # Read by `Admin::EditorScreen::TileSummaryComponent` alone.
+    def tile_picture(callable = nil)
+      return @tile_picture if callable.nil?
+      refuse "`tile_picture` is a callable taking the block and `locale:`" unless callable.respond_to?(:call) && takes_block_and_locale?(callable)
+
+      @tile_picture = callable
+    end
+
     # The type's editor-script actions that only read or move focus: they
     # survive in a form someone else holds (decision 10).
     def read_only_actions(*ids)
@@ -262,8 +277,12 @@ module ContentModel
       @body_content = kind
     end
 
+    # The type's one filled block. A translated value may be a callable,
+    # called once when the sample is first read and never while the type
+    # registers, so a value read from a file (the Diagram block's drawings)
+    # cannot stop a boot.
     def sample(**values)
-      return @sample if values.empty?
+      return @resolved_sample ||= resolved(@sample) if values.empty?
 
       unknown = values.keys - Sample.members
       refuse "a sample holds settings, translations, body, image, form, shows; not #{unknown.join(", ")}" if unknown.any?
@@ -281,6 +300,7 @@ module ContentModel
       translations = translations.transform_keys(&:to_s)
       refuse "a sample's translations are written for \"en\" at least" if translations.any? && !translations.key?("en")
 
+      @resolved_sample = nil
       @sample = Sample.new(
         settings: settings.transform_keys(&:to_s).freeze,
         translations: translations.freeze,
@@ -367,10 +387,18 @@ module ContentModel
       # the contract; and the sample is what puts the type into every shared
       # test, the canary above all.
       raise ArgumentError, "#{name}: a block type declares `theme_methods`, the methods its public template may call" if theme_methods.nil?
-      raise ArgumentError, "#{name}: a block type declares a `sample`, one filled block of itself, for the shared tests" if sample.nil?
+      raise ArgumentError, "#{name}: a block type declares a `sample`, one filled block of itself, for the shared tests" if @sample.nil?
     end
 
     private
+
+    # The sample with every callable translated value called.
+    def resolved(sample)
+      return if sample.nil?
+
+      translations = sample.translations.transform_values { |fields| fields.transform_values { |value| value.respond_to?(:call) ? value.call : value } }
+      sample.with(translations: translations.freeze)
+    end
 
     # An outside type (a name with an owner) reaches only what has a seam
     # (block types spec, decisions 3 and 12): neither `:container`, which is
@@ -401,10 +429,14 @@ module ContentModel
       # The table body is the CMS's own: its editor, its Markdown form and its
       # public markup are the Table block's, so an outside type has no way to
       # say what a table in its body would mean.
-      if fields.any?(&:block_only?)
-        refuse "a block type from outside may not declare a :theme_choice field: its list would need a key of theme.yml, which the CMS owns"
+      if (field = fields.find(&:block_only?))
+        refuse "a block type from outside may not declare a :#{field.type} field: #{ContentModel::FieldTypes::BLOCK_ONLY.dig(field.type, :outside)}"
       end
       refuse "a block type from outside holds rich text only: `body_content :table` is the CMS's own" unless body_content == :rich
+      if tile_picture
+        refuse "a block type from outside draws no tile picture: the tile prints its answer as markup, unescaped, " \
+               "on every editor page holding a block of the type"
+      end
       if icon_follows_block?
         refuse "a block type from outside names one icon for all its blocks: `icon for_block:` is the CMS's own yet, " \
                "because a callable that raised would fail every editor page holding a block of the type"

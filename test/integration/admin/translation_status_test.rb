@@ -147,6 +147,27 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A Diagram block's source is code: the confirmation streams its current
+  # card with the source in the code frame, its indentation kept.
+  test "confirming a diagram's source streams its card with the source as code" do
+    page = create_page(title: "Flow")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "diagram", settings: { "source" => "flowchart LR\n    A --> B" } }).record
+    assert ContentBlocks::Save.call(block, translations: { "de" => { settings: { "source" => "flowchart LR\n    A --> B" } } }).ok?
+    assert ContentBlocks::Save.call(block, attributes: { settings: { "source" => "flowchart LR\n    A --> C" } }).ok?
+    card = note_id("content-block", block, "source")
+
+    get "/cs-studio/pages/#{page.id}", params: { locale: "de" }
+    assert_select "##{card}[data-translation-state='outdated'] pre.font-cs-mono ins", text: "Added: C"
+
+    post "/cs-studio/translations/confirm", params: confirm_params(block, "source"), as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[action='replace'][target='#{card}'] template" do
+      assert_select "##{card}[data-translation-state='current'] pre.font-cs-mono", text: /flowchart LR\n    A --> C/
+      assert_select "del, ins", count: 0
+    end
+  end
+
   test "the page form, its block cards and the media detail show the note too" do
     with_test_types do
       page = create_page(title: "About", translations: { "de" => { title: "Über" } })

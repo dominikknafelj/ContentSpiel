@@ -1,9 +1,9 @@
 require "test_helper"
 
 class ContentModel::FieldTypesTest < ActiveSupport::TestCase
-  BUILT_INS = %i[string text code integer boolean date url select content_type tag].freeze
+  BUILT_INS = %i[string text code mermaid diagram_drawing integer boolean date url select content_type tag].freeze
 
-  test "the registry holds the ten built-in scalar types in their order, and fetch names the known types for an unknown one" do
+  test "the registry holds the first twelve built-in scalar types in their order, and fetch names the known types for an unknown one" do
     assert_equal BUILT_INS, ContentModel::FieldTypes.names.first(BUILT_INS.size)
     assert_equal :code, ContentModel::FieldTypes.fetch(:code).name
     assert_nil ContentModel::FieldTypes.find(:nonsense)
@@ -24,12 +24,12 @@ class ContentModel::FieldTypesTest < ActiveSupport::TestCase
     end
   end
 
-  test "string and text are translatable, code is audited as a digest, the rest as their value" do
+  test "string and text are translatable, code, mermaid and diagram_drawing are audited as a digest, the rest as their value" do
     translatable = ContentModel::FieldTypes.all.select(&:translatable).map(&:name)
     digests = ContentModel::FieldTypes.all.select { |type| type.audit == :digest }.map(&:name)
 
     assert_equal %i[string text], translatable.intersection(BUILT_INS)
-    assert_equal %i[code], digests.intersection(BUILT_INS)
+    assert_equal %i[code mermaid diagram_drawing], digests.intersection(BUILT_INS)
   end
 
   test "a type is registered once" do

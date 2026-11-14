@@ -60,6 +60,12 @@ module Audit
     # `definition`: see `typed_changes`.
     TYPED_COLUMNS = %w[settings metadata].freeze
 
+    # Their translated halves (`{ locale => { field => value } }`): a field
+    # audited as a digest is a digest and a length in every language there
+    # too, so a translated source or drawing never reaches a changes row
+    # whole (`translated_typed_change`).
+    TRANSLATED_TYPED_COLUMNS = %w[translated_settings translated_metadata].freeze
+
     FILTER_MASK = Object.new.freeze
     private_constant :FILTER_MASK
 
@@ -129,7 +135,22 @@ module Audit
       end
     end
 
-    def code_summary(value) = value.is_a?(String) ? { "digest" => Digest::SHA256.hexdigest(value), "length" => value.length } : value
+    # A String (a source) by its characters; a Hash (a drawing's
+    # `{ "svg", "from" }`) by its JSON.
+    def code_summary(value)
+      text = value.is_a?(Hash) ? JSON.generate(value) : value
+      text.is_a?(String) ? { "digest" => Digest::SHA256.hexdigest(text), "length" => text.length } : value
+    end
+
+    # A translated typed column's `[old, new]`, each language's values
+    # summarised as the untranslated column's are (`summarised`): a digested
+    # field as its digest and length, a reference as its digest, the rest as
+    # they are.
+    def translated_typed_change(old, new, fields)
+      [ old, new ].map do |by_locale|
+        by_locale.is_a?(Hash) ? by_locale.transform_values { |values| summarised(values, fields) } : by_locale
+      end
+    end
 
     # `translation_sources` entries carry the original's text (the word diff's
     # "before"), once per field and target language -- on the record that is
@@ -182,6 +203,9 @@ module Audit
           each_changed_locale(old, new) { |locale, before, after| result["#{locale} #{field}"] = [ before, after ] }
         elsif TYPED_COLUMNS.include?(field) && fields.any?
           result.merge!(typed_changes(field, old, new, fields))
+        elsif TRANSLATED_TYPED_COLUMNS.include?(field) && fields.any?
+          change = translated_typed_change(old, new, fields)
+          result[field] = change unless change.first == change.last
         else
           result[field] = [ old, new ]
         end
