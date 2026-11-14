@@ -215,7 +215,7 @@ class Translations::StatusTest < ActiveSupport::TestCase
     end
   end
 
-  # `translation_required:` (Diagram block plan, R4): the image alt's rule for
+  # `translation_required:` is the image alt's rule for
   # a schema field, required in a language only where the original has one.
   test "a translation_required field blank in a language is missing only when the primary language has a value" do
     saved = BlockTypes.all.dup

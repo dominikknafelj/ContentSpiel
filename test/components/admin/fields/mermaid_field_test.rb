@@ -3,7 +3,8 @@ require "test_helper"
 # `Admin::Fields::MermaidField` (Diagram block spec §7, EditorDiagramBlock):
 # the Code field's textarea, beside an empty slot the preview script builds
 # its frame in, a polite status line and the counter, all on
-# `admin--diagram--preview`.
+# `admin--diagram--preview`, which stands on the field's wrapper. Drawn as an
+# editor draws it, inside `Admin::Ui::FieldComponent`.
 class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
   Field = ContentModel::Definition::Field
   CONTROLLER = "admin--diagram--preview".freeze
@@ -12,7 +13,7 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
   def field(**options) = Field.new(name: "source", type: :mermaid, options: { translated: true, drawing: :drawing, max: 10_000 }.merge(options))
 
   def render_field(value, original: nil, locale: "en", **options)
-    render_inline Admin::Fields::MermaidField.new(field: field(**options), form_name: "block[settings]", value: value, original: original, locale: locale, id_prefix: "block-7")
+    render_inline Admin::Ui::FieldComponent.new(field: field(**options), form_name: "block[settings]", value: value, original: original, locale: locale, id_prefix: "block-7")
   end
 
   def target(name) = "[data-#{CONTROLLER}-target='#{name}']"
@@ -34,7 +35,7 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
   test "its wrapper is the preview's controller with the renderer, the rules, its messages, the drawing field and starting" do
     render_field(SOURCE)
 
-    assert_selector ".admin-mermaid-field[data-controller='#{CONTROLLER}']"
+    assert_selector ".admin-field[data-field-name='source'][data-controller='#{CONTROLLER}'] > .admin-mermaid-field"
     assert_equal "/cs-studio/diagram-renderer", wrapper["data-#{CONTROLLER}-renderer-url-value"]
     assert_equal Diagram::Source.rules_json, wrapper["data-#{CONTROLLER}-rules-value"]
     assert_equal "block-7-drawing", wrapper["data-#{CONTROLLER}-drawing-field-value"]
@@ -50,7 +51,7 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     %w[count over drawing no_description error_lead kept nothing_yet kept_badge].each { |key| assert served.key?("components.fields.mermaid_field.#{key}"), key }
   end
 
-  # Ruling 2: the sentences are written once, under `errors.messages`, and the
+  # The sentences are written once, under `errors.messages`, and the
   # script is handed those strings: what the card says of a refused line is
   # what a refused save says.
   test "the script's sentences for a refused line, a type and no type are the server's own strings" do
@@ -75,10 +76,10 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
   test "the frame slot is empty, the status line is a polite region the server leaves empty, and the colour probe is hidden from everyone" do
     render_field(SOURCE)
 
-    assert_selector "#{target("frame-slot")}:empty", visible: :all
+    assert_selector "#{target("frameSlot")}:empty", visible: :all
     assert_no_selector "iframe", visible: :all
     assert_selector "#{target("status")}[aria-live='polite']:empty", visible: :all
-    assert_selector "span.content-block--diagram[aria-hidden='true'][hidden]#{target("colour-probe")}:empty", visible: :all
+    assert_selector "span.content-block--diagram[aria-hidden='true'][hidden]#{target("colourProbe")}:empty", visible: :all
   end
 
   # The pair is two equal columns while the field has 40rem, stacked below:
@@ -90,7 +91,7 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     halves = page.all(".admin-mermaid-field__pair > *", visible: :all)
     assert_equal 2, halves.size
     assert halves.first.has_css?("textarea")
-    assert halves.last.has_css?(target("frame-slot"), visible: :all)
+    assert halves.last.has_css?(target("frameSlot"), visible: :all)
   end
 
   test "the counter is the Code field's, from nine tenths of the limit, and the counter target" do
@@ -127,7 +128,7 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
 
     assert_equal "readonly", held.at_css("textarea")["readonly"]
     assert held.at_css("[data-controller='#{CONTROLLER}']")
-    assert held.at_css(target("frame-slot"))
+    assert held.at_css(target("frameSlot"))
     assert_nil held.at_css("[data-action]")
   end
 
@@ -149,5 +150,33 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert_equal SOURCE, textarea.text
     assert_equal "Starts from the English diagram. It becomes this language's own when you change it.", held.at_css("p#block-7-source-starting").text
     assert_includes textarea["aria-describedby"].split, "block-7-source-starting"
+  end
+
+  # The original is code: shown in the frame CS Studio shows code it does
+  # not edit in (`admin/shared/_code_display`), its indentation kept.
+  test "on a translation tab the original source is a code frame in the reference card" do
+    original = "flowchart LR\n    A --> B\n\tB --> C"
+    render_field("flowchart LR\n  X --> Y", original: original, locale: "de")
+
+    pre = Nokogiri::HTML5.fragment(rendered_content).at_css(".admin-translation-pair [data-original-for='source'] pre")
+    assert pre, "the original is a pre"
+    assert_includes pre[:class].split, "font-cs-mono"
+    assert_includes pre[:class].split, "bg-sunken"
+    assert_nil Nokogiri::HTML5.fragment(rendered_content).at_css("[data-original-for='source'] p.whitespace-pre-line"), "not the plain paragraph, which folds the indentation"
+    assert_equal original, pre.text
+    assert_equal :code, Admin::Ui::ReferenceCardComponent.kind_for(original, field)
+    assert_equal :plain, Admin::Ui::ReferenceCardComponent.kind_for("Hallo", Field.new(name: "title", type: :string, options: {}))
+  end
+
+  test "on a translation tab the preview stands under the whole pair, inside the field's controller" do
+    render_field("flowchart LR\n  X --> Y", original: SOURCE, locale: "de")
+    fragment = Nokogiri::HTML5.fragment(rendered_content)
+
+    assert_nil fragment.at_css(".admin-translation-pair #{target("frameSlot")}"), "not beside the source"
+    below = fragment.at_css(".admin-field[data-controller='#{CONTROLLER}'] > .admin-translation-pair + .admin-mermaid-field__below")
+    assert below, "the preview follows the pair"
+    assert below.at_css(target("frameSlot"))
+    assert below.at_css("#{target("status")}[aria-live='polite']")
+    assert_equal 1, fragment.css(target("frameSlot")).size
   end
 end

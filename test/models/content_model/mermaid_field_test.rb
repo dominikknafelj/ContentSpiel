@@ -68,7 +68,7 @@ class ContentModel::MermaidFieldTest < ActiveSupport::TestCase
     assert_equal 1, ContentModel::FieldSet.for(define).new({}, both, locale: "en").tap(&:valid?).errors[:source].size
   end
 
-  # Ruling F: the drawing's `from` is the digest of what this cast stores, and
+  # The drawing's `from` is the digest of what this cast stores, and
   # the editor's script hashes the same normalised text.
   test "a source cast by mermaid and Drawing.digest of it agree with a drawing whose from was hashed from the same cast text" do
     typed = "\r\nflowchart LR\r\n  A --> B\r\n\r\n"

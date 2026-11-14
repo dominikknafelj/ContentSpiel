@@ -4,7 +4,9 @@ module Admin
     # above) a translated field (handoff §4.1 "Side-by-side translation"):
     # the language's own name as an uppercase mono label, then the original --
     # a `<p>` for a plain value, the rendered (and scrubbed) HTML for a rich
-    # one. It replaces the old sunken "original" panel `Admin::Columns::*` and
+    # one, and for code (`:code`, a Mermaid source) the code frame of
+    # `admin/shared/_code_display`, the one way CS Studio shows code it
+    # does not edit, so its indentation is kept (`kind_for`). It replaces the old sunken "original" panel `Admin::Columns::*` and
     # `Admin::Ui::FieldComponent` each rendered by hand.
     #
     # The root carries `data-original-for` (the field) and
@@ -121,7 +123,8 @@ module Admin
       # card never vanishes on confirm.
       def self.current_for(record, field, locale:)
         original = record.translation_value(field, ::Locales.default)
-        kind = original.is_a?(RichText::Document) ? :rich : :plain
+        schema_field = record.respond_to?(:definition) ? record.definition&.fields.to_a.find { |candidate| candidate.name == field.to_s } : nil
+        kind = kind_for(original, schema_field)
         new(field: field, locale: locale, original: original, kind: kind, state: record.translation_state(field, locale), record: record)
       end
 
@@ -138,11 +141,27 @@ module Admin
         @confirm = confirm&.to_h&.symbolize_keys
         @suggest = suggest
         raise ArgumentError, "unknown translation state #{@state.inspect}" unless STATES.include?(@state)
+        raise ArgumentError, "unknown kind #{@kind.inspect}" unless KINDS.include?(@kind)
       end
 
       attr_reader :record, :field, :locale, :original, :kind, :state, :confirm, :suggest
 
+      KINDS = %i[plain rich code].freeze
+
+      # The kind of an original: rich for a document, code where the field's
+      # input reads its value as code (`Admin::Fields::<Type>Field.display`, a
+      # `CodeDisplay`), plain otherwise. `field` is the schema field, or nil
+      # for a column.
+      def self.kind_for(original, field)
+        return :rich if original.is_a?(RichText::Document)
+        return :plain if field.nil? || field.group?
+
+        Admin::Ui::FieldComponent.input_class_for(field).display(field, original).is_a?(Admin::Fields::CodeDisplay) ? :code : :plain
+      end
+
       def rich? = kind == :rich
+
+      def code? = kind == :code
 
       def outdated? = state == :outdated
 

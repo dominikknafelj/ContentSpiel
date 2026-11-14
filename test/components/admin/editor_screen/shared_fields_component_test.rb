@@ -108,4 +108,11 @@ class Admin::EditorScreen::SharedFieldsComponentTest < ViewComponent::TestCase
     assert_no_text "path"
     assert_text "—"
   end
+
+  test "a hidden input has no row, and every other field has" do
+    assert_not Admin::EditorScreen::SharedFieldsComponent.listed?(Field.new(name: "drawing", type: :diagram_drawing, options: {}))
+    assert Admin::EditorScreen::SharedFieldsComponent.listed?(Field.new(name: "source", type: :mermaid, options: { drawing: :drawing }))
+    assert Admin::EditorScreen::SharedFieldsComponent.listed?(Field.new(name: "code", type: :code, options: {}))
+    assert Admin::EditorScreen::SharedFieldsComponent.listed?(Field.new(name: "speakers", type: :groups, options: { of: "x" }))
+  end
 end

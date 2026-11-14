@@ -1,4 +1,4 @@
-<%= tag.div class: "admin-mermaid-field", data: wrapper_data do %>
+<div class="admin-mermaid-field">
   <div class="admin-mermaid-field__pair">
     <div class="min-w-0">
       <%= tag.textarea shown, name: source_name, id: input_id, class: input_class, rows: rows, wrap: "off",
@@ -9,12 +9,9 @@
         <%= tag.p starting_text, id: starting_id, class: "mt-1 text-sm text-meta" %>
       <% end %>
     </div>
-    <div class="min-w-0">
-      <%# The script builds the renderer frame in here, and writes each new error into the status line. %>
-      <%= tag.div class: "admin-mermaid-field__frame", data: target("frame-slot") %>
-      <%= tag.div aria: { live: "polite" }, data: target("status") %>
-    </div>
+    <%# The script builds the renderer frame in the preview's slot; on a translation tab it stands under the pair (`#below_pair`). %>
+    <%= preview unless paired? %>
   </div>
   <%# Read by the script for the theme's colours; nobody sees or hears it. %>
-  <%= tag.span class: "content-block--diagram", hidden: true, aria: { hidden: true }, data: target("colour-probe") %>
-<% end %>
+  <%= tag.span class: "content-block--diagram", hidden: true, aria: { hidden: true }, data: target("colourProbe") %>
+</div>

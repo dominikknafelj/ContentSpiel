@@ -652,6 +652,32 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     end
   end
 
+  # A drawing nobody types in has nothing to read: an untranslated one is no
+  # row of Shared fields, while its source is.
+  test "on a translation tab an untranslated drawing has no row in Shared fields" do
+    saved = BlockTypes.all.dup
+    BlockTypes.register("test/shared_diagram") do |t|
+      TestTypes.declare(t)
+      t.label "Shared diagram"
+      t.field :source, :mermaid, drawing: :drawing
+      t.field :drawing, :diagram_drawing
+      t.component TestQuoteComponent
+    end
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "Diagram tab")
+      block = page.content_blocks.create!(block_type: "test/shared_diagram", position: 0,
+        settings: { "source" => "flowchart LR\n  A --> B", "drawing" => { "svg" => Diagram::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg, "from" => "a" * 64 } })
+
+      render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")
+
+      assert_equal [ "Source" ], Capybara.string(rendered_content).all("details[data-shared-fields] dt", visible: :all).map { |node| node.text(:all) }
+      assert_selector "details[data-shared-fields] summary", text: "Shared fields (1)", visible: :all
+    end
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
   test "the Post list's Content type says All types for its empty choice" do
     page = create_page(title: "All types")
     block = page.content_blocks.create!(block_type: "post_list", position: 0, settings: {})

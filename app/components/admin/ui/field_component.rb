@@ -22,7 +22,17 @@ module Admin
     # is deliberate: the caller already knows both facts building the field
     # list for a locale, and a field kept translated: true but with nothing
     # to compare against (a brand new translated field, no default-locale
-    # value yet) simply passes `original: nil` and gets no column.
+    # value yet) simply passes `original: nil` and gets no column. The input
+    # has the last word (`Fields::Base.reference?`): one nobody types in (a
+    # Diagram block's drawing) is never shown beside an original.
+    #
+    # Three more answers of the input shape what is drawn around it:
+    # `hidden?`, a hidden input nobody types in, drawn with its error slot
+    # alone in `.admin-field--hidden`, which takes no room in the form until
+    # the slot holds an error; `field_data`, data on the field's wrapper; and
+    # `below_pair`, what it draws under a translation pair, the pair's width.
+    # The original is a code frame (`ReferenceCardComponent`'s `:code`) where
+    # the input reads its value as code (`display`, a `Fields::CodeDisplay`).
     class FieldComponent < AdminComponent
       include Admin::Ui::Contract
 
@@ -34,7 +44,9 @@ module Admin
         interface: %i[field form_name value original locale errors id_prefix translation_state translation_confirm translation_record placeholder],
         limits: [
           "It draws the chrome around a field; the input is the Admin::Fields class of the field's type.",
-          "Whether the original is shown is the caller's: it is shown only when an original is handed over."
+          "Whether the original is shown is the caller's and the input's: it is shown only when an original is handed over and the input answers reference? (a drawing nobody types in does not).",
+          "A hidden input (hidden?) is drawn with its error slot alone: no label, help, original or Translate button, and no room in the form until the slot holds an error.",
+          "An input may put data on the field's wrapper (field_data) and draw under the translation pair (below_pair), the Mermaid source's preview."
         ],
         states: %i[rest invalid translated outdated hover focus],
         keys: [],
@@ -102,13 +114,21 @@ module Admin
       # already follows (`content_type` -> `ContentTypeField`, `groups` ->
       # `GroupsField`), so adding a field type later means adding one file,
       # not also editing a hand-kept dispatch table here.
+      #
+      # One instance per render: the template draws it once and then asks it
+      # for its wrapper's data and what it draws under the pair.
       def input_component
-        input_class.new(
+        @input_component ||= input_class.new(
           field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix, placeholder: placeholder
         )
       end
 
-      def input_class = "Admin::Fields::#{field.type.to_s.camelize}Field".constantize
+      def input_class = self.class.input_class_for(field)
+
+      # The input class of a scalar field (`Admin::Fields::<Type>Field`), for
+      # this component and for a part that asks an input how it reads a value
+      # (`ReferenceCardComponent.kind_for`).
+      def self.input_class_for(field) = "Admin::Fields::#{field.type.to_s.camelize}Field".constantize
 
       # Whether the input draws its own label (a checkbox, a row of buttons),
       # so this component draws none above it: the input's answer, not a
@@ -137,7 +157,7 @@ module Admin
       # input -- see `Admin::Columns::Base#reference_card`.
       def reference_card
         Admin::Ui::ReferenceCardComponent.new(
-          field: field.name, locale: locale, original: original, state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
+          field: field.name, locale: locale, original: original, kind: Admin::Ui::ReferenceCardComponent.kind_for(original, field), state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
         )
       end
 

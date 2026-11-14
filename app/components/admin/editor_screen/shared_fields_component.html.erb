@@ -10,9 +10,7 @@
         <dd class="text-ink">
           <% if value.is_a?(Admin::Fields::CodeDisplay) %>
             <p class="mb-1 text-xs text-meta" data-code-note><%= code_note %></p>
-            <%# The line break after the opening tag is the one a browser drops: see the component. %>
-            <pre tabindex="0" class="max-h-[12lh] overflow-auto rounded-cs border border-line bg-sunken p-2 font-cs-mono text-sm text-ink [tab-size:2]">
-<%= value.text %></pre>
+            <%= helpers.render "admin/shared/code_display", body: value.text %>
           <% else %>
             <%= value.presence || "—" %>
           <% end %>

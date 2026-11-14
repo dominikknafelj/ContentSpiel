@@ -35,6 +35,16 @@ module Admin
       # box, no gap in its column) until the slot holds an error.
       def self.hidden?(_field) = false
 
+      # Data for the field's wrapper (`Ui::FieldComponent`'s `.admin-field`),
+      # for an input whose script reaches beyond the input (the Mermaid
+      # source's preview, drawn under a translation pair). Read after the
+      # input is rendered.
+      def field_data = {}
+
+      # What the field draws under a translation pair, the pair's width, or
+      # nil. Read after the input is rendered.
+      def below_pair = nil
+
       # `id_prefix:` mirrors `Ui::FieldComponent`'s own (see its comment) --
       # forwarded here unchanged so `input_id` agrees with the wrapping
       # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a

@@ -9,32 +9,34 @@
 <%# The suggestion box is shared by Translate (an empty field) and Suggest update (an outdated one, in
     its reference card): one id, `Admin::Ui::SuggestionComponent.dom_id(input_id)`, so either lands under the input. %>
 <% box_button = translate || (show_original? ? suggest_update_button : nil) %>
-<div class="admin-field mb-4" data-field-name="<%= field.name %>">
-  <%# One side of the translation pair (or the whole field): label, input, the Translate button
-      and the suggestion box. The error slot stays a direct child of `.admin-field`. %>
-  <% field_side = capture do %>
-    <%# A switch carries its own label beside it (`Admin::Fields::BooleanField`), and a segmented
-        control its legend (`Admin::Fields::SelectField`); a second one above either would say it twice. %>
-    <% unless own_label? %>
-      <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
-    <% end %>
-    <%= render input_component %>
-    <% if field.help %>
-      <p id="<%= help_id %>" class="mt-1 text-sm text-meta"><%= field.help %></p>
-    <% end %>
-    <div data-translate-slot="<%= field.name %>"><% if translate %><%= render translate %><% end %></div>
-    <%= render "admin/shared/translation_box", button: box_button %>
+<%# One side of the translation pair (or the whole field): label, input, the Translate button
+    and the suggestion box. Drawn first, so the input has been rendered when the wrapper below
+    asks it for its data (`Fields::Base#field_data`). The error slot stays a direct child of `.admin-field`. %>
+<% field_side = capture do %>
+  <%# A switch carries its own label beside it (`Admin::Fields::BooleanField`), and a segmented
+      control its legend (`Admin::Fields::SelectField`); a second one above either would say it twice. %>
+  <% unless own_label? %>
+    <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
   <% end %>
-
+  <%= render input_component %>
+  <% if field.help %>
+    <p id="<%= help_id %>" class="mt-1 text-sm text-meta"><%= field.help %></p>
+  <% end %>
+  <div data-translate-slot="<%= field.name %>"><% if translate %><%= render translate %><% end %></div>
+  <%= render "admin/shared/translation_box", button: box_button %>
+<% end %>
+<%= tag.div class: "admin-field mb-4", data: { field_name: field.name, **input_component.field_data } do %>
   <% if show_original? %>
     <div class="admin-translation-pair">
       <div class="min-w-0"><%= field_side %></div>
       <%= render reference_card %>
     </div>
+    <%# What the input draws under the pair, the pair's width (a Mermaid source's preview). %>
+    <%= input_component.below_pair %>
   <% else %>
     <%= field_side %>
   <% end %>
 
   <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
-</div>
+<% end %>
 <% end %>
