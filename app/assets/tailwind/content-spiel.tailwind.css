@@ -937,7 +937,8 @@ tr:has(.admin-row-link), li:has(> * .admin-row-link) { position: relative; }
 /* The verb an action row ends in when it is words and not a link of its
    own, describing the row's one link: dim at rest, so a read row holds no
    accent, and accent while the row is under the pointer or holds the focus
-   (the Waiting for you row, the draft tile, a Translations row and a
+   (the Waiting for you row, the draft tile, a Translations row, a Draw
+   diagrams row and a
    table row of one link around their stretched links, the Notes for you
    row that is the link). In a table row the verb stands in a cell of its
    own, outside the link, so the row lights it. */
@@ -946,6 +947,8 @@ tr:has(.admin-row-link), li:has(> * .admin-row-link) { position: relative; }
 .admin-waiting-row:focus-within .admin-row-verb,
 .admin-translation-row:hover .admin-row-verb,
 .admin-translation-row:focus-within .admin-row-verb,
+.admin-draw-row:hover .admin-row-verb,
+.admin-draw-row:focus-within .admin-row-verb,
 tr:has(.admin-row-link):hover .admin-row-verb,
 tr:has(.admin-row-link):focus-within .admin-row-verb,
 .admin-draft-tile:hover .admin-row-verb,

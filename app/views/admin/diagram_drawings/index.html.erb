@@ -1,0 +1,8 @@
+<%# Draw diagrams (`Admin::DiagramDrawingsController#index`): every Diagram
+    block the viewer may save whose stored drawing is not of its current
+    source, grouped by page, and "Draw all", which draws them in this browser
+    one after another. The screen is `Admin::DiagramDrawingsScreen::ListComponent`
+    whole, the root of the run's script. It has no sidebar entry: it is a
+    task, not a module. %>
+<% content_for :title, t(".title") %>
+<%= render Admin::DiagramDrawingsScreen::ListComponent.new(to_draw: @to_draw) %>

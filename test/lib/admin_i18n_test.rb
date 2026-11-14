@@ -572,6 +572,17 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/trash_screen/tabs_component.rb
     app/components/admin/trash_screen/tabs_component.html.erb
     app/views/admin/trash/index.html.erb
+    app/components/admin/diagram_drawings_screen/list_component.rb
+    app/components/admin/diagram_drawings_screen/list_component.html.erb
+    app/components/admin/diagram_drawings_screen/page_group_component.rb
+    app/components/admin/diagram_drawings_screen/page_group_component.html.erb
+    app/components/admin/diagram_drawings_screen/publish_card_component.rb
+    app/components/admin/diagram_drawings_screen/publish_card_component.html.erb
+    app/components/admin/diagram_drawings_screen/row_component.rb
+    app/components/admin/diagram_drawings_screen/row_component.html.erb
+    app/components/admin/diagram_drawings_screen/run_head_component.rb
+    app/components/admin/diagram_drawings_screen/run_head_component.html.erb
+    app/views/admin/diagram_drawings/index.html.erb
     app/components/admin/translation_screen/matrix_component.rb
     app/components/admin/translation_screen/matrix_component.html.erb
     app/components/admin/translation_screen/summary_card_component.rb

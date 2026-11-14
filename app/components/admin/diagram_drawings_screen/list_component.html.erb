@@ -1,0 +1,18 @@
+<%= tag.div class: "flex max-w-[900px] flex-col gap-3.5", data: root_data do %>
+  <%= render Admin::DiagramDrawingsScreen::RunHeadComponent.new(count: count) %>
+  <%= insecure_notice %>
+  <%= render Admin::DiagramDrawingsScreen::PublishCardComponent.new %>
+  <div class="overflow-hidden rounded-card bg-surface shadow-1">
+    <% if groups.any? %>
+      <% groups.each do |page, rows| %>
+        <%= render Admin::DiagramDrawingsScreen::PageGroupComponent.new(page: page, rows: rows, language_column: language_column?) %>
+      <% end %>
+    <% else %>
+      <%= render empty_state %>
+    <% end %>
+  </div>
+  <%= chip_templates %>
+  <%= summary_template %>
+  <%# Read by the script for the theme's colours; nobody sees or hears it. %>
+  <%= tag.span class: "content-block--diagram", hidden: true, aria: { hidden: true }, data: target("colourProbe") %>
+<% end %>

@@ -233,6 +233,46 @@ class Admin::DiagramDrawingsControllerTest < ActionDispatch::IntegrationTest
     assert_nil block.reload.translated_settings.dig("en", "drawing")
   end
 
+  test "the list is grouped by page" do
+    first = diagram
+    other = create_page(title: "Other flows", published: false)
+    second = diagram(other)
+    sign_in_as users(:one)
+
+    get admin_diagram_drawings_path
+
+    assert_response :ok
+    assert_select "title", /Draw diagrams/
+    assert_select "[data-controller='admin--diagram--draw-all']" do
+      assert_select "button", text: "Draw all", count: 1
+      assert_select "[data-page-id='#{@page.id}'] li[data-draw-row][data-url='#{admin_diagram_drawing_path(first)}']", count: 1
+      assert_select "[data-page-id='#{other.id}'] li[data-draw-row][data-url='#{admin_diagram_drawing_path(second)}']", count: 1
+    end
+    assert_select "[data-page-id] h2", text: "Flows"
+    assert_select "[data-page-id] h2", text: "Other flows"
+  end
+
+  test "the empty state has no button" do
+    sign_in_as users(:one)
+
+    get admin_diagram_drawings_path
+
+    assert_response :ok
+    assert_select ".admin-empty-state", text: /Every diagram is drawn\./
+    assert_select "[data-controller='admin--diagram--draw-all'] button", count: 0
+    assert_select "[data-draw-row]", count: 0
+  end
+
+  test "a viewer without pages.edit is refused" do
+    diagram
+    sign_in_as users(:reader)
+
+    get admin_diagram_drawings_path
+
+    assert_response :forbidden
+    assert_select "[data-draw-row]", count: 0
+  end
+
   test "the CSRF check stays on" do
     block = diagram
     sign_in_as users(:one)

@@ -1,9 +1,12 @@
 module Admin
-  # The Draw diagrams task (draw-diagrams spec §4): `update` saves one Diagram
+  # The Draw diagrams task (draw-diagrams spec §3 to §5): `index` lists every
+  # Diagram block the viewer may save whose stored drawing is not of its
+  # current source (`Diagrams::ToDraw`), drawn by
+  # `Admin::DiagramDrawingsScreen::ListComponent`, and `update` saves one Diagram
   # block's drawing for one language, sent by the list's script through the
   # write queue after the renderer frame drew the language's source.
   #
-  # The action decides, in this order, and nothing is written or audited
+  # `update` decides, in this order, and nothing is written or audited
   # before the save:
   #   1. the block, through the read scope (a page outside it, or a block that
   #      is no Diagram, is `gone`, 404);
@@ -38,6 +41,10 @@ module Admin
     # is JSON too (`BaseController#forbidden!`).
     before_action(only: :update) { request.format = :json }
     before_action { require_permission("pages.edit") }
+
+    def index
+      @to_draw = ::Diagrams::ToDraw.new(actor: Current.actor)
+    end
 
     def update
       block = diagram_block or return refuse(:gone, :not_found)

@@ -85,6 +85,10 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/admin/dashboard_controller.rb
       app/controllers/admin/note_inbox_controller.rb
     ], # note_inbox/_card is the Dashboard's Notes for you panel, which NoteInboxController redraws; the controller's index is the Notes inbox, whose view is notes_screen's
+    "diagram_drawings_screen" => %w[
+      app/views/admin/diagram_drawings
+      app/controllers/admin/diagram_drawings_controller.rb
+    ],
     "editor_screen" => %w[
       app/views/admin/pages
       app/views/admin/posts
@@ -196,7 +200,6 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/system_status
       app/controllers/admin/confirmations_controller.rb
       app/controllers/admin/diagram_renderers_controller.rb
-      app/controllers/admin/diagram_drawings_controller.rb
       app/controllers/admin/enrolments_controller.rb
       app/controllers/admin/jump_controller.rb
       app/controllers/admin/passwords_controller.rb
@@ -223,7 +226,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/concerns/admin/stale_form.rb
       app/controllers/concerns/admin/toast_stream.rb
       app/controllers/concerns/admin/translatable_record_loading.rb
-    ] # media_assets: the picker's upload; rail_tab_streams and slot_streams: the slots' streams, whatever screen hosts them; diagram_renderers: the Diagram block's frame, which draws no component; diagram_drawings: a JSON save, which draws no component
+    ] # media_assets: the picker's upload; rail_tab_streams and slot_streams: the slots' streams, whatever screen hosts them; diagram_renderers: the Diagram block's frame, which draws no component
   }.freeze
 
   # A file that draws more than one screen, each by name, with the reason. It is

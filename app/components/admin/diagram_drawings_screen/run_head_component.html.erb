@@ -1,0 +1,21 @@
+<div class="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
+  <div>
+    <h1 class="text-h1 text-ink"><%= words(:title) %></h1>
+    <p class="mt-1 max-w-[620px] text-small text-meta"><%= words(:lead) %></p>
+    <% if runnable? %>
+      <p class="text-small text-meta" data-part="count"><%= words(:count, count: count) %></p>
+    <% end %>
+  </div>
+  <% if runnable? %>
+    <div class="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
+      <%= render Admin::Ui::ButtonComponent.new(label: words(:draw_all), data: { **target("start"), action: "click->#{CONTROLLER}#toggle" }) %>
+      <%= tag.p words(:insecure_short), id: reason_id, class: "max-w-[260px] text-small text-meta sm:text-right", hidden: true, data: target("insecure") %>
+    </div>
+  <% end %>
+</div>
+<%= tag.div class: "flex items-center gap-2.5 text-small text-dim", hidden: true, data: target("progress") do %>
+  <span data-part="words"></span>
+  <span class="h-1 max-w-80 flex-1 overflow-hidden rounded-full bg-sunken" aria-hidden="true"><span class="block h-full w-0 bg-accent" data-part="bar"></span></span>
+<% end %>
+<%= tag.div "", class: "sr-only", aria: { live: "polite" }, data: target("status") %>
+<%= tag.div "", data: target("summary") %>
