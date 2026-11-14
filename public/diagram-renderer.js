@@ -14,8 +14,7 @@
 //     store it, and its UTF-8 size and element count; a blank source answers
 //     `svg: ""` and clears the drawing;
 //   - `{ id, error: { kind, line, message, ... } }`, `kind` one of
-//     `too_long` (over the source's limit, or over Mermaid's own count of
-//     it in UTF-16 units; line 0), `refused` (a line rule of
+//     `too_long` (over the source's limit in code points; line 0), `refused` (a line rule of
 //     `Diagram::Source`, with its `rule` and `word`; `line` is 1-based, 0 for a
 //     directive Mermaid found that no line names), `parse` (Mermaid's own
 //     error), `type` (Mermaid read a diagram off the list) and `too_large`
@@ -206,12 +205,6 @@
       return { id, svg: "", bytes: 0, elements: 0 }
     }
 
-    // Mermaid measures `maxTextSize` in UTF-16 units, not code points, and
-    // over it draws a stand-in diagram instead of failing; a source within
-    // `Diagram::Source`'s count that many astral characters (emoji) take
-    // past Mermaid's is refused here as too long rather than drawn as that.
-    if (source.length > RULES.max_characters) return { id, error: refusal({ line: 0, rule: "too_long", word: null }) }
-
     const found = refusals(source)
     if (found.length) return { id, error: refusal(found[0]) }
 
@@ -263,7 +256,11 @@
       securityLevel: "strict",
       htmlLabels: false,
       flowchart: { htmlLabels: false },
-      maxTextSize: RULES.max_characters,
+      // Twice the source's limit: Mermaid counts UTF-16 units and draws a
+      // stand-in diagram past it, and a source within the limit in code
+      // points (the length is counted in code points everywhere, as
+      // `Diagram::Source` counts it) is at most twice that in UTF-16 units.
+      maxTextSize: 2 * RULES.max_characters,
       theme: "base",
       fontFamily: "Archivo",
       themeVariables: { fontFamily: "Archivo" },

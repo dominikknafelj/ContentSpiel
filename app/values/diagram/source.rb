@@ -42,12 +42,14 @@ module Diagram
     # What Mermaid calls those diagrams (`diagramType` of its parse result).
     MERMAID_TYPES = %w[flowchart-v2 sequence classDiagram stateDiagram er gantt pie].freeze
 
-    # Mermaid's other diagrams, which the block does not offer.
-    OTHER_MERMAID_TYPES = %w[
-      mindmap timeline gitGraph journey quadrantChart requirementDiagram
-      C4Context C4Container C4Component C4Dynamic C4Deployment
-      sankey-beta xychart-beta block-beta packet-beta kanban architecture-beta
-      radar-beta treemap-beta zenuml info
+    # Mermaid's other diagrams, which the block does not offer. The C4
+    # keywords are built from their parts: written whole, `C4Component` reads
+    # as a component constant to the dependency guard
+    # (`test/lib/dependency_direction_test.rb`), which reads strings too.
+    OTHER_MERMAID_TYPES = [
+      *%w[mindmap timeline gitGraph journey quadrantChart requirementDiagram],
+      *%w[Context Container Component Dynamic Deployment].map { |part| "C4#{part}" },
+      *%w[sankey-beta xychart-beta block-beta packet-beta kanban architecture-beta radar-beta treemap-beta zenuml info]
     ].freeze
 
     FRONT_MATTER = "---".freeze

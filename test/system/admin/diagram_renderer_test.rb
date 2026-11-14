@@ -127,21 +127,20 @@ class Admin::DiagramRendererTest < ApplicationSystemTestCase
     end
   end
 
-  # Mermaid counts its `maxTextSize` in UTF-16 units and draws a stand-in
-  # diagram past it; `Diagram::Source` counts code points. Between the two
-  # counts the frame refuses, so the stand-in is never handed back as the
-  # drawing, and the server would have let the source through.
-  test "a source within the code-point limit but over Mermaid's count in UTF-16 units is refused as too_long" do
-    count_mermaid_calls
-    source = "flowchart LR\n  A[\"#{"😀" * 5_000}\"] --> B"
+  # A length is counted in code points, as `Diagram::Source` counts it, and
+  # Mermaid's own limit (UTF-16 units) is set past anything that count lets
+  # through, so it never draws its stand-in for a source within the limit.
+  test "a source of 6,000 emoji is under the limit and is not refused as too_long" do
+    source = "flowchart LR\n  A[\"#{"😀" * 6_000}\"] --> B"
     assert_operator source.length, :<=, Diagram::Source::MAX_CHARACTERS
     assert_operator source.encode("UTF-16LE").bytesize / 2, :>, Diagram::Source::MAX_CHARACTERS
     assert_empty Diagram::Source.refusals(source)
 
-    answer = draw("astral", source)
+    answer = draw("emoji", source)
 
-    assert_equal({ "kind" => "too_long", "line" => 0 }, answer["error"].slice("kind", "line"))
-    assert_equal 0, frame.evaluate("window.__mermaidCalls")
+    assert_not_equal "too_long", answer.dig("error", "kind"), answer["error"].inspect
+    assert_nil answer["error"], answer["error"].inspect
+    assert_not_includes answer.fetch("svg"), "Maximum text size"
   end
 
   private
