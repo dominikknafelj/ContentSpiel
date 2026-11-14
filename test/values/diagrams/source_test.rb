@@ -93,6 +93,17 @@ class Diagrams::SourceTest < ActiveSupport::TestCase
     assert_nil Diagrams::Source.first_line("")
   end
 
+  # The tile shows what the drawing draws: Mermaid's accessibility lines (the
+  # title, a one-line description and a description block) are the
+  # description's words, and a comment is nobody's.
+  test "first_line skips accTitle, accDescr, an accDescr block and comments" do
+    source = "flowchart LR\n  %% a note\n  accTitle: Flow\n  accDescr: One line.\n  accDescr {\n    Two\n    lines.\n  }\n  A --> B"
+    assert_equal "A --> B", Diagrams::Source.first_line(source)
+    assert_equal "A --> B", Diagrams::Source.first_line("flowchart LR\n  accDescr{ on one line }\n  A --> B")
+    assert_nil Diagrams::Source.first_line("flowchart LR\n  accDescr {\n    never closed\n    A --> B")
+    assert_equal "A[Draft] --> B{Review}", Diagrams::Source.first_line(BlockTypes::Diagram::SAMPLE_SOURCES["en"])
+  end
+
   test "rules_json parses to the types, the mermaid types, the limit and each rule's words and markers" do
     json = JSON.parse(Diagrams::Source.rules_json)
     assert_equal Diagrams::Source::TYPES, json["types"]

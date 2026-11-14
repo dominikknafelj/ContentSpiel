@@ -696,6 +696,23 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_no_selector picture
   end
 
+  test "the sample's tile reads its type and its first drawing line, past its accessibility lines" do
+    sample = diagram("en" => { "source" => BlockTypes::Diagram::SAMPLE_SOURCES["en"].strip, "drawing" => BlockTypes::Diagram.sample_drawing("en"), "description" => "A flow." })
+    render_summary sample
+    assert_selector diagram_line(sample), exact_text: "Flowchart · A[Draft] --> B{Review}"
+  end
+
+  # One tile reads its drawing once: the hints, the picture and its markup
+  # share one parse.
+  test "a tile parses its drawing once" do
+    drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes." })
+    parses = 0
+    read = Diagrams::Drawing.method(:read)
+    with_singleton_override(Diagrams::Drawing, :read, ->(svg) { parses += 1; read.call(svg) }) { render_summary drawn }
+    assert_selector picture
+    assert_equal 1, parses
+  end
+
   test "the tile's picture is the stored drawing with tile ids and no script" do
     drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes <b>in</b> a row." })
     render_summary drawn

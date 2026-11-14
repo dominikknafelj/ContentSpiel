@@ -103,13 +103,34 @@ module Diagrams
       found
     end
 
-    # The first non-blank line after the keyword's, trimmed, for the block's tile.
+    # Mermaid's accessibility statements, as its grammar reads them: the
+    # title and the one-line description (`accTitle:`, `accDescr:`) and the
+    # description block, `accDescr {` to the first `}`.
+    ACCESSIBILITY_LINE = /\Aacc(?:Title|Descr)\s*:/
+    ACCESSIBILITY_BLOCK = /\AaccDescr\s*\{/
+
+    # The first line after the keyword's that draws something, trimmed, for
+    # the block's tile: blank lines, `%%` comments and the accessibility
+    # statements are skipped (they are the description's words, which the
+    # tile shows apart). Nil when nothing follows, or when a description
+    # block is never closed.
     def self.first_line(text)
       lines = text.to_s.delete_prefix(BOM).lines
       index, = keyword_line(lines)
       return unless index
 
-      lines[(index + 1)..].map(&:strip).find { |line| !line.empty? && !comment?(line) }
+      in_block = false
+      lines[(index + 1)..].each do |raw|
+        line = raw.strip
+        if in_block
+          in_block = !line.include?("}")
+        elsif line.match?(ACCESSIBILITY_BLOCK)
+          in_block = !line.include?("}")
+        elsif !line.empty? && !comment?(line) && !line.match?(ACCESSIBILITY_LINE)
+          return line
+        end
+      end
+      nil
     end
 
     def self.rules_json

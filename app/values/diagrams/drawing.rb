@@ -221,9 +221,19 @@ module Diagrams
         raise ArgumentError, "title id #{title_id.inspect} can be the name of a prefixed id of the drawing"
       end
 
-      document, reason = self.class.read(@svg)
+      @untitled ||= {}
+      return @untitled[[ prefix, title_id ]] if @untitled.key?([ prefix, title_id ])
+
+      @untitled[[ prefix, title_id ]] = write_untitled(prefix: prefix, title_id: title_id)
+    end
+
+    # The markup written from a copy of the one parse (`parsed`): the copy is
+    # changed, the parse is kept for the next read of this drawing.
+    def write_untitled(prefix:, title_id:)
+      document, reason = parsed
       return if reason
 
+      document = document.dup
       root = document.root
       prefix_ids(root, prefix)
       root["role"] = "img"
@@ -239,6 +249,7 @@ module Diagrams
 
       self.class.serialize(document)
     end
+    private :write_untitled
 
     # Writes the title's text into untitled markup's one empty `<title>`,
     # with no parse: the markup is this file's own serialisation, whose root

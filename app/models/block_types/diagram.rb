@@ -98,14 +98,33 @@ module BlockTypes
 
     SUMMARY_LENGTH = ContentModel::BlockTypeDefinition::SUMMARY_LENGTH
 
+    # block object => { [locale, stored values] => Shown }, held no longer
+    # than the block object is.
+    MEMO = ObjectSpace::WeakMap.new
+
     # What a closed block's tile reads in a language, by the public
     # component's fallback (`Blocks::DiagramComponent`): the source and the
     # drawing of the first language on the fallback chain with a source of
     # its own, and the description of the language itself, or else of the
     # language whose drawing it is. Read as stored, the drawing not cast.
+    #
+    # One tile asks it three times (its line, its preview and its picture),
+    # so it is kept per block object, language and stored values
+    # (`MEMO`): the three share one `Diagrams::Drawing`, which parses its
+    # drawing once and keeps its markup. A save hands the tile a block whose
+    # stored values changed, and so reads them again.
     Shown = Data.define(:source, :drawing, :description) do
       def self.for(block, locale:)
         stored = block.translated_settings.to_h
+        kept = (MEMO[block] ||= {})
+        key = [ locale.to_s, stored ]
+        return kept[key] if kept.key?(key)
+
+        kept.clear
+        kept[key] = read(block, stored, locale)
+      end
+
+      def self.read(block, stored, locale)
         code = ::Locales.fallback_chain(locale).map(&:to_s).find { |candidate| stored.dig(candidate, "source").present? }
         return unless code
 
@@ -114,6 +133,7 @@ module BlockTypes
         description = [ locale.to_s, code ].uniq.lazy.filter_map { |candidate| stored.dig(candidate, "description").presence }.first
         new(source: stored.dig(code, "source"), drawing: drawing && Diagrams::Drawing.new(drawing), description: description)
       end
+      private_class_method :read
 
       # The stored drawing when it passes on read: what the site shows.
       def shown_drawing = (drawing if drawing&.reason.nil?)
