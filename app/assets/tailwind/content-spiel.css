@@ -413,14 +413,20 @@ html[data-surface="studio"] .content-block--diagram {
    the renderer frame read unchanged), and each outweighs the rule it
    overrides there by the box's class. Fitted whole, never cropped, it is
    scaled far down, so a stroke stays 1px at any scale; its words and its
-   arrowheads, unreadable that small, are not drawn; and a node's or a
-   participant's box is filled sunken, so it reads as a solid shape. A pie's
-   slices and a gantt's bars keep their series colours. */
+   arrowheads, unreadable that small, are not drawn; and every node reads as
+   a solid block, filled sunken: a flowchart's box, diamond or circle, a
+   class's, state's or entity's box (Mermaid's `.outer-path` and an
+   entity's row stripes), a sequence's participant. Inside a node a label's
+   own box and a divider's line stay unfilled, a start state's dot keeps
+   the block's own rule (it weighs the same and comes later) and so does a
+   state note's fill, which weighs more. Edges, clusters, a pie's slices and
+   a gantt's bars keep the block's look. */
 .admin-block-tile__picture .content-block--diagram :is(path, line, rect, circle, polygon) { vector-effect: non-scaling-stroke; }
 .admin-block-tile__picture .content-block--diagram :is(text, foreignObject) { display: none; }
 .admin-block-tile__picture .content-block--diagram * { marker-start: none; marker-end: none; }
-.admin-block-tile__picture .content-block--diagram :is(.node rect, rect.actor) { fill: var(--cs-sunken); }
-.admin-block-tile__picture .content-block--diagram .node .label rect { fill: none; }
+.admin-block-tile__picture .content-block--diagram :is(.node rect, .node polygon, .node circle, .node ellipse, .node path, rect.actor, .actor-man circle) { fill: var(--cs-sunken); }
+.admin-block-tile__picture .content-block--diagram :is(.row-rect-odd, .row-rect-even) > path:first-child { fill: var(--cs-sunken); }
+.admin-block-tile__picture .content-block--diagram :is(.node .label rect, .node .divider path) { fill: none; }
 
 /* The theme switch's cross-fade: the browser's own fade-out of the old
    snapshot and fade-in of the new, at the fade's length and easing. Only the

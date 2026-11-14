@@ -614,6 +614,22 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
     assert_equal "non-scaling-stroke", look["stroke"]
     assert_equal look["sunken"], look["fill"], "a node is solid sunken"
 
+    # Every node shape is solid: a flowchart's diamond and a class's box,
+    # which Mermaid draws as paths; an edge keeps no fill.
+    fills = page.evaluate_script(<<~JS, "#block-#{wide.id}-tile-summary .admin-block-tile__picture", "#block-#{tall.id}-tile-summary .admin-block-tile__picture")
+      (() => {
+        const fill = (box, selector) => { const found = document.querySelector(box).querySelector(selector); return found && getComputedStyle(found).fill }
+        return {
+          diamond: fill(arguments[0], ".node polygon"),
+          class_box: fill(arguments[1], ".node .outer-path > path:first-child"),
+          edge: fill(arguments[1], ".edgePaths path")
+        }
+      })()
+    JS
+    assert_equal look["sunken"], fills["diamond"], "a diamond is solid sunken"
+    assert_equal look["sunken"], fills["class_box"], "a class's box is solid sunken"
+    assert_equal "none", fills["edge"], "an edge is a line, never filled"
+
     FileUtils.mkdir_p(SHOTS)
     shots = { "tile" => wide, "tile-wide" => wide, "tile-tall" => tall }
     %w[light dark].each do |theme|
