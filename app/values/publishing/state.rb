@@ -115,8 +115,8 @@ module Publishing
 
     # Live or scheduled: the record has a time, so it has a published copy,
     # in force or waiting for its time, which a save of its rows does not
-    # reach. No query.
-    def published? = !draft?
+    # reach. Not `Publishable.published`, which is live alone. No query.
+    def timed? = !draft?
 
     # Exactly one of STATES.
     def state

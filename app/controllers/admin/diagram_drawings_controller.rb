@@ -71,7 +71,7 @@ module Admin
 
       page = block.owner
       state = ::Publishing::State.of(page)
-      render json: { ok: true, published: state.published?, status: state.status, page_id: page.id, page_title: page.title,
+      render json: { ok: true, published: state.timed?, status: state.status, page_id: page.id, page_title: page.title,
                      review_url: admin_page_path(page, review: "publish"), base: result.record.updated_at.iso8601(6) }
     end
 
