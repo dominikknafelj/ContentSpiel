@@ -46,8 +46,8 @@ class BlockTypes::NoteTest < ActiveSupport::TestCase
     BlockTypes::Note::ICONS.each_value { |name| assert_includes ContentModel::BlockTypeDefinition::ICONS, name.tr("-", "_") }
   end
 
-  test "Note stands after Code in the picker, and the containers stay last" do
-    assert_equal %w[rich_text image code note table form card post_list section], BlockTypes.built_in_names
+  test "Note stands after Code and Diagram in the picker, and the containers stay last" do
+    assert_equal %w[rich_text image code diagram note table form card post_list section], BlockTypes.built_in_names
   end
 
   test "a new block is a Note, and an unknown stored kind reads as one" do

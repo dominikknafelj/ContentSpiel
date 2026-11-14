@@ -5,10 +5,13 @@
 # drawings' elements, attributes and classes against `Diagrams::Drawing`'s
 # lists and `diagram.css`:
 #   RAILS_ENV=test bin/rails diagram:fixtures
+# It also writes the Diagram block's sample drawings, cleaned, to
+# db/seeds/diagrams/sample-<locale>.svg, from the `sample_<locale>` sources;
+# run it after changing `BlockTypes::Diagram::SAMPLE_SOURCES` too.
 # Under the test environment only: it boots the test's server, signs in with
 # an owner made for the run and rolls the test database back at the end.
 namespace :diagram do
-  desc "Write test/fixtures/diagrams/*.svg and MERMAID_VERSION with the vendored Mermaid (RAILS_ENV=test)"
+  desc "Write test/fixtures/diagrams/*.svg, MERMAID_VERSION and db/seeds/diagrams/*.svg with the vendored Mermaid (RAILS_ENV=test)"
   task fixtures: :environment do
     abort "diagram:fixtures runs under RAILS_ENV=test (it boots the test's server)." unless Rails.env.test?
 

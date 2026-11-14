@@ -88,10 +88,10 @@ class ContentModel::CodeFieldTest < ActiveSupport::TestCase
     end
   end
 
-  test "the Code block calls its file name File name, and no other built-in field has a label of its own" do
+  test "the Code block calls its file name File name and the Diagram block its description Description, and no other built-in field has a label of its own" do
     labelled = [ BlockTypes, ContentTypes, FieldGroups ].flat_map { |registry| registry.all.flat_map { |type| type.fields.select { |field| field.options.key?(:label) }.map { |field| [ type.name, field.name, field.label ] } } }
 
-    assert_equal [ [ "code", "filename", "File name" ] ], labelled
+    assert_equal [ [ "code", "filename", "File name" ], [ "diagram", "description", "Description" ] ], labelled
   end
 
   test "a content type field may name its empty choice too" do

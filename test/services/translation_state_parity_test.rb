@@ -294,8 +294,9 @@ class TranslationStateParityTest < ActiveSupport::TestCase
 
           # Then changed in the first language, as the default-language card
           # sends it: a translated schema field with the settings, a column
-          # in the language's own translations.
-          changed = ->(value) { "#{value} changed" }
+          # in the language's own translations. A value that is not text (a
+          # Diagram block's drawing) is sent as it was.
+          changed = ->(value) { value.is_a?(String) ? "#{value} changed" : value }
           english_columns = english.except(*own.keys).transform_keys(&:to_sym).transform_values(&changed)
           attributes = own.any? ? { settings: definition.sample.settings.merge(own.transform_values(&changed)) } : {}
           assert ContentBlocks::Save.call(block, attributes: attributes, translations: english_columns.any? ? { "en" => english_columns } : {}).ok?

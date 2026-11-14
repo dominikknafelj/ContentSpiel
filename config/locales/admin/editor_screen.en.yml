@@ -49,6 +49,7 @@ en:
           # answers.
           types:
             # bin/rails generate block_type adds a type's scope below this line.
+            diagram: {}
             # A Form block's tile: no form chosen, or the one it names is
             # in the trash or purged (`BlockTypes::Form.summary`).
             form:

@@ -15,7 +15,7 @@ class Admin::Ui::BlockIconComponentTest < ViewComponent::TestCase
   end
 
   test "every built-in block type declares its icon" do
-    assert_equal({ "rich_text" => "pilcrow", "image" => "image", "code" => "code_xml", "note" => "info", "post_list" => "posts", "section" => "columns_2", "table" => "table", "card" => "card", "form" => "clipboard_list" },
+    assert_equal({ "rich_text" => "pilcrow", "image" => "image", "code" => "code_xml", "diagram" => "diagram", "note" => "info", "post_list" => "posts", "section" => "columns_2", "table" => "table", "card" => "card", "form" => "clipboard_list" },
       BlockTypes.all.to_h { |type| [ type.name, type.icon ] }.slice(*BuiltInBlockTypes.names))
   end
 

@@ -42,8 +42,8 @@ module ContentModel
     # one or none; an outside type picks from the same list. The last four
     # are the Note block's kinds (note block plan, rulings 11 and 12), which
     # its blocks' cards and tiles draw through `for_block:`; `table`
-    # is the Table block's.
-    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list].freeze
+    # is the Table block's and `diagram` the Diagram block's.
+    ICONS = %w[pilcrow image code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list].freeze
 
     # The hue families an icon may be drawn in: the chip behind a
     # type's icon takes the family's colour pair
@@ -262,8 +262,12 @@ module ContentModel
       @body_content = kind
     end
 
+    # The type's one filled block. A translated value may be a callable,
+    # called once when the sample is first read and never while the type
+    # registers, so a value read from a file (the Diagram block's drawings)
+    # cannot stop a boot.
     def sample(**values)
-      return @sample if values.empty?
+      return @resolved_sample ||= resolved(@sample) if values.empty?
 
       unknown = values.keys - Sample.members
       refuse "a sample holds settings, translations, body, image, form, shows; not #{unknown.join(", ")}" if unknown.any?
@@ -281,6 +285,7 @@ module ContentModel
       translations = translations.transform_keys(&:to_s)
       refuse "a sample's translations are written for \"en\" at least" if translations.any? && !translations.key?("en")
 
+      @resolved_sample = nil
       @sample = Sample.new(
         settings: settings.transform_keys(&:to_s).freeze,
         translations: translations.freeze,
@@ -290,6 +295,14 @@ module ContentModel
         shows: shows.freeze
       )
     end
+
+    def resolved(sample)
+      return if sample.nil?
+
+      translations = sample.translations.transform_values { |fields| fields.transform_values { |value| value.respond_to?(:call) ? value.call : value } }
+      sample.with(translations: translations.freeze)
+    end
+    private :resolved
 
     # "gallery" for "gallery/album": an outside type's names are its owner's.
     def owner = name.include?("/") ? name.split("/", 2).first : nil
@@ -367,7 +380,7 @@ module ContentModel
       # the contract; and the sample is what puts the type into every shared
       # test, the canary above all.
       raise ArgumentError, "#{name}: a block type declares `theme_methods`, the methods its public template may call" if theme_methods.nil?
-      raise ArgumentError, "#{name}: a block type declares a `sample`, one filled block of itself, for the shared tests" if sample.nil?
+      raise ArgumentError, "#{name}: a block type declares a `sample`, one filled block of itself, for the shared tests" if @sample.nil?
     end
 
     private

@@ -3,6 +3,11 @@
 # (RAILS_ENV=test) draws each with the vendored Mermaid and writes the raw
 # drawing to <key>.svg beside this file; `test/lib/diagram_fixtures_test.rb`
 # holds that every type has one and that every source passes the line rules.
+#
+# The `sample_<locale>` sources at the end are the block type's sample
+# (`BlockTypes::Diagram::SAMPLE_SOURCES`, which
+# `test/models/block_types/diagram_test.rb` holds them to): the task writes
+# their drawings CLEANED to db/seeds/diagrams/sample-<locale>.svg.
 flowchart: |
   flowchart LR
     accDescr: A request passes the gateway and is served from the backend or refused.
@@ -93,3 +98,21 @@ pie: |
     "English" : 62
     "German" : 25
     "Spanish" : 13
+sample_en: |
+  flowchart LR
+    accDescr: A draft goes to review, and is published once approved or sent back with changes.
+    A[Draft] --> B{Review}
+    B -->|approved| C[Published]
+    B -->|changes| A
+sample_de: |
+  flowchart LR
+    accDescr: Ein Entwurf geht zur Prüfung und wird nach der Freigabe veröffentlicht oder mit Änderungen zurückgeschickt.
+    A[Entwurf] --> B{Prüfung}
+    B -->|freigegeben| C[Veröffentlicht]
+    B -->|Änderungen| A
+sample_es: |
+  flowchart LR
+    accDescr: Un borrador pasa a revisión y se publica cuando se aprueba o se devuelve con cambios.
+    A[Borrador] --> B{Revisión}
+    B -->|aprobado| C[Publicado]
+    B -->|cambios| A

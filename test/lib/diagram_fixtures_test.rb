@@ -31,10 +31,24 @@ class DiagramFixturesTest < ActiveSupport::TestCase
   end
 
   test "every sample source is of its type and passes the line rules" do
-    DiagramFixtures.sources.each do |key, source|
+    DiagramFixtures.sources.merge(DiagramFixtures.samples).each do |key, source|
       assert Diagrams::Source.type(source), "#{key} names no type on the list"
       assert_empty Diagrams::Source.refusals(source), key
       assert_includes source, "accDescr", key
+    end
+  end
+
+  # The block type's sample sources stand at the end of the same file, and
+  # are no type's fixture: the task writes their drawings cleaned, into
+  # db/seeds/diagrams, where the sample reads them.
+  test "the block type's sample sources are split off the types' and each has its cleaned drawing" do
+    assert_equal %w[sample_en sample_de sample_es], DiagramFixtures.samples.keys
+    assert_equal DiagramFixtures.all_sources.keys, DiagramFixtures.sources.keys + DiagramFixtures.samples.keys
+    DiagramFixtures.samples.each do |key, source|
+      assert_equal "flowchart", Diagrams::Source.type(source), key
+      file = DiagramFixtures::SEEDS.join("sample-#{key.delete_prefix("sample_")}.svg")
+      assert file.file?, "no drawing for #{key}"
+      assert_equal file.read, Diagrams::Drawing.clean(file.read).svg, "the drawing for #{key} is not stored cleaned"
     end
   end
 

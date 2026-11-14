@@ -156,7 +156,7 @@ module ContentModel
             raise ArgumentError, "`drawing:` is a mermaid field's, naming its diagram_drawing field" if options.key?(:drawing)
             # `help:` is a line under a string field in CS Studio (the Note
             # block's title: what an empty one does).
-            raise ArgumentError, "`help:` is a line under a string field, written as a String" if options.key?(:help) && !(options[:help].is_a?(String) && options[:help].strip != "")
+            check_help(options)
             # `placeholder_from:` names a select declared BEFORE the string,
             # whose chosen label is the string's placeholder.
             if options.key?(:placeholder_from)
@@ -199,12 +199,15 @@ module ContentModel
       # (`Forms::BuiltInFieldTypes`) is limited, and the editors' own text
       # fields are not unless they say so. A translated text's other
       # languages are not looked at: the one caller with a limit is untranslated.
+      # `help:` is a line under it in CS Studio, as under a string (the
+      # Diagram block's description: what it is for).
       def text
         FieldType.new(
           name: :text, cast: STRIPPED, translatable: true, audit: :value,
           options: lambda { |options, _earlier|
             raise ArgumentError, "`max:` on a text field is a number of characters, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
-            refuse_choice_and_string_options(options.except(:max))
+            check_help(options)
+            refuse_choice_and_string_options(options.except(:max, :help))
           },
           validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
             max = field.options[:max]
@@ -562,8 +565,14 @@ module ContentModel
         raise ArgumentError, "`control: :segmented` draws a select's choices as buttons: it is for a select"
       end
 
+      HELP_REFUSAL = "`help:` is a line under a string or a text field, written as a String".freeze
+
+      def check_help(options)
+        raise ArgumentError, HELP_REFUSAL if options.key?(:help) && !(options[:help].is_a?(String) && options[:help].strip != "")
+      end
+
       def refuse_string_options(options)
-        raise ArgumentError, "`help:` is a line under a string field, written as a String" if options.key?(:help)
+        raise ArgumentError, HELP_REFUSAL if options.key?(:help)
         raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" if options.key?(:placeholder_from)
         raise ArgumentError, "`format:` is for a string field" if options.key?(:format) || options.key?(:format_message)
         raise ArgumentError, "`drawing:` is a mermaid field's, naming its diagram_drawing field" if options.key?(:drawing)

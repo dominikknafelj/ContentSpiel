@@ -16,6 +16,8 @@ module ContractLedger
     "blocks/rich_text_component" => %w[block page],
     "blocks/image_component" => %w[block page asset alt caption sizes],
     "blocks/code_component" => %w[block page lines code language language_label filename caption string],
+    # Release note (diagram): added the Diagram block's line.
+    "blocks/diagram_component" => %w[block page svg description caption],
     "blocks/note_component" => %w[block page kind heading titled? word icon body],
     "blocks/table_component" => %w[block page rows header_row? header_column? column_count caption],
     # Release note (forms): added the Form block, its line and the five

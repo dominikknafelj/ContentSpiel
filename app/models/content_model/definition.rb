@@ -33,9 +33,9 @@ module ContentModel
     # without a script; note block spec, decision 7). It is a look and changes
     # nothing about the value or its validation.
     #
-    # `help:` is a line under a string field in CS Studio (the Note block's
-    # title: what an empty one does), and `placeholder_from:` names a select
-    # declared BEFORE the string whose chosen label is the string's
+    # `help:` is a line under a string or a text field in CS Studio (the Note
+    # block's title: what an empty one does; the Diagram block's
+    # description), and `placeholder_from:` names a select declared BEFORE the string whose chosen label is the string's
     # placeholder (the Note block's title shows the kind's word, design
     # answer B3). Both are literals of the type's definition, as `label:` is.
     # `max:` on a string counts characters, as on a code field.
