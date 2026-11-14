@@ -34,7 +34,7 @@ module Admin
     # The most a drawing may hold after cleaning: the frame refuses a larger
     # one as too large instead of handing it back, so a save is never left
     # for the server's sanitizer to refuse.
-    LIMITS = { max_bytes: 1_048_576, max_elements: 5_000 }.freeze
+    LIMITS = { max_bytes: Diagram::Drawing::MAX_BYTES, max_elements: Diagram::Drawing::MAX_ELEMENTS }.freeze
 
     SCRIPT = "diagram-renderer.js".freeze
 

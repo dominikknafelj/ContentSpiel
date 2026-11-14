@@ -122,7 +122,8 @@
 
   // ---- Cleaning, as `Diagram::Drawing` drops quietly.
 
-  const DROPPED_ELEMENTS = new Set([ "style", "filter", "feDropShadow", "linearGradient", "stop", "symbol" ])
+  // `title` is Mermaid's `accTitle`: the component writes the one title.
+  const DROPPED_ELEMENTS = new Set([ "style", "filter", "feDropShadow", "linearGradient", "stop", "symbol", "title" ])
   // `filter` is the attribute that points a sequence diagram's boxes at the
   // dropped `<filter>`'s drop shadow.
   const DROPPED_ATTRIBUTES = new Set([
@@ -131,7 +132,7 @@
   ])
   // The component writes the root's role, name and size itself; Mermaid's
   // `aria-roledescription` (the diagram's kind) is the one aria name kept.
-  const DROPPED_ROOT_ATTRIBUTES = new Set([ "width", "style", "role" ])
+  const DROPPED_ROOT_ATTRIBUTES = new Set([ "width", "height", "style", "role" ])
   const KEPT_ROOT_ARIA = "aria-roledescription"
 
   const clean = (svg) => {

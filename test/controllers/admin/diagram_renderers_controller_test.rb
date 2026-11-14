@@ -71,7 +71,7 @@ class Admin::DiagramRenderersControllerTest < ActionDispatch::IntegrationTest
     assert_equal JSON.parse(Diagram::Source.rules_json), JSON.parse(rules.text)
 
     frame = JSON.parse(css_select("script#diagram-frame[type='application/json']").first.text)
-    assert_equal({ "max_bytes" => 1_048_576, "max_elements" => 5_000 }, frame["limits"])
+    assert_equal({ "max_bytes" => Diagram::Drawing::MAX_BYTES, "max_elements" => Diagram::Drawing::MAX_ELEMENTS }, frame["limits"])
     assert_equal %w[400 500 600 700], frame["fonts"].map { |font| font["weight"] }
     frame["fonts"].each do |font|
       assert_equal helpers.asset_path("archivo-latin-#{font["weight"]}-normal.woff2"), font["url"]
