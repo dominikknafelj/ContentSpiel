@@ -552,6 +552,9 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       assert_writes_settled
     end
     assert_selector strip, wait: LIVE
+    # The strip and Dana's text can arrive in two refreshes, and the second
+    # replaces the card's head: the menu is opened once the card holds both.
+    assert_selector "#{card(@block)} .ProseMirror", text: "Dana's text", wait: LIVE
     find("#{card(@block)} button[aria-label='Block actions']").click
     find("#{card(@block)} [data-admin--ui--menu-target~='panel'] button", text: "Take over").click
 
