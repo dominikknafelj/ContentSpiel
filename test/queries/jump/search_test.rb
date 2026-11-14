@@ -181,6 +181,19 @@ class Jump::SearchTest < ActiveSupport::TestCase
     assert_empty rows_of(search("draw diag"))
   end
 
+  test "a query that does not match draw diagrams never asks the count" do
+    create_undrawn_diagram
+    asked = false
+    original = Diagrams::ToDraw.method(:new)
+    Diagrams::ToDraw.define_singleton_method(:new) { |**args| asked = true; original.call(**args) }
+    begin
+      search("upload")
+    ensure
+      Diagrams::ToDraw.singleton_class.send(:remove_method, :new)
+    end
+    assert_not asked
+  end
+
   test "draw diagrams needs pages.edit, and the count is not asked without it" do
     create_undrawn_diagram
     nobody = User.create!(email_address: "nobody3@example.com", password: "a long enough password")

@@ -32,8 +32,9 @@ module Jump
     # gets. See `admin/jump/show`.
     #
     # An action with a `when:` is offered only while that callable, handed the
-    # actor, answers true; it is asked AFTER the permission holds, never before,
-    # so a viewer without the permission costs the question nothing. "Draw
+    # actor, answers true; it is asked LAST, after the permission holds and the
+    # title matches the query, so a viewer without the permission, or a query
+    # for something else, costs the question nothing. "Draw
     # diagrams" is listed only while there is a diagram to draw.
     ACTIONS = [
       { title: "New page", path: :new_admin_page_path, permission: "pages.create", dialog: "new-page-dialog" },
@@ -129,8 +130,8 @@ module Jump
 
     def action_rows
       ACTIONS.select { |action| action[:permission].nil? || AccessControl.holds?(actor, action[:permission], channel: :admin) }
-        .select { |action| action[:when].nil? || action[:when].call(actor) }
         .select { |action| blank? || matches?(action[:title]) }
+        .select { |action| action[:when].nil? || action[:when].call(actor) }
         .map { |action| { title: action[:title], route: [ action[:path], [], {} ], dialog: action[:dialog] }.compact }
     end
 
