@@ -196,6 +196,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/system_status
       app/controllers/admin/confirmations_controller.rb
       app/controllers/admin/diagram_renderers_controller.rb
+      app/controllers/admin/diagram_drawings_controller.rb
       app/controllers/admin/enrolments_controller.rb
       app/controllers/admin/jump_controller.rb
       app/controllers/admin/passwords_controller.rb
@@ -222,7 +223,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/concerns/admin/stale_form.rb
       app/controllers/concerns/admin/toast_stream.rb
       app/controllers/concerns/admin/translatable_record_loading.rb
-    ] # media_assets: the picker's upload; rail_tab_streams and slot_streams: the slots' streams, whatever screen hosts them; diagram_renderers: the Diagram block's frame, which draws no component
+    ] # media_assets: the picker's upload; rail_tab_streams and slot_streams: the slots' streams, whatever screen hosts them; diagram_renderers: the Diagram block's frame, which draws no component; diagram_drawings: a JSON save, which draws no component
   }.freeze
 
   # A file that draws more than one screen, each by name, with the reason. It is
