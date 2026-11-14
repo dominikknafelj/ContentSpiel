@@ -1002,6 +1002,19 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal Media::Asset.kept.count, response.parsed_body["counts"]["all"]
   end
 
+  test "the diagrams to draw leave out a trashed page's and its branch's blocks" do
+    source = BlockTypes::Diagram::SAMPLE_SOURCES.fetch("en")
+    diagram = ->(page) { ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "diagram" }, translations: { "en" => { settings: { "source" => source } } }).record }
+    kept = diagram.call(@kept_page)
+    branch = create_page(title: "Gone branch", parent: @kept_page)
+    below = diagram.call(branch)
+    diagram.call(@gone_page)
+    assert_equal [ kept, below ].map(&:id).sort, Diagrams::ToDraw.new(actor: users(:one)).rows.map { |row| row.block.id }.sort
+    assert Trash::Move.call(branch, actor: users(:one)).ok?
+
+    assert_equal [ kept ], Diagrams::ToDraw.new(actor: users(:one)).rows.map(&:block)
+  end
+
   # --- Choosing and embedding images -------------------------------------------
 
   test "choosing or embedding a trashed image reads as missing" do
