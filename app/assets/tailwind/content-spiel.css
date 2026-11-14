@@ -375,11 +375,12 @@ html[data-surface="studio"] {
 
 /* The Diagram block's colours in CS Studio: the `--th-diagram-*` tokens a
    site's theme defines, defined here once from CS Studio's own, on the
-   public diagram's class. Nothing in CS Studio paints with them: the block
-   card's script reads them off an element of that class (its colour probe)
-   and posts them to the renderer frame, which paints the drawing with the
-   site's stylesheet on these values, and the block's tile paints its small
-   drawing with the same. Both schemes follow, since every value is a
+   public diagram's class. Two readers: the block card's script reads them
+   off an element of that class (its colour probe) and posts them to the
+   renderer frame, which paints the drawing with the site's stylesheet on
+   these values; and the block's tile paints its small drawing with the same
+   stylesheet, which CS Studio's build imports (application.css), on these
+   values directly. Both schemes follow, since every value is a
    `var()` of a token both schemes define. The fill is the card's surface
    and the ink its ink; a line a node's outline (the field line, the faintest
    CS Studio line at 3:1 on the surface) and an edge dim; a group sunken, a

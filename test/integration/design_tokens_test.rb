@@ -22,8 +22,22 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     values = diagram.scan(/(--th-[\w-]+):([^;]+)/).to_h
     assert_equal BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }.sort, values.keys.sort
     values.each { |name, value| assert_empty value.scan(/--[\w-]+/).reject { |token| token.start_with?("--cs-") }, "#{name} is made of CS Studio tokens" }
-    assert_not_includes css.gsub(STUDIO_DIAGRAM, ""), "--th-"
+    # The Diagram block's public stylesheet is in it too, whole, so a tile
+    # paints its small drawing by the site's rules: every rule of it is
+    # under the block's class, and nothing else of the build reads a theme
+    # token.
+    diagram_rules = /[^{}]*\.content-block--diagram[^{}]*\{[^{}]*\}/
+    assert_includes css, ".content-block--diagram .node rect", "the drawing's rules are CS Studio's too"
+    assert_not_includes css.gsub(STUDIO_DIAGRAM, "").gsub(diagram_rules, ""), "--th-"
     assert_not_includes css, "cs-prose"
+  end
+
+  # The tile's drawing and the renderer frame's are painted by one file, the
+  # one the type declares, never a copy.
+  test "CS Studio's build imports the Diagram block's own stylesheet" do
+    entry = Rails.root.join("app/assets/tailwind/application.css")
+    imported = entry.read.scan(/^@import "([^"]+)"/).flatten.map { |path| entry.dirname.join(path).cleanpath }
+    assert_includes imported, BlockTypes.fetch(:diagram).stylesheet_path.cleanpath
   end
 
   # Once deleted by accident in an unrelated commit: SortableJS and the

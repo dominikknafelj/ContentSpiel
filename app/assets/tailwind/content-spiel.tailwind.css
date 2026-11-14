@@ -1559,6 +1559,12 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-block-tile:where(:hover) { box-shadow: var(--cs-shadow-2); background: var(--cs-tile-raised); }
 .admin-block-tile:where(:has(> .admin-block-tile__face[aria-expanded="true"])),
 .admin-block-tile:where(:has(> .admin-block-tile__face:focus-visible)) { box-shadow: var(--cs-shadow-3), 0 0 0 2px var(--cs-accent); background: var(--cs-tile-raised); }
+/* A type's small picture on its tile (`TileSummaryComponent`, a type's
+   `tile_picture`: the Diagram block's drawing): the drawing fills the box's
+   inside and keeps its aspect (an SVG's viewBox meets its box), whatever the
+   block's own stylesheet sizes it by on a page (its natural width, its
+   smallest width). Nothing in it moves the tile. */
+.admin-block-tile .admin-block-tile__picture svg { display: block; width: 100%; height: 100%; min-width: 0; max-width: 100%; }
 /* The tile of the block whose thread is open in the notes
    (`admin--notes--drawer#markActive`) takes the people frame, in the rule
    above. */

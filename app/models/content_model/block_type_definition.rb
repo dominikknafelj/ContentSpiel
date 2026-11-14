@@ -17,9 +17,9 @@ module ContentModel
     # What a block type brings beside its fields (block types spec, decision
     # 1). Each declaration is READ by the list that used to repeat it by hand:
     # `theme_methods` and `tokens` by `Theme::Contract`, `stylesheet` by the
-    # public stylesheet's build (`BlockTypes.theme_css_blocks`), `summary` and
-    # `preview` by the editor's tile, `read_only_actions` by the held form's allow-list,
-    # `sample` by the shared tests. A declaration nothing reads would be
+    # public stylesheet's build (`BlockTypes.theme_css_blocks`), `summary`,
+    # `preview` and `tile_picture` by the editor's tile, `read_only_actions`
+    # by the held form's allow-list, `sample` by the shared tests. A declaration nothing reads would be
     # documentation in code; none of these is.
 
     # The capabilities something in the CMS asks for (`capability?`): a type
@@ -234,6 +234,20 @@ module ContentModel
       @preview = callable
     end
 
+    # The small picture a closed block's tile draws beside its line, as
+    # markup: a callable taking the block and `locale:` and answering an
+    # `ActiveSupport::SafeBuffer` or nil (nothing to draw). The tile prints
+    # it as it is handed, in a box of its own that it hides from a screen
+    # reader (the line beside it names the block), so what it answers is
+    # markup this repository wrote: the Diagram block's cleaned drawing.
+    # Read by `Admin::EditorScreen::TileSummaryComponent` alone.
+    def tile_picture(callable = nil)
+      return @tile_picture if callable.nil?
+      refuse "`tile_picture` is a callable taking the block and `locale:`" unless callable.respond_to?(:call) && takes_block_and_locale?(callable)
+
+      @tile_picture = callable
+    end
+
     # The type's editor-script actions that only read or move focus: they
     # survive in a form someone else holds (decision 10).
     def read_only_actions(*ids)
@@ -418,6 +432,10 @@ module ContentModel
         refuse "a block type from outside may not declare a :theme_choice field: its list would need a key of theme.yml, which the CMS owns"
       end
       refuse "a block type from outside holds rich text only: `body_content :table` is the CMS's own" unless body_content == :rich
+      if tile_picture
+        refuse "a block type from outside draws no tile picture: the tile prints its answer as markup, unescaped, " \
+               "on every editor page holding a block of the type"
+      end
       if icon_follows_block?
         refuse "a block type from outside names one icon for all its blocks: `icon for_block:` is the CMS's own yet, " \
                "because a callable that raised would fail every editor page holding a block of the type"

@@ -78,6 +78,16 @@ module Translations
       def translation_tracked_fields(record)
         (translation_columns + record.send(:translation_schema_fields).map(&:name)).uniq
       end
+
+      # The tracked fields an AI provider may be asked to translate: every
+      # one but a schema field whose type is not offered to it
+      # (`FieldType#translatable`: a Mermaid source is code, never prose),
+      # the rule a field's Translate button follows too. A group is no type
+      # and stays: its raw value is skipped when the originals are read.
+      def ai_translatable_fields(record)
+        withheld = record.send(:translation_schema_fields).select { |field| field.field_type && !field.field_type.translatable }.map(&:name)
+        translation_tracked_fields(record) - withheld
+      end
     end
 
     # The literal value stored for `locale` -- no fallback. A

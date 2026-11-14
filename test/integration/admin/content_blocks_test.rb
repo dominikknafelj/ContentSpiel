@@ -1752,4 +1752,127 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       assert_equal "One", block.reload.settings_object.title
     end
   end
+
+  # ---- The Diagram block ---------------------------------------------------
+
+  DIAGRAM_SOURCE = "flowchart LR\n  A --> B".freeze
+  SVG_NS = Diagrams::Drawing::SVG
+
+  def diagram_block(**attributes) = @page.content_blocks.create!(block_type: "diagram", position: 0, **attributes)
+
+  # The drawing as the card's script sends it: JSON of the SVG and the digest
+  # of the source it was drawn from.
+  def drawing_param(svg = BlockTypes::Diagram.sample_drawing("en")["svg"], from: DIAGRAM_SOURCE) = JSON.generate(svg: svg, from: Diagrams::Drawing.digest(from))
+
+  def hostile_svg(body) = %(<svg xmlns="#{SVG_NS}" viewBox="0 0 200 100">#{body}</svg>)
+
+  def save_diagram(block, settings, base: block.reload.updated_at.iso8601(6), tab: nil, **more)
+    patch "#{blocks_path}/#{block.id}", params: { block: { settings: settings, **more }, base_updated_at: base }, as: :turbo_stream,
+      headers: { "X-Notes-Tab" => tab }.compact
+  end
+
+  test "a Diagram added from the picker saves its source and drawing together, with its description and caption" do
+    post blocks_path, params: { block: { block_type: "diagram" } }, as: :turbo_stream
+    assert_response :success
+    block = @page.content_blocks.sole
+    assert_equal "diagram", block.block_type
+    assert_select "turbo-stream template textarea[name='block[settings][source]']"
+
+    save_diagram(block, { source: "#{DIAGRAM_SOURCE}\r\n", drawing: drawing_param, description: "Two boxes." }, caption: "A sample")
+
+    assert_response :success
+    stored = block.reload.translated_settings.fetch("en")
+    assert_equal DIAGRAM_SOURCE, stored["source"]
+    assert_equal Diagrams::Drawing.digest(DIAGRAM_SOURCE), stored.dig("drawing", "from")
+    assert Diagrams::Drawing.new(stored["drawing"]).current?(stored["source"])
+    assert_nil Diagrams::Drawing.new(stored["drawing"]).reason
+    assert_equal "Two boxes.", stored["description"]
+    assert_equal "A sample", block.caption
+  end
+
+  # Review Focus 5: the browser is not trusted. A drawing that fetches, runs
+  # or links is refused whole, the save writes and audits nothing, and the
+  # refusal's sentence stands in the field's slot.
+  test "a hand-posted drawing with an entity, a DOCTYPE, an a href, a use href, a style url or an onload is refused" do
+    block = diagram_block(translated_settings: { "en" => { "source" => DIAGRAM_SOURCE, "drawing" => { "svg" => BlockTypes::Diagram.sample_drawing("en")["svg"], "from" => Diagrams::Drawing.digest(DIAGRAM_SOURCE) } } })
+    stored = block.reload.translated_settings
+    stamp = block.updated_at
+    version = PublicSite.content_version
+
+    {
+      entity: %(<!DOCTYPE svg [<!ENTITY x "boom">]>#{hostile_svg("<text>&x;</text>")}),
+      doctype: %(<!DOCTYPE svg>#{hostile_svg("<text>x</text>")}),
+      a_href: hostile_svg(%(<a href="https://x.test"><text>x</text></a>)),
+      use_href: hostile_svg(%(<use href="#a"/>)),
+      style_url: hostile_svg(%(<defs><style>@import url(https://x.test/a.css);</style></defs>)),
+      onload: %(<svg xmlns="#{SVG_NS}" viewBox="0 0 200 100" onload="alert(1)"><text>x</text></svg>)
+    }.each do |name, svg|
+      assert_no_difference -> { Audit::Event.count } do
+        save_diagram(block, { source: "#{DIAGRAM_SOURCE}\n  B --> C", drawing: drawing_param(svg, from: "#{DIAGRAM_SOURCE}\n  B --> C") })
+      end
+      assert_response :unprocessable_entity, name.to_s
+      assert_select "turbo-stream[target='block-#{block.id}-drawing-errors'] template", { text: /This drawing can't be shown on the site\./ }, name.to_s
+      assert_equal stored, block.reload.translated_settings, "#{name}: nothing is written, the source neither"
+      assert_equal stamp, block.updated_at
+    end
+    assert_equal version, PublicSite.content_version
+  end
+
+  # A refused line is the card's to say, never a reason to refuse the save:
+  # only the source's length and the drawing refuse.
+  test "a Diagram source with a classDef line is stored as typed" do
+    block = diagram_block
+    source = "#{DIAGRAM_SOURCE}\n  classDef hot fill:#f00\n  class A hot"
+
+    save_diagram(block, { source: source, drawing: drawing_param(from: source) })
+
+    assert_response :success
+    assert_equal source, block.reload.translated_settings.dig("en", "source")
+    assert_not_empty Diagrams::Source.refusals(source), "the line is one the card refuses"
+  end
+
+  test "a Diagram in a column says its line on its tile, is duplicated with ids its own, and is deleted" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "diagram", section: section, section_column: 1, position: 0)
+
+    save_diagram(inside, { source: DIAGRAM_SOURCE, drawing: drawing_param, description: "Two boxes." })
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='block-#{inside.id}-tile-summary'] template" do
+      assert_select ".admin-block-tile__picture[aria-hidden='true'] svg"
+      assert_select "*", text: /Flowchart · A --> B/
+    end
+
+    post "#{blocks_path}/#{inside.id}/duplicate", as: :turbo_stream
+    assert_response :success
+    copy = @page.content_blocks.where(block_type: "diagram").where.not(id: inside.id).sole
+    assert_equal inside.reload.translated_settings, copy.translated_settings
+
+    get "/cs-studio/pages/#{@page.id}"
+    assert_response :success
+    ids = css_select("[id]").map { |element| element["id"] }
+    assert_empty ids.tally.select { |_, count| count > 1 }.keys, "every id on the editor page is its own, the two tiles' drawings' included"
+    [ inside, copy ].each { |block| assert_includes ids, "diagram-tile-#{block.id}-en-d-1" }
+
+    delete "#{blocks_path}/#{copy.id}", as: :turbo_stream
+    assert_response :success
+    assert_not ContentBlock.exists?(copy.id)
+  end
+
+  test "a Diagram's save is refused when it is stale and when another tab holds it, like any block's" do
+    block = diagram_block(translated_settings: { "en" => { "source" => DIAGRAM_SOURCE } })
+    base = block.updated_at.iso8601(6)
+
+    save_diagram(block, { source: "#{DIAGRAM_SOURCE}\n  B --> C" }, base: base, tab: "tab-aaaaaaaa")
+    assert_response :success
+    travel 1.minute do
+      save_diagram(block, { source: "flowchart LR\n  X --> Y" }, base: base, tab: "tab-aaaaaaaa")
+    end
+    assert_response :conflict
+    assert_equal "#{DIAGRAM_SOURCE}\n  B --> C", block.reload.translated_settings.dig("en", "source")
+
+    sign_in_as users(:two)
+    save_diagram(block, { source: "flowchart LR\n  Theirs --> Mine" }, tab: "tab-bbbbbbbb")
+    assert_response :conflict
+    assert_equal "#{DIAGRAM_SOURCE}\n  B --> C", block.reload.translated_settings.dig("en", "source")
+  end
 end

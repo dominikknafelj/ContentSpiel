@@ -1,4 +1,24 @@
-<% if preview %>
+<% if pictured? %>
+  <%# The picture's layout: the type's picture (markup the type wrote, hidden from a screen reader), then the line with its
+      hints over the preview's heading, and the preview's text only without a picture. Every word is ERB-escaped. %>
+  <span id="<%= dom_id %>" class="admin-block-tile__summary flex min-w-0 items-start gap-2.5">
+    <% if picture %>
+      <span class="admin-block-tile__picture flex h-18 w-28 shrink-0 items-center justify-center overflow-hidden rounded-cs border border-line bg-surface p-1.5" aria-hidden="true"><%= picture %></span>
+    <% end %>
+    <span class="flex min-w-0 flex-col gap-0.5">
+      <span class="flex min-h-[1lh] min-w-0 items-center gap-1.5 text-sm text-dim">
+        <% if attention? %>
+          <span id="<%= attention_id %>" class="shrink-0 font-semibold text-warn-ink" role="img" aria-label="<%= t(".attention") %>">!</span>
+        <% end %>
+        <span id="<%= name_id %>" class="truncate"><% parts.each do |text, look| %><%= look ? tag.span(text, class: look) : text %><% end %></span>
+      </span>
+      <% if picture_heading.present? || picture_text.present? %>
+        <%# The two stand against each other: white space between them would be read with the description. %>
+        <span id="<%= text_id %>" class="flex min-w-0 flex-col gap-0.5"><% if picture_heading.present? %><span class="admin-block-tile__text truncate text-sm text-dim"><%= picture_heading %></span><% end %><% if picture_text.present? %><span class="<%= preview_text_class %>"><%= picture_text %></span><% end %></span>
+      <% end %>
+    </span>
+  </span>
+<% elsif preview %>
   <%# The preview: the heading (with the mark and the thumbnail before it) over the text. Every word is ERB-escaped. %>
   <span id="<%= dom_id %>" class="admin-block-tile__summary flex min-w-0 flex-col gap-0.5">
     <% if preview.heading.present? || attention? || thumbnail_asset %>

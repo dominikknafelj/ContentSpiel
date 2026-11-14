@@ -73,6 +73,16 @@ class Admin::Ui::TranslateAllComponentTest < ViewComponent::TestCase
     end
   end
 
+  # The count is what the button will ask for: a Diagram block's
+  # description, never its source, which no provider is asked to translate.
+  test "a page counts a diagram's description and never its source" do
+    page = create_page(title: "Flow")
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "diagram", settings: { "source" => "flowchart LR\n  A --> B", "description" => "Two boxes." } })
+    render_all page.reload
+
+    assert_selector "button", text: "Suggest translations for 2 empty fields"
+  end
+
   test "the count leaves out a held block's fields and the held page settings, and the bulk run is not offered for a held post (live editing)" do
     with_test_types do
       page = create_page(title: "About")

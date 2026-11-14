@@ -396,6 +396,29 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     end
   end
 
+  test "tile_picture is a callable taking the block and locale:, and anything else is refused, the type's name first" do
+    d = definition
+    assert_nil d.tile_picture
+    picture = ->(_block, locale:) { nil }
+    d.tile_picture picture
+    assert_same picture, d.tile_picture
+
+    [ "<svg/>", ->(block) { block }, ->(locale:) { locale } ].each do |bad|
+      error = assert_raises(ArgumentError) { definition.tile_picture bad }
+      assert_match(/\Atest_shape: `tile_picture` is a callable taking the block and `locale:`/, error.message)
+    end
+  end
+
+  # The tile prints a picture as the markup it is handed: a gem's would be
+  # markup nobody at the CMS reviewed, on every editor page.
+  test "a block type from outside draws no tile picture: tile_picture is refused at registration" do
+    definition = ContentModel::BlockTypeDefinition.new("gallery/flag")
+    definition.tile_picture ->(_block, locale:) { nil }
+
+    error = assert_raises(ArgumentError) { definition.finalize! }
+    assert_match(/\Agallery\/flag: a block type from outside draws no tile picture/, error.message)
+  end
+
   test "a type that declares no preview answers nil" do
     assert_nil definition.preview
   end

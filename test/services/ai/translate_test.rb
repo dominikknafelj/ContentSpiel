@@ -432,4 +432,34 @@ class AI::TranslateTest < ActiveSupport::TestCase
     assert_not refused.ok?
     assert_equal [ "Kind can't be translated" ], refused.errors
   end
+
+  # Diagram block spec §1: the description and the caption are words an AI
+  # provider may translate; the source is Mermaid (`:mermaid` is not
+  # translatable) and the drawing is derived from it, so neither is ever
+  # sent, asked by name or among every field of the block.
+  test "AI translation sends a diagram's description and caption and never its source or drawing" do
+    source = "flowchart LR\n  A --> B"
+    page = as_owner { create_page(title: "Flow") }
+    block = as_owner do
+      ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "diagram",
+        settings: { "source" => source, "description" => "Two boxes.",
+                    "drawing" => JSON.generate(svg: BlockTypes::Diagram.sample_drawing("en")["svg"], from: Diagrams::Drawing.digest(source)) } },
+        translations: { "en" => { caption: "How it flows" } }).record
+    end
+    assert block.persisted?
+
+    service, result = translate(block, %w[description caption])
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal({ "description" => "[de] Two boxes.", "caption" => "[de] How it flows" }, service.suggestions)
+    assert_equal [ [ "Two boxes.", "How it flows" ] ], StubProvider.calls.map { |call| call[:texts] }
+
+    %w[source drawing].each do |field|
+      _, refused = translate(block, [ field, "description" ])
+      assert_not refused.ok?, "#{field} is never sent"
+      assert_equal [ "#{field.humanize} can't be translated" ], refused.errors
+    end
+    assert_equal 1, StubProvider.calls.size
+    assert StubProvider.calls.none? { |call| call[:texts].any? { |text| text.include?("-->") || text.include?("<svg") } }
+  end
 end

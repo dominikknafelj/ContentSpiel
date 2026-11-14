@@ -141,8 +141,12 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert_equal "tinted", section.sample.settings.fetch("background")
   end
 
-  test "the five types that preview declare one, and image, form, post list and section declare none" do
-    assert_equal %w[card code note rich_text table], BlockTypes.all.select(&:preview).map(&:name).reject { |name| name.include?("/") }.sort
+  test "the six types that preview declare one, and image, form, post list and section declare none" do
+    assert_equal %w[card code diagram note rich_text table], BlockTypes.all.select(&:preview).map(&:name).reject { |name| name.include?("/") }.sort
     %w[image form post_list section].each { |name| assert_nil BlockTypes.fetch(name).preview, "#{name} keeps its summary line" }
+  end
+
+  test "the Diagram block alone draws a picture on its tile" do
+    assert_equal %w[diagram], BlockTypes.all.select(&:tile_picture).map(&:name)
   end
 end

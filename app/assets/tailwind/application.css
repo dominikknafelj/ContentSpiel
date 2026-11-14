@@ -36,3 +36,11 @@
 @source "../../javascript/editor";
 @import "./content-spiel.tailwind.css";
 @import "./admin-rich-text.css";
+/* The Diagram block's public stylesheet, the one file that paints a drawing
+   by Mermaid's class names (plain CSS, every rule under
+   `.content-block--diagram`), so a block's tile paints its small drawing
+   with the site's rules on CS Studio's colours (`--th-diagram-*` on that
+   class, in content-spiel.css), as the renderer frame inlines the same file
+   (`Admin::DiagramRenderersController.paint`). The default theme's file
+   always, whatever theme the site has, as the frame reads it. */
+@import "./themes/default/diagram.css";

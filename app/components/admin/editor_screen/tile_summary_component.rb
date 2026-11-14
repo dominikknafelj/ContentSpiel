@@ -39,6 +39,17 @@ module Admin
     # (`truncate` on the element around the parts), after the count that
     # every tile's text is cut at (`LENGTH`).
     #
+    # A TYPE WITH A PICTURE (`tile_picture`, the Diagram block's drawing)
+    # has a layout of its own: the picture small in a 112×72 box, hidden from
+    # a screen reader, and beside it the summary line, its hints with it,
+    # over the preview's heading as the words that describe the tile. The
+    # preview's text is drawn only when there is no picture, which stands
+    # for it. The picture is markup the type wrote (built-ins alone declare
+    # one: `BlockTypeDefinition#refuse_outside!`), printed as it is handed;
+    # an answer that is not an `ActiveSupport::SafeBuffer` raises. The box
+    # scales it to fit, its aspect kept (`.admin-block-tile__picture` in
+    # `content-spiel.tailwind.css`), and never moves the tile.
+    #
     # THE TILE IS THE ONLY PLACE a closed block shows its content. A
     # card of the page's own list that is collapsed
     # (`admin--editor--blocks#toggle`) shows its type's label and nothing
@@ -117,6 +128,22 @@ module Admin
         [ "admin-block-tile__text line-clamp-3 text-sm text-dim", ("font-cs-mono whitespace-pre-wrap" if preview.mono) ].compact.join(" ")
       end
 
+      # Whether the type draws a picture on its tile, and so the picture's
+      # layout, whether or not this block has one to draw.
+      def pictured? = definition&.tile_picture.present?
+
+      # The type's picture of the block, or nil.
+      def picture
+        return @picture if defined?(@picture)
+
+        @picture = (own_picture if pictured?)
+      end
+
+      # The preview's words in the picture's layout: its heading, and its
+      # text only when there is no picture.
+      def picture_heading = preview&.heading
+      def picture_text = (preview&.text unless picture)
+
       # "Needs fixing" under a preview: a refused save's word, alone.
       def needs_fixing = t(".needs_fixing")
 
@@ -148,6 +175,13 @@ module Admin
         elsif uses?("image") then asset ? asset.file.filename.to_s : t(".no_image")
         elsif uses?("body") then block.body_document(locale: locale).plain_paragraphs.first.to_s.truncate(LENGTH).presence || t(".empty_text")
         end
+      end
+
+      def own_picture
+        answer = definition.tile_picture.call(block, locale: locale)
+        raise ArgumentError, "#{block.block_type}'s tile_picture answered a #{answer.class}: a picture is an ActiveSupport::SafeBuffer or nil" unless answer.nil? || answer.is_a?(ActiveSupport::SafeBuffer)
+
+        answer.presence
       end
 
       # The definitions whose faulty summary has been logged, so a page of

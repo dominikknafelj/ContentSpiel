@@ -58,7 +58,7 @@ module AI
       return failure(@record, [ AI::NOT_CONFIGURED ]) unless AI.configured?
       return failure(@record, [ "Choose a language to translate into" ]) unless Translations.target_locales.include?(@to)
 
-      untranslatable = @fields - @record.class.translation_tracked_fields(@record)
+      untranslatable = @fields - @record.class.ai_translatable_fields(@record)
       # Named by label, the way the editor shows the field, never by attribute.
       return failure(@record, [ "#{untranslatable.map(&:humanize).to_sentence} can't be translated" ]) if untranslatable.any?
 
