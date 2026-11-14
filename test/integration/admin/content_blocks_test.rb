@@ -1749,6 +1749,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       sign_in_as users(:two)
       save_card(block, { title: "Theirs" }, tab: "tab-bbbbbbbb")
       assert_response :conflict
+      # The hold's answer, not a stale one: the strip names who holds the block.
+      assert_select "turbo-stream[action=update][target='block-#{block.id}-hold'] template [role=alert]", text: /is editing this block\. Your changes weren't saved\./
       assert_equal "One", block.reload.settings_object.title
     end
   end
@@ -1790,9 +1792,11 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal "A sample", block.caption
   end
 
-  # Review Focus 5: the browser is not trusted. A drawing that fetches, runs
-  # or links is refused whole, the save writes and audits nothing, and the
-  # refusal's sentence stands in the field's slot.
+  # The editor's browser is not trusted: a hand-posted drawing that fetches,
+  # runs or links (an entity, a DOCTYPE, an `<a href>`, a `<use href>`, a
+  # style's url(), a handler) is refused whole with a 422, the save writes
+  # and audits nothing, the source sent with it neither, and the refusal's
+  # sentence stands in the drawing field's slot.
   test "a hand-posted drawing with an entity, a DOCTYPE, an a href, a use href, a style url or an onload is refused" do
     block = diagram_block(translated_settings: { "en" => { "source" => DIAGRAM_SOURCE, "drawing" => { "svg" => BlockTypes::Diagram.sample_drawing("en")["svg"], "from" => Diagrams::Drawing.digest(DIAGRAM_SOURCE) } } })
     stored = block.reload.translated_settings
@@ -1873,6 +1877,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     sign_in_as users(:two)
     save_diagram(block, { source: "flowchart LR\n  Theirs --> Mine" }, tab: "tab-bbbbbbbb")
     assert_response :conflict
+    # The hold's answer, not a stale one: the strip names who holds the block.
+    assert_select "turbo-stream[action=update][target='block-#{block.id}-hold'] template [role=alert]", text: /is editing this block\. Your changes weren't saved\./
     assert_equal "#{DIAGRAM_SOURCE}\n  B --> C", block.reload.translated_settings.dig("en", "source")
   end
 end

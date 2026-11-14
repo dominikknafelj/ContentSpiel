@@ -20,7 +20,9 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     diagram = css.scan(STUDIO_DIAGRAM).flatten.join(";")
     assert_not_empty diagram, "CS Studio's diagram colours are in the product build"
     values = diagram.scan(/(--th-[\w-]+):([^;]+)/).to_h
-    assert_equal BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }.sort, values.keys.sort
+    diagram = BlockTypes.fetch(:diagram)
+    assert_equal (diagram.themed_tokens + diagram.fixed_tokens).map { |name| "--th-#{name}" }.sort, values.keys.sort
+    assert_equal "var(--cs-font)", values.fetch("--th-diagram-font"), "the drawing's face is CS Studio's sans, the one Mermaid measured in"
     values.each { |name, value| assert_empty value.scan(/--[\w-]+/).reject { |token| token.start_with?("--cs-") }, "#{name} is made of CS Studio tokens" }
     # The Diagram block's public stylesheet is in it too, whole, so a tile
     # paints its small drawing by the site's rules: every rule of it is

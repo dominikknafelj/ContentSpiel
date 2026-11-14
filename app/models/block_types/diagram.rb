@@ -175,12 +175,13 @@ module BlockTypes
       ContentModel::Preview.new(heading: shown.description, text: shown.source.lines.first(3).join, mono: true)
     end
 
-    # The tile's small picture: the drawing the site would show, named by the
-    # description, its ids the tile's own (`diagram-tile-<block>-<locale>-`,
+    # The tile's small picture: the drawing the site would show, with no
+    # title (hidden from a screen reader, it needs no name, and a title would
+    # be a tooltip over the tile's face), its ids the tile's own (`diagram-tile-<block>-<locale>-`,
     # never the card's frame's or the page's), in an element of the public
     # block's class, so CS Studio's stylesheet paints it with the block's
-    # own rules on CS Studio's colours. Hidden from a screen reader: the
-    # line beside it names the block. Nil when there is no drawing that
+    # own rules on CS Studio's colours. The line beside it names the
+    # block. Nil when there is no drawing that
     # passes on read.
     def self.tile_picture(block, locale:)
       shown = Shown.for(block, locale: locale)
@@ -188,7 +189,7 @@ module BlockTypes
       return unless drawing
 
       prefix = "diagram-tile-#{block.id}-#{locale}-"
-      svg = drawing.markup(prefix: prefix, title: shown.description.to_s, title_id: "#{prefix}title")
+      svg = drawing.markup(prefix: prefix, title: nil, title_id: "#{prefix}title")
       svg && ActiveSupport::SafeBuffer.new.safe_concat(%(<span class="content-block--diagram" aria-hidden="true">)).concat(svg).safe_concat("</span>")
     end
 

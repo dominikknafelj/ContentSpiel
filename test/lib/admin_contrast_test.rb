@@ -1051,9 +1051,12 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The colours and the one fixed token, the face (CS Studio's sans), which
+  # the tile's drawing reads; the card posts the colours alone.
   test "CS Studio defines every themed diagram token from its own tokens" do
-    names = BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }
-    assert_equal names.sort, diagram_colours.keys.sort
+    diagram = BlockTypes.fetch(:diagram)
+    names = diagram.themed_tokens.map { |name| "--th-#{name}" }
+    assert_equal (names + diagram.fixed_tokens.map { |name| "--th-#{name}" }).sort, diagram_colours.keys.sort
     assert_equal Admin::Fields::MermaidField.colour_names.sort, names.sort, "the card posts the names CS Studio defines"
     diagram_colours.each do |name, value|
       assert_empty value.scan(/--[\w-]+/).reject { |token| token.start_with?("--cs-") }, "#{name} is made of CS Studio tokens"

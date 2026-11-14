@@ -202,7 +202,9 @@ module Diagrams
     def height = view_box&.at(3)
 
     # The drawing as a public page inlines it: the root an image named by
-    # the `<title>` written here (the block's description, as escaped text),
+    # the `<title>` written here (the block's description, as escaped text;
+    # with `title: nil` no title and no name, for a drawing hidden from a
+    # screen reader, which a pointer's tooltip would otherwise read),
     # described by Mermaid's `<desc>` when it has one, sized by its viewBox
     # (an inline SVG with no size fills its column) with its smallest width
     # (MIN_SCALE), and every id prefixed. Nil when the drawing fails on read.
@@ -262,14 +264,18 @@ module Diagrams
     # it back from `Rails.cache` (Solid Cache in production, a table of the
     # database), so that store is trusted as the database is; no other caller
     # hands it a string. It refuses one that is not an SVG root holding the
-    # empty title once.
+    # empty title once. A nil title takes the element and the root's
+    # `aria-labelledby` out, so nothing names the drawing.
     def self.with_title(untitled, title:, title_id:)
       empty = %(<title id="#{title_id}"/>)
-      unless title_id.match?(ID) && untitled.to_s.start_with?("<svg ") && untitled.to_s.scan(empty).size == 1
+      labelled = %( aria-labelledby="#{title_id}")
+      unless title_id.match?(ID) && untitled.to_s.start_with?("<svg ") && untitled.to_s.scan(empty).size == 1 && untitled.to_s.scan(labelled).size == 1
         raise ArgumentError, "the markup is not an SVG root with the empty title #{title_id.inspect}"
       end
-
-      untitled.sub(empty) { %(<title id="#{title_id}">#{ERB::Util.html_escape(title.to_s)}</title>) }.html_safe
+      named = if title.nil? then untitled.sub(empty, "").sub(labelled, "")
+      else untitled.sub(empty) { %(<title id="#{title_id}">#{ERB::Util.html_escape(title.to_s)}</title>) }
+      end
+      named.html_safe
     end
 
     private

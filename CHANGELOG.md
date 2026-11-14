@@ -10,6 +10,11 @@
 
 - A new top-level name, `Diagrams` (`app/values/diagrams.rb`): a gem whose hook owner is `diagrams` is refused at boot. A gem with such an owner renames it.
 
+### For a gem or an outside caller
+
+- AI translation (`AI::Translate`) and "Suggest translations for N empty fields" no longer offer a translated field whose type is not `translatable` (`Translations::Tracker.ai_translatable_fields`), the rule the field's own Translate button always followed: a gem's block type with a translated `:url`, `:select` or `:link` field no longer has it sent to the AI provider or counted, and asking for it by name is refused as a field that can't be translated.
+- For a built-in block type: `t.tile_picture ->(block, locale:) { … }` draws a small picture on its tile in CS Studio, markup the type wrote; a block type from outside that declares one is refused at registration.
+
 ## 0.4.0 (2026-11-13)
 
 ### Added

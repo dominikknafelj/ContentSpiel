@@ -538,4 +538,66 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
     assert_no_button "Import file…", visible: :all
     assert_no_selector "#content_block_#{block.id} input[type=file], #{replace_dialog(block)}", visible: :all
   end
+
+  # ---- The tile's picture --------------------------------------------------
+
+  SHOTS = Rails.root.join(".superpowers/sdd/2026-11-13-diagram-block/shots")
+
+  # A fixture drawing of `type`, cleaned as a save stores it.
+  def tile_of(section, type, position)
+    source = DiagramFixtures.sources.fetch(type)
+    drawing = { "svg" => Diagrams::Drawing.clean(DiagramFixtures::DIR.join("#{type}.svg").read).svg, "from" => Diagrams::Drawing.digest(source) }
+    @page.content_blocks.create!(block_type: "diagram", section: section, section_column: 1, position: position,
+      translated_settings: { "en" => { "source" => source, "drawing" => drawing, "description" => "The #{type} diagram." } })
+  end
+
+  # The picture box's inside, the drawing's element and what it draws, in
+  # CSS pixels.
+  def picture_boxes(block)
+    page.evaluate_script(<<~JS, "#block-#{block.id}-tile-summary .admin-block-tile__picture")
+      (() => {
+        const box = document.querySelector(arguments[0])
+        const svg = box.querySelector("svg")
+        const style = getComputedStyle(box)
+        const outer = box.getBoundingClientRect()
+        const inset = (side) => parseFloat(style["border" + side + "Width"]) + parseFloat(style["padding" + side])
+        const inside = { left: outer.left + inset("Left"), top: outer.top + inset("Top"), right: outer.right - inset("Right"), bottom: outer.bottom - inset("Bottom") }
+        const rect = (r) => ({ left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height })
+        const drawn = Array.from(svg.children).filter((child) => child.tagName === "g").map((g) => g.getBoundingClientRect())
+          .reduce((all, r) => ({ left: Math.min(all.left, r.left), top: Math.min(all.top, r.top), right: Math.max(all.right, r.right), bottom: Math.max(all.bottom, r.bottom) }),
+                  { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity })
+        return { outer: rect(outer), inside: inside, svg: rect(svg.getBoundingClientRect()), drawn: drawn }
+      })()
+    JS
+  end
+
+  def assert_within(inner, outer, message)
+    %w[left top].each { |side| assert_operator inner[side], :>=, outer[side] - 0.5, "#{message}: #{side}" }
+    %w[right bottom].each { |side| assert_operator inner[side], :<=, outer[side] + 0.5, "#{message}: #{side}" }
+  end
+
+  test "a tile's picture scales a tall and a wide drawing to fit its 112 by 72 box, their aspect kept, in both schemes" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    tall = tile_of(section, "class", 0)
+    wide = tile_of(section, "flowchart", 1)
+    visit_editor(@page)
+
+    { tall => :height, wide => :width }.each do |block, fills|
+      boxes = picture_boxes(block)
+      assert_equal [ 112, 72 ], [ boxes["outer"]["width"].round, boxes["outer"]["height"].round ], "the box is 112 by 72"
+      assert_within boxes["svg"], boxes["inside"], "#{block.id}'s drawing element stands inside the box"
+      assert_within boxes["drawn"], boxes["inside"], "#{block.id}'s drawing is all inside the box, never cut"
+      inside = { width: boxes["inside"]["right"] - boxes["inside"]["left"], height: boxes["inside"]["bottom"] - boxes["inside"]["top"] }
+      drawn = boxes["drawn"][fills == :height ? "bottom" : "right"] - boxes["drawn"][fills == :height ? "top" : "left"]
+      assert_operator drawn, :>, inside[fills] * 0.8, "#{block.id}'s drawing is scaled to the box's #{fills}, not shrunk or cropped"
+    end
+
+    tile = ".admin-block-tile:has(#block-#{wide.id}-tile-summary)"
+    FileUtils.mkdir_p(SHOTS)
+    %w[light dark].each do |theme|
+      page.execute_script("document.documentElement.setAttribute('data-theme', arguments[0])", theme)
+      assert_selector "html[data-theme='#{theme}']"
+      page.save_screenshot(SHOTS.join("tile-#{theme}.png").to_s, selector: tile)
+    end
+  end
 end

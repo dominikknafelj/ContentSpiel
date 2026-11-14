@@ -1563,7 +1563,9 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    `tile_picture`: the Diagram block's drawing): the drawing fills the box's
    inside and keeps its aspect (an SVG's viewBox meets its box), whatever the
    block's own stylesheet sizes it by on a page (its natural width, its
-   smallest width). Nothing in it moves the tile. */
+   smallest width): the wrapper the type writes takes the box's inside, so
+   the drawing's 100% is of a size. Nothing in it moves the tile. */
+.admin-block-tile__picture > .content-block--diagram { display: block; width: 100%; height: 100%; }
 .admin-block-tile .admin-block-tile__picture svg { display: block; width: 100%; height: 100%; min-width: 0; max-width: 100%; }
 /* The tile of the block whose thread is open in the notes
    (`admin--notes--drawer#markActive`) takes the people frame, in the rule

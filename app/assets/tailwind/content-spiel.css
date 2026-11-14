@@ -381,7 +381,8 @@ html[data-surface="studio"] {
    these values; and the block's tile paints its small drawing with the same
    stylesheet, which CS Studio's build imports (application.css), on these
    values directly. Both schemes follow, since every value is a
-   `var()` of a token both schemes define. The fill is the card's surface
+   `var()` of a token both schemes define. The font is CS Studio's sans,
+   Archivo, the face Mermaid measured every box in. The fill is the card's surface
    and the ink its ink; a line a node's outline (the field line, the faintest
    CS Studio line at 3:1 on the surface) and an edge dim; a group sunken, a
    note the accent's tint; the six series grounds, a pie's slices or a
@@ -390,6 +391,7 @@ html[data-surface="studio"] {
    reads at 7.9:1 or better on each in light and 4.7:1 in dark, and each is
    told from the next (`test/lib/admin_contrast_test.rb`). */
 html[data-surface="studio"] .content-block--diagram {
+  --th-diagram-font: var(--cs-font);
   --th-diagram-ink: var(--cs-ink);
   --th-diagram-fill: var(--cs-surface);
   --th-diagram-line: var(--cs-field-line);

@@ -713,19 +713,22 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_equal 1, parses
   end
 
-  test "the tile's picture is the stored drawing with tile ids and no script" do
+  test "the tile's picture is the stored drawing with tile ids, no title and no script" do
     drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes <b>in</b> a row." })
     render_summary drawn
 
     box = page.find(picture, visible: :all)
     assert_equal "true", box["aria-hidden"]
-    assert_selector "#{picture} > .content-block--diagram[aria-hidden='true'] > svg[role='img'] > title", visible: :all
+    assert_selector "#{picture} > .content-block--diagram[aria-hidden='true'] > svg[role='img']", visible: :all
     prefix = "diagram-tile-#{drawn.id}-en-"
     ids = page.all("#{picture} [id]", visible: :all).map { |element| element["id"] }
     assert_operator ids.size, :>, 1
     assert ids.all? { |id| id.start_with?(prefix) }, ids.reject { |id| id.start_with?(prefix) }.inspect
     assert_includes ids, "#{prefix}d-1"
-    assert_equal "Boxes <b>in</b> a row.", page.find("#{picture} title", visible: :all).text(:all)
+    # No title: hidden from a screen reader, the picture needs no name, and a
+    # title would be a tooltip over the tile's face.
+    assert_no_selector "#{picture} title", visible: :all
+    assert_no_selector "#{picture} [aria-labelledby]", visible: :all
     html = page.native.to_html
     assert_no_match(/<script|\son\w+=|href=|<b>in/i, html)
 

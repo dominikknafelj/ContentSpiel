@@ -282,6 +282,20 @@ class Diagrams::DrawingTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { Diagrams::Drawing.with_title(untitled, title: "t", title_id: "diagram-12-de-other") }
   end
 
+  # The editor's tile hides its drawing from a screen reader, and a title
+  # would be a pointer's tooltip over the tile's face.
+  test "markup with no title writes no title and names nothing" do
+    svg = clean(drawing(%(<path d="M0 0"/>), root: "")).svg
+    markup = Diagrams::Drawing.new("svg" => svg, "from" => "x").markup(prefix: "diagram-tile-12-de-", title: nil, title_id: "diagram-tile-12-de-title")
+
+    assert_kind_of ActiveSupport::SafeBuffer, markup
+    root = parsed(markup).root
+    assert_nil root.at_xpath("//*[local-name()='title']")
+    assert_nil root["aria-labelledby"]
+    assert_equal "img", root["role"]
+    assert_equal "", Diagrams::Drawing.new("svg" => svg, "from" => "x").markup(prefix: "p-", title: "", title_id: "p-title").then { |named| parsed(named).at_xpath("//*[local-name()='title']").text }, "an empty title is still a title"
+  end
+
   test "markup keeps Mermaid's desc as the description and drops Mermaid's title" do
     raw = fixture("flowchart").sub(%(<desc id=), %(<title id="chart-title-diagram-1">Mermaid's own title</title><desc id=))
     markup = Diagrams::Drawing.new("svg" => clean(raw).svg, "from" => "x").markup(prefix: "diagram-1-en-", title: "The block's description", title_id: "diagram-1-en-title")
