@@ -1,0 +1,36 @@
+<% block = capture do %>
+  <div class="flex flex-col gap-4">
+    <p class="text-ink"><%= t(".body") %></p>
+    <%= render Admin::Ui::CopyValueComponent.new(id: "#{id}-copy", value: codes.join("\n"), copy_label: t(".copy"), layout: :block,
+          class: "[&_pre]:columns-2", source_data: { "admin--ui--recovery-codes-target": "list" }, role: "group", aria: { label: t(".list_label") }) %>
+    <div>
+      <button type="button" data-action="click->admin--ui--recovery-codes#download"
+              class="<%= Admin::Ui::ButtonComponent.classes(:secondary) %>"><%= t(".download") %></button>
+    </div>
+    <%= render Admin::Ui::CheckboxComponent.new(name: "saved", id: "#{id}-saved", label: t(".saved"),
+          data: { "admin--ui--recovery-codes-target": "saved", action: "change->admin--ui--recovery-codes#toggle" }) %>
+    <div class="flex justify-end">
+      <% if dialog? %>
+        <form method="dialog">
+          <button type="submit" disabled data-admin--ui--recovery-codes-target="done"
+                  class="<%= Admin::Ui::ButtonComponent.classes(:primary) %>"><%= t(".done") %></button>
+        </form>
+      <% else %>
+        <a href="<%= done_href %>" aria-disabled="true" data-admin--ui--recovery-codes-target="done" data-action="click->admin--ui--recovery-codes#refuse"
+           class="<%= done_link_classes %>"><%= t(".done") %></a>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+<%= tag.div(id: id, data: { controller: "admin--ui--recovery-codes" }) do %>
+  <% if dialog? %>
+    <%= render Admin::Ui::DialogComponent.new(id: "#{id}-dialog", title: t(".title"), width: :form, open_on_load: true) do %>
+      <div data-admin--ui--recovery-codes-target="block"><%= block %></div>
+    <% end %>
+  <% else %>
+    <div data-admin--ui--recovery-codes-target="block" class="flex flex-col gap-4">
+      <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+      <%= block %>
+    </div>
+  <% end %>
+<% end %>

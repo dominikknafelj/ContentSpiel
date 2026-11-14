@@ -1,0 +1,32 @@
+<%= tag.div(id: Admin::Ui::ConfirmIdentityDialogComponent::ID, data: controller_data) do %>
+  <%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: t(".title"), width: :form_narrow) do |dialog| %>
+    <div class="flex flex-col gap-4">
+      <p class="text-ink"><%= passkey ? t(".lead_passkey") : t(".lead_password") %></p>
+
+      <% if passkey %>
+        <button type="button" class="w-full <%= Admin::Ui::ButtonComponent.classes(:primary) %>" disabled
+                data-admin--passkeys--confirm-target="passkey" data-action="admin--passkeys--confirm#usePasskey">
+          <%= helpers.render "admin/shared/icon", name: :fingerprint, size: "size-4" %>
+          <%= t(".use_passkey") %>
+        </button>
+        <%= render Admin::Ui::OrDividerComponent.new(data: { "admin--passkeys--confirm-target": "divider" }) %>
+      <% end %>
+
+      <form id="<%= form_id %>" data-action="admin--passkeys--confirm#confirmPassword">
+        <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "#{ID}-password", label: t(".password"),
+              autocomplete: "current-password") %>
+      </form>
+
+      <p role="alert" class="text-sm text-danger-ink empty:hidden" data-admin--passkeys--confirm-target="error"></p>
+    </div>
+
+    <% dialog.with_footer do %>
+      <%= tag.form method: "dialog" do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, type: "submit") %>
+      <% end %>
+      <%= render Admin::Ui::ButtonComponent.new(label: passkey ? t(".confirm_password") : t(".confirm"), variant: passkey ? :secondary : :primary,
+            type: "submit", form: form_id) %>
+    <% end %>
+  <% end %>
+  <div id="<%= Admin::Ui::ConfirmIdentityDialogComponent::REQUESTS_ID %>" hidden></div>
+<% end %>

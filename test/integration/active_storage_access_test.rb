@@ -3,9 +3,8 @@ require "test_helper"
 # Active Storage's direct-upload endpoints are
 # Rails defaults the app never uses -- every upload goes through CS
 # Studio's own controllers (`Admin::MediaAssetsController`, the settings
-# logo, image blocks). Left open, anyone signed out could create blobs and
-# write bytes into storage. `config/initializers/active_storage_access.rb`
-# puts both behind the same sign-in as the rest of CS Studio, while the
+# logo, image blocks). `config/initializers/active_storage_access.rb`
+# answers both with a 404 to everyone, signed in or out, while the
 # read side stays public for what the site shows: a library image's made
 # widths and the logo (what it refuses is test/integration/image_delivery_test.rb).
 class ActiveStorageAccessTest < ActionDispatch::IntegrationTest
@@ -15,7 +14,7 @@ class ActiveStorageAccessTest < ActionDispatch::IntegrationTest
     assert_no_difference -> { ActiveStorage::Blob.count } do
       post "/rails/active_storage/direct_uploads", params: BLOB_PARAMS, as: :json
     end
-    assert_response :unauthorized
+    assert_response :not_found
   end
 
   test "signed out, a disk upload with a valid token writes nothing" do
@@ -24,17 +23,44 @@ class ActiveStorageAccessTest < ActionDispatch::IntegrationTest
 
     put path, params: +"abcd", headers: { "Content-Type" => "image/png" }
 
-    assert_response :unauthorized
+    assert_response :not_found
     assert_not blob.service.exist?(blob.key)
   end
 
-  test "signed in, a direct upload still works" do
+  test "signed in, a direct upload is refused too" do
     sign_in_as(users(:one))
 
-    assert_difference -> { ActiveStorage::Blob.count }, 1 do
+    assert_no_difference -> { ActiveStorage::Blob.count } do
       post "/rails/active_storage/direct_uploads", params: BLOB_PARAMS, as: :json
     end
-    assert_response :success
+    assert_response :not_found
+  end
+
+  # Forgery protection is off in the test environment but on in development
+  # and production, where its checks (422 for a missing token, and a session
+  # read to compare it) must not run before the refusal.
+  test "with forgery protection on, a tokenless direct upload is a 404 that reads and sets no session" do
+    previous = ActionController::Base.allow_forgery_protection
+    ActionController::Base.allow_forgery_protection = true
+
+    assert_no_difference -> { ActiveStorage::Blob.count } do
+      post "/rails/active_storage/direct_uploads", params: BLOB_PARAMS, as: :json
+    end
+    assert_response :not_found
+    assert_nil response.headers["Set-Cookie"]
+  ensure
+    ActionController::Base.allow_forgery_protection = previous
+  end
+
+  test "signed in, a disk upload with a valid token writes nothing" do
+    sign_in_as(users(:one))
+    blob = ActiveStorage::Blob.create_before_direct_upload!(**BLOB_PARAMS[:blob])
+    path = ActiveStorage::Current.set(url_options: { host: "www.example.com" }) { URI.parse(blob.service_url_for_direct_upload).path }
+
+    put path, params: +"abcd", headers: { "Content-Type" => "image/png" }
+
+    assert_response :not_found
+    assert_not blob.service.exist?(blob.key)
   end
 
   # Also the regression test for the catch-all route ordering: Rails draws

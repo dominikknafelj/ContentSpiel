@@ -85,7 +85,49 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     assert users(:reader).reload.authenticate("reset-pass-1")
   end
 
-  # --- Leaked passwords (Users::LeakedPasswordRule) ---------------------------
+  # --- clear: a password nobody holds (SignIn::Sso::Link) ---------------------
+
+  test "clear needs the user's own actor or the console, and never asks the leak lookup" do
+    clear = ->(user, actor:) { Users::UpdatePassword.call(user, clear: true, keep_acting_session: false, actor: actor) }
+    sessions = 2.times.map { Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil) }
+
+    with_leaked_password_check(leaked: []) do
+      [ users(:two), users(:one), users(:author) ].each do |someone|
+        refused = as(someone) { clear.call(users(:reader), actor: someone) }
+        assert refused.denied?, "#{someone.email_address} may not clear another person's password"
+      end
+      assert users(:reader).reload.authenticate("password")
+      sessions.each { |session| assert Session.exists?(session.id) }
+
+      own = as(nil) { clear.call(users(:reader), actor: users(:reader)) }
+      assert own.ok?, own.errors.inspect
+      assert_not users(:reader).reload.authenticate("password")
+      sessions.each { |session| assert_not Session.exists?(session.id) }
+      assert_equal [ nil, "password changed" ], Audit::Event.find_by!(action: "user.updated").field_changes["credentials"]
+      assert_equal "password_changed", Audit::Event.find_by!(action: "session.ended").metadata["reason"]
+
+      console = as(nil, channel: :console) { clear.call(users(:author), actor: nil) }
+      assert console.ok?, console.errors.inspect
+      assert_not users(:author).reload.authenticate("password")
+
+      assert_empty leaked_password_requests
+    end
+  end
+
+  test "clear does not open sign-in: nobody can type the password it writes" do
+    throttle = SignIn::Protection::Throttle.new
+    cleared = []
+    with_singleton_override(SignIn::Protection::Throttle, :new, ->(**) { throttle }) do
+      with_singleton_override(throttle, :clear, ->(identifier:) { cleared << identifier }) do
+        as(nil) { Users::UpdatePassword.call(users(:reader), clear: true, keep_acting_session: false, actor: users(:reader)) }
+        assert_empty cleared
+        as(nil) { change(users(:reader), actor: users(:reader)) }
+        assert_equal [ "reader@example.com" ], cleared
+      end
+    end
+  end
+
+  # --- Leaked passwords (SignIn::Password::LeakedRule) ------------------------
 
   test "a leaked password is refused and the user's sessions all stay" do
     leaked = "correct horse battery"
@@ -190,5 +232,102 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
 
     assert_not result.ok?
     assert Session.exists?(session.id)
+  end
+
+  # --- The console clears a lost person's passkeys --------------------------
+
+  def with_passkeys_and_codes(user)
+    2.times { |index| add_passkey(user, client: fake_authenticator, name: "Key #{index}") }
+    as(user) { SignIn::RecoveryCodes::Generate.call(user) }
+    2.times { Session.start(user: user, method: "passkey", user_agent: nil, ip_address: nil) }
+    user
+  end
+
+  test "remove_passkeys from the console removes passkeys and codes, ends every session and records one passkey.removed" do
+    owner = with_passkeys_and_codes(users(:one))
+    audit_ids = Audit::Event.pluck(:id)
+
+    result = as(nil, channel: :console) { change(owner, actor: nil, remove_passkeys: true) }
+
+    assert result.ok?, result.errors.inspect
+    assert owner.reload.authenticate("brand-new-pass")
+    assert_empty owner.passkeys
+    assert_empty owner.recovery_codes
+    assert_empty owner.sessions
+    assert_not owner.second_factor?
+
+    events = Audit::Event.where.not(id: audit_ids)
+    removed = events.where(action: "passkey.removed").sole
+    assert_equal({ "count" => 2, "recovery_codes_removed" => RecoveryCode::COUNT, "reason" => "console" }, removed.metadata)
+    assert_equal owner, removed.subject
+    assert_nil removed.actor
+    assert_equal "console", removed.channel
+    assert_equal({ "reason" => "password_changed", "count" => 2 }, events.find_by!(action: "session.ended").metadata)
+  end
+
+  test "remove_passkeys from a signed-in actor is denied and changes nothing" do
+    owner = with_passkeys_and_codes(users(:one))
+    reader = with_passkeys_and_codes(users(:reader))
+
+    [ [ owner, owner ], [ owner, reader ] ].each do |actor, user|
+      audit_ids = Audit::Event.pluck(:id)
+
+      result = as(actor) { change(user, actor: actor, remove_passkeys: true) }
+
+      assert result.denied?, "#{actor.email_address} on #{user.email_address}"
+      assert_equal [ "access.denied" ], Audit::Event.where.not(id: audit_ids).pluck(:action)
+    end
+    [ owner, reader ].each do |user|
+      assert user.reload.authenticate("password")
+      assert_equal 2, user.passkeys.count
+      assert_equal RecoveryCode::COUNT, user.recovery_codes.count
+      assert_equal 2, user.sessions.count
+    end
+  end
+
+  test "the console's password change leaves passkeys alone unless asked" do
+    owner = with_passkeys_and_codes(users(:one))
+
+    assert as(nil, channel: :console) { change(owner, actor: nil) }.ok?
+
+    assert_equal 2, owner.passkeys.count
+    assert_not Audit::Event.exists?(action: "passkey.removed")
+  end
+
+  test "a password for a linked account is refused with the sentence, its own or a manager's; clearing it is not" do
+    user = link_to_sso(users(:reader))
+    digest = user.password_digest
+
+    [ user, users(:one) ].each do |actor|
+      target = actor == user ? user : User.find(user.id)
+      result = as(actor) { change(target, actor: actor) }
+      assert_not result.ok?, actor.email_address
+      assert_equal [ "This account signs in with id.example.com and has no password here." ], result.errors
+    end
+    assert_equal digest, user.reload.password_digest
+    assert_not Audit::Event.exists?(action: "user.updated")
+
+    assert as(user) { Users::UpdatePassword.call(user, clear: true, keep_acting_session: false, actor: user) }.ok?
+  end
+
+  test "a refusal of a linked account asks the authorization first: a stranger learns no link" do
+    user = link_to_sso(users(:reader))
+
+    result = as(users(:author)) { change(user, actor: users(:author)) }
+
+    assert result.denied?
+  end
+
+  test "a link that lands between the read and the change is seen under the row lock" do
+    user = User.find(users(:reader).id)
+    digest = user.password_digest
+    link_to_sso(User.find(user.id))
+
+    result = as(user) { change(user, actor: user) }
+
+    assert_not result.ok?
+    assert_equal [ "This account signs in with id.example.com and has no password here." ], result.errors
+    assert_equal digest, users(:reader).reload.password_digest
+    assert_not Audit::Event.exists?(action: "user.updated")
   end
 end

@@ -130,6 +130,9 @@ module Audit
       starter_content.added trash.emptied media.regenerated user.owner_changed invitation.accepted
       language.enabled language.disabled language.configured language.default_changed
       session.created session.destroyed session.ended session.failed session.locked access.denied
+      passkey.added passkey.renamed passkey.removed recovery_codes.generated recovery_code.used
+      session.second_factor_failed session.confirmation_failed
+      sso.linked sso.refused sso.unlinked
     ].freeze
 
     ACTIONS = (
@@ -138,8 +141,10 @@ module Audit
     ).uniq.freeze
 
     # Sign-in's refusals: nobody signed in, and the sentence must not invent
-    # an actor.
-    NO_ACTOR = %w[session.failed session.locked].freeze
+    # an actor. A second step refused is one of them: the password before it
+    # signed nobody in. So is single sign-on's refusal: the provider named
+    # someone the site has no account for, or none it may sign in.
+    NO_ACTOR = %w[session.failed session.locked session.second_factor_failed sso.refused].freeze
 
     # The reasons of a `session.ended` whose sentence names who ended it
     # ("Ada ended every session of “Bo”"). An expiry has nobody to name, and
@@ -148,7 +153,23 @@ module Audit
     # those are told with no actor, as NO_ACTOR's are.
     SESSION_ENDED_BY = %w[ended_by_self ended_by_owner].freeze
 
-    SECURITY_ACTIONS = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted].freeze
+    # A passkey's or a code's change is a change to how the account is
+    # proved, so each is one, but a passkey's new name, which proves nothing;
+    # and a link to a sign-in provider, made, taken away or refused, is one
+    # too.
+    SECURITY_ACTIONS = %w[
+      session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted
+      passkey.added passkey.removed recovery_codes.generated recovery_code.used session.second_factor_failed session.confirmation_failed
+      sso.linked sso.refused sso.unlinked
+    ].freeze
+
+    # `sso.refused`'s reasons (`SignIn::Sso::ACCOUNT_REASONS`) in words. A
+    # reason this code doesn't know says none.
+    SSO_REFUSALS = {
+      "no_account" => "no invited account",
+      "email_unverified" => "the provider hasn't verified the email",
+      "owner" => "owners don't sign in with single sign-on"
+    }.freeze
 
     class << self
       # One event for one viewer (resolving its target by itself).
@@ -178,7 +199,8 @@ module Audit
         end
         raise ArgumentError, "at_least is for a counted sentence (count above 1)" if at_least && count <= 1
         visitor = visitor?(event)
-        actor = actor_for(event, viewer, none: NO_ACTOR.include?(action) || visitor || actorless_ending?(event, action))
+        none = NO_ACTOR.include?(action) || visitor || actorless_ending?(event, action) || console_removal?(event, action)
+        actor = actor_for(event, viewer, none:)
         parts = Wording.new(event, action, target, fallback_scheduled_at, you: actor.you, count:, mixed:, at_least:).parts
         parts = [ Wording.visitor_part ] + parts if visitor
         new(
@@ -227,6 +249,13 @@ module Audit
         return false unless action == "session.ended"
 
         event.actor_id.nil? || !SESSION_ENDED_BY.include?(Wording.metadata_of(event)["reason"])
+      end
+
+      # The console's clearing of a lost person's passkeys
+      # (`Users::UpdatePassword`, `remove_passkeys`): nobody signed in did it.
+      # A person's own removal has its actor, so the action is not NO_ACTOR.
+      def console_removal?(event, action)
+        action == "passkey.removed" && Wording.metadata_of(event)["reason"] == "console"
       end
 
       def actor_for(event, viewer, none:)
@@ -424,7 +453,7 @@ module Audit
         when "starter_content.added" then [ text("added the starter content") ]
         when "trash.emptied" then [ text("emptied the trash") ]
         when "media.regenerated" then regenerated_parts
-        when "session.created" then [ text("signed in") ]
+        when "session.created" then [ text(signed_in_sentence) ]
         when "session.destroyed" then [ text("signed out") ]
         when "session.ended" then ended_parts
         # No user, no email: the attempted address is in `metadata` for the
@@ -436,7 +465,45 @@ module Audit
         when "user.owner_changed" then owner_parts
         # The actor IS the subject: the account the invitation's token made.
         when "invitation.accepted" then [ text("accepted the invite") ]
+        when "passkey.added", "passkey.renamed", "passkey.removed" then passkey_parts
+        # Nothing of the codes: how many it replaced is the event's alone.
+        when "recovery_codes.generated" then [ text("made new recovery codes") ]
+        when "recovery_code.used" then [ text("signed in with a recovery code (#{self.class.metadata_of(event)["left"].to_i} left)") ]
+        when "session.second_factor_failed"
+          subject_label ? subject_parts("Failed second sign-in step for ") : [ text("Failed second sign-in step") ]
+        when "session.confirmation_failed" then [ text("didn't confirm it was #{@you ? "you" : "them"} before a sign-in change") ]
+        when "sso.linked" then [ text("linked #{@you ? "your" : "their"} account to single sign-on#{host_words}") ]
+        when "sso.refused" then refused_parts
+        when "sso.unlinked" then subject_parts("unlinked ", " from single sign-on")
         else language_parts
+        end
+      end
+
+      # A sign-in by password says only "signed in"; another way says which.
+      def signed_in_sentence
+        case self.class.metadata_of(event)["method"]
+        when "passkey" then "signed in with a passkey"
+        when "recovery_code" then "signed in with a recovery code"
+        when "sso" then "signed in with single sign-on"
+        else "signed in"
+        end
+      end
+
+      # A passkey's event names it by the name it had (the subject's stored
+      # label). A rename says the name before it too, from its `field_changes`;
+      # the console's removal is about the account, and counts.
+      def passkey_parts
+        metadata = self.class.metadata_of(event)
+        case @action
+        when "passkey.added" then subject_parts("added the passkey ")
+        when "passkey.renamed"
+          old = Array(event.field_changes.is_a?(Hash) ? event.field_changes["name"] : nil).first
+          old.present? && subject_label ? [ text("renamed the passkey “#{old}” to "), Part.new(:subject, subject_label) ] : subject_parts("renamed the passkey ")
+        else
+          return subject_parts("removed the passkey ") unless metadata["reason"] == "console"
+
+          count = metadata["count"].to_i
+          counted_of(subject_label, count, count == 1 ? "passkey" : "passkeys", " removed from the console")
         end
       end
 
@@ -472,8 +539,34 @@ module Audit
         when "ended_by_self" then [ text("ended #{count == 1 ? "one" : count} of #{@you ? "your" : "their"} other sessions") ]
         when "ended_by_owner" then user ? subject_parts("ended every session of ", " (#{count})") : [ text("ended #{count} #{sessions}") ]
         when "password_changed" then counted_of(user, count, sessions, " ended by a password change")
+        when "sso_revoked" then signed_out_parts(user, count, sessions, ": single sign-on no longer lets them in")
+        when "sso_unlinked" then signed_out_parts(user, count, sessions, ": unlinked from single sign-on")
+        when "expired_sso" then signed_out_parts(user, count, sessions, " after #{counted(metadata["after_hours"], "hour")} of single sign-on")
         else counted_of(user, count, sessions, " ended")
         end
+      end
+
+      # "“Bo” signed out: single sign-on no longer lets them in", with "(2 sessions)" when
+      # it was more than one; "3 sessions signed out …" with no one to name.
+      def signed_out_parts(user, count, sessions, after)
+        return [ text("#{count} #{sessions} signed out#{after}") ] unless user
+
+        [ Part.new(:subject, user), text(" signed out#{after}#{" (#{count} #{sessions})" if count > 1}") ]
+      end
+
+      # " (id.example.com)": the provider's host the event stored, or nothing.
+      def host_words
+        host = self.class.metadata_of(event)["issuer_host"]
+        host.present? ? " (#{host})" : ""
+      end
+
+      # The email the provider gave is the only name the event has: nobody was
+      # signed in, and no account is its subject.
+      def refused_parts
+        metadata = self.class.metadata_of(event)
+        email = metadata["email"].presence
+        reason = SSO_REFUSALS[metadata["reason"].to_s]
+        [ text("Single sign-on refused "), (email ? strong(email) : text("an unnamed account")), (text(": #{reason}") if reason) ].compact
       end
 
       # "12 hours", "1 day": the timeout the event stored
@@ -487,9 +580,10 @@ module Audit
         user ? [ text("Session of "), Part.new(:subject, user), text(" #{after}") ] : [ text("#{count} #{sessions} #{after}") ]
       end
 
-      # "2 sessions of “Bo” ended …", or "2 sessions ended …" with no one to name.
-      def counted_of(user, count, sessions, after)
-        user ? [ text("#{count} #{sessions} of "), Part.new(:subject, user), text(after) ] : [ text("#{count} #{sessions}#{after}") ]
+      # "2 sessions of “Bo” ended …", or "2 sessions ended …" with no one to
+      # name; `noun` is already singular or plural for the count.
+      def counted_of(user, count, noun, after)
+        user ? [ text("#{count} #{noun} of "), Part.new(:subject, user), text(after) ] : [ text("#{count} #{noun}#{after}") ]
       end
 
       def denied_parts

@@ -19,4 +19,12 @@ class Presence::ListChannelTest < ActionCable::Channel::TestCase
     assert subscription.rejected?
     assert_empty subscription.streams
   end
+
+  test "a socket whose session is held at enrolment is rejected" do
+    session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil, enrolment_due: true)
+    stub_connection current_user: users(:reader), session_id: session.id
+    subscribe
+    assert subscription.rejected?
+    assert_empty subscription.streams
+  end
 end

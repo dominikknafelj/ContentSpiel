@@ -37,3 +37,15 @@ en:
         ended_others:
           one: "Signed out of 1 other session."
           other: "Signed out of %{count} other sessions."
+      # The Passkeys and Recovery codes cards' answers
+      # (`Admin::PasskeysController`, `Admin::RecoveryCodesController`), and
+      # the notice after a sign-in with a recovery code, which the Passkeys
+      # card draws at its top by how many codes are left.
+      passkeys:
+        added: "Passkey added."
+        renamed: "Passkey renamed."
+        removed: "Passkey removed."
+        used_recovery:
+          one: "You signed in with a recovery code. 1 code is left. If you lost a passkey, remove it and add a new one."
+          other: "You signed in with a recovery code. %{count} codes are left. If you lost a passkey, remove it and add a new one."
+        used_last_recovery: "You signed in with your last recovery code. Generate new ones, and if you lost a passkey, remove it and add a new one."

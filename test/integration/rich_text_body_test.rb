@@ -4,8 +4,8 @@ require "test_helper"
 # every body renderer reads `Locales.read(record, :body)` -- a
 # `RichText::Document`, falling back per language when a locale's document
 # is blank -- and renders it with `to_html(locale:, urls: public_urls)`, so
-# internal links follow the request's own `PublicSite::Urls` (`/preview`
-# keeps its links under `/preview`).
+# internal links follow the request's own `PublicSite::Urls` (`/cs-studio/preview`
+# keeps its links under `/cs-studio/preview`).
 class RichTextBodyTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -81,15 +81,15 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
     assert_select ".content-block--rich-text a[href='/de/ueber-uns']", text: "about"
   end
 
-  test "internal links in a preview stay under /preview" do
+  test "internal links in a preview stay under /cs-studio/preview" do
     sign_in_as(users(:one))
     draft = Page.create!(parent: @root, title: "Draft", published_at: nil)
     @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("See [the draft](cs:page/#{draft.id})"))
 
-    get "/preview"
+    get "/cs-studio/preview"
 
     assert_response :success
-    assert_select ".content-block--rich-text a[href='/preview/draft']", text: "the draft"
+    assert_select ".content-block--rich-text a[href='/cs-studio/preview/draft']", text: "the draft"
   end
 
   # With a real cache store (the suite otherwise runs on

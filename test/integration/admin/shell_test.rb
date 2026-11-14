@@ -17,7 +17,7 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
   # this boot-time constant can't read).
   test "the reserved-paths denylist covers every already-claimed first segment" do
     assert_equal(
-      (%w[preview setup mcp up rails lookbook assets cable sitemap.xml] + SUPPORTED_LOCALES.keys).sort,
+      (%w[forms up rails lookbook assets sitemap.xml] + SUPPORTED_LOCALES.keys).sort,
       ContentSpiel::RESERVED_PATHS.sort
     )
   end
@@ -27,12 +27,12 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
   # when this process itself booted, so there's no way to re-run its own
   # `tap` block against a bad value from inside this already-running test
   # process. A subprocess is what actually re-triggers it: one static
-  # reserved word (`preview`) and one locale code (`de`), enough to prove
-  # both halves of the denylist actually reach the raise, not every one of
-  # `RESERVED_PATHS`' several dozen entries -- the list itself is already
+  # reserved word (`up`) and one locale code (`de`), enough to prove
+  # both halves of the denylist actually reach the raise, not every entry
+  # of `RESERVED_PATHS` (the static words and every locale code) -- the list itself is already
   # covered exhaustively, without a subprocess, just above.
   test "booting with a reserved ADMIN_PATH actually fails" do
-    %w[preview de].each do |reserved|
+    %w[up de].each do |reserved|
       output, status = Open3.capture2e({ "ADMIN_PATH" => reserved, "RAILS_ENV" => "test" }, "bin/rails", "runner", "1")
       assert_not status.success?, "expected ADMIN_PATH=#{reserved} to fail boot"
       assert_includes output, "already reserved"

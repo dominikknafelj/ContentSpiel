@@ -4,11 +4,15 @@
 # `setup.steps.<step>`, what it answers `setup.flash.*`. Access:
 #   - no user yet: anyone who entered the setup token this session, and only
 #     the steps up to creating the admin;
-#   - admin exists: only a signed-in user;
+#   - admin exists: only a signed-in user, and while the passkey policy
+#     covers them and they hold no passkey (`#passkey_due?`), only the steps
+#     up to the passkey step;
 #   - setup completed: 404.
 class SetupController < ApplicationController
-  STEPS = %w[token system_check admin site mail languages mcp_token starter_content review].freeze
+  STEPS = %w[token system_check admin passkey site mail languages mcp_token starter_content review].freeze
   PRE_ADMIN_STEPS = %w[token system_check admin].freeze
+  # The passkey step's body, which the recovery codes replace.
+  PASSKEY_STEP_ID = "setup-passkey".freeze
   OPTIONAL_STEPS = %w[system_check mail mcp_token starter_content].freeze
 
   # The rate limit needs a real store, and Rails.cache is :null_store in test
@@ -18,6 +22,8 @@ class SetupController < ApplicationController
 
   include MailTestLimit
   include MailTestSending
+  include PasskeyChallenges
+  include Admin::MailLinkOrigin
 
   allow_unauthenticated_access
   layout "setup"
@@ -29,6 +35,7 @@ class SetupController < ApplicationController
   before_action { Current.channel = :setup }
 
   before_action :require_setup_pending
+  before_action :require_passkey_options_access, only: :passkey_options
   before_action :load_step, only: %i[show update]
   before_action :require_step_access, only: %i[show update]
   # Once the owner exists every step runs signed in (`require_step_access`),
@@ -73,6 +80,12 @@ class SetupController < ApplicationController
       @results = Setup::SystemCheck.run(request_ssl: request.ssl?, reset_link_from_request: PasswordsMailer.request_origin_used?,
         remote_ip: request.remote_ip, cf_connecting_ip: request.headers[Setup::SystemCheck::CLOUDFLARE_HEADER])
     when "admin" then @user = User.new
+    when "passkey"
+      # Whoever holds a passkey already is sent on: the step only adds one.
+      return redirect_to(setup_step_path("site")) if Current.user.passkeys.exists?
+
+      @passkey_possible = passkey_relying_party.present?
+      @passkey_skippable = !SignIn::Passkeys::Policy.current.covers_owners?
     when "site", "languages" then @site_setting = Current.site
     when "mail"
       @site_setting = Current.site
@@ -83,13 +96,14 @@ class SetupController < ApplicationController
       @mcp_token_name = session[:setup_token_name]
     end
 
-    render @step
+    render @step unless performed?
   end
 
   def update
     case @step
     when "token" then update_token
     when "admin" then update_admin
+    when "passkey" then update_passkey
     when "site" then update_site
     when "mail" then update_mail
     when "languages" then update_languages
@@ -98,6 +112,22 @@ class SetupController < ApplicationController
     when "review" then update_review
     else head :not_found
     end
+  end
+
+  # The passkey step's registration options, as Your account's
+  # (`Admin::PasskeysController#options`), with a challenge of the purpose
+  # "register" kept for `#update_passkey`. Under /<ADMIN_PATH>/setup, since the redirect
+  # constraint sends CS Studio's own paths to the wizard until it ends; not
+  # behind Confirm it's you, since the session was made by the password the
+  # founding owner has just set. That holds for a first passkey alone: an
+  # owner who holds one gets no options and no add here (404, as `#show`
+  # sends them on), and adds another from Your account, behind the gate.
+  def passkey_options
+    user = Current.user
+    options, challenge = passkey_registration.options(user_handle: user.webauthn_handle!, user_name: user.email_address,
+      display_name: user.name.presence || user.email_address, exclude: user.passkeys.pluck(:external_id))
+    issue_passkey_challenge("register", challenge)
+    render json: options
   end
 
   private
@@ -117,8 +147,24 @@ class SetupController < ApplicationController
         redirect_to(setup_step_path("admin")) unless PRE_ADMIN_STEPS.include?(@step)
       else
         return request_authentication unless authenticated?
-        redirect_to(setup_step_path("site")) if %w[token admin].include?(@step)
+        return redirect_to(setup_step_path("passkey")) if %w[token admin].include?(@step)
+        redirect_to(setup_step_path("passkey")) if passkey_due? && STEPS.index(@step) > STEPS.index("passkey")
       end
+    end
+
+    # The founding owner must add a passkey before any later step, the MCP
+    # token's included: the policy covers them, they hold none, and this
+    # request has a relying party. At an IP address none can be made, so
+    # nothing is held (as `Admin::PasskeyEnrolment` holds nothing there).
+    # The wizard signs its founding owner in by password, its one way in.
+    def passkey_due?
+      passkey_relying_party.present? && SignIn::Passkeys::Policy.current.enrolment_due?(Current.user, method: "password")
+    end
+
+    # The options are the signed-in founding owner's alone, only where a
+    # passkey can be made, and only while they hold none.
+    def require_passkey_options_access
+      head :not_found unless authenticated? && passkey_relying_party && !Current.user.passkeys.exists?
     end
 
     def act_as_signed_in_user
@@ -135,7 +181,7 @@ class SetupController < ApplicationController
     end
 
     def first_step
-      return "site" if User.exists?
+      return "passkey" if User.exists?
 
       session[:setup_token_verified] ? "system_check" : "token"
     end
@@ -144,20 +190,29 @@ class SetupController < ApplicationController
       STEPS[STEPS.index(@step) + 1]
     end
 
-    # The step a "Back" link goes to: nil on the first step, and on "site",
-    # whose predecessor (creating the admin) can't be revisited once the
-    # account exists -- `require_step_access` bounces a signed-in visitor off
-    # "token" and "admin".
+    # The step a "Back" link goes to: nil on the first step; nil on
+    # "passkey", whose predecessor (creating the admin) can't be revisited
+    # once the account exists -- `require_step_access` bounces a signed-in
+    # visitor off "token" and "admin"; and nil on "site", since the passkey
+    # step sends on whoever holds a passkey, so Back would lead nowhere
+    # after one was added (a later one is added in Your account).
     def previous_step
       index = STEPS.index(@step)
-      return if index.zero? || @step == "site"
+      return if index.zero? || %w[passkey site].include?(@step)
 
       STEPS[index - 1]
     end
 
     def step_label(step) = I18n.t(step, scope: "setup.steps")
 
-    def optional_step?(step) = OPTIONAL_STEPS.include?(step)
+    # The passkey step is optional where the policy does not cover the
+    # founding owner (an owner is covered by every policy but `nobody`), and
+    # where no passkey can be made at all.
+    def optional_step?(step)
+      return !SignIn::Passkeys::Policy.current.covers_owners? || passkey_relying_party.nil? if step == "passkey"
+
+      OPTIONAL_STEPS.include?(step)
+    end
 
     def update_token
       if Setup::Token.valid?(params[:token])
@@ -189,7 +244,7 @@ class SetupController < ApplicationController
       end
 
       if result&.ok?
-        start_new_session_for(result.record)
+        start_new_session_for(result.record, method: "password")
         # A sign-in like any other, so audited like one (`Admin::
         # SessionsController#create`): `session.created`, the user as actor
         # and subject, on this request's `:setup` channel. Without it the
@@ -199,7 +254,7 @@ class SetupController < ApplicationController
         Current.actor = result.record
         Audit.record("session.created", subject: result.record)
         session.delete(:setup_token_verified)
-        redirect_to setup_step_path("site")
+        redirect_to setup_step_path("passkey")
       elsif result.nil?
         redirect_to admin_sign_in_path, alert: I18n.t("setup.flash.admin_exists")
       else
@@ -207,6 +262,33 @@ class SetupController < ApplicationController
         render :admin, status: :unprocessable_entity
       end
     end
+
+    # The browser's credential (`params[:credential]`, JSON) and the typed
+    # name, from `admin--passkeys--register` with the method PATCH. The
+    # challenge is taken before anything is decided, so a refused answer
+    # spends it too. `SignIn::Passkeys::Add` clears `enrolment_due` on the owner's
+    # sessions and makes the recovery codes; the answer is a stream that
+    # draws them in place of the step's body (`#setup-passkey`), once, Done
+    # leading on to "site", or a 303 there when no codes were made (the
+    # owner still held unused ones). A refusal is 422 `{ "error" }`, the
+    # sentence the step shows. The codes are drawn in this answer alone,
+    # never kept in the flash or the session.
+    def update_passkey
+      return head(:not_found) unless passkey_relying_party && !Current.user.passkeys.exists?
+
+      challenge = take_passkey_challenge("register")
+      result = SignIn::Passkeys::Add.call(Current.user, registration: passkey_registration.verify(params[:credential], challenge: challenge),
+        name: params[:name], **mail_link_origin)
+      return render(json: { error: result.errors.first }, status: :unprocessable_entity) unless result.ok?
+
+      _passkey, codes = result.record
+      return redirect_to(setup_step_path("site"), status: :see_other) unless codes
+
+      render turbo_stream: turbo_stream.replace(PASSKEY_STEP_ID,
+        Admin::Ui::RecoveryCodesComponent.new(codes: codes, frame: :page, done_href: setup_step_path("site"), id: PASSKEY_STEP_ID))
+    end
+
+    def passkey_registration = SignIn::Passkeys::Registration.new(relying_party: passkey_relying_party)
 
     def update_site
       @site_setting = Current.site

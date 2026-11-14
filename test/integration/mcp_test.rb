@@ -23,20 +23,20 @@ class McpTest < ActionDispatch::IntegrationTest
   end
 
   def mcp_post(body)
-    post "/mcp", params: body.to_json,
+    post "/cs-studio/mcp", params: body.to_json,
       headers: { "Content-Type" => "application/json", "Accept" => "application/json, text/event-stream",
         "Authorization" => "Bearer #{@raw_token}" }
   end
 
   test "a request with no Authorization header is rejected" do
-    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }.to_json,
+    post "/cs-studio/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }.to_json,
       headers: { "Content-Type" => "application/json", "Accept" => "application/json, text/event-stream" }
 
     assert_response :unauthorized
   end
 
   test "a request with an invalid token is rejected" do
-    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }.to_json,
+    post "/cs-studio/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }.to_json,
       headers: { "Content-Type" => "application/json", "Accept" => "application/json, text/event-stream",
         "Authorization" => "Bearer not-a-real-token" }
 

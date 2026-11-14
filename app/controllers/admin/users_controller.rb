@@ -4,7 +4,7 @@ module Admin
   # typed -- `Users::Save`'s own doc comment explains why a blank password
   # field means "leave it alone"), owner (the "Make owner…" / "Remove owner
   # rights…" action, the only request that changes the owner flag), sessions
-  # ("End all sessions…", `Sessions::EndAll`), destroy
+  # ("End all sessions…", `SignIn::Sessions::EndAll`), destroy
   # (refused for the last owner, `Users::Destroy` ->
   # `User#ensure_not_last_owner`). A permission refusal from `Users::Save` (a
   # group the actor can't assign, an owner or an outranking user changed by
@@ -103,11 +103,11 @@ module Admin
     end
 
     # "End all sessions…": an owner signs another user out everywhere,
-    # answered by `Sessions::EndAll` alone -- the owner rule, the refusal of your
+    # answered by `SignIn::Sessions::EndAll` alone -- the owner rule, the refusal of your
     # own account and the one `session.ended` event are its. A refusal is the 403
     # page; your own account is a plain failure, a toast on the editor.
     def sessions
-      result = Sessions::EndAll.call(@user)
+      result = SignIn::Sessions::EndAll.call(@user)
 
       if result.ok?
         redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, notice: t("admin.components.users_screen.sessions_zone.ended", name: @user.name_or_email)

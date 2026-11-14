@@ -14,9 +14,12 @@ module ApplicationCable
     # live too (`Session.live`, the rule `Session.from_cookies` ends by): a
     # socket open since before its session passed either timeout subscribes
     # to nothing, though its row stands until a request or the sweep ends it.
+    # A session held at enrolment (`Admin::PasskeyEnrolment`) subscribes to
+    # nothing either, as its requests reach nothing of CS Studio.
     # One query; a channel rejects on nil.
     def subscriber
-      @subscriber ||= User.where(id: Session.live(Time.current).where(id: connection.session_id, user_id: current_user.id).select(:user_id)).first
+      sessions = Session.live(Time.current).where(id: connection.session_id, user_id: current_user.id, enrolment_due: false)
+      @subscriber ||= User.where(id: sessions.select(:user_id)).first
     end
   end
 end

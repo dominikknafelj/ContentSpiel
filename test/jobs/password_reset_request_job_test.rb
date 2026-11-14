@@ -53,4 +53,47 @@ class PasswordResetRequestJobTest < ActiveJob::TestCase
       assert_includes ActionMailer::Base.deliveries.sole.text_part.body.to_s, "http://localhost:3000/cs-studio/password/edit#"
     end
   end
+
+  SSO_OFF = "[ContentSpiel] A reset was asked for an account linked to single sign-on, which is off.".freeze
+
+  test "a reset asked for a linked account sends the reminder with no reset link" do
+    linked = link_to_sso(users(:reader))
+
+    with_sso do
+      with_site_address(nil) do
+        assert_enqueued_email_with PasswordsMailer, :sso_reminder, params: queued, args: [ linked, { provider: OidcHelper::NAME, origin: "http://localhost:3000" } ] do
+          PasswordResetRequestJob.perform_now(linked.email_address, origin: "http://localhost:3000")
+        end
+        perform_enqueued_jobs
+      end
+    end
+
+    mail = ActionMailer::Base.deliveries.sole
+    assert_equal [ linked.email_address ], mail.to
+    assert_includes mail.text_part.body.to_s, "http://localhost:3000/cs-studio/sign-in"
+    assert_not_includes mail.encoded, "/password/edit"
+  end
+
+  test "under SSO_REQUIRED a non-owner's reset sends the reminder, and an owner's the reset" do
+    with_sso(required: true) do
+      assert_enqueued_email_with PasswordsMailer, :sso_reminder, params: queued, args: [ users(:reader), { provider: OidcHelper::NAME } ] do
+        PasswordResetRequestJob.perform_now(users(:reader).email_address)
+      end
+      assert_enqueued_email_with PasswordsMailer, :reset, params: queued, args: [ @user ] do
+        PasswordResetRequestJob.perform_now(@user.email_address)
+      end
+    end
+  end
+
+  test "with SSO off a linked account's reset sends nothing and the line names nobody" do
+    link_to_sso(users(:reader))
+
+    log = capture_log do
+      assert_no_enqueued_emails { PasswordResetRequestJob.perform_now(users(:reader).email_address) }
+    end
+
+    assert_equal [ SSO_OFF ], log.lines.map(&:strip).grep(/ContentSpiel/)
+    assert_not_includes log, users(:reader).email_address
+    assert_not_includes log, "id=#{users(:reader).id}"
+  end
 end

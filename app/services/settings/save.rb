@@ -64,6 +64,15 @@ module Settings
   # sentence (`.no_encryption_keys`), the transaction is rolled back, so
   # nothing of the call is written, and nothing is recorded.
   #
+  # WHO MUST SIGN IN WITH A PASSKEY (`passkey_policy`, OWNER_ATTRIBUTES) is an
+  # owner's decision alone, on top of `settings.manage`: a call carrying it
+  # from anyone else (a trusted nil actor aside, `Users::Manageability.
+  # actor_owner?`) is refused whole, before anything is written, with one
+  # `access.denied`. A stored nil is the environment's default
+  # (`SiteSetting#effective_passkey_policy`), so a save that posts the value
+  # the screen showed for it leaves it nil: only a choice the owner changed
+  # is written, and a site keeps following the default until then.
+  #
   # Recorded as `settings.updated`, and only when something actually changed.
   class Save < ApplicationService
     TRANSLATED = %i[title tagline].freeze
@@ -77,6 +86,11 @@ module Settings
     IMAGE_ATTRIBUTES = %i[image_format image_quality_webp image_quality_avif image_widths image_max_upload_mb].freeze
 
     def self.avif_unavailable = I18n.t("admin.settings.save.avif_unavailable", raise: true)
+
+    # Only an owner may write these (see the class comment).
+    OWNER_ATTRIBUTES = %i[passkey_policy].freeze
+
+    def self.owner_only = I18n.t("admin.settings.save.owner_only", raise: true)
 
     # The attribute of each `MailSettings` field.
     MAIL_ATTRIBUTES = {
@@ -125,6 +139,9 @@ module Settings
       end
       if languages_part? && !authorize!("languages.manage", @site)
         return denied("languages.manage", @site)
+      end
+      if owner_part? && !Users::Manageability.actor_owner?(actor)
+        return denied("settings.manage", @site, message: self.class.owner_only)
       end
 
       if site_part? && (from_host = mail_attributes_from_host).any?
@@ -324,7 +341,13 @@ module Settings
         (@attributes.key?(:default_locale) && @attributes[:default_locale].to_s != @site.default_locale.to_s)
     end
 
+    def owner_part? = (@attributes.keys & OWNER_ATTRIBUTES).any?
+
     def assign
+      # Read from the locked row: the default the screen showed is no change.
+      if @site.passkey_policy.nil? && @attributes[:passkey_policy].to_s == @site.effective_passkey_policy
+        @attributes = @attributes.except(:passkey_policy)
+      end
       @site.assign_attributes(@attributes)
 
       @translations.each do |locale, values|

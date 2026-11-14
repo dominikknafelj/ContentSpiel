@@ -125,6 +125,13 @@ class SiteSetting < ApplicationRecord
   validates :form_keep_days, numericality: { only_integer: true, in: Forms::Form::KEEP_DAYS, message: :keep_days_range },
     if: :will_save_change_to_form_keep_days?
 
+  # Who must sign in with a passkey: nobody, the owners and those who manage
+  # users, groups or tokens (`SignIn::Passkeys::Policy`), or everyone. Nil until an
+  # owner chooses: `#effective_passkey_policy` reads it as the environment's
+  # default, so a site made before the policy existed needs no value written.
+  PASSKEY_POLICIES = %w[nobody owners_and_admins everyone].freeze
+  validates :passkey_policy, inclusion: { in: PASSKEY_POLICIES }, allow_nil: true
+
   after_commit :reset_cached_state
 
   # Titled in the new row's own default language, not the ambient
@@ -160,6 +167,14 @@ class SiteSetting < ApplicationRecord
   # both up, readable in the one zone every stored time is actually in.
   def effective_time_zone
     ActiveSupport::TimeZone[time_zone.to_s] || ActiveSupport::TimeZone["UTC"]
+  end
+
+  # The passkey policy in force: the stored one, or unset, `owners_and_admins`
+  # in production and `nobody` in development and test, where a passkey asked
+  # for at every sign-in would stand in the way of the seed's accounts and
+  # every test's.
+  def effective_passkey_policy(production: Rails.env.production?)
+    passkey_policy || (production ? "owners_and_admins" : "nobody")
   end
 
   # Whether a key is stored, read off the raw column -- never decrypting

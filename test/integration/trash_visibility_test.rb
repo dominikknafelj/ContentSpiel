@@ -137,7 +137,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Gone child"
 
     sign_in_as users(:one)
-    get "/preview/kept-page"
+    get "/cs-studio/preview/kept-page"
     assert_response :ok
     assert_select ".page-children a", text: "Kept child", count: 1
     assert_not_includes response.body, "Gone child"
@@ -171,7 +171,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Gone leaf"
 
     sign_in_as users(:one)
-    with_plain_theme { get "/preview/guide/first-leaf" }
+    with_plain_theme { get "/cs-studio/preview/guide/first-leaf" }
 
     assert_response :success
     assert_select "nav.plain-tree a", text: "Last leaf"
@@ -192,7 +192,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Gone part"
 
     sign_in_as users(:one)
-    with_plain_theme { get "/preview/guide/gone-part/deep-leaf" }
+    with_plain_theme { get "/cs-studio/preview/guide/gone-part/deep-leaf" }
 
     assert_response :success
     assert_select "p.plain-crumb a", text: "Guide"
@@ -249,9 +249,9 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select ".content-block--rich-text a", text: /the gone/, count: 0
 
     sign_in_as users(:one)
-    get "/preview/kept-page"
+    get "/cs-studio/preview/kept-page"
     assert_response :ok
-    assert_select ".content-block--rich-text a[href='/preview/kept-page']", text: "the kept page"
+    assert_select ".content-block--rich-text a[href='/cs-studio/preview/kept-page']", text: "the kept page"
     assert_select ".content-block--rich-text", text: /the gone page/
     assert_select ".content-block--rich-text", text: /the gone post/
     assert_select ".content-block--rich-text a", text: /the gone/, count: 0
@@ -271,11 +271,11 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
   test "preview 404s a trashed page and post" do
     sign_in_as users(:one)
-    get "/preview/gone-page"
+    get "/cs-studio/preview/gone-page"
     assert_response :not_found
-    get "/preview/blog/gone-post"
+    get "/cs-studio/preview/blog/gone-post"
     assert_response :not_found
-    get "/preview/kept-page"
+    get "/cs-studio/preview/kept-page"
     assert_response :ok
   end
 
@@ -1358,7 +1358,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   private
 
   def call_tool(raw_token, name, arguments = {})
-    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: name, arguments: arguments } }.to_json,
+    post "/cs-studio/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: name, arguments: arguments } }.to_json,
       headers: { "Content-Type" => "application/json", "Accept" => "application/json, text/event-stream",
         "Authorization" => "Bearer #{raw_token}" }
     assert_response :success

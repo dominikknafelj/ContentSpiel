@@ -42,6 +42,19 @@ class PasswordsMailerTest < ActionMailer::TestCase
     end
   end
 
+  test "with an admin host the link names it, and without one it names the public host" do
+    with_site_address(SITE) do
+      with_admin_address("https://studio.example.internal") do
+        links_of(PasswordsMailer.reset(@user, origin: "http://evil.example")).each do |link|
+          assert_equal "studio.example.internal", URI.parse(link).host
+        end
+      end
+      links_of(PasswordsMailer.reset(@user, origin: "http://evil.example")).each do |link|
+        assert_equal "docs.example.org", URI.parse(link).host
+      end
+    end
+  end
+
   # WHERE THE REQUEST'S ORIGIN IS NOT USED (production, and every
   # environment that is not development or test: `in_production` below). It
   # is whatever Host the request named, and a site with no address
@@ -211,6 +224,51 @@ class PasswordsMailerTest < ActionMailer::TestCase
 
   test "the button is the violet with white words and an 8px radius, and the address follows it as text" do
     with_site_address(SITE) { assert_mail_button(PasswordsMailer.reset(@user).html_part.body.to_s) }
+  end
+
+  # ---- the reminder to sign in with the provider ----------------------------
+
+  test "the reminder says to sign in with the provider, in both parts, and its one link is the sign-in page" do
+    with_site_address(SITE) do
+      mail = PasswordsMailer.sso_reminder(@user, provider: "Okta", origin: "http://evil.example")
+
+      assert_equal [ @user.email_address ], mail.to
+      assert_equal "Sign in to Test Site with Okta", mail.subject
+      [ mail.text_part, mail.html_part ].each do |part|
+        body = Nokogiri::HTML5(part.body.to_s).text
+        assert_includes body, "Someone asked to reset the password of your account on Test Site."
+        assert_includes body, "Your account signs in with Okta, so it has no password here. Sign in with Okta on the sign-in page."
+        assert_includes body, "If you didn't ask, you can ignore this mail."
+        assert_includes body, "Sent by Test Site via Content Spiel"
+      end
+      html = Nokogiri::HTML5(mail.html_part.body.to_s)
+      assert_equal "Open the sign-in page", html.at_css("a").text
+      links_of(mail).each { |link| assert_equal "#{SITE}/cs-studio/sign-in", link }
+      assert_not_includes mail.encoded, "evil.example"
+      assert_no_match(/password\/edit/, mail.encoded)
+      assert_no_match TOKEN, mail.text_part.body.to_s
+      assert_mail_button(mail.html_part.body.to_s)
+    end
+  end
+
+  test "the reminder with no address known is built nowhere outside development and test, and the line names nobody" do
+    in_production do
+      with_site_address(nil) do
+        log = capture_log do
+          assert_no_emails { PasswordsMailer.sso_reminder(@user, provider: "Okta", origin: "http://evil.example").deliver_now }
+        end
+
+        assert_equal [ "[ContentSpiel] A single sign-on reminder mail was not sent: no site address is known. Set PUBLIC_HOST." ], log.lines.map(&:strip).grep(/ContentSpiel/)
+        assert_not_includes log, "evil.example"
+        assert_not_includes log, @user.email_address
+      end
+    end
+
+    with_site_address(nil) do
+      links_of(PasswordsMailer.sso_reminder(@user, provider: "Okta", origin: "http://localhost:3000")).each do |link|
+        assert_equal "http://localhost:3000/cs-studio/sign-in", link
+      end
+    end
   end
 
   private

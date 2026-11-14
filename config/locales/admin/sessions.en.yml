@@ -18,6 +18,23 @@ en:
         # In the hint's place when Turnstile's script cannot be loaded
         # (read by the `bot-check` script from its `data-messages`).
         check_unavailable: "The check couldn't load. Reload the page to try again."
+        passkey: "Sign in with a passkey"
+        # The site's single sign-on provider, named as the host names it
+        # (`SSO_NAME`): a secondary under the form, or the panel's primary
+        # while SSO_REQUIRED is set.
+        sso: "Sign in with %{provider}"
+        # The lead of the panel while SSO_REQUIRED is set, which draws no
+        # password form.
+        sso_lead: "This site signs you in with %{provider}."
+        # The small link from that panel to the owner path (`?owner=1`),
+        # and the owner path's heading.
+        owner_sign_in: "Owner sign-in"
+        owner_title: "Owner sign-in"
+        # The owner path's lead. Anyone may open the path; a non-owner who
+        # signs in there meets the ordinary refusal.
+        owner_lead: "For owners only. Everyone else signs in with %{provider}."
+        # The owner path's way back to the provider.
+        sso_instead: "Sign in with %{provider} instead"
       # A wrong address or password: one answer for both, so the page does
       # not say which addresses have an account.
       refused: "Try another email address or password."
@@ -33,3 +50,17 @@ en:
       # Shown only to a browser whose signed cookie named a session that is
       # gone; it names no account.
       ended: "Your session ended. Sign in again."
+      # A passkey that was not accepted, whatever the reason (unknown, a
+      # bad signature, an answer that came too late): one sentence for all.
+      passkey_failed: "That passkey didn't work. Try again, or sign in with your password."
+      # The second step of a sign-in was not answered in time.
+      second_factor_expired: "That took too long. Sign in again."
+      # Single sign-on's answer for every account the provider's identity
+      # finds no way into (no invited account, an unverified email, an
+      # owner's address, a linked account's address under another
+      # subject): one sentence for all, which says nothing of who exists.
+      sso_refused: "Your %{provider} account can't sign in to this site. Ask an owner to invite you."
+      # A single sign-on that did not finish: cancelled at the provider, a
+      # provider error, a state or token that did not hold, or a provider
+      # out of reach.
+      sso_unfinished: "Signing in with %{provider} didn't finish. Try again."

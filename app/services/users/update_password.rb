@@ -28,7 +28,7 @@ module Users
   # to be signed in in the same browser goes with the rest.
   #
   # A change opens sign-in for the account in every browser
-  # (`SignIn::Throttle#clear`: the account's bucket and every known
+  # (`SignIn::Protection::Throttle#clear`: the account's bucket and every known
   # device's), after the commit: whoever set the password proved the
   # account (the reset's token, the current password, the console; a
   # manager's set is `Users::Save`'s, which clears the same way), and a bot
@@ -36,18 +36,45 @@ module Users
   # The reset mail and the lock-out mail send a person here.
   #
   # A password in the list of leaked passwords is refused
-  # (`Users::LeakedPasswordRule`), asked only once the user is otherwise
+  # (`SignIn::Password::LeakedRule`), asked only once the user is otherwise
   # valid and before the transaction; a refusal ends no session.
   #
   # The password itself never reaches the log (Review Focus 5): the event
   # is `user.updated` with a `"credentials"` marker (`OwnerProtection#
   # user_field_changes`).
+  #
+  # `remove_passkeys: true` is the way back for a person who lost every
+  # passkey and every code: in the password's transaction it deletes the
+  # account's passkeys and recovery codes and records one `passkey.removed`
+  # (`reason: "console"`, the counts, no actor), and the sessions end as for
+  # any change. Only the trusted nil actor may ask it (the console's
+  # command): from anyone signed in it is refused whole, an owner included,
+  # since a second factor that someone else could clear protects nothing.
+  #
+  # `clear: true` writes a password nobody holds (`User.unusable_password`):
+  # the link to a sign-in provider (`SignIn::Sso::Link`), after which the account
+  # signs in through the provider alone. Only the user's own actor (the
+  # account the provider just proved) or the trusted nil actor (the console)
+  # may ask it: from anyone else, an owner included, it is refused, since
+  # clearing someone's password is taking their way in. Nothing is typed, so
+  # there is no blank check and no leak lookup, and the sentence is the
+  # ordinary change's (`user.updated` with its credentials marker, the
+  # sessions ended as for any change). Sign-in is not opened afterwards
+  # (`SignIn::Protection::Throttle#clear`): nobody can type the new password, so a bucket
+  # held closed keeps out nobody who could otherwise get in.
+  #
+  # A linked account's password is refused otherwise, its own included
+  # (`OwnerProtection#sso_linked_password_refusal`): it signs in through its
+  # provider alone, and the console's way back is `SignIn::Sso::Unlink`.
   class UpdatePassword < ApplicationService
     include OwnerProtection
-    include LeakedPasswordRule
+    include SignIn::Password::LeakedRule
 
-    def initialize(user, password:, password_confirmation:, current_password: nil, keep_acting_session: true, actor: Current.actor)
+    def initialize(user, password: nil, password_confirmation: nil, current_password: nil, keep_acting_session: true, remove_passkeys: false,
+      clear: false, actor: Current.actor)
       @user = user
+      @remove_passkeys = remove_passkeys
+      @clear = clear
       @password = password.to_s
       @password_confirmation = password_confirmation.to_s
       @current_password = current_password
@@ -56,34 +83,55 @@ module Users
     end
 
     def call
-      unless own_password?
+      return denied("users.manage", @user) if @remove_passkeys && !AccessControl.trusted?(actor, Current.channel)
+      return denied("users.manage", @user) if @clear && !own_password? && !AccessControl.trusted?(actor, Current.channel)
+
+      unless own_password? || @clear
         return denied("users.manage", @user) unless authorize!("users.manage", @user)
         return owner_only_denial if owner_protected?
         return denied("users.manage", @user) if outranked?
       end
+      return sso_linked_password_refusal if @user.sso_linked? && !@clear
 
-      return current_password_mismatch if !@current_password.nil? && !@user.authenticate(@current_password)
-      return blank_password if @password.blank?
+      if @clear
+        @user.password = User.unusable_password
+      else
+        return current_password_mismatch if !@current_password.nil? && !@user.authenticate(@current_password)
+        return blank_password if @password.blank?
 
-      @user.assign_attributes(password: @password, password_confirmation: @password_confirmation)
-      return leaked_password_failure(@user) if leaked_password?(@user, @password)
+        @user.assign_attributes(password: @password, password_confirmation: @password_confirmation)
+        return leaked_password_failure(@user) if leaked_password?(@user, @password)
+      end
 
+      linked_issuer = nil
       saved = User.transaction do
+        next false if !@clear && (linked_issuer = linked_issuer_under_lock)
+
         @user.save || raise(ActiveRecord::Rollback)
         end_sessions_after_password_change(keep_acting_session: @keep_acting_session)
+        remove_passkeys if @remove_passkeys
 
         record_event("user.updated", subject: @user, field_changes: user_field_changes(@user))
         true
       end
+      return sso_linked_password_refusal(issuer: linked_issuer) if linked_issuer
       return failure(@user) unless saved
 
-      SignIn::Throttle.new.clear(identifier: @user.email_address)
+      SignIn::Protection::Throttle.new.clear(identifier: @user.email_address) unless @clear
       success(@user)
     end
 
     private
 
     def own_password? = actor.is_a?(User) && actor == @user
+
+    def remove_passkeys
+      passkeys = Passkey.where(user_id: @user.id).delete_all # version: none (passkeys are on no public page)
+      codes = RecoveryCode.where(user_id: @user.id).delete_all # version: none (recovery codes are on no public page)
+      return if passkeys.zero? && codes.zero?
+
+      record_event("passkey.removed", subject: @user, metadata: { "count" => passkeys, "recovery_codes_removed" => codes, "reason" => "console" }, snapshot: nil)
+    end
 
     # A whole sentence for the field and for the summary alike
     # (config/locales/en.yml drops the attribute prefix for it). Wording

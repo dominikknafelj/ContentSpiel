@@ -21,7 +21,7 @@ class McpMediaTest < ActionDispatch::IntegrationTest
   end
 
   def mcp_post(raw_token, body)
-    post "/mcp", params: body.to_json,
+    post "/cs-studio/mcp", params: body.to_json,
       headers: { "Content-Type" => "application/json", "Accept" => "application/json, text/event-stream",
         "Authorization" => "Bearer #{raw_token}" }
     assert_response :success

@@ -16,6 +16,7 @@ en:
           forms: "Forms"
           ai: "AI translation"
           mail: "Mail"
+          sign_in: "Sign-in"
           images: "Images"
         nav:
           label: "Settings sections"
@@ -161,6 +162,22 @@ en:
           keep_label: "Keep submissions for"
           days: "days."
           help: "Forms that keep submissions and don't set their own time keep them this long. A change applies to submissions already kept."
+        # Who must sign in with a passkey (`SignInCardComponent`), an owner's
+        # section; `policies` in `SiteSetting::PASSKEY_POLICIES`' order.
+        sign_in_card:
+          title: "Sign-in"
+          intro: "Who must sign in with a passkey. For them a password alone is no longer enough."
+          legend: "Passkey required for"
+          policies:
+            nobody: "Nobody"
+            owners_and_admins: "Owners and admins"
+            everyone: "Everyone"
+          admins_help: "Admins are people who may manage users, groups or API tokens."
+          uncovered:
+            one: "1 person this covers has no passkey yet. They're asked to add one at their next sign-in; until then, nothing changes for them."
+            other: "%{count} people this covers have no passkey yet. Each is asked to add one at their next sign-in; until then, nothing changes for them."
+          all_covered: "Everyone this covers has a passkey."
+          saved: "Sign-in policy saved."
         images_card:
           intro: "How the images of the library are made for the public site. Saving these settings changes no image; Regenerate images does."
           format: "Format"

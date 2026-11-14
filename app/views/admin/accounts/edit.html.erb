@@ -1,8 +1,8 @@
-<%# "Your account": the h1, then four cards in the settings card frame
+<%# "Your account": the h1, then six cards in the settings card frame
     (`Admin::Ui::SettingsCardComponent`), 560px wide -- Profile and Notes in
     one form with one footer, Password, a form of its own with its own
     "Change password" footer and the promise about sessions as its card's
-    intro, and Sessions, in no form (see it below). Every signed-in user changes their own password here, behind their
+    intro, then Passkeys, Recovery codes and Sessions, in no form (see them below). Every signed-in user changes their own password here, behind their
     current one, and the one profile field, their name. A deliberate submit,
     never autosave, like the Users module's own forms.
 
@@ -111,6 +111,15 @@
     <%= render Admin::Ui::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options)) %>
   <% end %>
 
+  <%# A person linked to the provider has no password, passkeys or codes
+      here: the Sign-in card stands in the Password card's place, and the
+      Passkeys and Recovery codes cards are not drawn at all. A crafted
+      password change is refused by the service and its sentence is said
+      above the card. %>
+  <% if Current.user.sso_linked? %>
+    <%= render Admin::Ui::ErrorSummaryComponent.new(errors: Array(@errors)) %>
+    <%= render Admin::AccountScreen::SsoCardComponent.new(provider_name: sso_provider_name) %>
+  <% else %>
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>
     <%# `#password` is the card's anchor: what a link to "change your
         password" names, and where the form's own answer comes back to.
@@ -162,6 +171,23 @@
         <% end %>
       <% end %>
     <% end %>
+  <% end %>
+
+  <%# Passkeys and Recovery codes: after both forms and in neither, like
+      Sessions. Their answers redraw each card by its id, and a new set of
+      codes is drawn into the slot after them, shown once
+      (`Admin::AccountRecoveryCodes`). Adding or removing a passkey and
+      making codes ask Confirm it's you first when the session has not
+      proved its person lately: its one dialog stands after the cards, and
+      a passkey is offered in it once the person holds one. The cards are
+      the controller's (`load_passkeys`). %>
+  <div class="mt-8 flex flex-col gap-4">
+    <%= render @passkeys_card %>
+    <%= render @recovery_card %>
+  </div>
+  <div id="<%= Admin::AccountRecoveryCodes::SLOT_ID %>"></div>
+  <%= render Admin::Ui::ConfirmIdentityDialogComponent.new(passkey: @confirm_with_passkey, url_options: admin_url_options) %>
+
   <% end %>
 
   <%# Sessions: after both forms and in neither, so nothing in it is a

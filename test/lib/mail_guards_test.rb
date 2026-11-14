@@ -1,4 +1,5 @@
 require "test_helper"
+require_relative "../support/source_code"
 
 # What mail can break without anything failing loudly (docs/reference/mail.md,
 # "Rules a change can break silently"). Source greps: each is a
@@ -117,6 +118,9 @@ class MailGuardsTest < ActiveSupport::TestCase
     "app/models/invitation.rb" => "the model",
     "app/models/invitation_group.rb" => "the model's groups",
     "app/services/invitations/accept.rb" => "the service that turns an invitation into a user",
+    "app/services/invitations/accept_with_sso.rb" => "the same, through the sign-in provider",
+    "app/services/invitations/acceptance.rb" => "what those two share: the account made under the invitation's lock",
+    "app/services/sign_in/sso/admit.rb" => "a provider's identity accepts the open invitation of its verified email, or of the invitation it started from",
     "app/services/invitations/invite.rb" => "the service that makes one",
     "app/services/invitations/resend.rb" => "the service that sends a new link",
     "app/services/invitations/withdraw.rb" => "the service that deletes one",
@@ -124,6 +128,7 @@ class MailGuardsTest < ActiveSupport::TestCase
     "app/services/invitations/accounts.rb" => "an account made for an invited address closes its open invitation (the audit log's seam)",
     "app/controllers/admin/invites_controller.rb" => "the Users screen's invite, resend and withdraw",
     "app/controllers/invitations_controller.rb" => "the accept page",
+    "app/controllers/admin/sso_sessions_controller.rb" => "the provider's callback finds the open invitation the start was made from, and sends a mismatch back to its page",
     "app/controllers/concerns/admin/users_list.rb" => "the Users screen lists the open invitations among the users",
     "app/components/admin/users_screen/list_component.rb" => "an invitation's row in that list",
     "app/components/admin/users_screen/invite_dialog_component.rb" => "the invite dialog's empty form",
@@ -139,5 +144,41 @@ class MailGuardsTest < ActiveSupport::TestCase
     assert_empty namers - INVITATION_NAMERS.keys,
       "these files name Invitation: an invitation is no user, and the users side never learns it exists (docs/reference/mail.md, \"Invites\")"
     (INVITATION_NAMERS.keys - namers).each { |path| flunk "INVITATION_NAMERS[#{path.inspect}] names no Invitation any more: remove it" }
+  end
+
+  # ---- links into CS Studio name the link origin ----------------------------
+
+  # Route helpers only (a mailer's own `reset_url` is a method, not a route).
+  def route_url_helpers
+    Rails.application.reload_routes_unless_loaded
+    Rails.application.routes.named_routes.names.map { |name| "#{name}_url" }
+  end
+
+  # Line-based: a helper call split over lines is not read.
+  # Offences in `source`'s code: a call of an `admin_…_url(` without
+  # `**@url_options`, or of any other route's `_url` helper.
+  def mailer_link_offences(source)
+    helpers = route_url_helpers
+    source.lines.each_with_index.flat_map do |line, index|
+      called = line.scan(/\b(\w+_url)\b(?=\s*[(\s]|$)/).flatten & helpers
+      called.filter_map do |helper|
+        if !helper.start_with?("admin_") && !helper.start_with?("new_admin_", "edit_admin_")
+          "line #{index + 1}: #{helper} is not a link into CS Studio"
+        elsif !line.include?("**@url_options")
+          "line #{index + 1}: #{helper} does not take **@url_options"
+        end
+      end
+    end
+  end
+
+  test "every link into CS Studio a mailer builds takes the link origin's options" do
+    paths = ROOT.glob("app/mailers/**/*.rb") + ROOT.glob("app/views/*_mailer/**/*.erb")
+    offences = paths.to_h { |path| [ path.to_s.delete_prefix("#{ROOT}/"), mailer_link_offences(SourceCode.code_of(path.to_s)) ] }.reject { |_, found| found.empty? }
+    assert_empty offences
+
+    # A call with no options and a route that is not CS Studio's are caught.
+    assert_not_empty mailer_link_offences("admin_edit_password_url(anchor: x)")
+    assert_not_empty mailer_link_offences("root_url(**@url_options)")
+    assert_empty mailer_link_offences("admin_edit_password_url(port: nil, **@url_options, anchor: x)")
   end
 end

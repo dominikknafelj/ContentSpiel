@@ -172,6 +172,25 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_match "If that address belongs to an account, we've sent a link. It expires in 15 minutes.", known
   end
 
+  # The reminder to sign in with the provider is the job's choice, after
+  # the answer: a linked account's request reads as anybody's.
+  test "a reset asked for a linked account answers as any other's: the page, the statements and the one job" do
+    linked = link_to_sso(users(:reader))
+
+    with_sso do
+      answers = [ linked.email_address, users(:two).email_address ].map do |email|
+        queued = enqueued_jobs.size
+        statements = capture_sql { post admin_password_path, params: { email_address: email } }
+        location = response.location
+        follow_redirect!
+        { location: location, page: css_select("main").text.squish, statements: statements, jobs: enqueued_jobs.drop(queued).map { it[:job] } }
+      end
+
+      assert_equal(*answers)
+      assert_equal [ PasswordResetRequestJob ], answers.first[:jobs]
+    end
+  end
+
   # The request looks nobody up (`PasswordResetRequestJob` does): a known
   # and an unknown address run the same statements, the mail settings' read
   # alone, and enqueue the one job, whose arguments differ by the address.

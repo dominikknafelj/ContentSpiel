@@ -1,0 +1,39 @@
+<% case kind %>
+<% when :add %>
+  <%= tag.div data: { "admin--passkeys--register-target": "dialog" } do %>
+    <%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: t(".add_title"), width: :form_narrow) do |dialog| %>
+      <form id="<%= add_form_id %>" class="flex flex-col gap-1" novalidate data-action="admin--passkeys--register#continue">
+        <%= label_tag "#{ADD_ID}-name", t(".name"), class: setup_label_class %>
+        <%= text_field_tag "name", nil, id: "#{ADD_ID}-name", maxlength: Passkey::NAME_LIMIT, autocomplete: "off", required: true,
+              aria: { describedby: "#{ADD_ID}-name-help #{ADD_ID}-error" }, class: setup_input_class,
+              data: { "admin--passkeys--register-target": "name" } %>
+        <p id="<%= ADD_ID %>-name-help" class="mt-1 text-sm text-meta"><%= t(".name_help") %></p>
+        <p id="<%= ADD_ID %>-error" role="alert" class="mt-1 text-sm text-danger-ink empty:hidden" data-admin--passkeys--register-target="error"></p>
+      </form>
+      <% dialog.with_footer do %>
+        <%= tag.form method: "dialog" do %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, type: "submit") %>
+        <% end %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".continue"), type: "submit", form: add_form_id) %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% when :rename %>
+  <%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: t(".rename_title"), width: :form_narrow) do |dialog| %>
+    <%= render Admin::AccountScreen::PasskeyRenameFieldsComponent.new(passkey: passkey, url_options: url_options) %>
+    <% dialog.with_footer do %>
+      <%= tag.form method: "dialog" do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, type: "submit") %>
+      <% end %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".save_name"), type: "submit", form: Admin::AccountScreen::PasskeyRenameFieldsComponent.form_id(passkey)) %>
+    <% end %>
+  <% end %>
+<% when :remove %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(id: dialog_id, title: t(".remove_title", name: passkey.name), body: remove_body, destructive: true) do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: helpers.admin_account_passkey_path(passkey, **url_options), method: :delete, data: { confirm_identity: "" } do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".remove_confirm"), variant: :danger, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

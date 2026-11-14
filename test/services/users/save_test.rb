@@ -38,7 +38,7 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_not User.exists?(email_address: "fresh@example.com")
   end
 
-  # --- Leaked passwords (Users::LeakedPasswordRule) ---------------------------
+  # --- Leaked passwords (SignIn::Password::LeakedRule) ------------------------
 
   LEAKED = "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one.".freeze
 
@@ -428,5 +428,55 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_operator gained.reload.updated_at, :>, 30.minutes.ago
     assert_operator lost.reload.updated_at, :>, 30.minutes.ago
     assert_operator access_control_groups(:editor).reload.updated_at, :<, 30.minutes.ago, "a group that is neither gained nor lost stays put"
+  end
+
+  # --- A linked account (single sign-on) ------------------------------------
+
+  test "a manager's password for a linked user is refused with the sentence, and a linked user cannot be made an owner" do
+    user = link_to_sso(users(:reader))
+    digest = user.password_digest
+
+    with_sso do
+      result = as_owner { Users::Save.call(user, attributes: { password: "a-new-long-password-2", password_confirmation: "a-new-long-password-2" }) }
+      assert_not result.ok?
+      assert_equal [ "This account signs in with #{OidcHelper::NAME} and has no password here." ], result.errors
+      assert_equal digest, user.reload.password_digest
+
+      result = as_owner { Users::Save.call(user, attributes: { owner: "1" }) }
+      assert_not result.ok?
+      assert_equal [ "#{user.email_address} signs in with #{OidcHelper::NAME}. Unlink them first: owners don't sign in with single sign-on." ], result.errors
+      assert_not user.reload.owner?
+    end
+    assert_not Audit::Event.exists?(action: %w[user.updated user.owner_changed])
+
+    assert as_owner { Users::Save.call(user, attributes: { name: "Rea" }) }.ok?, "the rest of the account is edited as any other's"
+  end
+
+  # Link-then-promote: the link commits after the editor read the account
+  # and before the promotion. The flag is asked again under the account's row
+  # lock, the one `SignIn::Sso::Link` takes, so one of the two always sees the other.
+  test "a link that lands between the read and the promotion is seen under the row lock" do
+    user = User.find(users(:reader).id)
+    link_to_sso(User.find(user.id))
+
+    result = as_owner { Users::Save.call(user, attributes: { owner: "1" }) }
+
+    assert_not result.ok?
+    assert_match(/Unlink them first/, result.errors.to_sentence)
+    assert_not users(:reader).reload.owner?
+    assert_not Audit::Event.exists?(action: "user.owner_changed")
+  end
+
+  test "a link that lands between the read and a manager's typed password is seen under the row lock" do
+    user = User.find(users(:reader).id)
+    digest = user.password_digest
+    link_to_sso(User.find(user.id))
+
+    result = as_owner { Users::Save.call(user, attributes: { password: "a-new-long-password-2", password_confirmation: "a-new-long-password-2" }) }
+
+    assert_not result.ok?
+    assert_equal [ "This account signs in with id.example.com and has no password here." ], result.errors
+    assert_equal digest, users(:reader).reload.password_digest
+    assert_not Audit::Event.exists?(action: "user.updated")
   end
 end

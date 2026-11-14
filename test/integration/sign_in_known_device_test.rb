@@ -10,7 +10,7 @@ class SignInKnownDeviceTest < ActionDispatch::IntegrationTest
 
   EMAIL = "ann@example.org".freeze
   PASSWORD = "password12345".freeze
-  COOKIE = Admin::SessionsController::DEVICE_COOKIE.to_s
+  COOKIE = Admin::SignInCompletion::DEVICE_COOKIE.to_s
 
   setup do
     freeze_time
@@ -107,7 +107,7 @@ class SignInKnownDeviceTest < ActionDispatch::IntegrationTest
     sign_in
     signed_in_here
 
-    assert_no_enqueued_jobs only: SignIn::LockoutMailJob do
+    assert_no_enqueued_jobs only: SignIn::Protection::LockoutMailJob do
       5.times { sign_in(password: "wrong") }
     end
     assert_equal I18n.t("admin.sessions.locked"), flash[:alert]

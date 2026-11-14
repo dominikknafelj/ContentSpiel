@@ -28,6 +28,10 @@ module Admin
       # The Action select's groups in their order, by an action key's first
       # part; each is a key under `toolbar.groups`.
       GROUPS = %w[page post block media tag user group token language settings session access trash ai starter_content].freeze
+      # First parts whose actions belong to another group: a passkey's and a
+      # recovery code's events are how a person signs in, so they stand with
+      # the sessions' under "Sign-in".
+      GROUP_OF = { "passkey" => "session", "recovery_code" => "session", "recovery_codes" => "session" }.freeze
 
       def initialize(filter:, users:, other_actions: [], url_options: {}, locale: ::Locales.default)
         @filter = filter
@@ -56,12 +60,18 @@ module Admin
       end
 
       def action_groups
-        groups = Audit::Sentence::ACTIONS.group_by { |action| GROUPS.include?(group = action.split(".").first) ? group : "other" }
+        groups = Audit::Sentence::ACTIONS.group_by { |action| group_of(action) }
           .sort_by { |group, _| GROUPS.index(group) || GROUPS.size }
         other = (@other_actions - Audit::Sentence::ACTIONS)
         other |= [ filter.event_action ] if filter.event_action && !Audit::Sentence::ACTIONS.include?(filter.event_action)
         groups << [ "other", other ] if other.any?
         groups.map { |group, actions| [ t(".groups.#{group}"), actions.sort ] }
+      end
+
+      def group_of(action)
+        first = action.split(".").first
+        group = GROUP_OF.fetch(first, first)
+        GROUPS.include?(group) ? group : "other"
       end
 
       def date_options = DATES.map { |value, key| [ t(".dates.#{key}"), value ] }

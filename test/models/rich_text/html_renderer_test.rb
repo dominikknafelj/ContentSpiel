@@ -37,7 +37,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     page = create_page(title: "About")
     link = { "type" => "internalLink", "attrs" => { "type" => "page", "id" => page.id } }
     assert_includes render({ "type" => "paragraph", "content" => [ text("go", link) ] }), %(href="/about")
-    assert_includes render({ "type" => "paragraph", "content" => [ text("go", link) ] }, preview: true), %(href="/preview/about")
+    assert_includes render({ "type" => "paragraph", "content" => [ text("go", link) ] }, preview: true), %(href="/cs-studio/preview/about")
   end
 
   test "missing asset and missing link target render gracefully" do
@@ -151,7 +151,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_not_includes public_html, "<a"
 
     preview_html = render({ "type" => "paragraph", "content" => [ text("go", link) ] }, preview: true)
-    assert_includes preview_html, %(href="/preview/draft-page")
+    assert_includes preview_html, %(href="/cs-studio/preview/draft-page")
   end
 
   # `safe_href?` decodes HTML/numeric-character-reference
@@ -188,7 +188,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
       html_de_public = document.to_html(locale: "de", urls: PublicSite::Urls.new)
 
       assert_includes html_en_public, %(href="/cache-target")
-      assert_includes html_en_preview, %(href="/preview/cache-target")
+      assert_includes html_en_preview, %(href="/cs-studio/preview/cache-target")
       assert_includes html_de_public, %(href="/de/cache-target")
       assert_not_equal html_en_public, html_en_preview
       assert_not_equal html_en_public, html_de_public
@@ -211,13 +211,13 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
       link = { "type" => "internalLink", "attrs" => { "type" => "page", "id" => draft.id } }
       document = RichText::Document.new("type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ text("go", link) ] } ])
       preview = -> { Current.reset; document.to_html(locale: "en", urls: PublicSite::Urls.new(preview: true)) }
-      assert_includes preview.call, %(href="/preview/draft-target")
+      assert_includes preview.call, %(href="/cs-studio/preview/draft-target")
 
       version = PublicSite.content_version
       assert Pages::Save.call(draft, translations: { "en" => { slug: "renamed" } }).ok?
       assert_equal version, PublicSite.content_version, "a draft's slug moves no version, which is why the cache can't be trusted here"
 
-      assert_includes preview.call, %(href="/preview/renamed")
+      assert_includes preview.call, %(href="/cs-studio/preview/renamed")
     ensure
       Rails.cache = original_cache
     end

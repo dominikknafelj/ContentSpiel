@@ -4,6 +4,21 @@ class User < ApplicationRecord
   has_many :api_tokens, dependent: :destroy
   has_many :memberships, class_name: "AccessControl::Membership", dependent: :destroy
   has_many :groups, through: :memberships, class_name: "AccessControl::Group"
+  # A passkey or a recovery code is nothing without its account, and neither
+  # has a callback, so they go in one statement each.
+  has_many :passkeys, dependent: :delete_all # version: none (passkeys are on no public page)
+  has_many :recovery_codes, dependent: :delete_all, extend: RecoveryCode::Redeem # version: none (recovery codes are on no public page)
+
+  # The identity at the single sign-on provider this account is linked to
+  # (`sso_issuer` and `sso_subject`, both or neither: the database holds it).
+  # A linked account signs in through the provider alone.
+  scope :linked_to, ->(issuer:, subject:) { where(sso_issuer: issuer, sso_subject: subject) }
+
+  # A password nobody holds: a linked account's, written when it is linked.
+  # Never shown, kept or sent anywhere.
+  def self.unusable_password = SecureRandom.base58(48)
+
+  def sso_linked? = sso_subject.present?
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
@@ -22,8 +37,9 @@ class User < ApplicationRecord
   # the email as the fallback -- `name_or_email` is the one reader, so no
   # screen decides the fallback for itself. A blank name is stored as nil,
   # so "no name" has one representation.
+  NAME_LIMIT = 120
   normalizes :name, with: ->(name) { name.to_s.strip.presence }
-  validates :name, length: { maximum: 120 }
+  validates :name, length: { maximum: NAME_LIMIT }
 
   # Presence here so the setup wizard shows a form error; uniqueness backs up
   # the unique index with a readable message instead of an exception.
@@ -76,6 +92,26 @@ class User < ApplicationRecord
   # timeout), and how many.
   def open_sessions(at = Time.current) = sessions.live(at)
   def open_session_count(at = Time.current) = open_sessions(at).count
+
+  # Whether the account has a second proof beside its password: a passkey,
+  # or a recovery code not yet used. An account that has one is never signed
+  # in by its password alone.
+  def second_factor? = passkeys.exists? || recovery_codes.unused.exists?
+
+  # The random user handle an authenticator keeps for this account in place
+  # of its email (WebAuthn's `user.id`), made at the first ask and kept, so
+  # every passkey of the account carries the same one. Written only where the
+  # row has none yet and then read back, so two first asks at once (two tabs
+  # adding a passkey) both answer the one handle that was stored, never each
+  # its own.
+  def webauthn_handle!
+    if webauthn_id.nil?
+      User.where(id: id, webauthn_id: nil).update_all(webauthn_id: WebAuthn.generate_user_id) # version: none (a user's handle is on no public page)
+      self[:webauthn_id] = User.where(id: id).pick(:webauthn_id)
+      clear_attribute_changes([ :webauthn_id ])
+    end
+    webauthn_id
+  end
 
   private
 

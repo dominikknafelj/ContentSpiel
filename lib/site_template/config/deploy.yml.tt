@@ -80,6 +80,12 @@ env:
     # (an exact match: no www. if the host has none), HTTPS is forced, and
     # pages and mails carry it.
     PUBLIC_HOST: https://<%%= host %>
+    # Only for a backend behind a DMZ: CS Studio's own address, served on
+    # that host alone (docs/reference/hosting.md, "Behind a DMZ"). It
+    # needs its own proxy entry (proxy.hosts, or a proxy of its own) and a
+    # certificate it can get, which Let's Encrypt cannot issue for an
+    # internal-only name ("What the host arranges").
+    # ADMIN_HOST: https://studio.example.internal
 
     # The theme folder in the image. The Dockerfile sets the same value and
     # copies theme/ there; change both or neither.
@@ -141,8 +147,8 @@ env:
   secret:
     # Signs sessions and tokens. Without it production does not start.
     - SECRET_KEY_BASE
-    # The one-time code /setup asks for on the first visit. Set here, so it
-    # is never printed to the log.
+    # The one-time code the setup wizard (/cs-studio/setup by default) asks
+    # for on the first visit. Set here, so it is never printed to the log.
     - SETUP_TOKEN
     # The password of the Postgres role `content_spiel` (all four databases).
     - CONTENT_SPIEL_DATABASE_PASSWORD

@@ -1,5 +1,4 @@
-# Active Storage's *write* endpoints require a
-# signed-in user.
+# Active Storage's *write* endpoints answer 404 to everyone.
 #
 # Rails draws `POST /rails/active_storage/direct_uploads` (creates a blob
 # row and hands back a signed upload URL) and `PUT
@@ -8,15 +7,14 @@
 # authentication of their own. ContentSpiel never uses direct uploads --
 # every upload goes through a CS Studio controller (`Admin::
 # MediaAssetsController`, the settings logo, image blocks), which checks
-# the file itself -- so, left alone, the two only gave a signed-out visitor
-# a way to create blobs and fill storage.
+# the file itself -- so the two are surface with no use, and a session that
+# could create orphan blobs through them would be one more door.
 #
-# They're gated rather than removed (`draw_routes = false` would also take
+# They're refused rather than removed (`draw_routes = false` would also take
 # away `rails_blob_path` and the other `direct` routes Active Storage
 # defines in the same file, which `Media::Asset#url` and the site's images
-# depend on -- re-declaring those means copying Rails internals). The same
-# session check CS Studio uses, answering a signed-out request with a bare
-# 401 (`ActiveStorageWriteAuthentication`, which says why not a redirect).
+# depend on -- re-declaring those means copying Rails internals). Each
+# answers a bare 404 and reads no session (`ActiveStorageWriteRefusal`).
 # The *read* side (blob redirects, representations, `GET /disk/...`) stays
 # public -- public pages embed those URLs -- but for the blobs below.
 #
@@ -46,11 +44,8 @@
 # freshly loaded controller classes; the `include?` guards keep a repeated
 # run from stacking callbacks.
 Rails.application.config.to_prepare do
-  ActiveStorage::DirectUploadsController.include(ActiveStorageWriteAuthentication) unless ActiveStorage::DirectUploadsController.include?(ActiveStorageWriteAuthentication)
-
-  unless ActiveStorage::DiskController.include?(ActiveStorageWriteAuthentication)
-    ActiveStorage::DiskController.include(ActiveStorageWriteAuthentication)
-    ActiveStorage::DiskController.allow_unauthenticated_access only: :show
+  [ ActiveStorage::DirectUploadsController, ActiveStorage::DiskController ].each do |controller|
+    controller.include(ActiveStorageWriteRefusal) unless controller.include?(ActiveStorageWriteRefusal)
   end
 
   [ ActiveStorage::Blobs::RedirectController, ActiveStorage::Blobs::ProxyController, ActiveStorage::Representations::RedirectController,

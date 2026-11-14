@@ -128,7 +128,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
       visit_screen admin_settings_path
       # A press on the heading puts the sequential focus starting point there.
       find(".admin-settings-layout h1").click
-      stops = Array.new(12) do
+      stops = Array.new(13) do
         page.send_keys(:tab)
         page.evaluate_script(<<~JS)
           (() => {
@@ -141,7 +141,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
           })()
         JS
       end
-      assert_equal [ *%w[#site #languages #publishing #forms #ai #mail #images],
+      assert_equal [ *%w[#site #languages #publishing #forms #ai #mail #sign_in #images],
                      *%w[settings-glance-languages settings-glance-ai settings-glance-mail settings-glance-images], "site card" ], stops
     end
   end

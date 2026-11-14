@@ -3,7 +3,7 @@ module Admin
   # (`Admin::AccountScreen::SessionsCardComponent`): a row's End, and "Sign
   # out everywhere else". Open to every signed-in user, for their own
   # sessions only: the request names a session, never a user, and
-  # `Sessions::EndOthers` looks the id up among `Current.user`'s.
+  # `SignIn::Sessions::EndOthers` looks the id up among `Current.user`'s.
   #
   # The session the request is made in is always the one kept
   # (`keep: Current.session`), so neither ending signs the person out here:
@@ -44,11 +44,11 @@ module Admin
 
     private
 
-    # How many sessions ended. `Sessions::EndOthers` refuses only an actor
+    # How many sessions ended. `SignIn::Sessions::EndOthers` refuses only an actor
     # that is not the user, which a signed-in person's own request never is;
     # a refusal would have ended nothing, and is counted as that.
     def end_sessions(only: nil)
-      result = Sessions::EndOthers.call(user: Current.user, keep: Current.session, only: only)
+      result = SignIn::Sessions::EndOthers.call(user: Current.user, keep: Current.session, only: only)
       result.ok? ? result.record : 0
     end
 

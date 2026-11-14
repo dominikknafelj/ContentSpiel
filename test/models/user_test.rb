@@ -168,4 +168,78 @@ class UserTest < ActiveSupport::TestCase
       User.name_or_email_starting_first("ANDERS").by_email.pluck(:email_address)
     assert_equal %w[anders@example.org b@example.org c@example.org zed@example.org], User.by_email.pluck(:email_address)
   end
+
+  test "second_factor? is true with a passkey or an unused code, and false with only used codes" do
+    user = users(:reader)
+    assert_not user.second_factor?
+
+    code = user.recovery_codes.create!(digest: RecoveryCode.digest("ABCD-EFGH"), generated_at: Time.current)
+    assert user.second_factor?
+
+    code.update!(used_at: Time.current)
+    assert_not user.second_factor?
+
+    user.passkeys.create!(name: "Phone", external_id: "credential-1", public_key: "pk")
+    assert user.second_factor?
+  end
+
+  test "the WebAuthn user handle is made once, at the first ask, and kept" do
+    user = users(:reader)
+    assert_nil user.webauthn_id
+
+    handle = user.webauthn_handle!
+
+    assert handle.present?
+    assert_equal handle, user.reload.webauthn_id
+    assert_equal handle, user.webauthn_handle!
+    assert_not_equal handle, users(:two).webauthn_handle!
+  end
+
+  test "a first ask for the handle that meets one stored meanwhile answers the stored one and writes nothing" do
+    stale = User.find(users(:reader).id)
+    stored = User.find(users(:reader).id).webauthn_handle!
+
+    assert_nil stale.webauthn_id
+    assert_equal stored, stale.webauthn_handle!
+    assert_equal stored, users(:reader).reload.webauthn_id
+    assert_not stale.changed?
+  end
+
+  test "an account's passkeys and recovery codes go with it" do
+    user = users(:reader)
+    user.passkeys.create!(name: "Phone", external_id: "credential-1", public_key: "pk")
+    user.recovery_codes.create!(digest: RecoveryCode.digest("ABCD-EFGH"), generated_at: Time.current)
+
+    user.destroy!
+
+    assert_equal 0, Passkey.where(user_id: user.id).count
+    assert_equal 0, RecoveryCode.where(user_id: user.id).count
+  end
+
+  test "sso_linked? follows the subject, and an issuer without a subject is refused by the database" do
+    user = users(:reader)
+    assert_not user.sso_linked?
+
+    user.update!(sso_issuer: "https://idp.example", sso_subject: "abc", sso_linked_at: Time.current)
+    assert user.sso_linked?
+
+    other = users(:two)
+    assert_raises(ActiveRecord::StatementInvalid) { other.update_columns(sso_issuer: "https://idp.example") } # version: none (a test's own row)
+    assert_raises(ActiveRecord::StatementInvalid) { other.update_columns(sso_subject: "abc") } # version: none (a test's own row)
+  end
+
+  test "two users cannot hold one issuer and subject, and one subject under two issuers is two links" do
+    users(:reader).update!(sso_issuer: "https://a.example", sso_subject: "s1")
+    assert_raises(ActiveRecord::RecordNotUnique) { users(:two).update!(sso_issuer: "https://a.example", sso_subject: "s1") }
+    users(:two).update!(sso_issuer: "https://b.example", sso_subject: "s1")
+
+    assert_equal [ users(:reader) ], User.linked_to(issuer: "https://a.example", subject: "s1").to_a
+    assert_equal users(:two), User.linked_to(issuer: "https://b.example", subject: "s1").first
+    assert_nil User.linked_to(issuer: "https://c.example", subject: "s1").first
+  end
+
+  test "an unusable password is long, random and different every time" do
+    assert_equal 48, User.unusable_password.length
+    assert_not_equal User.unusable_password, User.unusable_password
+  end
 end

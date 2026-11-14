@@ -75,6 +75,29 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
     assert_equal 1, known[:hashes]
   end
 
+  # A refusal by rule (`SignIn::Rules`): a linked account, or a non-owner
+  # under SSO_REQUIRED, typing its right password is answered as another
+  # account typing a wrong one, with the same work.
+  test "a refused-by-rule right password answers as a wrong one: status, body, redirect and the same authenticate_by" do
+    other = User.create!(email_address: "ben@example.org", password: PASSWORD)
+    link_to_sso(@user)
+    @user.update_column(:password_digest, BCrypt::Password.create(PASSWORD, cost: BCrypt::Engine::MIN_COST)) # version: none (a test's setup)
+
+    wrong = answer_to(other.email_address)
+    linked = answer_to(EMAIL, password: PASSWORD)
+    assert_equal wrong, linked
+    assert_equal I18n.t("admin.sessions.refused"), linked[:flash]
+    assert_equal 1, linked[:hashes]
+
+    with_sso(required: true) do
+      third = User.create!(email_address: "cleo@example.org", password: PASSWORD)
+      fourth = User.create!(email_address: "dan@example.org", password: PASSWORD)
+      assert_equal answer_to(third.email_address), answer_to(fourth.email_address, password: PASSWORD)
+    end
+    assert_not Session.exists?, "nobody was signed in"
+    assert_equal 4, Audit::Event.where(action: "session.failed").count
+  end
+
   test "a required and a refused bot check answer the same for a known and an unknown address, and check no password" do
     with_bot_check(:failed) do
       3.times { |index| attempt("person#{index}@example.org") }
@@ -136,7 +159,7 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
 
     assert_equal(*fifth)
     assert_equal I18n.t("admin.sessions.locked"), fifth.first[:flash]
-    assert_equal [ "SignIn::LockoutMailJob" ], fifth.first[:jobs], "the pause mail's job, for an email with no account too"
+    assert_equal [ "SignIn::Protection::LockoutMailJob" ], fifth.first[:jobs], "the pause mail's job, for an email with no account too"
     assert_equal(*sixth)
     assert_equal I18n.t("admin.sessions.locked"), sixth.first[:flash]
     assert_equal 0, sixth.first[:hashes]
@@ -163,13 +186,13 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
   test "the fifth failure enqueues one lock-out job for a known and an unknown address alike, and the next lock within the hour enqueues none" do
     [ EMAIL, UNKNOWN ].each do |email|
       wrong_attempts(4, email)
-      assert_enqueued_with(job: SignIn::LockoutMailJob, args: [ email, { locked_at: Time.current, from_address: "127.0.0.1", minutes: 1, origin: "http://www.example.com" } ]) do
+      assert_enqueued_with(job: SignIn::Protection::LockoutMailJob, args: [ email, { locked_at: Time.current, from_address: "127.0.0.1", minutes: 1, origin: "http://www.example.com" } ]) do
         attempt(email)
       end
 
       travel 1.minute
       assert_difference -> { locked_events.count }, 1 do
-        assert_no_enqueued_jobs(only: SignIn::LockoutMailJob) { attempt(email) }
+        assert_no_enqueued_jobs(only: SignIn::Protection::LockoutMailJob) { attempt(email) }
       end
       assert_equal 1, locked_events.last.metadata["level"], "the sixth failure is the next lock, two minutes"
     end
@@ -263,7 +286,7 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
       attempt(EMAIL)
       assert_equal true, session[:sign_in_bot_check]
       get admin_sign_in_path
-      assert_kind_of SignIn::BotCheck, controller.instance_variable_get(:@bot_check)
+      assert_kind_of SignIn::Protection::BotCheck, controller.instance_variable_get(:@bot_check)
 
       assert_no_difference -> { Audit::Event.count } do
         attempt(EMAIL, password: PASSWORD)
@@ -290,11 +313,11 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
       assert_equal I18n.t("admin.sessions.bot_check"), flash[:alert]
       assert_equal true, session[:sign_in_bot_check]
       get admin_sign_in_path
-      assert_kind_of SignIn::BotCheck, controller.instance_variable_get(:@bot_check)
+      assert_kind_of SignIn::Protection::BotCheck, controller.instance_variable_get(:@bot_check)
 
       reset!
       get admin_sign_in_path, headers: { "X-Forwarded-For" => "203.0.113.1" }, env: { "REMOTE_ADDR" => "10.0.0.2" }
-      assert_kind_of SignIn::BotCheck, controller.instance_variable_get(:@bot_check)
+      assert_kind_of SignIn::Protection::BotCheck, controller.instance_variable_get(:@bot_check)
     end
   end
 

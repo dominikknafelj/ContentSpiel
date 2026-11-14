@@ -3,14 +3,14 @@ require "socket"
 # The sign-in checks' outside calls, answered without the network.
 #
 # - `with_bot_check(answer) { … }`: Turnstile configured with Cloudflare's
-#   documented always-pass test keys, and `SignIn::BotCheck.siteverify`
+#   documented always-pass test keys, and `SignIn::Protection::BotCheck.siteverify`
 #   answering `:passed` (for `hostname`, an integration test's host unless
 #   named, and the sign-in action), `:failed` or `:unavailable` (a refused
 #   connection).
 #   Each form it was sent is in `bot_check_requests`.
 # - `with_leaked_password_check(leaked:, unavailable:) { … }`: the check
 #   switched on (it is off in tests unless asked), and
-#   `SignIn::LeakedPassword.range` answering as the service does, with the
+#   `SignIn::Password::Leaked.range` answering as the service does, with the
 #   suffixes of the `leaked` passwords at count 7 among padding and
 #   unrelated lines; or, with `unavailable:` (an exception, or an Integer
 #   status), failing so. Each prefix it was asked for is in
@@ -29,7 +29,7 @@ module SignInHelper
   BOT_CHECK_HOSTNAME = "www.example.com".freeze
 
   BOT_CHECK_ANSWERS = {
-    passed: { "success" => true, "action" => SignIn::BotCheck::ACTION },
+    passed: { "success" => true, "action" => SignIn::Protection::BotCheck::ACTION },
     failed: { "success" => false, "error-codes" => [ "invalid-input-response" ] }
   }.freeze
 
@@ -57,7 +57,7 @@ module SignInHelper
 
       BOT_CHECK_ANSWERS.fetch(answer).merge("hostname" => hostname)
     end
-    with_sign_in_env(BOT_CHECK_KEYS) { with_singleton_override(SignIn::BotCheck, :siteverify, siteverify, &block) }
+    with_sign_in_env(BOT_CHECK_KEYS) { with_singleton_override(SignIn::Protection::BotCheck, :siteverify, siteverify, &block) }
   end
 
   def leaked_password_requests = (@leaked_password_requests ||= [])
@@ -67,13 +67,13 @@ module SignInHelper
     digests = leaked.map { |password| Digest::SHA1.hexdigest(password).upcase }
     range = lambda do |prefix, url: nil|
       requests << prefix
-      raise SignIn::LeakedPassword::Unavailable.status(unavailable) if unavailable.is_a?(Integer)
+      raise SignIn::Password::Leaked::Unavailable.status(unavailable) if unavailable.is_a?(Integer)
       raise unavailable if unavailable
 
       listed = digests.select { |digest| digest.start_with?(prefix) }.map { |digest| "#{digest[5..]}:7" }
       [ *RANGE_UNRELATED, RANGE_PADDING, *listed ].sort.join("\r\n")
     end
-    with_sign_in_env("LEAKED_PASSWORD_CHECK" => "on") { with_singleton_override(SignIn::LeakedPassword, :range, range, &block) }
+    with_sign_in_env("LEAKED_PASSWORD_CHECK" => "on") { with_singleton_override(SignIn::Password::Leaked, :range, range, &block) }
   end
 
   def with_http_stub(status: 200, body: "", content_type: "text/plain")

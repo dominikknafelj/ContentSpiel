@@ -1,5 +1,5 @@
 module Public
-  # The bar a signed-in editor sees across the top of a preview (`/preview...`,
+  # The bar a signed-in editor sees across the top of a preview (`/<ADMIN_PATH>/preview...`,
   # `PreviewController`; design pass round 3, handoff C40, plan D26):
   # "PREVIEW · <title> · <Draft|Scheduled|Live> · <the language's own name>",
   # then Edit and Exit preview. It is the public site's own chrome: it renders
@@ -18,9 +18,11 @@ module Public
   #   can read the record by definition (`PreviewController#readable?`).
   # - Exit preview (plan D26, amended): the record's public URL in the previewed
   #   language when it is live, since that is then where a visitor would see
-  #   it; otherwise there is no public page to leave for and Edit already is
-  #   the editor, so it goes to CS Studio's list instead: the pages landing for
-  #   a page, the posts list for a post (the language kept).
+  #   it (a path, or the public URL when CS Studio, and so the preview, has a
+  #   host of its own: `PublicSite::Urls.studio_link`); otherwise there is no
+  #   public page to leave for and Edit already is the editor, so it goes to
+  #   CS Studio's list instead: the pages landing for a page, the posts list
+  #   for a post (the language kept).
   #
   # The response is never cached (`Cache-Control: private, no-store`), and the
   # bar must not become part of any cached render: nothing here is memoised or
@@ -49,7 +51,7 @@ module Public
     end
 
     def exit_path
-      (record.live? && PublicSite::Urls.new.path_for(record, locale)) || studio_list_path
+      (record.live? && PublicSite::Urls.studio_link(PublicSite::Urls.new.path_for(record, locale))) || studio_list_path
     end
 
     def studio_list_path

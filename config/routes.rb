@@ -1,11 +1,20 @@
 Rails.application.routes.draw do
-  # While setup is required, every route below is unreachable: these two
+  # While setup is required, every route below is unreachable: these
   # catch-alls are declared first, so they win over
   # CS Studio and the public page routes. A lambda, so the constant is only
-  # resolved per request (never while routes load during boot).
+  # resolved per request (never while routes load during boot). These and the
+  # refusal below stand outside both host constraints: inside the site's they
+  # would stop gating CS Studio on the admin host while setup is pending, and
+  # on the public host the wizard they send to is a 404.
   constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
-    match "/", to: redirect("/setup", status: 302), via: :all, as: :setup_required_root
-    match "*path", to: redirect("/setup", status: 302), via: :all, format: false, as: :setup_required
+    match "/", to: redirect("/#{ContentSpiel::ADMIN_PATH}/setup", status: 302), via: :all, as: :setup_required_root
+    match "*path", to: redirect("/#{ContentSpiel::ADMIN_PATH}/setup", status: 302), via: :all, format: false, as: :setup_required
+  end
+  # What is not a page load is refused by a bare Rack answer, which loads
+  # no session (the constraint's comment says why).
+  constraints(->(request) { Setup::RedirectConstraint.refuses?(request) }) do
+    match "/", to: ->(_env) { [ 404, { "content-type" => "text/plain" }, [] ] }, via: :all, as: :setup_refused_root
+    match "*path", to: ->(_env) { [ 404, { "content-type" => "text/plain" }, [] ] }, via: :all, format: false, as: :setup_refused
   end
 
   # A component browser for the ViewComponents under app/components
@@ -19,560 +28,635 @@ Rails.application.routes.draw do
   # path.
   mount Lookbook::Engine, at: "/lookbook" if Rails.env.development?
 
-  # CS Studio, the admin. Its path is configurable
-  # (ContentSpiel::ADMIN_PATH) and sign-in lives under it, so the public site
-  # advertises no login page. Declared before /preview and the public
-  # catch-alls, which would otherwise swallow it as a page path.
-  scope ContentSpiel::ADMIN_PATH, module: :admin, as: :admin do
-    get "sign-in", to: "sessions#new", as: :sign_in
-    post "sign-in", to: "sessions#create"
-    delete "sign-out", to: "sessions#destroy", as: :sign_out
+  # The backend, every route under /<ADMIN_PATH>/: on the admin host alone
+  # when ADMIN_HOST is set (`HostRouteConstraint`), on every host otherwise.
+  constraints(HostRouteConstraint::Backend) do
+    # CS Studio, the admin. Its path is configurable
+    # (ContentSpiel::ADMIN_PATH) and sign-in lives under it, so the public site
+    # advertises no login page. Declared before /<ADMIN_PATH>/preview and the public
+    # catch-alls, which would otherwise swallow it as a page path.
+    scope ContentSpiel::ADMIN_PATH, module: :admin, as: :admin do
+      get "sign-in", to: "sessions#new", as: :sign_in
+      post "sign-in", to: "sessions#create"
+      post "sign-in/passkey/options", to: "sessions#passkey_options", as: :sign_in_passkey_options
+      post "sign-in/passkey", to: "sessions#passkey", as: :sign_in_passkey
+      # The second step, after a right password for an account that holds a
+      # passkey or recovery codes (`Admin::SecondFactorsController`). Under
+      # `sign-in/`, which `Setup::RedirectConstraint` lets through.
+      get "sign-in/second-step", to: "second_factors#show", as: :second_factor
+      post "sign-in/second-step/options", to: "second_factors#options", as: :second_factor_options
+      post "sign-in/second-step/passkey", to: "second_factors#passkey", as: :second_factor_passkey
+      post "sign-in/second-step/code", to: "second_factors#code", as: :second_factor_code
+      delete "sign-in/second-step", to: "second_factors#destroy"
+      # Single sign-on (`Admin::SsoSessionsController`): the button's POST,
+      # which sends the person to the site's provider, and the provider's
+      # way back. Inside this host constraint, so with ADMIN_HOST set the
+      # callback answers on the admin host alone, and the provider sends the
+      # person back there (`SignIn::Sso.callback_origin`). Under
+      # `sign-in/` too, which `Setup::RedirectConstraint` lets through; the
+      # state's cookie is pathed to `sign-in/sso` (`SsoStarts`).
+      post "sign-in/sso", to: "sso_sessions#create", as: :sso
+      get "sign-in/sso/callback", to: "sso_sessions#callback", as: :sso_callback
+      delete "sign-out", to: "sessions#destroy", as: :sign_out
 
-    # ⌘K "Jump to..." results: a layout-less HTML
-    # fragment for the palette's turbo-frame, read-only, open to every
-    # signed-in user (each row is already narrowed to what they may read).
-    get "jump", to: "jump#show", as: :jump
+      # ⌘K "Jump to..." results: a layout-less HTML
+      # fragment for the palette's turbo-frame, read-only, open to every
+      # signed-in user (each row is already narrowed to what they may read).
+      get "jump", to: "jump#show", as: :jump
 
-    # The invitation's link: `<admin>/invitation#<token>`, the
-    # token in the fragment so no server sees it. Under the admin path like
-    # the reset page, so it shadows no public page slug. The leading slash
-    # keeps `InvitationsController` out of the `Admin::` module: like the
-    # reset page it is outside the shell's sign-in requirement.
-    #
-    # `invitation/check` is the page's own question, asked once by its script
-    # when it has the token (the reset page's `password/check`, with the
-    # person's address and name in the answer); `invitation` POST is the
-    # accept form. Both carry the token in their body.
-    get "invitation", to: "/invitations#show", as: :invitation
-    post "invitation", to: "/invitations#update", as: :accept_invitation
-    post "invitation/check", to: "/invitations#check", as: :check_invitation
-    # The password reset. The token of the mailed link is in NO address a
-    # server sees: the link is `password/edit#<token>`, a browser keeps what
-    # follows the "#" to itself, and the form sends the token in its body,
-    # where `filter_parameters` masks it (`Admin::PasswordsController`).
-    #
-    # Written out rather than added to the `resource`, which would give the
-    # same two paths under other names (`edit_admin_password`, and
-    # `admin_password` for the PATCH, which is the request form's POST name
-    # already) and a PUT nobody sends.
-    #
-    # `password/check` is the page's own question, asked once by its script
-    # when it has the token: is this link still good? The token is in the
-    # body there as well (`#check`).
-    #
-    resource :password, only: %i[new create]
-    get "password/edit", to: "passwords#edit", as: :edit_password
-    patch "password", to: "passwords#update", as: :update_password
-    post "password/check", to: "passwords#check", as: :check_password
+      # The invitation's link: `<admin>/invitation#<token>`, the
+      # token in the fragment so no server sees it. Under the admin path like
+      # the reset page, so it shadows no public page slug. The leading slash
+      # keeps `InvitationsController` out of the `Admin::` module: like the
+      # reset page it is outside the shell's sign-in requirement.
+      #
+      # `invitation/check` is the page's own question, asked once by its script
+      # when it has the token (the reset page's `password/check`, with the
+      # person's address and name in the answer); `invitation` POST is the
+      # accept form. Both carry the token in their body.
+      get "invitation", to: "/invitations#show", as: :invitation
+      post "invitation", to: "/invitations#update", as: :accept_invitation
+      post "invitation/check", to: "/invitations#check", as: :check_invitation
+      # "Continue with <provider>" on the same page: the token in the body,
+      # never an address; an open invitation is sent to the provider.
+      post "invitation/sso", to: "/invitations#sso", as: :invitation_sso
+      # The password reset. The token of the mailed link is in NO address a
+      # server sees: the link is `password/edit#<token>`, a browser keeps what
+      # follows the "#" to itself, and the form sends the token in its body,
+      # where `filter_parameters` masks it (`Admin::PasswordsController`).
+      #
+      # Written out rather than added to the `resource`, which would give the
+      # same two paths under other names (`edit_admin_password`, and
+      # `admin_password` for the PATCH, which is the request form's POST name
+      # already) and a PUT nobody sends.
+      #
+      # `password/check` is the page's own question, asked once by its script
+      # when it has the token: is this link still good? The token is in the
+      # body there as well (`#check`).
+      #
+      resource :password, only: %i[new create]
+      get "password/edit", to: "passwords#edit", as: :edit_password
+      patch "password", to: "passwords#update", as: :update_password
+      post "password/check", to: "passwords#check", as: :check_password
 
-    # The Pages module. `member` adds the three
-    # publish-state actions the record header's own buttons post to
-    # (Publish now / Unpublish / Schedule…) -- each its own
-    # one-shot POST, deliberately outside the settings form's autosave
-    # (`Admin::PagesController`'s own class comment explains why).
-    resources :pages, only: %i[index new create show update destroy] do
-      member do
-        post :publish
-        post :unpublish
-        post :schedule
-        # A published or scheduled page's slug, behind its own confirmation
-        # (`Admin::PagesController#slug`): not part of the autosaving settings.
-        patch :slug
+      # The Pages module. `member` adds the three
+      # publish-state actions the record header's own buttons post to
+      # (Publish now / Unpublish / Schedule…) -- each its own
+      # one-shot POST, deliberately outside the settings form's autosave
+      # (`Admin::PagesController`'s own class comment explains why).
+      resources :pages, only: %i[index new create show update destroy] do
+        member do
+          post :publish
+          post :unpublish
+          post :schedule
+          # A published or scheduled page's slug, behind its own confirmation
+          # (`Admin::PagesController#slug`): not part of the autosaving settings.
+          patch :slug
+        end
+
+        # A page's blocks: nested under the
+        # page rather than a top-level resource, since a block is meaningless
+        # without the page it's on and every one of these actions already
+        # needs `page_id` to scope its lookup (`Admin::ContentBlocksController
+        # #set_page`) -- there is no "show a block on its own" screen for
+        # `:show`/`:index` to serve. `reorder` is a `collection` route (it
+        # names every block to keep, not one) the same way the page tree's own
+        # move endpoint is `resource :tree`, not nested under one page;
+        # `duplicate` is a `member` route since it always starts from exactly
+        # one existing block.
+        resources :content_blocks, only: %i[create update destroy] do
+          collection { patch :reorder }
+          member { post :duplicate }
+        end
       end
 
-      # A page's blocks: nested under the
-      # page rather than a top-level resource, since a block is meaningless
-      # without the page it's on and every one of these actions already
-      # needs `page_id` to scope its lookup (`Admin::ContentBlocksController
-      # #set_page`) -- there is no "show a block on its own" screen for
-      # `:show`/`:index` to serve. `reorder` is a `collection` route (it
-      # names every block to keep, not one) the same way the page tree's own
-      # move endpoint is `resource :tree`, not nested under one page;
-      # `duplicate` is a `member` route since it always starts from exactly
-      # one existing block.
-      resources :content_blocks, only: %i[create update destroy] do
-        collection { patch :reorder }
-        member { post :duplicate }
+      # The page tree's own move endpoint, a `resource`
+      # (singular) rather than nested under `pages` -- a move names the page
+      # being dragged in its own params (`page_id`), not the URL, since the
+      # same one PATCH target serves every node in the tree. `update` only
+      # (final-fixes round, finding 11): the tree's own GET is already free on
+      # every Pages view via `content_for :tree` -- a bare `:show` here
+      # answered a plain GET with a Turbo Stream body, which nothing in this
+      # app ever actually requests (no `<turbo-frame src="...">` points at
+      # it) and no browser navigating here directly could even render (a
+      # `<turbo-stream>` response isn't valid, renderable HTML for a
+      # top-level GET).
+      resource :tree, only: %i[update], controller: :tree
+
+      # The Tiptap editor's own upload button: POSTs
+      # a multipart `file`, gets back `{ id, url }` (201) or `{ errors }`
+      # (422) -- `create` only, kept separate from the Media module's own
+      # `media` resource just below: there's no page or post this upload
+      # belongs to yet at editing time, so it has no id to nest under, and
+      # `Admin::MediaAssetsController#create` is the editor's own, narrower
+      # JSON-in-JSON-out contract, not the module's own browse/edit screens.
+      resources :media_assets, only: :create
+
+      # The Media module: browse,
+      # upload, edit and delete library images, all through `Media::Upload`/
+      # `Save`/`Destroy`. `index` is the grid (search, filters, pagination);
+      # `show` is one image's detail panel; `create` is the grid's own
+      # multi-file upload (`admin--media--upload`, one request per file, per
+      # the global constraints' own ruling); `update`/`destroy` save/delete.
+      # `resources :media` singularizes to "medium" for its member routes
+      # (`admin_medium_path`) -- the plain, if slightly odd-looking, Rails
+      # default for this one English word, left as-is rather than overridden
+      # with an `:as` this app has no other resource needing.
+      resources :media, only: %i[index show create update destroy]
+      # "Download original": the library
+      # image's original file, for a holder of `media.upload` alone. Active
+      # Storage's own blob routes refuse it to everyone
+      # (config/initializers/active_storage_access.rb).
+      get "media/:id/original", to: "media_originals#show", as: :media_original, constraints: { id: /\d+/ }
+
+      # Trash. `:type` is page|post|media|form -- one screen for
+      # four models, so the item is addressed by type and id rather than by a
+      # resource per model. The constraint is what turns any other `:type`
+      # into a routing 404 before `Admin::TrashController` is ever reached.
+      get "trash", to: "trash#index", as: :trash
+      delete "trash", to: "trash#empty", as: :empty_trash
+      # A bulk trash's Undo: restores exactly the posts it names.
+      post "trash/restore_many", to: "trash#restore_many", as: :restore_many_trash
+      post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media|form/ }
+      delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media|form/ }
+
+      # "Still correct — mark up to date" for an outdated translation:
+      # one endpoint for every translatable record kind, named
+      # by `record_type`/`record_id` in the params (the editor's button posts
+      # them in its `formaction`), the way the trash addresses its items by
+      # type rather than one nested route per model.
+      post "translations/confirm", to: "translation_confirmations#create", as: :translation_confirmation
+
+      # The Translations matrix: every item
+      # that needs work in any target language, one column per language,
+      # optionally narrowed by `?type=page|post|media|settings` and
+      # `?language=` and paged by `?page=`. A plain
+      # `get` rather than `resources :translations, only: :index`, so the
+      # AI suggestion action can join the same controller on a
+      # route of its own without a resource's implied member routes.
+      get "translations", to: "translations#index", as: :translations
+
+      # AI translation suggestions: the
+      # editor's Translate buttons post the record (`record_type`/
+      # `record_id`, like the confirm endpoint above), `fields[]`, the target
+      # `locale` and `inputs[field]` (the input each suggestion is for), and
+      # get Turbo Streams back. A POST although nothing is saved: it spends
+      # the provider's quota and records an `ai.translated` event.
+      post "translations/suggest", to: "translations#suggest", as: :translation_suggestions
+
+      # The internal-link picker's own search: a
+      # `GET`, not nested under `pages`/`posts` -- it searches across both at
+      # once (`?type=` narrows to one), so there is no single owning resource
+      # to nest it under the way `content_blocks` nests under `pages`.
+      get "link_targets", to: "link_targets#index"
+
+      # The Posts module: a flat, filterable list
+      # (no tree column of its own -- a post has no parent/child structure the
+      # way a page does) plus the post editor. `member` adds the same three
+      # publish-state actions the page editor's own record header posts to
+      # (Publish now / Unpublish / Schedule…, `Admin::PagesController`'s own
+      # comment explains why each is a one-shot POST kept deliberately outside
+      # the post form's own autosave, not folded into `update`).
+      # The posts list's bulk bar: publish or trash the ticked posts,
+      # one `Posts::Bulk` call. Declared before the resource so "bulk" can never
+      # be read as a post id.
+      post "posts/bulk", to: "posts#bulk", as: :posts_bulk
+      resources :posts, only: %i[index new create show update destroy] do
+        member do
+          post :publish
+          post :unpublish
+          post :schedule
+        end
+      end
+
+      # The Tags module: a flat list with no `:new`/`:create` of its own -- a
+      # tag has no editor screen, only an inline rename (`:update`), a delete
+      # (`:destroy`) and a merge into another tag (`merge`, `Tags::Merge`) from
+      # the list itself; new tags are only ever created in passing, through a
+      # post's own `tag_names` (`Posts::Save`). `show` is the list's detail
+      # rail, answered only to its frame (`tag-detail`).
+      # The post editor's tag chip input asks `tags/suggest` for suggestions
+      # (`Admin::TagSuggestionsController`): needs `posts.read`, not the Tags
+      # module's `tags.manage`. It is declared before the tags' own routes, and
+      # `show` takes digits only, so `suggest` is never read as a tag.
+      get "tags/suggest", to: "tag_suggestions#index", as: :tag_suggestions
+
+      # `show` is a route of its own so that its constraint is its own: the
+      # list builds the dialogs' form addresses from `admin_tag_path("__ID__")`
+      # and `merge_admin_tag_path("__ID__")`, a placeholder its script replaces,
+      # which a digits-only id on every member route would refuse. Its path is
+      # `admin_tag_path`'s, which `update`'s route names.
+      resources :tags, only: %i[index update destroy] do
+        member { post :merge }
+      end
+      get "tags/:id", to: "tags#show", constraints: { id: /\d+/ }
+
+      # The Settings module: the `SiteSetting`
+      # singleton's own autosaving form (title, tagline, logo, social links,
+      # default language) -- `resource` (singular), like the page tree's own
+      # `resource :tree`, since there's exactly one settings row to show or
+      # update, never a collection or an `:id` to route on.
+      resource :settings, only: %i[show update] do
+        # Checks the saved AI provider, model
+        # and key with one tiny request, answered inline as a Turbo Stream.
+        post :test_ai_connection
+        # The API key's own save (PATCH) and remove (DELETE), `Admin::AiKeysController`:
+        # instant actions beside the Settings form, never part of it (the key is
+        # never in the form's data, so it can't be counted as a pending change or
+        # sent with the rest).
+        resource :ai_key, only: %i[update destroy]
+        # Settings → Mail (docs/reference/mail.md): a test mail to the person
+        # pressing it, answered in place, and the mail login's own save and
+        # remove (`Admin::MailLoginsController`), written once and never shown
+        # again -- instant actions beside the Settings form, like the AI key's.
+        post :send_test_mail
+        # Settings → Images: queues the widths of every image not made with the
+        # saved image settings (`Media::Regenerate`), answered with a 303 to the card.
+        post :regenerate_images
+        resource :mail_login, only: %i[update destroy]
+      end
+
+      # Languages (they live INSIDE the
+      # Settings screen, as its `#languages` card). Still under "settings" by
+      # *path* only (`scope`, not `namespace`: a plain `Admin::LanguagesController`).
+      # What is left is the card's INSTANT actions, each answering with a 303 back
+      # to the card: `create` is `Locales::Enable`, `destroy` `Locales::Disable`
+      # (one language at a time, by its code as `:id`), `make_default`
+      # `Locales::MakeDefault`. The order and fallbacks are not here: they are
+      # fields of the Settings form (`Settings::Save`'s `languages:`). The old
+      # screen's URL redirects (301) to the card, so bookmarks and links keep working.
+      scope "settings", as: "settings" do
+        get "languages", to: redirect(status: 301) { |_params, request|
+          query = request.query_string.presence
+          "#{request.path.sub(%r{/languages(?:/|\.[^/]*)?\z}, "")}#{"?#{query}" if query}#languages"
+        }, as: :languages_screen
+        resources :languages, only: %i[create destroy]
+        patch "languages/:id/default", to: "languages#make_default", as: :default_language
+      end
+
+      # The Users module: list, new/create,
+      # edit/update (email, and a password only when one was typed --
+      # `Users::Save`), destroy (refused for the last user, `Users::Destroy`
+      # -- `Admin::UsersController#destroy` is also where deleting *yourself*
+      # ends your own session, since only the controller knows which request
+      # this is). Inviting someone is `invites` below, a module of its own.
+      # The group editor's member chip input asks this for suggestions
+      # (`Admin::UserSuggestionsController`, needs `groups.manage`); declared before
+      # `resources :users` so `suggest` is never read as a user id.
+      get "users/suggest", to: "user_suggestions#index", as: :user_suggestions
+
+      resources :users, only: %i[index new create edit update destroy] do
+        # "Make owner…" / "Remove owner rights…": an instant
+        # action of its own, `owner=1|0`, answered by `Users::Save` like any other
+        # change to a user -- never a field of the editor's form.
+        member { patch :owner }
+        # "End all sessions…": an owner signs another user out everywhere
+        # (`SignIn::Sessions::EndAll`, which refuses a non-owner and your own account).
+        member { delete :sessions }
+        # "Unlink…" in the Single sign-on zone (`SignIn::Sso::Unlink`, owner only).
+        member { delete :sso_link, to: "sso_links#destroy" }
+      end
+
+      # Invites (`Admin::InvitesController`): "Invite
+      # person" posts `invites`; an invited row's menu resends
+      # (`invites/:id/resend`) and withdraws (DELETE `invites/:id`). The id is
+      # the `Invitation`'s: an invitation is no user until it is accepted.
+      resources :invites, only: %i[create destroy] do
+        member { post :resend }
+      end
+
+      # The Groups module: the list, the
+      # editor (name, description, members, the permission matrix) and
+      # delete (`Groups::Destroy`, which revokes the group's tokens). No
+      # `:show` -- the editor is the group's page.
+      resources :groups, only: %i[index new create edit update destroy]
+
+      # The Forms screen: the list, New form (a dialog,
+      # with `new` its page without JavaScript), the builder (`show`, saved
+      # explicitly by `update`) and Move to trash (`destroy`, `Trash::Move`).
+      # Ids only: the form is `Forms::Form`, addressed as `forms/:id`.
+      resources :forms, only: %i[index new create show update destroy], constraints: { id: /\d+/ } do
+        # A form's submissions: the list
+        # (`?page=`), one submission, deleting one and deleting all. A
+        # submission is found among its form's, by its id: no answer is ever
+        # part of an address.
+        resources :submissions, controller: "form_submissions", only: %i[index show destroy], constraints: { id: /\d+/ } do
+          delete :destroy_all, on: :collection
+        end
+      end
+      # Send again, for one failed delivery (`Forms::Resend`), by its id.
+      resources :form_deliveries, only: [], constraints: { id: /\d+/ } do
+        post :resend, on: :member
+      end
+
+      # "Your account": the signed-in user's own account, open to every
+      # user -- unlike the Users module, which needs `users.manage`. Singular:
+      # it's always *your* account. The page is `account`. It began as "Change
+      # my password" at `account/password`, an address that named one of its
+      # three cards: a GET of that one now moves to the page for good (a 301,
+      # `accounts#moved`), and the Password card is `#password` there. The two
+      # forms post where they always did -- `account/password` (which keeps
+      # the name `admin_account_password_path`) and `account/profile` -- so a
+      # non-GET is never redirected.
+      get "account", to: "accounts#edit", as: :account
+      get "account/password", to: "accounts#moved", as: nil
+      patch "account/password", to: "accounts#update", as: :account_password
+      patch "account/profile", to: "accounts#update_profile", as: :account_profile
+      # The Sessions card's two endings, of the signed-in user's own sessions
+      # only: the request names a session, never a user.
+      delete "account/sessions/:id", to: "account_sessions#destroy", as: :account_session
+      delete "account/sessions", to: "account_sessions#destroy_others", as: :account_sessions
+      # Confirm it's you: the signed-in person's password, or the options for
+      # one of their own passkeys and its answer, before a change to how they
+      # sign in (`Admin::RecentConfirmation`).
+      post "account/confirmation", to: "confirmations#create", as: :account_confirmation
+      post "account/confirmation/options", to: "confirmations#options", as: :account_confirmation_options
+      post "account/confirmation/passkey", to: "confirmations#passkey", as: :account_confirmation_passkey
+      # The Passkeys and Recovery codes cards, on the signed-in user's own
+      # account only: a passkey's id is looked up among theirs. The options
+      # are a registration's, fetched before the browser's prompt.
+      post "account/passkeys/options", to: "passkeys#options", as: :account_passkey_options
+      post "account/passkeys", to: "passkeys#create", as: :account_passkeys
+      patch "account/passkeys/:id", to: "passkeys#update", as: :account_passkey, constraints: { id: /\d+/ }
+      delete "account/passkeys/:id", to: "passkeys#destroy", constraints: { id: /\d+/ }
+      # Enrolment: where a person the passkey policy covered at sign-in, who
+      # holds no passkey, is sent from every CS Studio page until they add one
+      # (`Admin::PasskeyEnrolment`). The add itself is the Passkeys card's
+      # endpoints above, with `from: "enrolment"`.
+      get "enrolment", to: "enrolments#show", as: :enrolment
+      post "account/recovery-codes", to: "recovery_codes#create", as: :account_recovery_codes
+
+      # "Connect an AI assistant": the MCP bearer
+      # tokens. No `:new`/`:show` -- "Create token" is one button on the list
+      # that POSTs straight to `create`, and `create` *renders* the one-time
+      # reveal itself (never a redirect to a `show`, which would need the raw
+      # token to survive a second request somewhere -- see `Admin::
+      # ApiTokensController#create`). `destroy` is revoke
+      # (`ApiTokens::Revoke`): the row stays, marked revoked, for the list's
+      # own "last used / IP" history.
+      resources :api_tokens, only: %i[index create destroy]
+
+      # System status and the mind graph: one
+      # read-only screen each, `resource` (singular) since neither has an
+      # `:id` to route on. "Run again" on the status screen is a plain reload
+      # of `show` -- `Setup::SystemCheck` runs on every request.
+      resource :system_status, only: :show, controller: :system_status
+      # `data`, `search`, `unlisted` and `listed` are the mind graph screen's
+      # own JSON reads: the graph,
+      # global or around `page=` / `post=` / `tag=`; the search field's rows;
+      # the posts no page lists; and the posts one target of `page=` brings in
+      # (`target=`) beyond the ones its local view draws.
+      resource :mind_graph, only: :show, controller: :mind_graph do
+        get :data, defaults: { format: :json }
+        get :search, defaults: { format: :json }
+        get :unlisted, defaults: { format: :json }
+        get :listed, defaults: { format: :json }
+      end
+
+      # The audit log:
+      # a paginated, filterable list plus one event's own page.
+      # `resources` (plural, unlike `system_status`/`mind_graph` above) since
+      # each row has its own `:id` to route `show` on -- but only `:index`/
+      # `:show`: `Audit::Event` is append-only (its own class comment), never
+      # created, edited or destroyed through a CS Studio form.
+      resources :audit_events, only: %i[index show]
+
+      # "Create starter pages" on the Pages home:
+      # one POST, `StarterContents::Add`, idempotent.
+      resources :starter_contents, only: :create
+
+      # A person's own inbox, five answers: the full list, "Mark all read",
+      # Notes for you as its frame (`turbo-frame#notes-for-you`), the sidebar's
+      # number (`#sidebar-badge-dashboard`) as JSON, each fetched again by
+      # itself, and one delivery as data. None of these words can be taken for
+      # a record's notes below: that scope needs `page`, `post` or `media` and
+      # an id.
+      get "notes", to: "note_inbox#index", as: :notes
+      post "notes/read", to: "note_inbox#read", as: :read_notes
+      get "notes/card", to: "note_inbox#card", as: :notes_card
+      get "notes/unread", to: "note_inbox#unread", as: :unread_notes, defaults: { format: :json }
+      # One delivery of the viewer's own, as data: what a tab asks for when a
+      # signal names its id, before it says anything.
+      get "notes/deliveries/:id", to: "note_inbox#delivery", as: :note_delivery, constraints: { id: /\d+/ }, defaults: { format: :json }
+
+      # The dashboard is CS Studio's home, open to every signed-in user. The
+      # Pages module -- the tree and its own editor -- is at `/pages`
+      # (`resources :pages` above). Waiting for you is the one part of it
+      # fetched again by itself, as a frame (`turbo-frame#dashboard-waiting`,
+      # `?filter=everything|threads|unpublished`).
+      root to: "dashboard#show"
+      get "dashboard/waiting", to: "dashboard#waiting", as: :dashboard_waiting
+      # Presence: who else has a record open, and which of a
+      # list's records have someone here. Two reads, both through the read
+      # scope; the writes are a channel's (`Presence::Channel`). `here` comes
+      # first and its words can not be taken for a kind below.
+      get "presence/here", to: "presence#here", as: :presence_here, defaults: { format: :json }
+      get "presence/:kind/:id", to: "presence#show", as: :record_presence, constraints: { kind: /page|post|media/, id: /\d+/ }
+      # Live editing: the parts an open page or post
+      # editor fetches when it is told something changed, each through the read
+      # scope: a page's block list, one block, the record's own form. Hung under
+      # the record like notes' and presence's, but `kind` is only `page|post`:
+      # the library has no editor of this shape, and a `media` here would be a
+      # route that can only answer 404. `block_id` is digits, so `blocks` and
+      # `blocks/:block_id` can not be taken for each other.
+      scope "editing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
+        get "blocks", to: "editing#blocks", as: :editing_blocks
+        get "blocks/:block_id", to: "editing#block", as: :editing_block, constraints: { block_id: /\d+/ }
+        get "record", to: "editing#record", as: :editing_record
+        # The header's publishing chip, for another tab's change to the mark.
+        get "publishing", to: "editing#publishing", as: :editing_publishing
+        # A save is a claim: the tab takes a subject ahead
+        # of its first save, and lets it go. `block_id` is optional (absent: the
+        # record itself); a block that is not this record's is a 404.
+        post "claim", to: "editing#claim", as: :editing_claim
+        post "release", to: "editing#release", as: :editing_release
+        # Taking over: the requester asks, the holder's tab hands over.
+        post "take_over", to: "editing#take_over", as: :editing_take_over
+        post "hand_over", to: "editing#hand_over", as: :editing_hand_over
+        # The asking tab leaves, or stops asking: its own request goes.
+        post "withdraw", to: "editing#withdraw", as: :editing_withdraw
+      end
+      # Publishing a record's changes.
+      scope "publishing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
+        post "publish", to: "publishing#publish", as: :publishing_publish
+        # What a publish would change, for the dialog: a POST, sent through the
+        # tab's write queue, because part of the answer is found by trying
+        # (`Publishing::Changes.addresses` takes the record's row lock).
+        post "changes", to: "publishing#changes", as: :publishing_changes
+        post "discard", to: "publishing#discard", as: :publishing_discard
+        post "cancel_scheduled_change", to: "publishing#cancel_scheduled_change", as: :publishing_cancel_scheduled_change
+      end
+      # Notes on content. Everything about one record's
+      # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,
+      # `/notes/media/5` -- so a controller finds the container through the read
+      # scope first and a thread only among that container's: a thread is never
+      # found by its id alone. Each part of the notes UI has its own GET here
+      # (the list, one thread, the resolved ones, the counts), which is what a
+      # live signal asks the browser to fetch again.
+      scope "notes/:container_type/:container_id", constraints: { container_type: /page|post|media/, container_id: /\d+/ } do
+        get "", to: "notes#index", as: :record_notes
+        get "resolved", to: "notes#resolved", as: :resolved_record_notes
+        get "counts", to: "notes#counts", as: :record_note_counts, defaults: { format: :json }
+        get "threads/:id", to: "note_threads#show", as: :record_note_thread, constraints: { id: /\d+/ }
+        # The writes, each an ordinary Turbo form inside
+        # `turbo-frame#notes`. A thread's six changes share one action: the
+        # segment is the whole request, so nothing about it is read from a
+        # parameter (`Admin::NoteThreadsController::CHANGES`).
+        get "mentions", to: "note_mentions#index", as: :record_note_mentions, defaults: { format: :json }
+        # The record's open threads as data, for the mind graph's card.
+        # It shares its path with the POST below, which the card
+        # sends too, and has a name of its own because two routes can't share
+        # one: `admin_record_note_threads_data_path`.
+        get "threads", to: "note_threads#index", as: :record_note_threads_data, defaults: { format: :json }
+        post "threads", to: "note_threads#create", as: :record_note_threads
+        post "threads/:id/:change", to: "note_threads#change", as: :change_record_note_thread,
+          constraints: { id: /\d+/, change: /resolve|reopen|pin|unpin|follow|unfollow/ }
+        post "threads/:thread_id/messages", to: "note_messages#create", as: :record_note_messages, constraints: { thread_id: /\d+/ }
+        patch "threads/:thread_id/messages/:id", to: "note_messages#update", as: :record_note_message, constraints: { thread_id: /\d+/, id: /\d+/ }
+        delete "threads/:thread_id/messages/:id", to: "note_messages#destroy", constraints: { thread_id: /\d+/, id: /\d+/ }
+        # A reaction on one message: a toggle of the viewer's own.
+        post "threads/:thread_id/messages/:id/reactions", to: "note_reactions#create", as: :record_note_message_reactions,
+          constraints: { thread_id: /\d+/, id: /\d+/ }
+        # A file of one message: the ONLY address a
+        # note's file has. Its id is an attachment's, looked up among that
+        # message's, of that thread, of this record -- never a blob's key or a
+        # signed id, and no Active Storage URL of one is ever rendered.
+        get "threads/:thread_id/messages/:message_id/files/:id", to: "note_files#show", as: :record_note_file,
+          constraints: { thread_id: /\d+/, message_id: /\d+/, id: /\d+/ }
       end
     end
 
-    # The page tree's own move endpoint, a `resource`
-    # (singular) rather than nested under `pages` -- a move names the page
-    # being dragged in its own params (`page_id`), not the URL, since the
-    # same one PATCH target serves every node in the tree. `update` only
-    # (final-fixes round, finding 11): the tree's own GET is already free on
-    # every Pages view via `content_for :tree` -- a bare `:show` here
-    # answered a plain GET with a Turbo Stream body, which nothing in this
-    # app ever actually requests (no `<turbo-frame src="...">` points at
-    # it) and no browser navigating here directly could even render (a
-    # `<turbo-stream>` response isn't valid, renderable HTML for a
-    # top-level GET).
-    resource :tree, only: %i[update], controller: :tree
-
-    # The Tiptap editor's own upload button: POSTs
-    # a multipart `file`, gets back `{ id, url }` (201) or `{ errors }`
-    # (422) -- `create` only, kept separate from the Media module's own
-    # `media` resource just below: there's no page or post this upload
-    # belongs to yet at editing time, so it has no id to nest under, and
-    # `Admin::MediaAssetsController#create` is the editor's own, narrower
-    # JSON-in-JSON-out contract, not the module's own browse/edit screens.
-    resources :media_assets, only: :create
-
-    # The Media module: browse,
-    # upload, edit and delete library images, all through `Media::Upload`/
-    # `Save`/`Destroy`. `index` is the grid (search, filters, pagination);
-    # `show` is one image's detail panel; `create` is the grid's own
-    # multi-file upload (`admin--media--upload`, one request per file, per
-    # the global constraints' own ruling); `update`/`destroy` save/delete.
-    # `resources :media` singularizes to "medium" for its member routes
-    # (`admin_medium_path`) -- the plain, if slightly odd-looking, Rails
-    # default for this one English word, left as-is rather than overridden
-    # with an `:as` this app has no other resource needing.
-    resources :media, only: %i[index show create update destroy]
-    # "Download original": the library
-    # image's original file, for a holder of `media.upload` alone. Active
-    # Storage's own blob routes refuse it to everyone
-    # (config/initializers/active_storage_access.rb).
-    get "media/:id/original", to: "media_originals#show", as: :media_original, constraints: { id: /\d+/ }
-
-    # Trash. `:type` is page|post|media|form -- one screen for
-    # four models, so the item is addressed by type and id rather than by a
-    # resource per model. The constraint is what turns any other `:type`
-    # into a routing 404 before `Admin::TrashController` is ever reached.
-    get "trash", to: "trash#index", as: :trash
-    delete "trash", to: "trash#empty", as: :empty_trash
-    # A bulk trash's Undo: restores exactly the posts it names.
-    post "trash/restore_many", to: "trash#restore_many", as: :restore_many_trash
-    post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media|form/ }
-    delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media|form/ }
-
-    # "Still correct — mark up to date" for an outdated translation:
-    # one endpoint for every translatable record kind, named
-    # by `record_type`/`record_id` in the params (the editor's button posts
-    # them in its `formaction`), the way the trash addresses its items by
-    # type rather than one nested route per model.
-    post "translations/confirm", to: "translation_confirmations#create", as: :translation_confirmation
-
-    # The Translations matrix: every item
-    # that needs work in any target language, one column per language,
-    # optionally narrowed by `?type=page|post|media|settings` and
-    # `?language=` and paged by `?page=`. A plain
-    # `get` rather than `resources :translations, only: :index`, so the
-    # AI suggestion action can join the same controller on a
-    # route of its own without a resource's implied member routes.
-    get "translations", to: "translations#index", as: :translations
-
-    # AI translation suggestions: the
-    # editor's Translate buttons post the record (`record_type`/
-    # `record_id`, like the confirm endpoint above), `fields[]`, the target
-    # `locale` and `inputs[field]` (the input each suggestion is for), and
-    # get Turbo Streams back. A POST although nothing is saved: it spends
-    # the provider's quota and records an `ai.translated` event.
-    post "translations/suggest", to: "translations#suggest", as: :translation_suggestions
-
-    # The internal-link picker's own search: a
-    # `GET`, not nested under `pages`/`posts` -- it searches across both at
-    # once (`?type=` narrows to one), so there is no single owning resource
-    # to nest it under the way `content_blocks` nests under `pages`.
-    get "link_targets", to: "link_targets#index"
-
-    # The Posts module: a flat, filterable list
-    # (no tree column of its own -- a post has no parent/child structure the
-    # way a page does) plus the post editor. `member` adds the same three
-    # publish-state actions the page editor's own record header posts to
-    # (Publish now / Unpublish / Schedule…, `Admin::PagesController`'s own
-    # comment explains why each is a one-shot POST kept deliberately outside
-    # the post form's own autosave, not folded into `update`).
-    # The posts list's bulk bar: publish or trash the ticked posts,
-    # one `Posts::Bulk` call. Declared before the resource so "bulk" can never
-    # be read as a post id.
-    post "posts/bulk", to: "posts#bulk", as: :posts_bulk
-    resources :posts, only: %i[index new create show update destroy] do
-      member do
-        post :publish
-        post :unpublish
-        post :schedule
+    # The backend's plain routes, under the admin path (no `module:`, no `as:`).
+    scope ContentSpiel::ADMIN_PATH do
+      # Signed-in preview of unpublished pages and posts -- its own
+      # URL space, so the public routes below can stay session-free and cacheable,
+      # and under the admin path, so a top-level page slugged "preview" is a public
+      # page like any other. Two routes for the same reason the public site has two:
+      # an optional `(/:locale)` would leave "about" in /<ADMIN_PATH>/preview/about
+      # to be read as a locale. The locale's constraint is a block, not a
+      # `constraints:` option: an object given as the option replaces the host
+      # constraint around it instead of joining it (Rails' mapper keeps one or
+      # the other), and `test/lib/backend_paths_test.rb` would find the route bare.
+      constraints(LocaleRouteConstraint) do
+        get "preview/:locale(/*path)", to: "preview#show", defaults: { path: "" }, format: false, as: :localized_preview
       end
-    end
+      get "preview(/*path)", to: "preview#show", defaults: { path: "" }, format: false, as: :preview
 
-    # The Tags module: a flat list with no `:new`/`:create` of its own -- a
-    # tag has no editor screen, only an inline rename (`:update`), a delete
-    # (`:destroy`) and a merge into another tag (`merge`, `Tags::Merge`) from
-    # the list itself; new tags are only ever created in passing, through a
-    # post's own `tag_names` (`Posts::Save`). `show` is the list's detail
-    # rail, answered only to its frame (`tag-detail`).
-    # The post editor's tag chip input asks `tags/suggest` for suggestions
-    # (`Admin::TagSuggestionsController`): needs `posts.read`, not the Tags
-    # module's `tags.manage`. It is declared before the tags' own routes, and
-    # `show` takes digits only, so `suggest` is never read as a tag.
-    get "tags/suggest", to: "tag_suggestions#index", as: :tag_suggestions
+      # First-run setup wizard. SetupController itself 404s once setup is
+      # complete. Under the admin path, which the redirect constraint leaves open.
+      get "setup", to: "setup#index", as: :setup
+      # The passkey step's registration options (`SetupController#passkey_options`).
+      post "setup/passkey/options", to: "setup#passkey_options", as: :setup_passkey_options
+      get "setup/:step", to: "setup#show", as: :setup_step
+      patch "setup/:step", to: "setup#update"
 
-    # `show` is a route of its own so that its constraint is its own: the
-    # list builds the dialogs' form addresses from `admin_tag_path("__ID__")`
-    # and `merge_admin_tag_path("__ID__")`, a placeholder its script replaces,
-    # which a digits-only id on every member route would refuse. Its path is
-    # `admin_tag_path`'s, which `update`'s route names.
-    resources :tags, only: %i[index update destroy] do
-      member { post :merge }
-    end
-    get "tags/:id", to: "tags#show", constraints: { id: /\d+/ }
+      # The MCP server, bearer-token authenticated (McpController#authenticate),
+      # under the admin path with the rest of the backend: the public site's
+      # catch-all below never sees it, and `/mcp` is a public page path like any other.
+      post "mcp", to: "mcp#create"
 
-    # The Settings module: the `SiteSetting`
-    # singleton's own autosaving form (title, tagline, logo, social links,
-    # default language) -- `resource` (singular), like the page tree's own
-    # `resource :tree`, since there's exactly one settings row to show or
-    # update, never a collection or an `:id` to route on.
-    resource :settings, only: %i[show update] do
-      # Checks the saved AI provider, model
-      # and key with one tiny request, answered inline as a Turbo Stream.
-      post :test_ai_connection
-      # The API key's own save (PATCH) and remove (DELETE), `Admin::AiKeysController`:
-      # instant actions beside the Settings form, never part of it (the key is
-      # never in the form's data, so it can't be counted as a pending change or
-      # sent with the rest).
-      resource :ai_key, only: %i[update destroy]
-      # Settings → Mail (docs/reference/mail.md): a test mail to the person
-      # pressing it, answered in place, and the mail login's own save and
-      # remove (`Admin::MailLoginsController`), written once and never shown
-      # again -- instant actions beside the Settings form, like the AI key's.
-      post :send_test_mail
-      # Settings → Images: queues the widths of every image not made with the
-      # saved image settings (`Media::Regenerate`), answered with a 303 to the card.
-      post :regenerate_images
-      resource :mail_login, only: %i[update destroy]
-    end
-
-    # Languages (they live INSIDE the
-    # Settings screen, as its `#languages` card). Still under "settings" by
-    # *path* only (`scope`, not `namespace`: a plain `Admin::LanguagesController`).
-    # What is left is the card's INSTANT actions, each answering with a 303 back
-    # to the card: `create` is `Locales::Enable`, `destroy` `Locales::Disable`
-    # (one language at a time, by its code as `:id`), `make_default`
-    # `Locales::MakeDefault`. The order and fallbacks are not here: they are
-    # fields of the Settings form (`Settings::Save`'s `languages:`). The old
-    # screen's URL redirects (301) to the card, so bookmarks and links keep working.
-    scope "settings", as: "settings" do
-      get "languages", to: redirect(status: 301) { |_params, request|
-        query = request.query_string.presence
-        "#{request.path.sub(%r{/languages(?:/|\.[^/]*)?\z}, "")}#{"?#{query}" if query}#languages"
-      }, as: :languages_screen
-      resources :languages, only: %i[create destroy]
-      patch "languages/:id/default", to: "languages#make_default", as: :default_language
-    end
-
-    # The Users module: list, new/create,
-    # edit/update (email, and a password only when one was typed --
-    # `Users::Save`), destroy (refused for the last user, `Users::Destroy`
-    # -- `Admin::UsersController#destroy` is also where deleting *yourself*
-    # ends your own session, since only the controller knows which request
-    # this is). Inviting someone is `invites` below, a module of its own.
-    # The group editor's member chip input asks this for suggestions
-    # (`Admin::UserSuggestionsController`, needs `groups.manage`); declared before
-    # `resources :users` so `suggest` is never read as a user id.
-    get "users/suggest", to: "user_suggestions#index", as: :user_suggestions
-
-    resources :users, only: %i[index new create edit update destroy] do
-      # "Make owner…" / "Remove owner rights…": an instant
-      # action of its own, `owner=1|0`, answered by `Users::Save` like any other
-      # change to a user -- never a field of the editor's form.
-      member { patch :owner }
-      # "End all sessions…": an owner signs another user out everywhere
-      # (`Sessions::EndAll`, which refuses a non-owner and your own account).
-      member { delete :sessions }
-    end
-
-    # Invites (`Admin::InvitesController`): "Invite
-    # person" posts `invites`; an invited row's menu resends
-    # (`invites/:id/resend`) and withdraws (DELETE `invites/:id`). The id is
-    # the `Invitation`'s: an invitation is no user until it is accepted.
-    resources :invites, only: %i[create destroy] do
-      member { post :resend }
-    end
-
-    # The Groups module: the list, the
-    # editor (name, description, members, the permission matrix) and
-    # delete (`Groups::Destroy`, which revokes the group's tokens). No
-    # `:show` -- the editor is the group's page.
-    resources :groups, only: %i[index new create edit update destroy]
-
-    # The Forms screen: the list, New form (a dialog,
-    # with `new` its page without JavaScript), the builder (`show`, saved
-    # explicitly by `update`) and Move to trash (`destroy`, `Trash::Move`).
-    # Ids only: the form is `Forms::Form`, addressed as `forms/:id`.
-    resources :forms, only: %i[index new create show update destroy], constraints: { id: /\d+/ } do
-      # A form's submissions: the list
-      # (`?page=`), one submission, deleting one and deleting all. A
-      # submission is found among its form's, by its id: no answer is ever
-      # part of an address.
-      resources :submissions, controller: "form_submissions", only: %i[index show destroy], constraints: { id: /\d+/ } do
-        delete :destroy_all, on: :collection
-      end
-    end
-    # Send again, for one failed delivery (`Forms::Resend`), by its id.
-    resources :form_deliveries, only: [], constraints: { id: /\d+/ } do
-      post :resend, on: :member
-    end
-
-    # "Your account": the signed-in user's own account, open to every
-    # user -- unlike the Users module, which needs `users.manage`. Singular:
-    # it's always *your* account. The page is `account`. It began as "Change
-    # my password" at `account/password`, an address that named one of its
-    # three cards: a GET of that one now moves to the page for good (a 301,
-    # `accounts#moved`), and the Password card is `#password` there. The two
-    # forms post where they always did -- `account/password` (which keeps
-    # the name `admin_account_password_path`) and `account/profile` -- so a
-    # non-GET is never redirected.
-    get "account", to: "accounts#edit", as: :account
-    get "account/password", to: "accounts#moved", as: nil
-    patch "account/password", to: "accounts#update", as: :account_password
-    patch "account/profile", to: "accounts#update_profile", as: :account_profile
-    # The Sessions card's two endings, of the signed-in user's own sessions
-    # only: the request names a session, never a user.
-    delete "account/sessions/:id", to: "account_sessions#destroy", as: :account_session
-    delete "account/sessions", to: "account_sessions#destroy_others", as: :account_sessions
-
-    # "Connect an AI assistant": the MCP bearer
-    # tokens. No `:new`/`:show` -- "Create token" is one button on the list
-    # that POSTs straight to `create`, and `create` *renders* the one-time
-    # reveal itself (never a redirect to a `show`, which would need the raw
-    # token to survive a second request somewhere -- see `Admin::
-    # ApiTokensController#create`). `destroy` is revoke
-    # (`ApiTokens::Revoke`): the row stays, marked revoked, for the list's
-    # own "last used / IP" history.
-    resources :api_tokens, only: %i[index create destroy]
-
-    # System status and the mind graph: one
-    # read-only screen each, `resource` (singular) since neither has an
-    # `:id` to route on. "Run again" on the status screen is a plain reload
-    # of `show` -- `Setup::SystemCheck` runs on every request.
-    resource :system_status, only: :show, controller: :system_status
-    # `data`, `search`, `unlisted` and `listed` are the mind graph screen's
-    # own JSON reads: the graph,
-    # global or around `page=` / `post=` / `tag=`; the search field's rows;
-    # the posts no page lists; and the posts one target of `page=` brings in
-    # (`target=`) beyond the ones its local view draws.
-    resource :mind_graph, only: :show, controller: :mind_graph do
-      get :data, defaults: { format: :json }
-      get :search, defaults: { format: :json }
-      get :unlisted, defaults: { format: :json }
-      get :listed, defaults: { format: :json }
-    end
-
-    # The audit log:
-    # a paginated, filterable list plus one event's own page.
-    # `resources` (plural, unlike `system_status`/`mind_graph` above) since
-    # each row has its own `:id` to route `show` on -- but only `:index`/
-    # `:show`: `Audit::Event` is append-only (its own class comment), never
-    # created, edited or destroyed through a CS Studio form.
-    resources :audit_events, only: %i[index show]
-
-    # "Create starter pages" on the Pages home:
-    # one POST, `StarterContents::Add`, idempotent.
-    resources :starter_contents, only: :create
-
-    # A person's own inbox, five answers: the full list, "Mark all read",
-    # Notes for you as its frame (`turbo-frame#notes-for-you`), the sidebar's
-    # number (`#sidebar-badge-dashboard`) as JSON, each fetched again by
-    # itself, and one delivery as data. None of these words can be taken for
-    # a record's notes below: that scope needs `page`, `post` or `media` and
-    # an id.
-    get "notes", to: "note_inbox#index", as: :notes
-    post "notes/read", to: "note_inbox#read", as: :read_notes
-    get "notes/card", to: "note_inbox#card", as: :notes_card
-    get "notes/unread", to: "note_inbox#unread", as: :unread_notes, defaults: { format: :json }
-    # One delivery of the viewer's own, as data: what a tab asks for when a
-    # signal names its id, before it says anything.
-    get "notes/deliveries/:id", to: "note_inbox#delivery", as: :note_delivery, constraints: { id: /\d+/ }, defaults: { format: :json }
-
-    # The dashboard is CS Studio's home, open to every signed-in user. The
-    # Pages module -- the tree and its own editor -- is at `/pages`
-    # (`resources :pages` above). Waiting for you is the one part of it
-    # fetched again by itself, as a frame (`turbo-frame#dashboard-waiting`,
-    # `?filter=everything|threads|unpublished`).
-    root to: "dashboard#show"
-    get "dashboard/waiting", to: "dashboard#waiting", as: :dashboard_waiting
-    # Presence: who else has a record open, and which of a
-    # list's records have someone here. Two reads, both through the read
-    # scope; the writes are a channel's (`Presence::Channel`). `here` comes
-    # first and its words can not be taken for a kind below.
-    get "presence/here", to: "presence#here", as: :presence_here, defaults: { format: :json }
-    get "presence/:kind/:id", to: "presence#show", as: :record_presence, constraints: { kind: /page|post|media/, id: /\d+/ }
-    # Live editing: the parts an open page or post
-    # editor fetches when it is told something changed, each through the read
-    # scope: a page's block list, one block, the record's own form. Hung under
-    # the record like notes' and presence's, but `kind` is only `page|post`:
-    # the library has no editor of this shape, and a `media` here would be a
-    # route that can only answer 404. `block_id` is digits, so `blocks` and
-    # `blocks/:block_id` can not be taken for each other.
-    scope "editing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
-      get "blocks", to: "editing#blocks", as: :editing_blocks
-      get "blocks/:block_id", to: "editing#block", as: :editing_block, constraints: { block_id: /\d+/ }
-      get "record", to: "editing#record", as: :editing_record
-      # The header's publishing chip, for another tab's change to the mark.
-      get "publishing", to: "editing#publishing", as: :editing_publishing
-      # A save is a claim: the tab takes a subject ahead
-      # of its first save, and lets it go. `block_id` is optional (absent: the
-      # record itself); a block that is not this record's is a 404.
-      post "claim", to: "editing#claim", as: :editing_claim
-      post "release", to: "editing#release", as: :editing_release
-      # Taking over: the requester asks, the holder's tab hands over.
-      post "take_over", to: "editing#take_over", as: :editing_take_over
-      post "hand_over", to: "editing#hand_over", as: :editing_hand_over
-      # The asking tab leaves, or stops asking: its own request goes.
-      post "withdraw", to: "editing#withdraw", as: :editing_withdraw
-    end
-    # Publishing a record's changes.
-    scope "publishing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
-      post "publish", to: "publishing#publish", as: :publishing_publish
-      # What a publish would change, for the dialog: a POST, sent through the
-      # tab's write queue, because part of the answer is found by trying
-      # (`Publishing::Changes.addresses` takes the record's row lock).
-      post "changes", to: "publishing#changes", as: :publishing_changes
-      post "discard", to: "publishing#discard", as: :publishing_discard
-      post "cancel_scheduled_change", to: "publishing#cancel_scheduled_change", as: :publishing_cancel_scheduled_change
-    end
-    # Notes on content. Everything about one record's
-    # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,
-    # `/notes/media/5` -- so a controller finds the container through the read
-    # scope first and a thread only among that container's: a thread is never
-    # found by its id alone. Each part of the notes UI has its own GET here
-    # (the list, one thread, the resolved ones, the counts), which is what a
-    # live signal asks the browser to fetch again.
-    scope "notes/:container_type/:container_id", constraints: { container_type: /page|post|media/, container_id: /\d+/ } do
-      get "", to: "notes#index", as: :record_notes
-      get "resolved", to: "notes#resolved", as: :resolved_record_notes
-      get "counts", to: "notes#counts", as: :record_note_counts, defaults: { format: :json }
-      get "threads/:id", to: "note_threads#show", as: :record_note_thread, constraints: { id: /\d+/ }
-      # The writes, each an ordinary Turbo form inside
-      # `turbo-frame#notes`. A thread's six changes share one action: the
-      # segment is the whole request, so nothing about it is read from a
-      # parameter (`Admin::NoteThreadsController::CHANGES`).
-      get "mentions", to: "note_mentions#index", as: :record_note_mentions, defaults: { format: :json }
-      # The record's open threads as data, for the mind graph's card.
-      # It shares its path with the POST below, which the card
-      # sends too, and has a name of its own because two routes can't share
-      # one: `admin_record_note_threads_data_path`.
-      get "threads", to: "note_threads#index", as: :record_note_threads_data, defaults: { format: :json }
-      post "threads", to: "note_threads#create", as: :record_note_threads
-      post "threads/:id/:change", to: "note_threads#change", as: :change_record_note_thread,
-        constraints: { id: /\d+/, change: /resolve|reopen|pin|unpin|follow|unfollow/ }
-      post "threads/:thread_id/messages", to: "note_messages#create", as: :record_note_messages, constraints: { thread_id: /\d+/ }
-      patch "threads/:thread_id/messages/:id", to: "note_messages#update", as: :record_note_message, constraints: { thread_id: /\d+/, id: /\d+/ }
-      delete "threads/:thread_id/messages/:id", to: "note_messages#destroy", constraints: { thread_id: /\d+/, id: /\d+/ }
-      # A reaction on one message: a toggle of the viewer's own.
-      post "threads/:thread_id/messages/:id/reactions", to: "note_reactions#create", as: :record_note_message_reactions,
-        constraints: { thread_id: /\d+/, id: /\d+/ }
-      # A file of one message: the ONLY address a
-      # note's file has. Its id is an attachment's, looked up among that
-      # message's, of that thread, of this record -- never a blob's key or a
-      # signed id, and no Active Storage URL of one is ever rendered.
-      get "threads/:thread_id/messages/:message_id/files/:id", to: "note_files#show", as: :record_note_file,
-        constraints: { thread_id: /\d+/, message_id: /\d+/, id: /\d+/ }
+      # The socket of notes, presence and live editing. `internal` keeps it out
+      # of `bin/rails routes`; `test/lib/backend_paths_test.rb` reads it anyway. Rails' own
+      # mount at `/cable` is off (`config.action_cable.mount_path = nil`).
+      mount ActionCable.server => "cable", internal: true, anchor: true
     end
   end
+
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
-
-  # First-run setup wizard. SetupController
-  # itself 404s once setup is complete.
-  get "setup", to: "setup#index", as: :setup
-  get "setup/:step", to: "setup#show", as: :setup_step
-  patch "setup/:step", to: "setup#update"
-
-  # The MCP server, bearer-token authenticated
-  # (McpController#authenticate) -- declared here, before the public-site
-  # catch-all below, or "/mcp" would be swallowed as a page path instead.
-  post "mcp", to: "mcp#create"
-
-  # A visitor's send of a form: the form
-  # posts to its own endpoint, never to the page, so a public page stays a
-  # GET that is the same for everyone. POST only: a GET of this address is
-  # the public catch-all's below, a page path like any other (and a 404
-  # unless a page is called "forms"). Declared before the catch-alls, which
-  # are GETs and could not take it anyway, as `mcp` is. `format: false`, as
-  # the public routes have it: JSON or a plain page is chosen by the
-  # `Accept` header (`FormSendsController#json?`), never by a suffix.
-  post "forms/:form_id", to: "form_sends#create", as: :form_send, constraints: { form_id: /\d+/ }, format: false
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
+  # Outside both host constraints: the proxy asks it on either host name.
   get "up" => "rails/health#show", as: :rails_health_check
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  # Signed-in preview of unpublished pages and posts -- its own
-  # URL space, so the public routes below can stay session-free and cacheable.
-  # Two routes for the same reason the public site has two: an optional
-  # `(/:locale)` would leave "about" in /preview/about to be read as a locale.
-  get "preview/:locale(/*path)", to: "preview#show", constraints: LocaleRouteConstraint,
-    defaults: { path: "" }, format: false, as: :localized_preview
-  get "preview(/*path)", to: "preview#show", defaults: { path: "" }, format: false, as: :preview
+  # The public site, its pages and a visitor's form sends: on every host but
+  # the admin one (`HostRouteConstraint::Site`). Active Storage's routes,
+  # drawn after this file, carry no host constraint: both hosts embed its files.
+  constraints(HostRouteConstraint::Site) do
+    # A visitor's send of a form: the form
+    # posts to its own endpoint, never to the page, so a public page stays a
+    # GET that is the same for everyone. POST only: a GET of this address is
+    # the public catch-all's below, a page path like any other (and a 404
+    # unless a page is called "forms"). Declared before the catch-alls, which
+    # are GETs and could not take it anyway. `format: false`, as
+    # the public routes have it: JSON or a plain page is chosen by the
+    # `Accept` header (`FormSendsController#json?`), never by a suffix.
+    post "forms/:form_id", to: "form_sends#create", as: :form_send, constraints: { form_id: /\d+/ }, format: false
 
-  # Every locale is reachable under its own prefix (e.g. /de/about), including
-  # whichever one is currently the site's default -- but a default-locale
-  # prefix isn't the *canonical* URL for that content; PagesController
-  # redirects it to the unprefixed route below, since SiteSetting's own
-  # default_locale is a runtime setting this route can't see.
-  #
-  # Declared before the unprefixed routes below so an explicit "/de/..."
-  # always matches here first: Rails tries routes in declaration order, and
-  # "de" satisfies this route's locale constraint before the catch-all ever
-  # gets a chance to read it as a page path instead.
-  #
-  # `format: false` suppresses the `(.:format)` group Rails otherwise appends
-  # to every route. The site serves exactly one representation of a page, so
-  # there is no format to negotiate -- and leaving the group in place breaks
-  # this route in both directions, because a dot in the final segment is what
-  # triggers it:
-  #
-  #   - "/de/about.json" on a real page still matches, so the controller finds
-  #     the page and renders `show` in a format that has no template.
-  #     `ActionView::MissingTemplate` is absent from
-  #     `ActionDispatch::ExceptionWrapper.rescue_responses`, so it is mapped to
-  #     no status and reaches the visitor as an uncaught 500 -- on a URL any
-  #     crawler can construct.
-  #   - A page whose slug legitimately contains a dot ("/v1.0") has its own
-  #     trailing characters sliced off into `params[:format]`, so it 404s at
-  #     the exact path `Page#full_path` publishes and config/sitemap.rb hands
-  #     to search engines.
-  #
-  # The glob segment is wrapped in an optional group rather than left bare: a
-  # `defaults: { path: "" }` alone does *not* make `*path` optional -- Journey
-  # still requires at least one character for it, so "/de/" (which Rails
-  # normalizes to "/de") would raise a routing error and that locale's root
-  # would be unreachable. `(/*path)` makes the segment genuinely optional.
-  # `constraints: LocaleRouteConstraint` (not a fixed regex): which locales
-  # this route actually matches is a runtime setting (site_settings.locales),
-  # so it can't be hard-coded here the way `:path`'s absence of a
-  # constraint can. `LocaleRouteConstraint#matches?` calls `Locales.enabled?`
-  # per request; a locale that fails it is not an error -- the router simply
-  # tries the next route, which is exactly what lets "/fr/about" fall through
-  # to the unprefixed catch-all below (and then 404 there, since "fr/about"
-  # is not itself a page) the moment "fr" is disabled, with no deploy needed.
-  get ":locale(/*path)", to: "pages#show", constraints: LocaleRouteConstraint, as: :localized_page,
-    defaults: { path: "" }, format: false
+    # Every locale is reachable under its own prefix (e.g. /de/about), including
+    # whichever one is currently the site's default -- but a default-locale
+    # prefix isn't the *canonical* URL for that content; PagesController
+    # redirects it to the unprefixed route below, since SiteSetting's own
+    # default_locale is a runtime setting this route can't see.
+    #
+    # Declared before the unprefixed routes below so an explicit "/de/..."
+    # always matches here first: Rails tries routes in declaration order, and
+    # "de" satisfies this route's locale constraint before the catch-all ever
+    # gets a chance to read it as a page path instead.
+    #
+    # `format: false` suppresses the `(.:format)` group Rails otherwise appends
+    # to every route. The site serves exactly one representation of a page, so
+    # there is no format to negotiate -- and leaving the group in place breaks
+    # this route in both directions, because a dot in the final segment is what
+    # triggers it:
+    #
+    #   - "/de/about.json" on a real page still matches, so the controller finds
+    #     the page and renders `show` in a format that has no template.
+    #     `ActionView::MissingTemplate` is absent from
+    #     `ActionDispatch::ExceptionWrapper.rescue_responses`, so it is mapped to
+    #     no status and reaches the visitor as an uncaught 500 -- on a URL any
+    #     crawler can construct.
+    #   - A page whose slug legitimately contains a dot ("/v1.0") has its own
+    #     trailing characters sliced off into `params[:format]`, so it 404s at
+    #     the exact path `Page#full_path` publishes and config/sitemap.rb hands
+    #     to search engines.
+    #
+    # The glob segment is wrapped in an optional group rather than left bare: a
+    # `defaults: { path: "" }` alone does *not* make `*path` optional -- Journey
+    # still requires at least one character for it, so "/de/" (which Rails
+    # normalizes to "/de") would raise a routing error and that locale's root
+    # would be unreachable. `(/*path)` makes the segment genuinely optional.
+    # `LocaleRouteConstraint` (not a fixed regex): which locales
+    # this route actually matches is a runtime setting (site_settings.locales),
+    # so it can't be hard-coded here the way `:path`'s absence of a
+    # constraint can. `LocaleRouteConstraint#matches?` calls `Locales.enabled?`
+    # per request; a locale that fails it is not an error -- the router simply
+    # tries the next route, which is exactly what lets "/fr/about" fall through
+    # to the unprefixed catch-all below (and then 404 there, since "fr/about"
+    # is not itself a page) the moment "fr" is disabled, with no deploy needed.
+    # A block, not a `constraints:` option: an object given as the option
+    # replaces the host constraint around it instead of joining it.
+    constraints(LocaleRouteConstraint) do
+      get ":locale(/*path)", to: "pages#show", as: :localized_page, defaults: { path: "" }, format: false
+    end
 
-  # No locale prefix at all: served in the site's current default locale
-  # (SiteSetting#default_locale, read per request by PagesController). Two
-  # routes rather than one optional-locale route, deliberately -- a single
-  # `"(/:locale)(/*path)"` pattern leaves Rails to decide for itself whether
-  # a first segment like "de" is a locale or a page slug, which is exactly
-  # the kind of routing ambiguity `format: false` above was already added to
-  # close off one instance of; two separate, explicitly-ordered routes have
-  # no such ambiguity to resolve.
-  #
-  # `root` on its own (rather than folding "/" into the `*path` glob below)
-  # because an unwrapped `get "*path"` requires at least one character, the
-  # same Journey behavior the locale route above works around with `(/*path)`
-  # -- but here there's no static segment ahead of the glob to wrap it against,
-  # so the homepage gets its own route instead.
-  #
-  # The constraint keeps Active Storage's own URLs out of
-  # this catch-all: Rails draws the Active Storage routes *after* this file,
-  # so without it `/rails/active_storage/blobs/...` -- every image a page,
-  # post or rich-text body embeds -- was routed here and answered 404.
-  root to: "pages#show", format: false
-  get "*path", to: "pages#show", as: :page, format: false,
-    constraints: ->(request) { !request.path.start_with?("#{ActiveStorage.routes_prefix}/") }
+    # No locale prefix at all: served in the site's current default locale
+    # (SiteSetting#default_locale, read per request by PagesController). Two
+    # routes rather than one optional-locale route, deliberately -- a single
+    # `"(/:locale)(/*path)"` pattern leaves Rails to decide for itself whether
+    # a first segment like "de" is a locale or a page slug, which is exactly
+    # the kind of routing ambiguity `format: false` above was already added to
+    # close off one instance of; two separate, explicitly-ordered routes have
+    # no such ambiguity to resolve.
+    #
+    # `root` on its own (rather than folding "/" into the `*path` glob below)
+    # because an unwrapped `get "*path"` requires at least one character, the
+    # same Journey behavior the locale route above works around with `(/*path)`
+    # -- but here there's no static segment ahead of the glob to wrap it against,
+    # so the homepage gets its own route instead.
+    #
+    # The constraint keeps Active Storage's own URLs out of
+    # this catch-all: Rails draws the Active Storage routes *after* this file,
+    # so without it `/rails/active_storage/blobs/...` -- every image a page,
+    # post or rich-text body embeds -- was routed here and answered 404. A
+    # block, as the locale route's, so it joins the host constraint.
+    root to: "pages#show", format: false
+    constraints(->(request) { !request.path.start_with?("#{ActiveStorage.routes_prefix}/") }) do
+      get "*path", to: "pages#show", as: :page, format: false
+    end
+  end
 end

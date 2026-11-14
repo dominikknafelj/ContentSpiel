@@ -1,4 +1,4 @@
-# Rate limits the MCP endpoint (/mcp) per bearer token, not per IP -- it's a
+# Rate limits the MCP endpoint (/<ADMIN_PATH>/mcp) per bearer token, not per IP -- it's a
 # token-authenticated API (design spec section 10), and multiple legitimate
 # agents could share an IP (office network, VPN, hosted runner), so an IP
 # bucket would either punish innocent tokens together or (if wide enough to
@@ -26,7 +26,7 @@ Rack::Attack::MCP_RATE_LIMIT = 60
 Rack::Attack::MCP_RATE_LIMIT_PERIOD = 1.minute
 
 Rack::Attack.throttle("mcp/requests", limit: Rack::Attack::MCP_RATE_LIMIT, period: Rack::Attack::MCP_RATE_LIMIT_PERIOD) do |req|
-  next unless req.path == "/mcp" && req.post?
+  next unless req.path == "/#{ContentSpiel::ADMIN_PATH}/mcp" && req.post?
 
   raw_token = req.get_header("HTTP_AUTHORIZATION").to_s[/\ABearer\s+(.+)\z/i, 1]
   raw_token.present? ? "token:#{Digest::SHA256.hexdigest(raw_token)}" : "ip:#{req.ip}"

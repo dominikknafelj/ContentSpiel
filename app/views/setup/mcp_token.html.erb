@@ -1,6 +1,6 @@
 <% content_for :title, t(".heading") %>
 <h1 class="text-h1 font-semibold"><%= t(".heading") %> <span class="text-label text-meta"><%= t("setup.layout.optional") %></span></h1>
-<p class="mt-2 text-dim"><%= t(".intro_html", path: tag.code("/mcp", class: "font-cs-mono")) %></p>
+<p class="mt-2 text-dim"><%= t(".intro_html", path: tag.code(mcp_path, class: "font-cs-mono")) %></p>
 
 <%# Turbo Drive refuses non-redirect 2xx form responses ("Form responses must
     redirect to another location"); update_mcp_token renders (not redirects)

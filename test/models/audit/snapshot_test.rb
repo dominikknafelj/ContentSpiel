@@ -90,6 +90,24 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     assert_equal [ "two@example.com", "renamed@example.com" ], changes["email_address"]
   end
 
+  test "a passkey's snapshot and changes hold no credential id or public key, and a recovery code's no digest" do
+    passkey = users(:two).passkeys.create!(name: "Phone", external_id: "cred-id-abc", public_key: "pk-xyz")
+    code = users(:two).recovery_codes.create!(digest: RecoveryCode.digest("ABCD-EFGH"), generated_at: Time.current)
+
+    snapshot = Audit::Snapshot.for(passkey)
+    assert_equal "Phone", snapshot["name"]
+    assert_equal users(:two).id, snapshot["user_id"]
+    [ snapshot, Audit::Snapshot.field_changes_for(passkey) ].each do |hash|
+      assert_not_includes hash.to_json, "cred-id-abc"
+      assert_not_includes hash.to_json, "pk-xyz"
+    end
+
+    [ Audit::Snapshot.for(code), Audit::Snapshot.field_changes_for(code) ].each do |hash|
+      assert_not_includes hash.to_json, code.digest
+    end
+    assert_not Audit::Snapshot.for(users(:two).tap(&:webauthn_handle!)).key?("webauthn_id")
+  end
+
   test "any key matching filter_parameters is dropped" do
     scrubbed = Audit::Snapshot.scrub("id" => 1, "title" => "kept", "secret_answer" => "x", "api_token" => "y", "salt" => "z", "otp_code" => "q")
 
@@ -310,5 +328,29 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       assert_equal({ "en" => { "title" => "Before" }, "de" => { "title" => "Vorher" } }, Audit::Snapshot.for(block.reload)["translated_settings"])
       assert_equal({ "kind" => "tip" }, Audit::Snapshot.for(block)["settings"])
     end
+  end
+
+  test "filter_parameters masks code, state and nonce by their whole names, and not a name that contains them" do
+    filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
+    filtered = filter.filter("code" => "a", "state" => "b", "nonce" => "e", "zip_code" => "10115", "estate" => "c", "code_of_conduct" => "d")
+
+    assert_equal [ "[FILTERED]" ] * 3, filtered.values_at("code", "state", "nonce")
+    assert_equal({ "zip_code" => "10115", "estate" => "c", "code_of_conduct" => "d" }, filtered.except("code", "state", "nonce"))
+  end
+
+  test "a request's logged address masks the single sign-on's state, code and nonce" do
+    request = ActionDispatch::Request.new(Rack::MockRequest.env_for("/cs-studio/sign-in/sso/callback?code=c1&state=s1&nonce=n1&page=2", Rails.application.env_config))
+
+    assert_equal "/cs-studio/sign-in/sso/callback?code=[FILTERED]&state=[FILTERED]&nonce=[FILTERED]&page=2", request.filtered_path
+  end
+
+  test "the single sign-on's request-only names reach neither a record's inspect nor a snapshot" do
+    # Once a request's filter is built, Rails folds the list's patterns into one.
+    Rails.application.env_config
+    thread = Notes::Thread.new(state: "open")
+
+    assert_includes thread.inspect, 'state: "open"'
+    assert_equal "open", ActiveSupport::ParameterFilter.new(ActiveRecord::Base.filter_attributes).filter_param("state", "open")
+    assert_equal({ "state" => "open", "code" => "en", "nonce" => "n" }, Audit::Snapshot.scrub("state" => "open", "code" => "en", "nonce" => "n"))
   end
 end

@@ -3,7 +3,7 @@ module Admin
     # The user editor's sessions zone: the shared action zone after the form --
     # for a viewer who is an owner, and only on an existing user -- offering "End
     # all sessions…", which signs the person out on every browser
-    # (`Sessions::EndAll`, which asks the owner rule again on the request).
+    # (`SignIn::Sessions::EndAll`, which asks the owner rule again on the request).
     #
     # - The count is the person's LIVE sessions (`Session.live`), the caller's to
     #   pass: a row past its timeout is not "open" and nothing is left to end.

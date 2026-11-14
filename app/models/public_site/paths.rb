@@ -455,7 +455,7 @@ module PublicSite
     #    same page's chain), and the published listing links to those 404s --
     #    leaking the draft page's slug in its hrefs. An unpublished candidate
     #    still wins when it is the *only* kind there is, so a post listed only
-    #    by a draft page keeps a URL there and `/preview` can show it.
+    #    by a draft page keeps a URL there and `/<ADMIN_PATH>/preview` can show it.
     #
     #    "Live" is a publication time not after `now`, so a *scheduled* page
     #    counts as unpublished until its time comes -- and nothing writes a

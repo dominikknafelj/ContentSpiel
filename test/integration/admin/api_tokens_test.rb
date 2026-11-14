@@ -102,8 +102,21 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
     get "/cs-studio/api_tokens"
 
-    assert_includes response.body, "#{PublicSite::Urls.default_host}/mcp"
+    assert_includes response.body, "#{PublicSite::Urls.default_host}/cs-studio/mcp"
     assert_select "pre", text: /mcpServers/
+  end
+
+  test "with an admin host the client configuration's url names it" do
+    with_site_address("https://docs.example.org") do
+      with_admin_address("https://studio.example.internal") do
+        sign_in_as(users(:one))
+        get "/cs-studio/api_tokens", headers: { "Host" => "studio.example.internal" }
+
+        assert_response :success
+        assert_includes response.body, "https://studio.example.internal/cs-studio/mcp"
+        assert_not_includes response.body, "docs.example.org/cs-studio/mcp"
+      end
+    end
   end
 
   test "creating a token reveals it once, no-store, in the response itself" do
@@ -127,7 +140,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_select "pre", text: /#{raw}/ # the client config snippet carries it
     assert_select "pre#api-token-config", text: /Bearer #{raw}/
     assert_select "table", text: /claude-desktop/
-    assert_includes response.body, "#{PublicSite::Urls.default_host}/mcp"
+    assert_includes response.body, "#{PublicSite::Urls.default_host}/cs-studio/mcp"
 
     assert_nil flash[:notice]
     assert_not_includes session.to_hash.to_s, raw
@@ -187,7 +200,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
   def mcp_list(raw)
     admin_host = host
     host! "127.0.0.1"
-    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }.to_json,
+    post "/cs-studio/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }.to_json,
       headers: { "Content-Type" => "application/json", "Accept" => "application/json, text/event-stream",
         "Authorization" => "Bearer #{raw}" }
   ensure

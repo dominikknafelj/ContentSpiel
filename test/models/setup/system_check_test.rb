@@ -6,13 +6,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "reports every check, in order" do
     labels = run_check.map(&:label)
 
-    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail", "Forms" ], labels
+    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail", "Forms" ], labels
   end
 
   test "in production with the request's facts, HTTPS comes second" do
     labels = run_check(production: true, request_ssl: true).map(&:label)
 
-    assert_equal [ "Site address", "HTTPS", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail", "Forms" ], labels
+    assert_equal [ "Site address", "Single sign-on", "HTTPS", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail", "Forms" ], labels
   end
 
   test "a configured site address is named by its origin" do
@@ -91,6 +91,23 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     end
   end
 
+  test "with an admin address the CS Studio address row says where CS Studio answers" do
+    with_site_address("https://docs.example.org") do
+      with_admin_address("https://studio.example.org") do
+        check = result("CS Studio address", Setup::SystemCheck.run)
+
+        assert_equal :ok, check.status
+        assert_equal "CS Studio answers at https://studio.example.org alone. The public address answers no CS Studio page.", check.message
+      end
+    end
+  end
+
+  test "without an admin address there is no CS Studio address row" do
+    with_admin_address(nil) do
+      assert_nil Setup::SystemCheck.run.find { |row| row.label == "CS Studio address" }
+    end
+  end
+
   test "HTTPS in production: an encrypted request is ok" do
     check = result("HTTPS", run_check(production: true, request_ssl: true))
 
@@ -119,7 +136,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "with the request's address the Visitor address row stands after HTTPS, and without it there is none" do
     labels = run_check(production: true, request_ssl: true, remote_ip: "203.0.113.5").map(&:label)
 
-    assert_equal [ "Site address", "HTTPS", "Visitor address", "Theme" ], labels.first(4)
+    assert_equal [ "Site address", "Single sign-on", "HTTPS", "Visitor address", "Theme" ], labels.first(5)
     assert_nil result("Visitor address", run_check)
   end
 
@@ -461,7 +478,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     results = nil
     logged = capture_log { results = run_check(image_progress: failing) }
 
-    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Background jobs", "Mail", "Forms" ], results.map(&:label)
+    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Background jobs", "Mail", "Forms" ], results.map(&:label)
     assert_includes logged, "ActiveRecord::StatementInvalid"
     assert_not_includes logged, "PG::QueryCanceled"
   end
@@ -576,6 +593,56 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
         assert_equal [ :ok, "No forms yet." ], [ check.status, check.message ]
       end
     end
+  end
+
+  test "with a provider that answers the row is ok and names the provider and the full issuer URL" do
+    with_fake_idp do |idp|
+      check = result("Single sign-on", run_check)
+
+      assert check.ok?
+      assert_equal "#{OidcHelper::NAME} (#{idp.issuer}) answers.", check.message
+      assert_no_match(/#{OidcHelper::CLIENT_SECRET}/, check.message)
+      assert_equal 1, idp.requests.count { |request| request.path.end_with?("openid-configuration") }
+      result("Single sign-on", run_check)
+      assert_equal 1, idp.requests.count { |request| request.path.end_with?("openid-configuration") }, "the second run reads the cache"
+    end
+  end
+
+  test "required adds its sentence" do
+    with_fake_idp(required: true) do |idp|
+      assert_equal "#{OidcHelper::NAME} (#{idp.issuer}) answers. Required for everyone but owners.", result("Single sign-on", run_check).message
+    end
+  end
+
+  test "a provider that doesn't answer is a warning with the reason as a phrase, not the code" do
+    with_fake_idp do |idp|
+      idp.down!
+      check = result("Single sign-on", run_check)
+
+      assert_equal :warning, check.status
+      assert_equal "#{OidcHelper::NAME} (#{idp.issuer}) didn't answer: it could not be reached. Nobody can sign in with it until it does.", check.message
+      assert_no_match(/unreachable|#{OidcHelper::CLIENT_SECRET}/, check.message)
+    end
+  end
+
+  test "every reason of an unreachable provider has a phrase, and a status is named" do
+    provider = Struct.new(:name, :issuer, :error) { def configuration = raise(error) }
+    reasons = %w[unreachable not_json issuer_mismatch missing_endpoint http_503]
+    reasons.each do |reason|
+      error = SignIn::Sso::Unavailable.new("x", reason: reason)
+      message = result("Single sign-on", run_check(sso_provider: provider.new("Okta", "https://id.example.com/tenant/v2.0", error))).message
+      assert_no_match(/translation missing|#{reason}/, message)
+    end
+    assert_includes result("Single sign-on", run_check(sso_provider: provider.new("Okta", "https://id.example.com/tenant/v2.0", SignIn::Sso::Unavailable.status(503)))).message, "HTTP status 503"
+  end
+
+  test "without a provider the row is off, which is neither ok nor a failure" do
+    check = result("Single sign-on", run_check(sso_provider: nil))
+
+    assert_equal :off, check.status
+    assert check.off?
+    assert_not check.ok?
+    assert_equal "Not set up. The hosting reference lists its variables.", check.message
   end
 
   private

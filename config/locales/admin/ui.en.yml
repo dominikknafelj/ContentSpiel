@@ -20,6 +20,37 @@ en:
         confirm_dialog:
           cancel: "Cancel"
 
+        # Confirm it's you, before a change to how a person signs in (Your
+        # account, enrolment). `wrong_password`, `passkey_failed` and `limited`
+        # are the confirmation's answers, which the dialog shows as they come.
+        confirm_identity_dialog:
+          title: "Confirm it's you"
+          lead_passkey: "To change how you sign in, confirm with your passkey or your password."
+          lead_password: "To change how you sign in, confirm with your password."
+          use_passkey: "Use your passkey"
+          password: "Password"
+          confirm_password: "Confirm with password"
+          confirm: "Confirm"
+          cancel: "Cancel"
+          passkey_failed: "That passkey didn't work. Try again, or use your password."
+          wrong_password: "That password isn't right."
+          limited: "Try again in a few minutes."
+
+        # The "or" between two ways in: the sign-in panel, Confirm it's you
+        # and the invitation page.
+        or_divider:
+          or: "or"
+
+        # The recovery codes block, shown once (enrolment, the wizard, new codes).
+        recovery_codes:
+          title: "Save your recovery codes"
+          body: "Each code signs you in once when your passkeys aren't at hand. This is the only time they're shown: keep them somewhere safe, apart from your devices."
+          list_label: "Recovery codes"
+          copy: "Copy codes"
+          download: "Download"
+          saved: "I have saved these codes"
+          done: "Done"
+
         # The "+N" circle's letters: `many` past nine, where three characters
         # would not stand in the circle.
         avatar:
@@ -46,6 +77,7 @@ en:
         system_check_row:
           ok: "OK"
           warning: "Warning"
+          "off": "Off"
           copy_label: "Copy command for %{label}"
           open_mail_settings: "Open Mail settings →"
           open_image_settings: "Open Image settings →"

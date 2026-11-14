@@ -1,0 +1,4 @@
+<p><%= t("mail.sso_reminder.intro", site: site_name) %></p>
+<p><%= t("mail.sso_reminder.body", provider: provider_name) %></p>
+<%= render "mails/button", url: sign_in_url, label: t("mail.sso_reminder.button") %>
+<p><%= t("mail.sso_reminder.ignore") %></p>

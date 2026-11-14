@@ -15,7 +15,6 @@ require "action_view/railtie"
 require "action_mailer/railtie"
 require "active_job/railtie"
 require "action_cable/engine"
-require "action_mailbox/engine"
 require "rails/test_unit/railtie"
 
 # Before the gems (block types spec, decision 11): an engine may name
@@ -50,6 +49,14 @@ module ContentSpiel
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
+
+    # Action Cable is mounted by `config/routes.rb` under the admin path, so
+    # Rails' own prepended mount at `/cable` is switched off: `/cable` is a
+    # public page's address like any other.
+    config.action_cable.mount_path = nil
+
+    # Turbo's historical-location routes answer a native client's redirect; this app has none, so they are unreachable.
+    config.turbo.draw_routes = false
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.

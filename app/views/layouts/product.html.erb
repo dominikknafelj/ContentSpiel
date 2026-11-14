@@ -5,14 +5,20 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <%# turbo-rails' consumer reads the socket's address here and otherwise asks /cable. %>
+    <%= action_cable_meta_tag %>
     <%= render "shared/theme_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
-    <%= javascript_importmap_tags %>
+    <%# The `application` entry point, or CS Studio's (`admin`) for a page
+        that asks with `content_for :entry_point` (enrolment, which draws
+        the Passkeys card's script and Confirm it's you). %>
+    <%= javascript_importmap_tags(content_for(:entry_point) == "admin" ? "admin" : "application") %>
     <%# A page's own head lines (sign-in's `turbo-visit-control`). %>
     <%= yield :head %>
   </head>
 
-  <%# Product UI layout for sign-in, the password reset and an invitation:
+  <%# Product UI layout for sign-in, the password reset, an invitation and
+      passkey enrolment:
       product stylesheet, no public header/footer. The header is the
       wordmark (a link home to sign-in) and the theme switch, with no rule
       under it. Below it, in a centred 420px column, the page stands on one

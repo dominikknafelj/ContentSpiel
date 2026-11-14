@@ -40,6 +40,49 @@ class HostSettingsTest < ActiveSupport::TestCase
     assert_equal({ host: "localhost", protocol: "http", port: 3030 }, config.action_mailer.default_url_options)
   end
 
+  test "an admin address is answered beside the public one" do
+    config = apply("https://docs.example.org", {}, "https://studio.example.internal")
+
+    assert_equal [ "docs.example.org", "studio.example.internal" ], config.hosts
+    assert_equal({ host: "docs.example.org", protocol: "https" }, config.action_mailer.default_url_options)
+  end
+
+  test "an admin address without a public one is refused before anything is set" do
+    config = fake_config
+    error = assert_raises(SiteAddress::Invalid) do
+      HostSettings.apply(config, address: SiteAddress.parse(nil), admin: SiteAddress.parse("https://studio.example.internal"), env: {})
+    end
+
+    assert_equal "ADMIN_HOST needs PUBLIC_HOST: set the site's public address too.", error.message
+    assert_no_match(/studio/, error.message)
+    assert_equal [], config.hosts
+    assert_nil config.force_ssl
+  end
+
+  test "an admin address on the public host name is refused, in any case, and the message holds no value" do
+    [ "https://docs.example.org", "https://DOCS.example.org:8443" ].each do |admin|
+      error = assert_raises(SiteAddress::Invalid, admin) { apply("https://docs.example.org", {}, admin) }
+
+      assert_equal "ADMIN_HOST must be another host name than PUBLIC_HOST's.", error.message
+      assert_no_match(/docs\.example|8443/i, error.message)
+    end
+  end
+
+  test "an admin address of the other scheme is refused" do
+    error = assert_raises(SiteAddress::Invalid) { apply("https://docs.example.org", {}, "http://studio.example.internal") }
+
+    assert_equal "ADMIN_HOST and PUBLIC_HOST must both be https, or both http.", error.message
+    assert_no_match(/studio|docs/, error.message)
+  end
+
+  test "the boot names the admin origin" do
+    lines = HostSettings.announcement(SiteAddress.parse("https://docs.example.org"), {}, admin: SiteAddress.parse("https://studio.example.internal"))
+
+    assert_includes lines, "[ContentSpiel] CS Studio is served on https://studio.example.internal alone; " \
+                           "https://docs.example.org answers no CS Studio address."
+    assert_empty HostSettings.announcement(SiteAddress.parse("https://docs.example.org"), {}, admin: SiteAddress.parse(nil)).grep(/CS Studio/)
+  end
+
   test "no address: the hosts are left as they were, nothing is forced and mailed links have no host" do
     config = apply(nil)
 
@@ -263,7 +306,9 @@ class HostSettingsTest < ActiveSupport::TestCase
       config
     end
 
-    def apply(address, env = {})
-      fake_config.tap { |config| HostSettings.apply(config, address: SiteAddress.parse(address), env: env) }
+    def apply(address, env = {}, admin = nil)
+      fake_config.tap do |config|
+        HostSettings.apply(config, address: SiteAddress.parse(address), admin: SiteAddress.parse(admin), env: env)
+      end
     end
 end

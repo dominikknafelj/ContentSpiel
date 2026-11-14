@@ -18,6 +18,10 @@ module Setup
       def initialize(label:, status:, message:, command: nil, docs: nil, link: nil) = super
 
       def ok? = status == :ok
+
+      # A check that has nothing to check (single sign-on not set up): neither
+      # passing nor failing, so no count of passed checks includes or misses it.
+      def off? = status == :off
     end
 
     # What the Mail row offers to copy while mail is NOT ready (Not set up,
@@ -89,6 +93,9 @@ module Setup
     # nobody said, as from the console, and then there is nothing to say
     # about HTTPS. `production` is handed in so a test can say it.
     #
+    # `admin_address` is the optional CS Studio address (`SiteAddress.admin`):
+    # without one there is no "CS Studio address" row.
+    #
     # `reset_link_from_request` is whether a password reset mail takes its
     # link from the request when no address is set: the mailer's own rule
     # (`PasswordsMailer.request_origin_used?`, development and test), which
@@ -108,6 +115,11 @@ module Setup
     # may manage Settings, as `mail_settings_link` is: only then does the
     # Images row carry the link to the Images card.
     #
+    # `sso_provider` is the site's OpenID Connect provider
+    # (`SignIn::Sso::Provider.current`, nil when single sign-on is not set
+    # up) and `sso_required` whether SSO_REQUIRED is set, both handed in so a
+    # test can say them.
+    #
     # `theme` is the theme that draws the site (`Theme.current`), handed in so
     # a test can say it. `stylesheet_probe` answers whether the public
     # stylesheet was built for that theme: by default, whether the build's
@@ -120,9 +132,10 @@ module Setup
     # row.
     def initialize(storage_probe: STORAGE_PROBE, image_probe: IMAGE_PROBE, worker_alive_probe: WORKER_ALIVE_PROBE,
       queue_adapter: ActiveJob::Base.queue_adapter_name,
-      address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
+      address: SiteAddress.current, admin_address: SiteAddress.admin, request_ssl: nil, production: Rails.env.production?,
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil, remote_ip: nil, cf_connecting_ip: nil,
-      mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false)
+      mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false,
+      sso_provider: SignIn::Sso::Provider.current, sso_required: SignIn::Sso.required?)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -132,7 +145,10 @@ module Setup
       @image_progress = image_progress
       @image_settings_link = image_settings_link
       @forms_link = forms_link
+      @sso_provider = sso_provider
+      @sso_required = sso_required
       @address = address
+      @admin_address = admin_address
       @request_ssl = request_ssl
       @production = production
       @reset_link_from_request = reset_link_from_request
@@ -154,7 +170,7 @@ module Setup
     end
 
     def run
-      [ site_address, https, visitor_address, theme, storage, image_processing, images, background_jobs, mail, forms ].compact
+      [ site_address, admin_address, single_sign_on, https, visitor_address, theme, storage, image_processing, images, background_jobs, mail, forms ].compact
     end
 
     private
@@ -185,6 +201,50 @@ module Setup
         else
           warning("Site address", "No site address is set. Any host name is accepted, addresses in pages follow the request, " \
             "and password reset mails are not sent until it is set.", command: SITE_ADDRESS_COMMAND)
+        end
+      end
+
+      # The row exists only when ADMIN_HOST is set: CS Studio then answers at
+      # that origin alone, and the public address answers none of its pages.
+      def admin_address
+        return nil unless @admin_address.configured?
+
+        ok(I18n.t("admin.system_status.admin_address.label"),
+          I18n.t("admin.system_status.admin_address.message", origin: @admin_address.origin))
+      end
+
+      # Single sign-on: off with no provider (neutral: a site that does not
+      # use it has nothing to fix), else whether the provider's discovery
+      # document answers. The answer is the provider's cached discovery
+      # (`SignIn::Sso::Provider#configuration`, cached for its CACHE_FOR), so
+      # System status calls the provider only when the cache is empty, and
+      # then through `SignIn::OutsideCall`'s timeouts. The row names the
+      # provider and the issuer URL as configured (a host may hold several
+      # tenants told apart by path; the URL is no secret), never the client secret or any token;
+      # a failure is said by a sentence for its reason word, never the
+      # message of the answer.
+      def single_sign_on
+        label = I18n.t("admin.system_status.sso.label")
+        return Result.new(label:, status: :off, message: I18n.t("admin.system_status.sso.off")) if @sso_provider.nil?
+
+        facts = { provider: @sso_provider.name, issuer: @sso_provider.issuer }
+        begin
+          @sso_provider.configuration
+        rescue SignIn::Sso::Unavailable => error
+          return Result.new(label:, status: :warning,
+            message: I18n.t("admin.system_status.sso.unreachable", **facts, reason: sso_reason(error.reason)))
+        end
+        message = I18n.t("admin.system_status.sso.ok", **facts)
+        message = "#{message} #{I18n.t("admin.system_status.sso.required")}" if @sso_required
+        Result.new(label:, status: :ok, message:)
+      end
+
+      # A person-readable phrase for an `Unavailable`'s reason word.
+      def sso_reason(reason)
+        if reason.to_s.start_with?("http_")
+          I18n.t("admin.system_status.sso.reasons.http", status: reason.to_s.delete_prefix("http_"))
+        else
+          I18n.t("admin.system_status.sso.reasons.#{reason}", default: I18n.t("admin.system_status.sso.reasons.unreachable"))
         end
       end
 

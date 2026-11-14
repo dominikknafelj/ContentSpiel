@@ -221,10 +221,10 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     post "/cs-studio/pages/#{@outside.id}/content_blocks", params: { block: { block_type: "rich_text" } }, as: :turbo_stream
     assert_response :not_found
 
-    get "/preview/outside"
+    get "/cs-studio/preview/outside"
     assert_response :not_found
 
-    get "/preview/branch/inside"
+    get "/cs-studio/preview/branch/inside"
     assert_response :success
   end
 
@@ -454,11 +454,11 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: {})
     sign_in_as(users(:editor_branch))
 
-    get "/preview/blog/other-post"
+    get "/cs-studio/preview/blog/other-post"
     assert_response :not_found
 
     sign_in_as(users(:two))
-    get "/preview/blog/other-post"
+    get "/cs-studio/preview/blog/other-post"
     assert_response :success
   end
 
@@ -467,12 +467,12 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     grant_branch("pages.read")
     sign_in_as(users(:editor_branch))
 
-    get "/preview/outside"
+    get "/cs-studio/preview/outside"
     assert_response :not_found
 
     sign_in_as(users(:two))
-    get "/preview/outside"
-    assert_redirected_to "/preview/elsewhere"
+    get "/cs-studio/preview/outside"
+    assert_redirected_to "/cs-studio/preview/elsewhere"
   end
 
   test "an autosave refused by an area check answers the 403 save-status stream" do

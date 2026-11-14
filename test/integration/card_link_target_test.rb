@@ -230,7 +230,7 @@ class CardLinkTargetTest < ActionDispatch::IntegrationTest
     get holder_path
     assert_words_without_link
 
-    get "/preview#{holder_path}"
+    get "/cs-studio/preview#{holder_path}"
     assert_response :success
     address = PublicSite::Urls.new(preview: true).path_for(draft, "en")
     assert address, "a draft page has an address in the preview"
@@ -255,7 +255,7 @@ class CardLinkTargetTest < ActionDispatch::IntegrationTest
     %w[pages.read pages.edit].each { |key| AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: { "page_ids" => [ branch.id ] }) }
     sign_in_as(users(:editor_branch))
 
-    get "/preview#{PublicSite::Urls.new.path_for(holder, "en")}"
+    get "/cs-studio/preview#{PublicSite::Urls.new.path_for(holder, "en")}"
 
     assert_response :success
     assert_select ".content-block--card h3 a", count: 1

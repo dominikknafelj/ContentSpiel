@@ -83,14 +83,17 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/account"
 
     # The page is "Your account"; its cards are
-    # Profile, Notes, Password and Sessions, in that order; and the promise
-    # about sessions stands directly under the Password card's title.
+    # Profile, Notes, Password, Passkeys, Recovery codes and Sessions, in that
+    # order; and the promise about sessions stands directly under the
+    # Password card's title.
     assert_select "title", text: "Your account"
     assert_select "h1", text: "Your account", count: 1
-    assert_equal %w[Profile Notes Password Sessions], css_select("turbo-frame#content section h2").map { |heading| heading.text.strip }
-    # Sessions stands in neither form: nothing in it is a change either save bar counts.
-    assert_select "form section#account-sessions", count: 0
-    assert_select "form#password-form + section#account-sessions"
+    assert_equal [ "Profile", "Notes", "Password", "Passkeys", "Recovery codes", "Sessions" ],
+      css_select("turbo-frame#content section .admin-settings-card__head h2").map { |heading| heading.text.strip }
+    # Passkeys, Recovery codes and Sessions stand in neither form: nothing in
+    # them is a change either save bar counts.
+    assert_select "form section#account-passkeys, form section#account-recovery, form section#account-sessions", count: 0
+    assert_select "form#password-form + div > section#account-passkeys + section#account-recovery"
     assert_select "form#profile-form section", count: 2
     assert_select "form#password-form section[aria-labelledby=account-password]" do
       assert_select ".admin-settings-card__head:has(h2#account-password) > p", text: "You'll stay signed in here. Other sessions are signed out."
@@ -409,14 +412,14 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "form#profile-form[action='/cs-studio/account/profile']"
   end
 
-  test "the four cards are card frames, the password card anchored at #password and the sessions card at #sessions" do
+  test "the six cards are card frames, the password card anchored at #password and the sessions card at #sessions" do
     sign_in_as(users(:reader))
 
     get "/cs-studio/account"
 
     assert_select "turbo-frame#content .max-w-\\[560px\\] > h1", text: "Your account"
     cards = css_select("turbo-frame#content section.admin-settings-card")
-    assert_equal %w[account-profile account-notes account-password sessions], cards.map { |card| card["aria-labelledby"] }
+    assert_equal %w[account-profile account-notes account-password passkeys recovery-codes sessions], cards.map { |card| card["aria-labelledby"] }
     # Profile and Notes are the person's, in the people pair; Password is neutral, its own key.
     assert_select "section.admin-settings-card[aria-labelledby=account-profile] .admin-settings-card__head" do
       assert_select "span.bg-ic-people-bg[aria-hidden=true] svg path[d^='M19 21v-2']"
@@ -500,5 +503,58 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "section#password[data-controller='admin--account--password-answer']"
     get "/cs-studio/account"
     assert_select "section#password[data-controller]", count: 0
+  end
+
+  test "a linked person's account shows the Sign-in card and Sessions, and no password, passkeys or codes" do
+    with_sso do
+      user = link_to_sso(users(:reader))
+      sign_in_as(user)
+
+      get "/cs-studio/account"
+
+      assert_response :success
+      assert_select "section#password h2", text: "Sign-in"
+      assert_select "section#password", text: /You sign in with .+\./
+      assert_select "section#account-sessions"
+      assert_select "#password-form, input[type=password], #account-passkeys, #account-recovery, #account-recovery-codes", count: 0
+      assert_select "form[action$='/account/passkeys'], form[action$='/account/recovery-codes'], dialog#regenerate-recovery-codes", count: 0
+      assert_select "section#account-profile, #profile-form"
+    end
+  end
+
+  test "a linked person's Sign-in card says the host when single sign-on is off, never a blank" do
+    user = link_to_sso(users(:reader))
+    sign_in_as(user)
+
+    get "/cs-studio/account"
+
+    assert_select "section#password", text: /You sign in with id\.example\.com\./
+  end
+
+  test "a crafted password change for a linked person is refused and changes nothing" do
+    with_sso do
+      user = link_to_sso(users(:reader))
+      sign_in_as(user)
+      digest = user.reload.password_digest
+
+      patch "/cs-studio/account/password", params: { current_password: "password", password: "new-password-1", password_confirmation: "new-password-1" }
+
+      assert_response :unprocessable_entity
+      assert_select ".admin-error-summary[role=alert] li", text: I18n.t("admin.users.sso_linked_password", provider: OidcHelper::NAME)
+      assert_equal digest, user.reload.password_digest
+    end
+  end
+
+  test "an owner's account is unchanged: Password, Passkeys and Recovery codes stay" do
+    with_sso do
+      sign_in_as(users(:one))
+
+      get "/cs-studio/account"
+
+      assert_select "#password-form"
+      assert_select "section#account-passkeys"
+      assert_select "section#account-recovery"
+      assert_select "section#password h2", text: "Password"
+    end
   end
 end

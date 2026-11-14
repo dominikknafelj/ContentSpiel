@@ -99,7 +99,7 @@ module Admin
     # `path` is the plain public path (`urls.path_for`, `urls` built with no
     # `preview:`) -- admin-preview-agnostic, per the plan's own ruling: this
     # is a picker result, not a rendered link, so it has no reason to carry
-    # `/preview`'s own prefix the way `RichText::BuiltIns#render_internal_
+    # `/<ADMIN_PATH>/preview`'s own prefix the way `RichText::BuiltIns#render_internal_
     # link` does when actually rendering inside a preview request. `nil`
     # when the record has no path at all in this locale (an unpublished
     # page with no canonical listing yet, e.g.) -- the editor still gets a

@@ -1,6 +1,6 @@
 # The registration hooks for code outside the CMS (block types spec,
 # decision 11), one per registry: `block_types`, `form_field_types`,
-# `form_destinations` and `studio_modules`. An engine calls, for example,
+# `form_destinations`, `studio_modules` and `sign_in_methods`. An engine calls, for example,
 #
 #   ContentSpiel::Plugins.block_types do |types|
 #     types.register "gallery/album" do |t| … end
@@ -9,7 +9,8 @@
 # from an `initializer` of its own (Rails' convention). A hook KEEPS the
 # block, for the life of the process, and the application's initializer
 # (config/initializers/types.rb for the three type hooks,
-# config/initializers/studio_modules.rb for the modules') calls every kept
+# config/initializers/studio_modules.rb for the modules',
+# config/initializers/sign_in_methods.rb for the sign-in methods') calls every kept
 # block after the built-ins on every `to_prepare`, so a reload registers the
 # outside entries again against freshly loaded classes, as it does the
 # built-ins. An engine's own `to_prepare` would not do: it runs before the
@@ -17,7 +18,7 @@
 # registers `owner/name`, under the same owner rules (`Registrar`), and an
 # owner named like one of the CMS's own top-level constants is refused.
 #
-# These four are the only registries a gem can reach. Every other one is
+# These five are the only registries a gem can reach. Every other one is
 # emptied and refilled with the built-ins on every `to_prepare` and replays
 # nothing from outside, so a gem's own `register` there is wiped at boot and
 # on every reload, without an error: the content types and field groups, the
@@ -105,6 +106,7 @@ module ContentSpiel
     # its own initializer, not with the types, and is not among them.
     REPLAYED_ALL = [ REPLAYED, REPLAYED_FORM_FIELD_TYPES, REPLAYED_FORM_DESTINATIONS ].freeze
     REPLAYED_STUDIO_MODULES = "ContentSpiel::Plugins.studio_modules, called at".freeze
+    REPLAYED_SIGN_IN_METHODS = "ContentSpiel::Plugins.sign_in_methods, called at".freeze
 
     # What a studio modules hook's block is handed: `register` and `badge`
     # with `StudioModules`' own signatures, and nothing else of the registry
@@ -136,7 +138,7 @@ module ContentSpiel
 
     # One hook list per registry: a hook is replayed into its own registry
     # only, in the order it was called.
-    @hooks = { block_types: [], form_field_types: [], form_destinations: [], studio_modules: [] }
+    @hooks = { block_types: [], form_field_types: [], form_destinations: [], studio_modules: [], sign_in_methods: [] }
 
     class << self
       def block_types(&block)
@@ -204,6 +206,25 @@ module ContentSpiel
         keep(:studio_modules, block, caller_locations(1, 1).first)
       end
 
+      # A gem's way to sign in to CS Studio:
+      #
+      #   ContentSpiel::Plugins.sign_in_methods do |methods|
+      #     methods.register "acme/saml", label: "acme.sign_in.saml", path: :acme_saml_start_path,
+      #       recheck: Acme::Saml::Recheck, passkey_policy: :exempt
+      #   end
+      #
+      # The arguments are `SignIn::Methods.register`'s (its comment says what
+      # each means), with the owner rules of `Registrar`. The hook registers
+      # a method and nothing more: the gem's controller signs a person in
+      # with `Admin::SignInCompletion#complete_sign_in`. Kept and replayed by
+      # config/initializers/sign_in_methods.rb on every `to_prepare`, for the
+      # reasons the studio modules' hook gives.
+      def sign_in_methods(&block)
+        raise ArgumentError, "ContentSpiel::Plugins.sign_in_methods takes a block" unless block
+
+        keep(:sign_in_methods, block, caller_locations(1, 1).first)
+      end
+
       # Every kept block, in the order the hooks were called (the Gemfile's
       # order), each with a registrar of its own. Whatever a block raises is
       # raised again, as the same class, with the place of the hook's call in
@@ -236,6 +257,15 @@ module ContentSpiel
       # were called.
       def register_studio_modules(registry)
         replay(:studio_modules, REPLAYED_STUDIO_MODULES) { |location, owners| ModuleRegistrar.new(registry, location, owners) }
+      end
+
+      # Every kept sign-in method hook, replayed the same way into
+      # `SignIn::Methods`.
+      def register_sign_in_methods(registry)
+        replay(:sign_in_methods, REPLAYED_SIGN_IN_METHODS) do |location, owners|
+          Registrar.new(registry, location, owners, kind: "sign-in method", takes: %i[attributes],
+            build: ->(name, attributes, _definition) { registry.register(name, **attributes) })
+        end
       end
 
       # Tests only: a hook a test kept is taken out again.

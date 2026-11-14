@@ -1,4 +1,28 @@
 {
-  "ignored_warnings": [],
+  "ignored_warnings": [
+    {
+      "warning_type": "Redirect",
+      "warning_code": 18,
+      "fingerprint": "4a223a9b49201c5977355db624123c31efd04d72bfeadb97b6a4644ecf5162e7",
+      "check_name": "Redirect",
+      "message": "Possible unprotected redirect",
+      "file": "app/controllers/concerns/sso_starts.rb",
+      "line": 71,
+      "link": "https://brakemanscanner.org/docs/warning_types/redirect/",
+      "code": "redirect_to(SignIn::Sso::Authorization.start(:provider => sso_provider, :redirect_uri => sso_redirect_uri).url, :allow_other_host => true, :status => :see_other)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "SsoStarts",
+        "method": "start_sso"
+      },
+      "user_input": "SignIn::Sso::Authorization.start(:provider => sso_provider, :redirect_uri => sso_redirect_uri).url",
+      "confidence": "Weak",
+      "cwe_id": [
+        601
+      ],
+      "note": "The single sign-on start sends the browser to the provider's authorization endpoint, which comes from the provider's discovery document under SSO_ISSUER (`SignIn::Sso::Provider#configuration`, https only outside loopback); no part of the address is taken from the request. `allow_other_host` is needed because the provider is another host."
+    }
+  ],
   "brakeman_version": "8.1.0"
 }

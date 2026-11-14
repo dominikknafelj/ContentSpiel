@@ -15,6 +15,7 @@ module Admin
   # (`Users::OwnerProtection#end_sessions_after_password_change`).
   class AccountsController < BaseController
     include AutosaveResponses
+    include PasskeyChallenges
 
     # The current-password check is a password oracle; throttled like
     # sign-in and the reset flow.
@@ -26,6 +27,7 @@ module Admin
 
     def edit
       load_sessions
+      load_passkeys
     end
 
     # The page's first address, `account/password` (the handoff's decision
@@ -59,6 +61,7 @@ module Admin
         @field_errors = result.record.errors.to_hash(true)
         @password_answer = "refused"
         load_sessions
+        load_passkeys
         render :edit, status: :unprocessable_entity
       end
     end
@@ -114,6 +117,7 @@ module Admin
         @profile_values = Current.user.slice(:name, :notes_sound, :notes_desktop).symbolize_keys
         Current.user.restore_attributes
         load_sessions
+        load_passkeys
         render :edit, status: :unprocessable_entity
       end
     end
@@ -125,6 +129,24 @@ module Admin
     def load_sessions
       @sessions = Current.user.open_sessions.to_a
     end
+
+    # The Passkeys and Recovery codes cards, and whether Confirm it's you
+    # offers a passkey, for every answer that draws the screen. After a
+    # sign-in with a recovery code (`SecondFactorsController#code`) the
+    # Passkeys card says how many codes are left. "Add a passkey…" is drawn
+    # only where a passkey can be made: not at an IP address
+    # (`PasskeyChallenges#passkey_relying_party`).
+    def load_passkeys
+      return if Current.user.sso_linked?
+
+      @passkeys_card = AccountScreen::PasskeysCardComponent.for(Current.user, addable: passkey_relying_party.present?, recovery_left: flash[:recovery_code_left]&.to_i, url_options: admin_url_options)
+      @recovery_card = AccountScreen::RecoveryCardComponent.for(Current.user, url_options: admin_url_options)
+      @confirm_with_passkey = Current.user.passkeys.exists?
+    end
+
+    # The provider's name for the Sign-in card of a linked person.
+    def sso_provider_name = SignIn::Rules.provider_name(Current.user)
+    helper_method :sso_provider_name
 
     # A switch as the form sends it: "1" on, anything else off, absent nil.
     def switch(name) = params.key?(name) ? params[name] == "1" : nil

@@ -18,10 +18,23 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     Setup::SystemCheck.run.each do |result|
-      assert_select "li", text: /#{result.ok? ? "OK" : "Warning"}.*#{Regexp.escape(result.label)}/m
+      word = { ok: "OK", off: "Off" }.fetch(result.status, "Warning")
+      assert_select "li", text: /#{word}.*#{Regexp.escape(result.label)}/m
     end
     assert_select "a[href='/cs-studio/system_status']", text: "Run checks again"
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/system_status']", text: "System status"
+  end
+
+  test "single sign-on not set up is an Off row drawn last, and counts as neither passed nor failed" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+
+    rows = css_select("li.admin-system-check")
+    assert_equal "off", rows.last["data-status"]
+    assert_select "li[data-status=off]", text: /Off.*Single sign-on.*Not set up/m
+    results = Setup::SystemCheck.run(remote_ip: "127.0.0.1").reject(&:off?)
+    assert_select "p", text: /\A#{results.count(&:ok?)} of #{results.size} checks? passed/
   end
 
   # The page is shown to anyone with `system_status.view`: it names the
@@ -62,6 +75,8 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     # The request's own address makes the Visitor address row one of them.
     results = Setup::SystemCheck.run(remote_ip: "127.0.0.1")
     assert_select "h1.text-h1", text: "System status"
+    # Off rows are in neither count.
+    results = results.reject(&:off?)
     assert_select "h1 + p.text-small.text-meta", text: "#{results.count(&:ok?)} of #{results.size} checks passed · last run 17:30"
     assert_select "a[href='/cs-studio/system_status'][class=?]", Admin::Ui::ButtonComponent.classes(:secondary), text: "Run checks again"
   end
@@ -239,7 +254,7 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     get "/cs-studio/system_status"
 
     assert_select "li.admin-system-check" do |rows|
-      rows.each { |row| assert_match(/\A\s*(OK|Warning)\b/, row.css("span").first.text.strip) }
+      rows.each { |row| assert_match(/\A\s*(OK|Warning|Off)\b/, row.css("span").first.text.strip) }
     end
     assert_select "li.admin-system-check span[aria-hidden=true]"
   end

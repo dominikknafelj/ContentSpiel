@@ -1,0 +1,22 @@
+# Enrolment (docs/reference/i18n.md): `admin.enrolment.show` is read by full
+# key from `app/views/admin/enrolments/show.html.erb`, where a lazy lookup
+# would read the controller's plural name. The register script's own words
+# (a blank name, a refused passkey) are Your account's Name dialog's,
+# `admin.components.account_screen.passkey_dialog.*`, served to it on the page.
+en:
+  admin:
+    enrolment:
+      show:
+        title: "Add a passkey"
+        # By the policy that covers the person (`SiteSetting::PASSKEY_POLICIES`).
+        lead:
+          owners_and_admins: "This site asks owners and admins to sign in with a passkey. Add one to go on."
+          everyone: "This site asks everyone to sign in with a passkey. Add one to go on."
+        name: "Name"
+        name_help: "A name to tell your passkeys apart, like \"1Password\" or \"MacBook\"."
+        add: "Add passkey"
+        sign_out: "Sign out"
+        failed: "The passkey wasn't added. Try again."
+        # Shown by `admin--passkeys--register` where the browser can make no
+        # passkey.
+        unsupported: "This browser can't make a passkey. Sign out and sign in from a browser that can, and you'll come back to this page."

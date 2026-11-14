@@ -89,6 +89,23 @@ class SessionsTest < ActionDispatch::IntegrationTest
     assert_equal @user, destroyed.subject
   end
 
+  # A passkey challenge's cookie (`PasskeyChallenges`) is the signed-out
+  # person's, so signing out drops every one the browser holds.
+  test "signing out deletes every passkey challenge's cookie" do
+    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password12345" }
+    names = PasskeyChallenges.cookie_names
+    assert_equal %w[cs_passkey_sign_in cs_passkey_second_factor cs_passkey_confirm cs_passkey_register], names
+    names.each { |name| cookies[name] = "kept" }
+
+    delete admin_sign_out_url
+
+    written = Array(response.headers["Set-Cookie"]).flat_map { |line| line.split("\n") }
+    names.each do |name|
+      assert written.any? { |line| line.start_with?("#{name}=;") && line.include?("path=/") }, "#{name} is deleted: #{written.inspect}"
+      assert cookies[name].blank?, name
+    end
+  end
+
   # A WebSocket is authenticated once, at connect: signing out disconnects
   # the user's cable (`Session#disconnect_cable`), and the cookie's session
   # is no session any more.

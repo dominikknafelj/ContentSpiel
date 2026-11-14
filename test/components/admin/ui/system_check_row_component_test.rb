@@ -23,6 +23,13 @@ class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
     assert_no_selector "button"
   end
 
+  test "an off row is a hollow dot and the word Off, in the state chip's neutral tone" do
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(index: 0, result: result(status: :off, command: nil)))
+
+    assert_selector "li[data-status=off] .admin-state-chip[data-state-tone=off]", text: "Off"
+    assert_no_selector ".admin-state-chip[data-state-tone=warn]"
+  end
+
   test "OK and Warning are keys, drawn by the state chip" do
     assert_equal "OK", I18n.t("admin.components.ui.system_check_row.ok")
     I18n.backend.store_translations(:en, admin: { components: { ui: { system_check_row: { ok: "Fine", warning: "Careful" } } } })

@@ -12,7 +12,13 @@
 <div class="max-w-[880px]">
   <p class="mb-1 text-label text-meta"><%= link_to t(".breadcrumb"), admin_users_path(**admin_url_options), class: "text-meta" %> /</p>
   <div class="mb-1 flex items-center justify-between gap-3">
-    <h1 class="text-h1 text-ink"><%= heading %></h1>
+    <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      <h1 class="text-h1 text-ink"><%= heading %></h1>
+      <%# Who signs in through the provider, beside the name; the zone below is the owner's. %>
+      <% if @user.sso_linked? %>
+        <%= render Admin::Ui::BadgeComponent.new(label: t("admin.components.users_screen.sso_zone.badge", provider: Admin::UsersScreen::SsoZoneComponent.provider_words(SignIn::Rules.provider_name(@user))), data: { sso_badge: true }) %>
+      <% end %>
+    </div>
     <%# Opens the audit log filtered to this user, with `audit.view` only.
         `_top`, not the content frame it sits in. %>
     <% if can?("audit.view") %>
@@ -42,6 +48,10 @@
     <% if Current.user&.owner? %>
       <%= render Admin::UsersScreen::OwnerZoneComponent.new(user: @user, last_owner: last_owner?(@user), url_options: admin_url_options) %>
       <%= render Admin::UsersScreen::SessionsZoneComponent.new(user: @user, own: @user == Current.user, count: @open_sessions, url_options: admin_url_options) %>
+      <%# Owners never link, so a linked user is never an owner. %>
+      <% if @user.sso_linked? && !@user.owner? %>
+        <%= render Admin::UsersScreen::SsoZoneComponent.new(user: @user, provider_name: SignIn::Rules.provider_name(@user), mail_ready: MailSettings.current.ready?, url_options: admin_url_options) %>
+      <% end %>
     <% end %>
     <%= render Admin::UsersScreen::DeleteZoneComponent.new(user: @user, own: @user == Current.user, last_owner: last_owner?(@user), url_options: admin_url_options) %>
   <% end %>

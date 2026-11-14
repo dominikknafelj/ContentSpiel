@@ -58,7 +58,7 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
     Page.create!(parent: root, title: "Draft", published_at: nil)
 
-    visit "/preview/draft"
+    visit "/cs-studio/preview/draft"
 
     bar = page.evaluate_script("(() => { const r = document.querySelector('[role=region][aria-label=Preview]').getBoundingClientRect(); return [r.top, r.height, r.width, window.innerWidth] })()")
     assert_equal [ 0, 36 ], bar.first(2)
@@ -80,7 +80,7 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     Page.create!(parent: root, title: "A very long title for a page that is only a draft and has to be truncated", slug: "long", published_at: nil)
     page.current_window.resize_to(360, 700)
 
-    visit "/preview/long"
+    visit "/cs-studio/preview/long"
 
     right = page.evaluate_script("Array.from(document.querySelectorAll('[role=region][aria-label=Preview] a')).find((a) => a.textContent === 'Exit preview').getBoundingClientRect().right")
     assert_operator right, :<=, page.evaluate_script("document.documentElement.clientWidth")

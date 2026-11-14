@@ -60,6 +60,17 @@ module Telemetry
     auth.lockout_mail
     auth.session
     auth.session_sweep
+    auth.passkey
+    auth.recovery_code
+    auth.second_factor
+    auth.confirmation
+    auth.account_mail
+    auth.sso.redirect
+    auth.sso.callback
+    auth.sso.discovery
+    auth.sso.token
+    auth.sso.recheck
+    auth.sso.recheck_run
   ].freeze
 
   ATTRIBUTES = %w[
@@ -75,6 +86,20 @@ module Telemetry
     auth.mail.queued
     auth.session.reason
     auth.session.count
+    auth.passkey.ceremony
+    auth.policy
+    auth.second_factor.required
+    auth.mail.kind
+    auth.sso.intent
+    auth.sso.reason
+    auth.sso.cached
+    auth.sso.refresh_token
+    auth.sso.issuer_host
+    auth.sso.recheck.checked
+    auth.sso.recheck.ok
+    auth.sso.recheck.revoked
+    auth.sso.recheck.unavailable
+    auth.refused_by_rule
     server.address
     http.response.status_code
     error.type

@@ -67,6 +67,17 @@ class InvitesMailerTest < ActionMailer::TestCase
     end
   end
 
+  test "with an admin host the link names it, and without one it names the public host" do
+    with_site_address(SITE) do
+      with_admin_address("https://studio.example.internal") do
+        mail = InvitesMailer.invite(@invitation, origin: "http://evil.example").message
+        assert_equal "studio.example.internal", URI.parse(html_link(mail)).host
+        assert_equal "studio.example.internal", URI.parse(mail.text_part.body.to_s[%r{https?://\S+}]).host
+      end
+    end
+    assert_equal "docs.example.org", URI.parse(html_link(invite)).host
+  end
+
   test "the queued job holds no token: its arguments are the invitation's Global ID and an origin" do
     with_site_address(SITE) do
       ApplicationMailer.queue(InvitesMailer, :invite, @invitation)

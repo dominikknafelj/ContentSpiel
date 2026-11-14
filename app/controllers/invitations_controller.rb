@@ -24,9 +24,24 @@
 # now. Accepting creates the account (`Invitations::Accept`): until then the
 # person is no user, and the page knows them by the invitation alone.
 #
+# UNDER SSO_REQUIRED the password is no way in (`Invitations::Accept`
+# answers `[:sso_required]` for every token): a POST of the password form
+# starts the provider's sign-in for an open invitation instead
+# (`accept_with_sso_instead`, `SsoStarts`). "Continue with <provider>" is
+# that same start, asked for by name (`sso`), with the token in its body as
+# the form's is (the script copies it in when the button is pressed).
+#
+# COMING BACK WITH NO TOKEN. The provider's mismatch (`flash[:sso_mismatch]`,
+# both addresses) and a start that could not reach it or was
+# limited (`flash[:sso_unfinished]` and `flash[:sso_limited]`, set only by the SSO start) redirect here, and the redirect lost the token: `show` draws the
+# notice alone, with no form and no script (any form would be dead), and the
+# sentence says to open the mail's link again.
+#
 # What the service answers for a link (`:expired`, `:used`) are symbols, not
 # words: the words are this page's (`config/locales/invitations.en.yml`).
 class InvitationsController < ApplicationController
+  include SsoStarts
+
   layout "product"
 
   # What `Invitations::Accept` answers for a link that is no good, and the
@@ -39,11 +54,34 @@ class InvitationsController < ApplicationController
   # a bare 429, which the page's script takes as "not known": it shows the
   # form, and `update` decides.
   rate_limit to: 10, within: 3.minutes, only: :check, name: "check", with: -> { head :too_many_requests }
+  # A start asks the provider's discovery and writes a cookie, so it is
+  # counted too, on a count of its own.
+  # Keyed as sign-in keys an address (an IPv6 one by its /64), and answered
+  # on the page, which is drawn with no form.
+  rate_limit to: 20, within: 3.minutes, only: :sso, name: "sso", store: SignIn.store,
+    by: -> { VisitorAddress.key(request.remote_ip, purpose: Admin::SessionsController::RATE_LIMIT_PURPOSE) },
+    with: -> { redirect_to admin_invitation_path, status: :see_other, flash: { sso_limited: t("invitations.sso_limited") } }
+
+  helper_method :sso_provider
 
   # The page with no token: the form hidden, the two link states hidden, and
   # the script decides which to show. A `token` parameter is ignored: it
   # would be a token in an address.
   def show
+    mismatch = flash[:sso_mismatch]
+    @sso_mismatch = mismatch.slice("got", "email") if mismatch.is_a?(Hash) && sso_provider
+    return unless sso_provider && @sso_mismatch.nil?
+
+    @sso_limited = flash[:sso_limited].presence
+    @sso_unfinished = flash[:sso_unfinished].presence
+  end
+
+  # "Continue with <provider>": an open invitation goes to the provider, any
+  # other token gets the page's own answer, as a password sent for it does.
+  def sso
+    return head(:not_found) if sso_provider.nil?
+
+    accept_with_sso_instead
   end
 
   # THE EARLY CHECK, the reset page's `check` with one difference: the page
@@ -80,13 +118,15 @@ class InvitationsController < ApplicationController
       # ended on the server and not only replaced in the cookie: the browser
       # is the invited person's from here on.
       terminate_session if resume_session
-      start_new_session_for(result.record)
+      start_new_session_for(result.record, method: "password")
       # Recorded as sign-in records it (`Admin::SessionsController#create`):
       # the user's own event, actor and subject both, so their last sign-in
       # and the log say they signed in.
       Current.actor = result.record
       Audit.record("session.created", subject: result.record)
       redirect_to admin_root_path, status: :see_other, notice: t(".ready")
+    elsif result.errors == [ Invitations::Accept::SSO_REQUIRED ]
+      accept_with_sso_instead
     elsif (state = LINK_STATES[result.errors])
       @state = state
       render :show, status: :unprocessable_entity
@@ -105,6 +145,20 @@ class InvitationsController < ApplicationController
   end
 
   private
+
+  # A password sent while SSO_REQUIRED is set (a page drawn before the host
+  # set it, or a hand-made POST): the password is not looked at, and an open
+  # invitation is accepted the one way left, through the provider, as its
+  # "Continue with" button would start it. A link that is no good is the
+  # page's own expired or used state, as for a password.
+  def accept_with_sso_instead
+    invitation = invitation_for_token
+    state = link_state(invitation)
+    return start_sso(intent: "invitation", invitation: invitation) if state == :open
+
+    @state = state
+    render :show, status: :unprocessable_entity
+  end
 
   # A String or nothing: a list or a hash where a token belongs is no token.
   def token_param

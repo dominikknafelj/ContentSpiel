@@ -83,12 +83,12 @@ class Admin::InvariantsTest < ActionDispatch::IntegrationTest
   # itself, not just the admin that came before it, is gated behind setup
   # the same way -- Setup::RedirectConstraint's own comment already says it
   # covers CS Studio, but nothing exercised that directly until now.
-  test "CS Studio is gated behind /setup while setup is required" do
+  test "CS Studio is gated behind /cs-studio/setup while setup is required" do
     start_fresh_install
 
     [ "/cs-studio", "/cs-studio/posts", "/cs-studio/settings" ].each do |path|
       get path
-      assert_redirected_to "/setup", "expected #{path} to redirect to /setup"
+      assert_redirected_to "/cs-studio/setup", "expected #{path} to redirect to /cs-studio/setup"
     end
   end
 

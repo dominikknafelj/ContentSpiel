@@ -19,6 +19,15 @@ en:
       intro: "Someone asked to reset the password for your account on %{site}. Use this link within %{minutes} minutes:"
       button: "Reset password"
       outro: "If this wasn't you, ignore this mail. Your password stays the same."
+    # The reset request's answer for an account that signs in through the
+    # provider alone (`PasswordsMailer#sso_reminder`): %{provider} is
+    # SSO_NAME. It carries no reset link, only the sign-in page.
+    sso_reminder:
+      subject: "Sign in to %{site} with %{provider}"
+      intro: "Someone asked to reset the password of your account on %{site}."
+      body: "Your account signs in with %{provider}, so it has no password here. Sign in with %{provider} on the sign-in page."
+      button: "Open the sign-in page"
+      ignore: "If you didn't ask, you can ignore this mail."
     # The mail to an account whose sign-in a run of failed attempts paused
     # (`SignInMailer#locked`): %{count} is the pause's minutes, %{time} when
     # the attempt that paused it came, in the site's zone, %{address} the
@@ -31,6 +40,22 @@ en:
       details: "The last attempt was at %{time}, from the address %{address}."
       button: "Reset password"
       outro: "If this was you, wait and try again, or reset your password, which ends the pause. A browser you have signed in with before is not paused. If it wasn't you, your password kept them out, and resetting it is still the safest step."
+    # The mails to an account whose second factors changed
+    # (`SignInMailer#passkey_added`, `#recovery_code_used`): %{name} is the
+    # passkey's name, %{time} in the site's zone, %{address} where the code
+    # was used from, %{count} the codes left. No code or key is in either.
+    passkey_added:
+      subject: "A passkey was added to your account on %{site}"
+      intro: "A passkey named “%{name}” was added to your account on %{site} at %{time}."
+      button: "Open Your account"
+      outro: "If this wasn't you, remove the passkey there and change your password."
+    recovery_code_used:
+      subject: "A recovery code was used on %{site}"
+      intro:
+        one: "A recovery code was used to sign in to your account on %{site} at %{time}, from the address %{address}. 1 code is left."
+        other: "A recovery code was used to sign in to your account on %{site} at %{time}, from the address %{address}. %{count} codes are left."
+      button: "Open Your account"
+      outro: "If this wasn't you, regenerate your recovery codes and change your password."
     invite:
       subject: "%{inviter} invited you to %{site}"
       intro: "%{inviter} invited you to work on %{site} in Content Spiel. Set a password to finish your account:"

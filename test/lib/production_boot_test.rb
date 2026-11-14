@@ -23,14 +23,16 @@ require "fileutils"
 # without a secret; the secret check has its tests in `host_settings_test.rb`
 # and is not booted for here.
 #
-# Each boot is about three seconds, so there are eight and no more: an https
+# Each boot is about three seconds, so there are ten and no more: an https
 # address, none, and a value that is no address; and for the theme, a
 # folder, a path that is none, a folder with a file the contract does
 # not name (`Theme::Check`, run by `Theme.load` in `to_prepare`: the one
 # proof that the contract is checked when the application starts), and a
 # folder the stylesheet was not built for; and a gem's block type hook that
 # raises (the one proof that a registration raises at boot and names its
-# place, block types spec, decision 11).
+# place, block types spec, decision 11); and single sign-on's two: a
+# required provider that is not there, which stops the boot, and a half-set
+# one, which only says which variable is missing.
 class ProductionBootTest < ActiveSupport::TestCase
   SCRIPT = <<~'RUBY'.freeze
     config = Rails.application.config
@@ -113,6 +115,24 @@ class ProductionBootTest < ActiveSupport::TestCase
     end
   end
 
+  test "production with an ADMIN_HOST on the public host name does not start and says why" do
+    printed, status = boot_production("PUBLIC_HOST" => "https://docs.example.org", "ADMIN_HOST" => "https://docs.example.org")
+
+    assert_not status.success?, printed
+    assert_includes printed, "ADMIN_HOST must be another host name than PUBLIC_HOST's."
+    assert_no_match(/^hosts:/, printed)
+  end
+
+  test "production with an ADMIN_HOST answers both hosts and names the admin origin at boot" do
+    printed, status = boot_production("PUBLIC_HOST" => "https://docs.example.org", "ADMIN_HOST" => "https://studio.example.internal")
+    lines = printed.lines(chomp: true)
+
+    assert status.success?, printed
+    assert_includes lines, %(hosts: ["docs.example.org", "studio.example.internal"])
+    assert_includes lines, "[ContentSpiel] CS Studio is served on https://studio.example.internal alone; " \
+                           "https://docs.example.org answers no CS Studio address."
+  end
+
   test "production with a THEME_PATH that names no folder does not start, and says which variable and which path" do
     printed, status = boot_production("THEME_PATH" => "/no/such/theme/anywhere")
 
@@ -162,6 +182,23 @@ class ProductionBootTest < ActiveSupport::TestCase
     assert_no_match(/^hosts:/, printed)
   end
 
+  test "production with SSO_REQUIRED and no provider does not start, and says which variables" do
+    printed, status = boot_production("PUBLIC_HOST" => "https://docs.example.org", "SSO_REQUIRED" => "1")
+
+    assert_not status.success?
+    assert_includes printed, "SSO_REQUIRED is set, but single sign-on is not: set SSO_ISSUER, SSO_CLIENT_ID, SSO_CLIENT_SECRET and SSO_NAME."
+  end
+
+  test "production with three of the four SSO variables starts and names the missing one" do
+    printed, status = boot_production(
+      "PUBLIC_HOST" => "https://docs.example.org", "SSO_ISSUER" => "https://sso.example.org",
+      "SSO_CLIENT_ID" => "client-1", "SSO_NAME" => "Okta"
+    )
+
+    assert status.success?, printed
+    assert_includes printed.lines(chomp: true), "[ContentSpiel] Single sign-on is off: SSO_CLIENT_SECRET is not set."
+  end
+
   private
     BOOT_SECONDS = 90
 
@@ -171,9 +208,10 @@ class ProductionBootTest < ActiveSupport::TestCase
     def boot_production(variables)
       env = {
         "RAILS_ENV" => "production", "SECRET_KEY_BASE_DUMMY" => "1",
-        "PUBLIC_HOST" => nil, "TRUSTED_PROXIES" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
+        "PUBLIC_HOST" => nil, "ADMIN_HOST" => nil, "TRUSTED_PROXIES" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
         "SECRET_KEY_BASE" => nil, "RAILS_MASTER_KEY" => nil, "DATABASE_URL" => nil, "ADMIN_PATH" => nil,
-        "OTEL_EXPORTER_OTLP_ENDPOINT" => nil, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" => nil, "OTEL_CONSOLE" => nil
+        "OTEL_EXPORTER_OTLP_ENDPOINT" => nil, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" => nil, "OTEL_CONSOLE" => nil,
+        "SSO_ISSUER" => nil, "SSO_CLIENT_ID" => nil, "SSO_CLIENT_SECRET" => nil, "SSO_NAME" => nil, "SSO_REQUIRED" => nil
       }.merge(variables)
 
       Bundler.with_original_env do

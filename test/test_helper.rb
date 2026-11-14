@@ -18,7 +18,7 @@ if ENV["COVERAGE"].present? && ENV["COVERAGE"] != "0"
 end
 
 # THE SUITE DOES NOT DEPEND ON THE SHELL'S SITE ADDRESS. Someone who has
-# `PUBLIC_HOST` exported, as the hosting documents tell a person to try
+# `PUBLIC_HOST` (or `ADMIN_HOST`) exported, as the hosting documents tell a person to try
 # locally, would otherwise run every test under that address:
 # head tags, the sitemap and MCP's URLs carry it, and five tests that expect
 # "no address configured" failed that way. Removed here, once, before the
@@ -33,11 +33,13 @@ end
 # LEAKED_PASSWORD_CHECK go too, so a test has a bot check only inside
 # `with_bot_check` and a leaked-password check only inside
 # `with_leaked_password_check`, neither of which asks the network
-# (test/support/sign_in_helper.rb).
-%w[PUBLIC_HOST THEME_PATH
+# (test/support/sign_in_helper.rb). The SSO variables go too: a developer's
+# provider would otherwise sign every test's page with a button.
+%w[PUBLIC_HOST ADMIN_HOST THEME_PATH
    MAIL_SMTP_SERVER MAIL_SMTP_PORT MAIL_SMTP_SECURITY MAIL_SMTP_USERNAME MAIL_SMTP_PASSWORD
    MAIL_SENDER_NAME MAIL_SENDER_ADDRESS
-   TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY LEAKED_PASSWORD_CHECK].each { |name| ENV.delete(name) }
+   TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY LEAKED_PASSWORD_CHECK
+   SSO_ISSUER SSO_CLIENT_ID SSO_CLIENT_SECRET SSO_NAME SSO_REQUIRED].each { |name| ENV.delete(name) }
 
 require_relative "../config/environment"
 SiteAddress.reset!
@@ -67,6 +69,8 @@ require_relative "support/sanitizer_parses"
 require_relative "support/contrast_measure"
 require_relative "support/theme_test_helper"
 require_relative "support/sign_in_helper"
+require_relative "support/passkey_helper"
+require_relative "support/oidc_helper"
 
 # What tests themselves print -- the statements a migration test runs
 # ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise
@@ -151,6 +155,17 @@ module ActiveSupport
     # the sign-in checks' outside calls, never the network -- see
     # test/support/sign_in_helper.rb.
     include SignInHelper
+
+    # `fake_authenticator`, `add_passkey(user, client:)` and
+    # `passkey_assertion(client, challenge:)`: a passkey through the webauthn
+    # gem's fake authenticator, never a browser -- see
+    # test/support/passkey_helper.rb.
+    include PasskeyHelper
+
+    # `with_fake_idp { |idp| … }`: an OpenID Connect provider on 127.0.0.1,
+    # the SSO variables pointed at it and a cache that keeps, never the
+    # network -- see test/support/oidc_helper.rb.
+    include OidcHelper
 
     # Setup.required? memoizes "setup is done" per process, reset by
     # SiteSetting after every commit -- but a test that clears the table with
