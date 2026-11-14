@@ -39,9 +39,10 @@
 // `constructor` is not on the list).
 //
 // THE CLEANING drops what `Diagram::Drawing` drops quietly, with DOM APIs,
-// so the size measured is the size stored. It refuses nothing: the server's
-// sanitizer is the boundary, and the line rules keep what it refuses out of
-// the drawing.
+// so the size measured is at most the size stored: the server renames the
+// ids to shorter ones and serialises the drawing itself. It refuses
+// nothing: the server's sanitizer is the boundary, and the line rules keep
+// what it refuses out of the drawing.
 //
 // `raw` in a message hands back Mermaid's drawing before cleaning as well,
 // and only when `window.__diagramFixtures` is true in THIS frame: no parent
@@ -54,7 +55,7 @@
   const RULES = read("diagram-rules")
   const FRAME = read("diagram-frame")
 
-  const BOM = "﻿"
+  const BOM = "\uFEFF"
   const RUBY_SPACE = "\\0\\t\\n\\v\\f\\r "
   const STRIP = new RegExp(`^[${RUBY_SPACE}]+|[${RUBY_SPACE}]+$`, "g")
   const WORDS = /[ \t\r\n\f\v]+/
@@ -200,13 +201,15 @@
 
   const draw = async ({ id, source, colours, raw }) => {
     paint(colours)
+    // The refusals first, so a blank source over the limit is too long, as
+    // `Diagram::Source` says; a blank one within it has no refusal.
+    const found = refusals(source)
+    if (found.length) return { id, error: refusal(found[0]) }
+
     if (strip(source) === "") {
       shown.replaceChildren()
       return { id, svg: "", bytes: 0, elements: 0 }
     }
-
-    const found = refusals(source)
-    if (found.length) return { id, error: refusal(found[0]) }
 
     let parsed
     try {

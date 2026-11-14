@@ -110,7 +110,8 @@ class Admin::DiagramRendererTest < ApplicationSystemTestCase
       "maths" => "flowchart LR\n  A[\"$$x^2$$\"] --> B",
       "crlf" => "flowchart LR\r\n  A --> B\r\n  style A fill:#f00\r\n",
       "code_points" => "flowchart LR\n  A --> B\n%% #{"😀" * 4_980}",
-      "over_the_limit" => "flowchart LR\n" + ("  A --> B\n" * 1_000)
+      "over_the_limit" => "flowchart LR\n" + ("  A --> B\n" * 1_000),
+      "blank_over_the_limit" => " \n" * 5_001
     }
 
     cases.each do |key, source|
