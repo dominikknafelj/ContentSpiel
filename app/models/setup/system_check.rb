@@ -14,8 +14,12 @@ module Setup
     # `link` is a symbol naming where a row sends the reader (today
     # `:mail_settings` and `:image_settings`), for the component that draws the row to resolve:
     # this model names no route and no component.
-    Result = Data.define(:label, :status, :message, :command, :docs, :link) do
-      def initialize(label:, status:, message:, command: nil, docs: nil, link: nil) = super
+    #
+    # `note` is a sentence under the message that is no state of the check
+    # (the Search row's limited languages): the chip says what the check
+    # says and the note adds to it.
+    Result = Data.define(:label, :status, :message, :command, :docs, :link, :note) do
+      def initialize(label:, status:, message:, command: nil, docs: nil, link: nil, note: nil) = super
 
       def ok? = status == :ok
 
@@ -50,6 +54,10 @@ module Setup
     # fixed string, like the two above. In production the build is the
     # image's, which is no one command, and the warning carries none.
     STYLESHEET_COMMAND = "bin/rails tailwindcss:build".freeze
+
+    # What the Search row offers to copy when a build stopped: the task that
+    # builds the index in the foreground. A fixed string.
+    SEARCH_REINDEX_COMMAND = "bin/rails search:reindex".freeze
 
     # The header Cloudflare names the visitor's address in, which both
     # screens hand over as `cf_connecting_ip`.
@@ -120,6 +128,10 @@ module Setup
     # up) and `sso_required` whether SSO_REQUIRED is set, both handed in so a
     # test can say them.
     #
+    # `search` is the Search row's facts (`SiteSearch::Status.read`: the index's
+    # build, the backend's answer, the limited languages), handed in so a test
+    # can say them.
+    #
     # `theme` is the theme that draws the site (`Theme.current`), handed in so
     # a test can say it. `stylesheet_probe` answers whether the public
     # stylesheet was built for that theme: by default, whether the build's
@@ -135,7 +147,8 @@ module Setup
       address: SiteAddress.current, admin_address: SiteAddress.admin, request_ssl: nil, production: Rails.env.production?,
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil, remote_ip: nil, cf_connecting_ip: nil,
       mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false,
-      sso_provider: SignIn::Sso::Provider.current, sso_required: SignIn::Sso.required?)
+      sso_provider: SignIn::Sso::Provider.current, sso_required: SignIn::Sso.required?,
+      search: SiteSearch::Status.read)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -147,6 +160,7 @@ module Setup
       @forms_link = forms_link
       @sso_provider = sso_provider
       @sso_required = sso_required
+      @search = search
       @address = address
       @admin_address = admin_address
       @request_ssl = request_ssl
@@ -170,7 +184,7 @@ module Setup
     end
 
     def run
-      [ site_address, admin_address, single_sign_on, https, visitor_address, theme, storage, image_processing, images, background_jobs, mail, forms ].compact
+      [ site_address, admin_address, single_sign_on, https, visitor_address, theme, storage, image_processing, images, background_jobs, search, mail, forms ].compact
     end
 
     private
@@ -441,6 +455,36 @@ module Setup
             "(upload analysis, emails) won't run. Set SOLID_QUEUE_IN_PUMA=1 or run bin/jobs.")
         end
       end
+
+      # Public search (spec §10): one row, in the words of `admin.system_status.search`.
+      # While the index is built it is a warning with the progress, and a
+      # build that stopped offers `search:reindex` to finish it. Ready, the
+      # built-in says how many pages and posts it finds and an outside backend
+      # that it answers; a backend that answered `:warn` or `:failed` is its
+      # own sentence, from its `Health` (never an error's message), and one
+      # that did not answer in time says what visitors see. The limited
+      # languages are a note under the message and leave the chip as it is.
+      def search
+        s = @search
+        t = ->(key, **values) { I18n.t("admin.system_status.search.#{key}", **values) }
+        progress = { done: delimited(s.done), total: delimited(s.total) }
+        note = (t.call(:limited, languages: s.limited.map { |code| Locales.name(code) }.to_sentence) if s.limited.any?)
+        label = t.call(:label)
+        case s.state
+        when :building then Result.new(label:, status: :warning, message: t.call(:building, **progress), note:)
+        when :stopped then Result.new(label:, status: :warning, message: t.call(:stopped, **progress), command: SEARCH_REINDEX_COMMAND, note:)
+        when :timeout then Result.new(label:, status: :warning, message: t.call(:timeout, backend: s.label), note:)
+        when :unhealthy
+          detail = s.health.detail.presence
+          message = detail ? t.call(:unhealthy, backend: s.label, detail: detail) : t.call(:unhealthy_plain, backend: s.label)
+          Result.new(label:, status: :warning, message:, note:)
+        else
+          message = s.count ? t.call(:ready_builtin, count: s.count, number: delimited(s.count)) : t.call(:ready, backend: s.label)
+          Result.new(label:, status: :ok, message:, note:)
+        end
+      end
+
+      def delimited(number) = ActiveSupport::NumberHelper.number_to_delimited(number.to_i)
 
       # Outgoing mail's state in its own words (`MailStateSentence`, the
       # sentence the Settings card shows): Working is OK and the other three

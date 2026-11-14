@@ -44,6 +44,24 @@ en:
           not_json: "its answer was not a discovery document"
           issuer_mismatch: "its document names another issuer"
           missing_endpoint: "its document lacks an endpoint sign-in needs"
+      # The "Search" row (`Setup::SystemCheck#search`, `SiteSearch::Status`): `building`
+      # and `stopped` with the build's progress, `ready_builtin` (plural by the
+      # pages and posts found, `number` the same with its delimiters) or `ready`
+      # for an outside backend, `timeout`, `unhealthy` (a backend's own warning, its
+      # `Health` sentence: `unhealthy_plain` when it gave none) and `limited`, the note
+      # under the row for the languages the built-in finds only whole runs of text in.
+      search:
+        label: "Search"
+        building: "Building the search index: %{done} of %{total} records."
+        stopped: "The search index stopped building at %{done} of %{total} records. Run this to finish it:"
+        ready_builtin:
+          one: "Search finds 1 page or post (built-in)."
+          other: "Search finds %{number} pages and posts (built-in)."
+        ready: "%{backend} answers."
+        timeout: "%{backend} did not answer in 3 seconds. Visitors see “Search isn't available right now.”"
+        unhealthy: "%{backend}: %{detail}"
+        unhealthy_plain: "%{backend} reports a problem."
+        limited: "Search is limited in %{languages}: a word is found only as part of the whole run of text it stands in."
       # The "Visitor address" row (`Setup::SystemCheck#visitor_address`):
       # OK with no Cloudflare header, OK when the header is the address the
       # request is counted by, and the warning when it is not.
