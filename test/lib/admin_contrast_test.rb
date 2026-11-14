@@ -1025,34 +1025,63 @@ class AdminContrastTest < ActiveSupport::TestCase
 
   # The Diagram block's colours in CS Studio (`html[data-surface="studio"]
   # .content-block--diagram` in content-spiel.css), which the block card
-  # posts to its renderer frame and the tile paints with: each a `var()` of a
-  # CS Studio token, measured in both schemes as the default theme's are in
-  # `design_tokens_test.rb`. The ink is a label's on every ground it stands
-  # on, 4.5:1; a node's outline and an edge are graphics on the fill, 3:1.
+  # posts to its renderer frame and the tile paints with: each a CS Studio
+  # token, or for a series an icon hue mixed into its chip's ground, measured
+  # in both schemes as the default theme's are in `design_tokens_test.rb`.
+  # The ink is a label's on every ground it stands on: 4.5:1, and on a series
+  # held at the floor it measures, 7.9:1 in light (7.97, people) and 4.7:1
+  # in dark (4.77, code), so a change cannot quietly take it back; a node's outline
+  # and an edge are graphics on the fill, 3:1. Two series side by side (a
+  # pie's slices) are told apart: SERIES_APART in sRGB, 0 to 255 a channel.
+  SERIES_APART = 20
+
   def diagram_colours
     css = STYLESHEET.read.gsub(%r{/\*.*?\*/}m, "")
     block = css[/html\[data-surface="studio"\] \.content-block--diagram\s*\{(.*?)\}/m, 1]
     assert block, "content-spiel.css defines no diagram colours for CS Studio"
-    block.scan(/(--th-diagram-[\w-]+):\s*var\((--cs-[\w-]+)\);/).to_h
+    block.scan(/(--th-diagram-[\w-]+):\s*([^;]+);/).to_h.transform_values(&:strip)
   end
 
-  test "CS Studio defines every themed diagram token, each from a token of its own" do
+  def each_diagram_scheme
+    diagram = diagram_colours
+    each_scheme do |scheme, _colour, tokens|
+      all = tokens.merge(diagram)
+      fill = resolve_colour(all, "--th-diagram-fill")
+      yield scheme, ->(name) { resolve_colour(all, "--th-diagram-#{name}", under: fill) }
+    end
+  end
+
+  test "CS Studio defines every themed diagram token from its own tokens" do
     names = BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }
     assert_equal names.sort, diagram_colours.keys.sort
     assert_equal Admin::Fields::MermaidField.colour_names.sort, names.sort, "the card posts the names CS Studio defines"
-    series = diagram_colours.select { |name, _| name.include?("series") }.values
-    assert_equal series.uniq, series, "the six series are six tokens"
+    diagram_colours.each do |name, value|
+      assert_empty value.scan(/--[\w-]+/).reject { |token| token.start_with?("--cs-") }, "#{name} is made of CS Studio tokens"
+    end
+    families = %w[code media people text form lists]
+    families.each.with_index(1) do |family, n|
+      assert_equal "color-mix(in srgb, var(--cs-ic-#{family}) 35%, var(--cs-ic-#{family}-bg))", diagram_colours.fetch("--th-diagram-series-#{n}")
+    end
   end
 
   test "a diagram's ink reads on its fill, group, note and every series, and its line and edge on the fill, in both schemes" do
-    tokens = diagram_colours
-    each_scheme do |scheme, colour|
-      diagram = ->(name) { colour.(tokens.fetch("--th-diagram-#{name}"), under: tokens.fetch("--th-diagram-fill")) }
+    each_diagram_scheme do |scheme, diagram|
       ink = diagram.("ink")
-      (%w[fill group note] + (1..6).map { |n| "series-#{n}" }).each do |ground|
-        assert_ratio(4.5, ink, diagram.(ground), "the diagram's ink on its #{ground} (#{scheme})")
+      %w[fill group note].each { |ground| assert_ratio(4.5, ink, diagram.(ground), "the diagram's ink on its #{ground} (#{scheme})") }
+      (1..6).each do |n|
+        assert_ratio(scheme == :light ? 7.9 : 4.7, ink, diagram.("series-#{n}"), "the diagram's ink on series #{n} (#{scheme})")
       end
       %w[line edge].each { |stroke| assert_ratio(3.0, diagram.(stroke), diagram.("fill"), "the diagram's #{stroke} on its fill (#{scheme})") }
+    end
+  end
+
+  test "each series is told from the next, in both schemes" do
+    each_diagram_scheme do |scheme, diagram|
+      series = (1..6).map { |n| diagram.("series-#{n}").map { |channel| encode(channel) * 255 } }
+      series.each_cons(2).with_index(1) do |(one, other), n|
+        apart = Math.sqrt(one.zip(other).sum { |a, b| (a - b)**2 })
+        assert_operator apart, :>=, SERIES_APART, "series #{n} and #{n + 1} are #{apart.round(1)} apart (#{scheme})"
+      end
     end
   end
 end

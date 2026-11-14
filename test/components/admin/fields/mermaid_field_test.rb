@@ -49,13 +49,12 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     served = JSON.parse(wrapper["data-messages"])
     assert_equal "Diagram preview", served.fetch("components.fields.mermaid_field.frame_title")
     assert_equal "Type a diagram to see it drawn.", served.fetch("components.fields.mermaid_field.empty")
-    %w[drawing no_description error_lead kept nothing_yet kept_badge too_long too_large].each { |key| assert served.key?("components.fields.mermaid_field.#{key}"), key }
+    %w[error_lead kept nothing_yet kept_badge too_long too_large].each { |key| assert served.key?("components.fields.mermaid_field.#{key}"), key }
   end
 
   # The sentences are written once, under `errors.messages`, and the
-  # script is handed those strings: what the card says of a refused line is
-  # what a refused save says.
-  test "the script's sentences for a refused line, a type and no type are the server's own strings" do
+  # script is handed those strings.
+  test "the script's sentences for a refused line, a type and no type are the errors.messages strings" do
     render_field(SOURCE)
     served = JSON.parse(wrapper["data-messages"])
 
@@ -66,13 +65,8 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert_equal %w[refused.colours refused.directive refused.front_matter refused.links refused.maths no_type unsupported],
       Admin::Fields::MermaidField::SENTENCES.keys.map { |key| key.delete_prefix("components.fields.mermaid_field.") }.sort_by { |key| [ key.start_with?("refused") ? 0 : 1, key ] }
 
-    definition = ContentModel::BlockTypeDefinition.new("sample").tap do |t|
-      t.field :source, :mermaid, drawing: :drawing
-      t.field :drawing, :diagram_drawing
-    end
-    server = definition.field_set.new({}).assign("source" => "flowchart LR\n  classDef a fill:red").tap(&:valid?).errors[:source]
     script = served.fetch("components.fields.mermaid_field.refused.colours").gsub(/%\{(\w+)\}/) { { "line" => "2", "word" => "classDef" }.fetch($1) }
-    assert_equal server, [ script ]
+    assert_equal I18n.t("errors.messages.diagram_colours", line: 2, word: "classDef"), script
   end
 
   test "the frame slot holds no frame and the state's words hidden, the status line is a polite region the server leaves empty, and the colour probe is hidden from everyone" do
@@ -86,6 +80,18 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert_selector "#{target("status")}[aria-live='polite']:empty", visible: :all
     assert_selector "span.content-block--diagram[aria-hidden='true'][hidden]#{target("colourProbe")}:empty", visible: :all
     assert_selector ".admin-mermaid-field__well > span#{target("line")}[hidden][aria-hidden='true']", visible: :all
+  end
+
+  test "with a description named, the neutral note is drawn hidden under the preview and the wrapper names the description's input" do
+    render_field(SOURCE)
+    assert_no_selector target("undescribed"), visible: :all
+    assert_nil wrapper["data-#{CONTROLLER}-description-field-value"]
+
+    render_field(SOURCE, description: :description)
+    assert_equal "block-7-description", wrapper["data-#{CONTROLLER}-description-field-value"]
+    note = page.find(".admin-mermaid-field__preview #{target("undescribed")}[hidden][role='note']", visible: :all)
+    assert_equal "The site shows this diagram once it has a description.", note.text(:all)
+    assert_equal (Admin::Ui::NoticeComponent.classes(:neutral, size: :compact).split + [ "mt-2" ]).sort, note[:class].split.sort
   end
 
   # The script clones the notice and fills its parts: no box is built by hand.

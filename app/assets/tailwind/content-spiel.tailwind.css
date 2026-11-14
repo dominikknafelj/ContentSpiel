@@ -849,14 +849,15 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-mermaid-field__pair { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
 .admin-mermaid-field__pair > * { flex: 1 1 19.5rem; min-width: min(100%, 19.5rem); }
 .admin-mermaid-field__frame { position: relative; min-height: 200px; border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
-/* The renderer frame fills the slot; the state's words stand over it: the
+/* The renderer frame is the slot's width and as high as its drawing (the
+   script sets the height, 200px to 640px); the state's words stand over it: the
    blank frame's line in its middle, the kept drawing's badge at its top
    left and "Drawing…" at its top right. None takes the pointer. The
    frame's document declares no colour scheme, and a browser paints an
    opaque canvas under a frame whose scheme differs from its element's, so
    the element says the same (`normal`) and the slot's surface shows through
    in both of CS Studio's schemes. */
-.admin-mermaid-field__renderer { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; color-scheme: normal; }
+.admin-mermaid-field__renderer { display: block; width: 100%; height: 200px; border: 0; border-radius: inherit; background: transparent; color-scheme: normal; }
 .admin-mermaid-field__blank { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; margin: 0; padding: 1rem; text-align: center; pointer-events: none; }
 .admin-mermaid-field__kept { position: absolute; top: 0.5rem; left: 0.5rem; pointer-events: none; }
 .admin-mermaid-field__busy { position: absolute; top: 0.5rem; right: 0.625rem; pointer-events: none; }

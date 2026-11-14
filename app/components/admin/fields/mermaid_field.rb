@@ -46,14 +46,15 @@ module Admin
     # preview stands under the whole pair (`below_pair`).
     #
     # THE SENTENCES of a refused line, of a type off the list and of a first
-    # line that names none are the server's own (`errors.messages.diagram_*`,
-    # `SENTENCES`), handed to the script under this field's keys, so the
-    # card says before a save what a refused save says.
+    # line that names none are written once, in `errors.messages.diagram_*`
+    # (`SENTENCES`), and handed to the script under this field's keys. No
+    # save is refused for them: the card says them, the source is stored as
+    # typed and the drawing stays the last that worked.
     class MermaidField < CodeField
       CONTROLLER = "admin--diagram--preview".freeze
 
       # The card's words the script shows, under `admin.components.fields.mermaid_field`.
-      MESSAGES = %w[frame_title empty drawing no_description error_lead kept nothing_yet kept_badge too_long too_large]
+      MESSAGES = %w[frame_title empty error_lead kept nothing_yet kept_badge too_long too_large]
         .map { |key| "components.fields.mermaid_field.#{key}" }.freeze
 
       # The server's sentences the script shows: its key => the I18n key
@@ -109,6 +110,7 @@ module Admin
           "#{CONTROLLER}-source-name-value": input_name,
           "#{CONTROLLER}-starting-value": starting?,
           "#{CONTROLLER}-colours-value": self.class.colour_names.to_json,
+          "#{CONTROLLER}-description-field-value": description_id,
           messages: messages
         }
       end
@@ -122,6 +124,18 @@ module Admin
           "admin--editor--code-limit-target": "input",
           action: "input->admin--editor--code-limit#update input->#{CONTROLLER}#input"
         }
+      end
+
+      # The input of the field that describes the drawing (`description:`),
+      # whose blank the card points out; nil when the schema names none.
+      def description_id = (field.options[:description] && "#{id_prefix}-#{field.options[:description]}")
+
+      # "The site shows this diagram once it has a description.", drawn hidden:
+      # the script shows it while the description's input is blank.
+      def undescribed_notice
+        return unless description_id
+
+        render(Admin::Ui::NoticeComponent.new(tone: :neutral, size: :compact, hidden: true, class: "mt-2", data: target("undescribed"))) { t(".no_description") }
       end
 
       def kept_badge = render(Admin::Ui::BadgeComponent.new(label: t(".kept_badge"), hidden: true, class: "admin-mermaid-field__kept", data: target("kept")))
@@ -141,7 +155,8 @@ module Admin
         tag.template(notice, data: target("notice"))
       end
 
-      # The frame slot, the status line and the notice's template. The slot
+      # The frame slot, the status line, the description's note and the
+      # notice's template. The slot
       # holds the script's renderer frame and, over it, the state's words,
       # each drawn hidden for the script to show: the blank frame's line
       # (`empty`, or `nothing_yet` beside an error), the kept drawing's
@@ -158,6 +173,7 @@ module Admin
               ])
             end,
             tag.div(aria: { live: "polite" }, data: target("status")),
+            undescribed_notice,
             notice_template
           ])
         end

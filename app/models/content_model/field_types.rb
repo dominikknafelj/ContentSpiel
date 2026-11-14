@@ -154,6 +154,7 @@ module ContentModel
             refuse_blank(options)
             refuse_control(options)
             raise ArgumentError, "`drawing:` is a mermaid field's, naming its diagram_drawing field" if options.key?(:drawing)
+            raise ArgumentError, DESCRIPTION_REFUSAL if options.key?(:description)
             # `help:` is a line under a string field in CS Studio (the Note
             # block's title: what an empty one does).
             check_help(options)
@@ -298,32 +299,48 @@ module ContentModel
       # and like code it is never offered to an AI provider. `max:` counts
       # characters, and the source's own limit
       # (`Diagrams::Source::MAX_CHARACTERS`) holds without one; both are
-      # refused in the Code field's words. Every line `Diagrams::Source` refuses
-      # is one sentence naming the line (`errors.messages.diagram_*`, the
-      # sentences the editor's card shows). A block's settings are validated
-      # in the default language alone (`ContentBlock#settings_are_valid`), so
-      # every language the object holds is read here, each sentence once.
+      # refused in the Code field's words, and the length is all a save is
+      # refused for. A source with a line `Diagrams::Source` refuses (a
+      # `classDef`, a `click`, a type off the list) is stored as typed, as any
+      # half-typed source is: the line rules are the editor's and the frame's,
+      # which say the line's sentence and draw nothing from it, so the drawing
+      # stays the last that worked. Mermaid never runs on the server, the
+      # frame refuses such a source before Mermaid sees it, and what reaches a
+      # page is a drawing `Diagrams::Drawing` cleaned. A block's settings are
+      # validated in the default language alone
+      # (`ContentBlock#settings_are_valid`), so every language the object
+      # holds is read here, each sentence once.
       #
       # `drawing:` names the `:diagram_drawing` field its drawing is written
       # into, translated as the source is.
+      # `description:`, if given, names the string or text field that
+      # describes the drawing, translated as the source is: the card says the
+      # site shows nothing while it is blank.
       def mermaid
         FieldType.new(
           name: :mermaid, translatable: false, audit: :digest, cast: TYPED_TEXT,
           options: lambda { |options, _earlier|
             raise ArgumentError, "a mermaid field names its drawing field, `drawing:`" unless options[:drawing].is_a?(Symbol) || options[:drawing].is_a?(String)
             raise ArgumentError, "`max:` on a mermaid field is a number of characters, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
-            refuse_choice_and_string_options(options.except(:drawing))
+            raise ArgumentError, DESCRIPTION_REFUSAL if options.key?(:description) && !(options[:description].is_a?(Symbol) || options[:description].is_a?(String))
+            refuse_choice_and_string_options(options.except(:drawing, :description))
           },
           finish: lambda { |field, fields|
             drawing = fields.find { |candidate| candidate.name == field.options[:drawing].to_s }
             unless drawing&.type == :diagram_drawing && drawing.translated? == field.translated?
               raise ArgumentError, "the mermaid field #{field.name} names `drawing: #{field.options[:drawing].inspect}`, which is to be a diagram_drawing field of this definition, translated as the source is"
             end
+            next unless field.options.key?(:description)
+
+            description = fields.find { |candidate| candidate.name == field.options[:description].to_s }
+            unless %i[string text].include?(description&.type) && description.translated? == field.translated?
+              raise ArgumentError, "the mermaid field #{field.name} names `description: #{field.options[:description].inspect}`, which is to be a string or text field of this definition, translated as the source is"
+            end
           },
           validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
             texts = [ value ]
             texts += translations.values.map { |values| TYPED_TEXT.call(values.to_h[field.name]) } if field.translated?
-            texts.compact.uniq.each { |text| refuse_mermaid(field, text, errors) }
+            texts.compact.uniq.each { |text| refuse_long_mermaid(field, text, errors) }
           }
         )
       end
@@ -508,20 +525,11 @@ module ContentModel
       # One error per refusal of `Diagrams::Source`, said once however many
       # languages share it. The limit is the smaller of `max:` and the
       # source's own, in the Code field's sentence.
-      def refuse_mermaid(field, text, errors)
+      def refuse_long_mermaid(field, text, errors)
         limit = [ field.options[:max], Diagrams::Source::MAX_CHARACTERS ].compact.min
-        if text.length > limit
-          add_once(errors, field.name, :too_long, count: limit, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(limit))
-          return
-        end
+        return unless text.length > limit
 
-        Diagrams::Source.refusals(text).each do |refusal|
-          if refusal.rule == :type
-            add_once(errors, field.name, :diagram_unsupported, type: refusal.word, types: Diagrams::Source.keywords.join(", "))
-          else
-            add_once(errors, field.name, :"diagram_#{refusal.rule}", line: refusal.line, word: refusal.word)
-          end
-        end
+        add_once(errors, field.name, :too_long, count: limit, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(limit))
       end
 
       def add_once(errors, name, type, **options)
@@ -576,7 +584,10 @@ module ContentModel
         raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" if options.key?(:placeholder_from)
         raise ArgumentError, "`format:` is for a string field" if options.key?(:format) || options.key?(:format_message)
         raise ArgumentError, "`drawing:` is a mermaid field's, naming its diagram_drawing field" if options.key?(:drawing)
+        raise ArgumentError, DESCRIPTION_REFUSAL if options.key?(:description)
       end
+
+      DESCRIPTION_REFUSAL = "`description:` is a mermaid field's, naming the text field that describes its drawing".freeze
 
       def url?(value)
         URL_SCHEMES.include?(URI.parse(value).scheme.to_s.downcase)

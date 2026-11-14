@@ -74,11 +74,11 @@ en:
       # formatted ("2,000").
       table_too_large: "A table can have at most %{columns} columns and %{rows} rows."
       table_cell_too_long: "A cell can have at most %{characters} characters."
-      # A Diagram block's source and drawing (`ContentModel::FieldTypes`,
-      # `:mermaid` and `:diagram_drawing`), one sentence per `Diagrams::Source`
-      # rule. These are also the sentences the editor's card shows before a
-      # save (`Admin::Fields::MermaidField::SENTENCES` hands them to the
-      # script), so they are written here once. `%{word}` is what the line
+      # A Diagram block's line rules, one sentence per `Diagrams::Source`
+      # rule, which the editor's card shows (`Admin::Fields::MermaidField::
+      # SENTENCES` hands them to the script); no save is refused for them
+      # (`:mermaid` refuses only the length). `invalid_drawing` is
+      # `:diagram_drawing`'s refusal. `%{word}` is what the line
       # holds; the directive's word is its marker, `%%{`, because a `%%`
       # written here would be read as an escaped `%`. `%{types}` arrives
       # joined ("flowchart, sequenceDiagram, …").

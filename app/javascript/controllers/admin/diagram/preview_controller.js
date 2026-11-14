@@ -10,9 +10,14 @@ import { digest } from "diagram/digest"
 // preview stands.
 //
 // DRAWING. At `connect` it builds the sandboxed renderer frame into the
-// `frameSlot` (`diagram/frame`) and draws the source as it is; at each
-// `input` of the source it draws again after DRAW_DEBOUNCE. The frame shows
-// the drawing itself: its SVG never enters this page.
+// `frameSlot` (`diagram/frame`), shows in it the drawing the hidden field
+// holds (the one the site shows), and draws the source as it is: a source
+// that draws replaces it, one that does not leaves it shown as the last
+// drawing that worked. At each `input` of the source it draws again after
+// DRAW_DEBOUNCE. The frame shows the drawing itself: its SVG never enters
+// this page. Every answer says how high the drawing stands, and the frame
+// takes that height, between FRAME_MIN and FRAME_MAX; past that it scrolls
+// inside itself.
 //
 // WRITING. Only a draw asked for by a person's change writes. When it
 // succeeds, the drawing goes into the hidden drawing input as
@@ -47,12 +52,18 @@ import { digest } from "diagram/digest"
 // when it has none, and the source's offending line is marked with a band
 // (`line`), which the sentence also names in words.
 //
+// THE DESCRIPTION (`descriptionField`, the input of the field the schema
+// names): while it is blank, the neutral note the server drew hidden under
+// the preview says the site shows the diagram only once it has one.
+//
 // TAKE-BACK. `disconnect` and `turbo:before-cache` remove the frame, its
 // listener, the timers and everything this script showed, so a copy Turbo
 // keeps holds the server's markup as drawn, and a page shown again from it
 // builds a frame of its own at `connect`.
 const DRAW_DEBOUNCE = 300
 const BUSY_AFTER = 300
+const FRAME_MIN = 200
+const FRAME_MAX = 640
 // A sentence's coded word is put in as this mark and then cut out as a
 // `<code>`: no locale string holds it.
 const CODED = ""
@@ -60,7 +71,7 @@ const CODED = ""
 const REFUSED = [ "colours", "links", "directive", "front_matter", "maths" ]
 
 export default class extends Controller {
-  static targets = [ "source", "frameSlot", "status", "colourProbe", "blank", "kept", "busy", "line", "notice" ]
+  static targets = [ "source", "frameSlot", "status", "colourProbe", "blank", "kept", "busy", "line", "notice", "undescribed" ]
 
   static values = {
     rendererUrl: String,
@@ -69,7 +80,8 @@ export default class extends Controller {
     drawingName: String,
     sourceName: String,
     starting: Boolean,
-    colours: Array
+    colours: Array,
+    descriptionField: String
   }
 
   connect() {
@@ -85,9 +97,32 @@ export default class extends Controller {
     })
     this.takeBack = () => this.close()
     this.follow = () => this.placeLine()
+    this.described = () => this.showDescribed()
     document.addEventListener("turbo:before-cache", this.takeBack)
     this.sourceTarget.addEventListener("scroll", this.follow)
+    this.description = this.descriptionFieldValue ? document.getElementById(this.descriptionFieldValue) : null
+    this.description?.addEventListener("input", this.described)
+    this.showDescribed()
+    this.showStored()
     this.draw()
+  }
+
+  // The drawing the hidden field holds, shown until a draw replaces it.
+  showStored() {
+    let stored = null
+    try {
+      stored = JSON.parse(this.drawingInput.value || "null")
+    } catch {
+      stored = null
+    }
+    if (typeof stored?.svg !== "string" || stored.svg === "") return
+    this.frame.show(stored.svg, this.colours())
+    this.pictured = true
+  }
+
+  showDescribed() {
+    if (!this.hasUndescribedTarget || !this.description) return
+    this.undescribedTarget.hidden = this.description.value.trim() !== ""
   }
 
   disconnect() {
@@ -115,6 +150,8 @@ export default class extends Controller {
   }
 
   async answered(answer) {
+    if (Number.isFinite(answer.height)) this.frame.resize(Math.min(FRAME_MAX, Math.max(FRAME_MIN, answer.height)))
+    if (answer.shown) return
     clearTimeout(this.busyTimer)
     this.busyTarget.hidden = true
     if (answer.error) {
@@ -192,12 +229,12 @@ export default class extends Controller {
   }
 
   // What the site does meanwhile: the drawing it keeps, when the hidden
-  // field holds one. Without one, a draw that does not parse or a drawing
-  // too large to keep says nothing is drawn yet (as the frame does), and so
-  // does a type the site can't draw.
+  // field holds one. Without one, a draw that does not parse, a source too
+  // long to draw, a drawing too large to keep and a type the site can't draw
+  // say nothing is drawn yet (as the frame does).
   siteSays(error) {
     if (this.drawingInput.value !== "") return this.text("components.fields.mermaid_field.kept")
-    const nothing = [ "parse", "too_large", "type" ].includes(error.kind) || (error.kind === "refused" && !REFUSED.includes(error.rule))
+    const nothing = [ "parse", "too_large", "too_long", "type" ].includes(error.kind) || (error.kind === "refused" && !REFUSED.includes(error.rule))
     return nothing ? this.text("components.fields.mermaid_field.nothing_yet") : ""
   }
 
@@ -285,6 +322,9 @@ export default class extends Controller {
     clearTimeout(this.busyTimer)
     document.removeEventListener("turbo:before-cache", this.takeBack)
     this.sourceTarget.removeEventListener("scroll", this.follow)
+    this.description?.removeEventListener("input", this.described)
+    this.description = null
+    if (this.hasUndescribedTarget) this.undescribedTarget.hidden = true
     this.frame?.close()
     this.frame = null
     this.spoken = ""

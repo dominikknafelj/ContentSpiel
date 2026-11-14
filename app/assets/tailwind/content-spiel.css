@@ -384,9 +384,10 @@ html[data-surface="studio"] {
    and the ink its ink; a line a node's outline (the field line, the faintest
    CS Studio line at 3:1 on the surface) and an edge dim; a group sunken, a
    note the accent's tint; the six series grounds, a pie's slices or a
-   gantt's tasks, the icon chips' grounds, starting with the block's own
-   family (code), media and people, each holding the ink at 4.5:1
-   (`test/lib/admin_contrast_test.rb`). */
+   gantt's tasks, each an icon chip's hue mixed into its ground (35%),
+   starting with the block's own family (code), media and people: the ink
+   reads at 7.9:1 or better on each in light and 4.7:1 in dark, and each is
+   told from the next (`test/lib/admin_contrast_test.rb`). */
 html[data-surface="studio"] .content-block--diagram {
   --th-diagram-ink: var(--cs-ink);
   --th-diagram-fill: var(--cs-surface);
@@ -395,12 +396,12 @@ html[data-surface="studio"] .content-block--diagram {
   --th-diagram-group: var(--cs-sunken);
   --th-diagram-note: var(--cs-accent-tint);
   --th-diagram-accent: var(--cs-accent);
-  --th-diagram-series-1: var(--cs-ic-code-bg);
-  --th-diagram-series-2: var(--cs-ic-media-bg);
-  --th-diagram-series-3: var(--cs-ic-people-bg);
-  --th-diagram-series-4: var(--cs-ic-text-bg);
-  --th-diagram-series-5: var(--cs-ic-form-bg);
-  --th-diagram-series-6: var(--cs-ic-lists-bg);
+  --th-diagram-series-1: color-mix(in srgb, var(--cs-ic-code) 35%, var(--cs-ic-code-bg));
+  --th-diagram-series-2: color-mix(in srgb, var(--cs-ic-media) 35%, var(--cs-ic-media-bg));
+  --th-diagram-series-3: color-mix(in srgb, var(--cs-ic-people) 35%, var(--cs-ic-people-bg));
+  --th-diagram-series-4: color-mix(in srgb, var(--cs-ic-text) 35%, var(--cs-ic-text-bg));
+  --th-diagram-series-5: color-mix(in srgb, var(--cs-ic-form) 35%, var(--cs-ic-form-bg));
+  --th-diagram-series-6: color-mix(in srgb, var(--cs-ic-lists) 35%, var(--cs-ic-lists-bg));
 }
 
 /* The theme switch's cross-fade: the browser's own fade-out of the old

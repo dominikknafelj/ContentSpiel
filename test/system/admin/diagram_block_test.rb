@@ -1,4 +1,5 @@
 require "application_system_test_case"
+require_relative "../../support/diagram_fixtures"
 
 # The Diagram block's card in the page editor, in a browser (Diagram block
 # spec §2 and §7, the Design System's EditorDiagramBlock and
@@ -69,6 +70,8 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
       })()
     JS
   end
+
+  def frame_height(block) = page.evaluate_script("Math.round(document.querySelector(arguments[0] + ' iframe').getBoundingClientRect().height)", field_selector(block))
 
   def status_text(block) = find("#{field_selector(block)} [data-admin--diagram--preview-target='status']", visible: :all).text(:all).squish
 
@@ -177,19 +180,26 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
     assert_nil stored(block)["drawing"]
   end
 
-  test "a classDef line is refused with its line's sentence" do
+  # A refused line is the card's to say and never a refused save: the
+  # source is stored as typed and the drawing stays the last that worked.
+  test "a classDef line is said with its line's sentence, its source saved with no field error, its drawing kept" do
     block = diagram_of
     visit_editor(@page)
     paste_source(block, FLOW)
     await_stored_drawing(block, FLOW)
 
-    paste_source(block, "#{FLOW}\n  classDef done fill:#0f0")
+    refused = "#{FLOW}\n  classDef done fill:#0f0"
+    paste_source(block, refused)
     assert_selector "#{field_selector(block)} [data-admin--diagram--preview-target='status']",
       text: "Line 3: colours come from the site's theme, so classDef isn't used here.", wait: 10
     assert_selector "#{field_selector(block)} [data-admin--diagram--preview-target='status'] code", exact_text: "classDef"
     assert_includes status_text(block), "The site keeps the last drawing that worked."
-
     assert_equal 2, marked_line(block), "the mark stands on the third line"
+
+    assert_eventually(wait: 10, message: "the refused source was never saved") { stored(block)["source"] == refused }
+    assert_writes_settled
+    assert_equal "", find("##{source_id(block)}-errors", visible: :all).text(:all).strip, "no field error"
+    assert_equal Diagrams::Drawing.digest(FLOW), stored(block).dig("drawing", "from"), "the drawing that worked is kept"
 
     # Typed on with the same refusal, the region is not written again.
     page.execute_script(<<~JS, field_selector(block))
@@ -197,14 +207,65 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
       window.__statusWrites = 0
       new MutationObserver((records) => { window.__statusWrites += records.length }).observe(region, { childList: true, subtree: true, characterData: true })
     JS
-    paste_source(block, "#{FLOW}\n  classDef done fill:#0f0\n")
-    paste_source(block, "#{FLOW}\n  classDef done fill:#0f0\n  ")
-    # The source's autosave is the form's ordinary 422 (the server holds the
-    # same line rules); its answer is the end of the window.
-    assert_selector "##{source_id(block)}-errors", text: "Line 3: colours come from the site's theme", wait: 10
+    paste_source(block, "#{refused}\n")
+    paste_source(block, "#{refused}\n  ")
+    assert_eventually(wait: 10) { stored(block)["source"] == refused } # the cast drops the outer blank lines
+    assert_writes_settled
     await_frames
     assert_equal 0, page.evaluate_script("window.__statusWrites"), "the same error is said once"
-    assert_equal Diagrams::Drawing.digest(FLOW), stored(block).dig("drawing", "from")
+  end
+
+  # The frame takes its drawing's height, between 200 and 640 pixels, so a
+  # pie is shown whole.
+  test "the frame is as high as its drawing" do
+    block = diagram_of
+    visit_editor(@page)
+    assert_equal 200, frame_height(block)
+
+    paste_source(block, DiagramFixtures.sources.fetch("pie"))
+    await_frame_text(block, "English")
+    assert_eventually(wait: 5, message: "the frame never grew") { frame_height(block) > 200 }
+    height = frame_height(block)
+    assert_operator height, :<=, 640
+    assert page.evaluate_script(<<~JS, field_selector(block)), "the frame shows its drawing with no scroll"
+      (() => {
+        const frame = document.querySelector(arguments[0] + " iframe")
+        const root = frame.contentDocument.documentElement
+        return root.scrollHeight <= root.clientHeight + 1
+      })()
+    JS
+
+    paste_source(block, "")
+    assert_eventually(wait: 10, message: "the frame never went back to its least height") { frame_height(block) == 200 }
+  end
+
+  # A stored drawing whose source no longer draws (a source changed and
+  # saved while it did not draw) is what the site shows, and the card shows
+  # it too, under the badge, beside a notice that says it is kept.
+  test "a card whose source fails at connect shows the stored drawing as the last that worked" do
+    drawing = BlockTypes::Diagram.sample_drawing("en")
+    block = diagram_of("en" => { "source" => BROKEN, "drawing" => drawing })
+    visit_editor(@page)
+
+    await_frame_text(block, "Published")
+    assert_selector "#{field_selector(block)} [data-admin--diagram--preview-target='kept']", exact_text: "Last drawing that worked", wait: 10
+    assert_selector "#{field_selector(block)} [data-admin--diagram--preview-target='status']", text: "This diagram doesn't draw:"
+    assert_includes status_text(block), "The site keeps the last drawing that worked."
+    assert_no_selector "#{field_selector(block)} [data-admin--diagram--preview-target='blank']"
+    assert_writes_settled
+    assert_equal drawing["from"], stored(block).dig("drawing", "from"), "opening the card wrote nothing"
+  end
+
+  test "while the description is blank a note under the preview says the site shows nothing" do
+    block = diagram_of("en" => { "source" => FLOW })
+    visit_editor(@page)
+    note = "#{field_selector(block)} [data-admin--diagram--preview-target='undescribed']"
+
+    assert_selector "#{note}[role='note']", exact_text: "The site shows this diagram once it has a description."
+    find("#block-#{block.id}-description").set("A draft goes to review.")
+    assert_no_selector note
+    find("#block-#{block.id}-description").set("  ")
+    assert_selector note
   end
 
   test "a type that isn't supported names the list" do

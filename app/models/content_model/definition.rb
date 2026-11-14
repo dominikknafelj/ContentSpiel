@@ -54,8 +54,10 @@ module ContentModel
     #
     # `drawing:` names the `:diagram_drawing` field a `:mermaid` source's
     # drawing is written into (`ContentModel::FieldTypes`, checked once every
-    # field is declared).
-    OPTIONS = %i[required default min max translated translation_required options of blank label control help placeholder_from format format_message drawing].freeze
+    # field is declared), and `description:` the text field whose words
+    # describe that drawing, which the source's card asks for while it is
+    # blank.
+    OPTIONS = %i[required default min max translated translation_required options of blank label control help placeholder_from format format_message drawing description].freeze
     CONTROLS = %i[segmented].freeze
 
     # One field in the schema: `options` carries everything but name/type

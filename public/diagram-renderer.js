@@ -8,11 +8,17 @@
 // drawing's limits and the font files) and from its parent's messages.
 //
 // THE PROTOCOL. The parent posts `{ id, source, colours }` with target '*'
-// (an opaque origin cannot be named). The frame answers its parent, with '*',
-// in the order the messages came:
+// (an opaque origin cannot be named), or `{ id, show, colours }`: `show` a
+// drawing the server stored, which the frame cleans as it cleans its own and
+// shows without drawing anything, so that a card whose source does not draw
+// shows the drawing the site keeps. The frame answers its parent, with '*',
+// in the order the messages came, and every answer carries `height`: how
+// high the drawing it shows now stands in its document, in CSS pixels (0
+// for none), for the card to size the frame to:
 //   - `{ id, svg, bytes, elements }`: the CLEANED drawing, as the server will
 //     store it, and its UTF-8 size and element count; a blank source answers
 //     `svg: ""` and clears the drawing;
+//   - `{ id, shown: true }` for a `show`;
 //   - `{ id, error: { kind, line, message, ... } }`, `kind` one of
 //     `too_long` (over the source's limit in code points; line 0), `refused` (a line rule of
 //     `Diagrams::Source`, with its `rule` and `word`; `line` is 1-based, 0 for a
@@ -210,6 +216,22 @@
 
   const parseError = (error) => ({ kind: "parse", line: errorLine(error), message: String((error && error.message) || error) })
 
+  // How high the drawing shown stands: down to its bottom edge and the
+  // body's margin under it, so the frame needs no scroll to show it whole.
+  const height = () => {
+    if (!shown.firstElementChild) return 0
+    const bottom = shown.getBoundingClientRect().bottom + window.scrollY
+    return Math.ceil(bottom + parseFloat(getComputedStyle(document.body).marginBottom || "0"))
+  }
+
+  // A stored drawing, shown as it is once cleaned: no Mermaid, no limits
+  // (the server stored it), nothing handed back but that it is shown.
+  const show = ({ id, show: svg, colours }) => {
+    paint(colours)
+    shown.replaceChildren(document.importNode(clean(svg).root, true))
+    return { id, shown: true }
+  }
+
   const draw = async ({ id, source, colours, raw }) => {
     paint(colours)
     // The refusals first, so a blank source over the limit is too long, as
@@ -290,12 +312,14 @@
   window.addEventListener("message", (event) => {
     if (event.source !== window.parent) return
     const message = event.data
-    if (!message || typeof message !== "object" || typeof message.source !== "string") return
+    if (!message || typeof message !== "object") return
+    if (typeof message.source !== "string" && typeof message.show !== "string") return
     if (typeof message.id !== "string" && typeof message.id !== "number") return
 
-    queue = queue.then(() => draw(message)).then(
-      (answer) => window.parent.postMessage(answer, "*"),
-      (error) => window.parent.postMessage({ id: message.id, error: parseError(error) }, "*")
+    const work = typeof message.source === "string" ? () => draw(message) : () => show(message)
+    queue = queue.then(work).then(
+      (answer) => window.parent.postMessage({ ...answer, height: height() }, "*"),
+      (error) => window.parent.postMessage({ id: message.id, error: parseError(error), height: height() }, "*")
     )
   })
 })()

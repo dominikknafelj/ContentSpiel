@@ -58,7 +58,7 @@ module BlockTypes
       BlockTypes.register :diagram do |t|
         t.label "Diagram"
         t.icon "diagram", family: :code
-        t.field :source, :mermaid, translated: true, max: Diagrams::Source::MAX_CHARACTERS, drawing: :drawing
+        t.field :source, :mermaid, translated: true, max: Diagrams::Source::MAX_CHARACTERS, drawing: :drawing, description: :description
         t.field :drawing, :diagram_drawing, translated: true
         t.field :description, :text, translated: true, translation_required: true, label: "Description",
                 help: "Describe what the diagram shows, for people who can't see it. The diagram shows on the site only with a description."

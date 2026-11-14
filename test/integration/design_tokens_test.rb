@@ -8,18 +8,21 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   # But one rule: CS Studio's values of the Diagram block's themed tokens,
   # on the public diagram's class, which the block card reads off its colour
   # probe and posts to the renderer frame (content-spiel.css). They define
-  # those names from `--cs-*` tokens and nothing reads a theme token.
+  # those names from `--cs-*` tokens alone and nothing reads a theme token.
   STUDIO_DIAGRAM = /html\[data-surface="?studio"?\]\s*\.content-block--diagram\s*\{([^}]*)\}/
 
   test "the product build carries product tokens and no theme tokens" do
     css = stylesheet("tailwind.css")
 
     assert_includes css, "--cs-paper"
-    diagram = css[STUDIO_DIAGRAM, 1]
-    assert diagram, "CS Studio's diagram colours are in the product build"
-    assert_equal BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }.sort,
-      diagram.scan(/(--th-[\w-]+):\s*var\(--cs-[\w-]+\)/).flatten.sort, "each a CS Studio token"
-    assert_not_includes css.sub(STUDIO_DIAGRAM, ""), "--th-"
+    # The build writes a `color-mix()` value twice, a fallback and the mix
+    # under `@supports`, each in a rule of the same selector.
+    diagram = css.scan(STUDIO_DIAGRAM).flatten.join(";")
+    assert_not_empty diagram, "CS Studio's diagram colours are in the product build"
+    values = diagram.scan(/(--th-[\w-]+):([^;]+)/).to_h
+    assert_equal BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }.sort, values.keys.sort
+    values.each { |name, value| assert_empty value.scan(/--[\w-]+/).reject { |token| token.start_with?("--cs-") }, "#{name} is made of CS Studio tokens" }
+    assert_not_includes css.gsub(STUDIO_DIAGRAM, ""), "--th-"
     assert_not_includes css, "cs-prose"
   end
 
