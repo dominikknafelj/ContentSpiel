@@ -4,7 +4,12 @@
 
 ### Added
 
-- The theme contract's Diagram block: the line `blocks/diagram_component` (`block`, `page`, `svg`, `description`, `caption`), thirteen themed tokens (`--th-diagram-ink`, `-fill`, `-line`, `-edge`, `-group`, `-note`, `-accent`, `-series-1` to `-series-6`) and the fixed `--th-diagram-font`, and the type's stylesheet `diagram.css`, which a theme that replaces it keeps the layout rules of (`docs/reference/theming.md`, "The Diagram block").
+- The Diagram block, an eighth block type: a diagram written as Mermaid text (flowchart, sequence, class, state, ER, gantt and pie), drawn in CS Studio as the editor types and shown on the site as a cleaned SVG printed inline with no script, in the theme's colours in both schemes and on every band. Each language may have its own source, drawing and description; a diagram shows on the site only once it has a description, which is its accessible name. A wide diagram scales down to its column to three fifths of its size, then scrolls sideways in its own box. On the card the preview says why a source does not draw (a construct the site does not use, a type not supported yet, Mermaid's own message) and keeps the last drawing that worked; Import file… reads a `.mmd` file, or a `.md` file's first mermaid fence, into the source. The tile shows the drawing's shape in small, with "No description", "Last drawing kept" or "Not drawn yet". AI translation sends the description and the caption, never the source (`docs/reference/content-blocks-and-types.md`, "The Diagram block").
+- The field types `:mermaid` (a Mermaid source, kept as typed, translatable per language, never offered to AI, refused only over its length) and `:diagram_drawing` (a drawing cleaned by `Diagrams::Drawing` on write and on read, not tracked for translation state).
+- The field options `translation_required: true` (with `translated: true`: blank where the primary language has a value reads missing, as an image's alt does, and is never required for a save), `drawing:` and `description:` on a `:mermaid` field (the `:diagram_drawing` field its drawing is written into, and the field that describes it), and `help:` on a `:text` field, as on a `:string`.
+- The route `GET <ADMIN_PATH>/diagram-renderer`, behind sign-in: the Diagram block's renderer frame, one document with no data, sandboxed with its own Content-Security-Policy. The four Archivo `.woff2` faces answer `Access-Control-Allow-Origin: *`, so the frame's opaque origin can load them.
+- The task `RAILS_ENV=test bin/rails diagram:fixtures`, which draws the Diagram block's fixture drawings and the sample's with the vendored Mermaid in headless Chrome, for after a Mermaid upgrade.
+- Mermaid 12.2.0, vendored (`vendor/javascript/mermaid.js`, its SHA-256 in `mermaid.VERSION`), loaded only by the renderer frame and never on a public page.
 
 ### Breaking
 
@@ -12,8 +17,11 @@
 
 ### For a gem or an outside caller
 
+- The theme contract's Diagram block: the line `blocks/diagram_component` (`block`, `page`, `svg`, `description`, `caption`), thirteen themed tokens (`--th-diagram-ink`, `-fill`, `-line`, `-edge`, `-group`, `-note`, `-accent`, `-series-1` to `-series-6`) and the fixed `--th-diagram-font`, and the type's stylesheet `diagram.css`, which a theme that replaces it keeps the layout rules of (`docs/reference/theming.md`, "The Diagram block").
 - AI translation (`AI::Translate`) and "Suggest translations for N empty fields" no longer offer a translated field whose type is not `translatable` (`Translations::Tracker.ai_translatable_fields`), the rule the field's own Translate button always followed: a gem's block type with a translated `:url`, `:select` or `:link` field no longer has it sent to the AI provider or counted, and asking for it by name is refused as a field that can't be translated.
 - For a built-in block type: `t.tile_picture ->(block, locale:) { … }` draws a small picture on its tile in CS Studio, markup the type wrote; a block type from outside that declares one is refused at registration.
+- A block type's sample may give a translated value as a callable, called once when the sample is first read and never while the type registers.
+- `ContentModel::FieldType` takes `tracked:` (default true; false for a value derived from another field, which has no translation state of its own) and `finish:` (a type's refusals once every field of the definition is declared, for an option that names a later field). An input in `Admin::Fields` may answer `self.reference?`, `self.hidden?` (the hidden variant: drawn with its error slot alone, taking no room until it holds an error), `field_data`, `below_pair`, `label_end` and `self.outside_form`, and takes `importable:` (false unless the caller can take a file into the field now); `Admin::Ui::FieldComponent` takes `importable:` and hands it on.
 
 ## 0.4.0 (2026-11-13)
 
