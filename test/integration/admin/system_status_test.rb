@@ -30,7 +30,7 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/system_status"
 
-    rows = css_select("li.admin-system-check")
+    rows = css_select("#system-checks li.admin-system-check")
     assert_equal "off", rows.last["data-status"]
     assert_select "li[data-status=off]", text: /Off.*Single sign-on.*Not set up/m
     results = Setup::SystemCheck.run(remote_ip: "127.0.0.1").reject(&:off?)
@@ -97,7 +97,7 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/system_status"
 
-    assert_select "div.rounded-card.bg-surface.shadow-1", count: 1 do
+    assert_select "#system-checks.rounded-card.bg-surface.shadow-1", count: 1 do
       assert_select "> ul.divide-y.divide-line.px-4", count: 1 do
         assert_select "> li.admin-system-check", count: Setup::SystemCheck.run(remote_ip: "127.0.0.1").size
       end
@@ -127,8 +127,79 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/system_status"
 
-    statuses = css_select("li.admin-system-check").map { |row| row["data-status"] }
+    statuses = css_select("#system-checks li.admin-system-check").map { |row| row["data-status"] }
     assert_equal statuses.sort_by { |status| status == "warning" ? 0 : 1 }, statuses
+  end
+
+  # The Content card (Design System card StudioDrawDiagrams): what the site's
+  # content asks of someone. Its row is drawn by the checks' row component but
+  # is no `Setup::SystemCheck`, so it is in no count.
+  def undrawn_diagram
+    @flows = @flows.to_i + 1
+    page = create_page(title: "Flows #{@flows}", published: false)
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "diagram" },
+      translations: { "en" => { settings: { "source" => BlockTypes::Diagram::SAMPLE_SOURCES.fetch("en") } } }, actor: users(:one))
+    assert result.ok?, result.errors.to_sentence
+  end
+
+  test "the content card counts the diagrams to draw" do
+    2.times { undrawn_diagram }
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+
+    assert_select "h2", text: "Content"
+    assert_select "#content-checks li.admin-system-check[data-status=warning]", count: 1 do
+      assert_select "p", text: "Diagrams"
+      assert_select "p", text: "2 diagrams to draw. Until one is drawn, the site shows its last drawing, or nothing."
+      assert_select "a[href=?]", "/cs-studio/diagram-drawings", text: "Draw diagrams →"
+    end
+  end
+
+  test "the content card says one diagram in the singular" do
+    undrawn_diagram
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+
+    assert_select "#content-checks p", text: "1 diagram to draw. Until it is drawn, the site shows its last drawing, or nothing."
+  end
+
+  test "the content card says every diagram is drawn" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+
+    assert_select "#content-checks li.admin-system-check[data-status=ok]" do
+      assert_select "p", text: "Diagrams"
+      assert_select "p", text: "Every diagram is drawn."
+      assert_select "a", count: 0
+    end
+  end
+
+  test "the content card is not shown without pages.edit" do
+    undrawn_diagram
+    access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/system_status"
+
+    assert_response :success
+    assert_select "#content-checks", count: 0
+    assert_select "#content-heading", count: 0
+    assert_select "a[href=?]", "/cs-studio/diagram-drawings", count: 0
+  end
+
+  test "the content row is not a check" do
+    undrawn_diagram
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+
+    results = Setup::SystemCheck.run(remote_ip: "127.0.0.1").reject(&:off?)
+    assert_select "h1 + p.text-small.text-meta", text: /\A#{results.count(&:ok?)} of #{results.size} checks? passed/
+    assert_select "#system-checks li.admin-system-check", count: Setup::SystemCheck.run(remote_ip: "127.0.0.1").size
+    assert_not_includes Setup::SystemCheck.run.map(&:label), "Diagrams"
   end
 
   include MailState

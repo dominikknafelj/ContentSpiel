@@ -32,6 +32,7 @@ module Admin
         limits: [
           "It is drawn in five variants and two sizes, and a look outside them is refused rather than added by a caller's class.",
           "Under reduced motion the fill and the lift change at once and the primary's one-pixel press does not move; its press is told by its elevation going.",
+          "`disabled` is for a button with no reason shown; `aria-disabled=\"true\"` takes the same look (each `disabled:` class has its `aria-disabled:` twin) and keeps the focus ring, for a button that stays focusable because a reason stands beside it in words, joined by `aria-describedby`. Pressing it does nothing only if the caller's script says so: it is still a real button, so a submit in a form must be stopped too.",
           "Busy is set by admin--ui--busy on the button's form; the button only keeps its variant's look while it is busy."
         ],
         states: %i[rest hover focus pressed disabled],
@@ -42,8 +43,8 @@ module Admin
         keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a button is one Tab stop that Enter and Space both press: an image block's Choose image opens the picker" ]
       )
 
-      # Every hover is `not-disabled:hover:`: a disabled button never answers
-      # the pointer. Tailwind's `hover:` stands under `@media (hover: hover)`,
+      # Every hover and press is `not-disabled:not-aria-disabled:`: neither kind
+      # of disabled button answers the pointer. Tailwind's `hover:` stands under `@media (hover: hover)`,
       # so a touch screen keeps no stuck hover (`admin_design_rules_test`).
       #
       # THE EDGE. A secondary's tint and a danger text's sunken fill are no
@@ -62,15 +63,15 @@ module Admin
       # darker accent and shadow 3. Each press fill's step from its
       # rest and its words on it are measured (`admin_contrast_test`).
       VARIANT_CLASSES = {
-        primary: "border-transparent bg-accent text-on-accent shadow-2 not-disabled:hover:bg-accent-hover not-disabled:hover:shadow-3 " \
-                 "not-disabled:active:translate-y-px not-disabled:active:shadow-none motion-reduce:not-disabled:active:translate-y-0",
-        secondary: "border-field-line bg-accent-tint text-accent not-disabled:hover:bg-accent-press not-disabled:hover:shadow-2",
-        tertiary: "border-transparent bg-transparent text-accent not-disabled:hover:bg-accent-press not-disabled:hover:underline",
+        primary: "border-transparent bg-accent text-on-accent shadow-2 not-disabled:not-aria-disabled:hover:bg-accent-hover not-disabled:not-aria-disabled:hover:shadow-3 " \
+                 "not-disabled:not-aria-disabled:active:translate-y-px not-disabled:not-aria-disabled:active:shadow-none motion-reduce:not-disabled:not-aria-disabled:active:translate-y-0",
+        secondary: "border-field-line bg-accent-tint text-accent not-disabled:not-aria-disabled:hover:bg-accent-press not-disabled:not-aria-disabled:hover:shadow-2",
+        tertiary: "border-transparent bg-transparent text-accent not-disabled:not-aria-disabled:hover:bg-accent-press not-disabled:not-aria-disabled:hover:underline",
         # Solid red: a dialog's destructive confirm only. `on-danger` is the
         # token for the words on it (white in light, near-black in dark).
-        danger: "border-transparent bg-danger text-on-danger not-disabled:hover:bg-danger-hover not-disabled:hover:shadow-2",
+        danger: "border-transparent bg-danger text-on-danger not-disabled:not-aria-disabled:hover:bg-danger-hover not-disabled:not-aria-disabled:hover:shadow-2",
         # The trigger for a destructive action: sunken, red words.
-        danger_text: "border-field-line bg-sunken text-danger-ink not-disabled:hover:bg-danger-press not-disabled:hover:shadow-2"
+        danger_text: "border-field-line bg-sunken text-danger-ink not-disabled:not-aria-disabled:hover:bg-danger-press not-disabled:not-aria-disabled:hover:shadow-2"
       }.freeze
 
       # A small button's variant: the same, but for the edge, which is the
@@ -78,9 +79,9 @@ module Admin
       # (3px under its words) and thickens its line to 2px under the pointer.
       # Whole strings, which Tailwind sees.
       SMALL_VARIANT_CLASSES = VARIANT_CLASSES.merge(
-        secondary: "border-accent bg-accent-tint text-accent not-disabled:hover:bg-accent-press not-disabled:hover:shadow-2",
-        tertiary: "border-transparent bg-transparent text-accent underline underline-offset-3 not-disabled:hover:bg-accent-press not-disabled:hover:decoration-2",
-        danger_text: "border-danger bg-sunken text-danger-ink not-disabled:hover:bg-danger-press not-disabled:hover:shadow-2"
+        secondary: "border-accent bg-accent-tint text-accent not-disabled:not-aria-disabled:hover:bg-accent-press not-disabled:not-aria-disabled:hover:shadow-2",
+        tertiary: "border-transparent bg-transparent text-accent underline underline-offset-3 not-disabled:not-aria-disabled:hover:bg-accent-press not-disabled:not-aria-disabled:hover:decoration-2",
+        danger_text: "border-danger bg-sunken text-danger-ink not-disabled:not-aria-disabled:hover:bg-danger-press not-disabled:not-aria-disabled:hover:shadow-2"
       ).freeze
 
       # Every variant carries a 1px `border` at rest, transparent or its edge,
@@ -88,7 +89,10 @@ module Admin
       # the save bar's Save). DISABLED is one look for every variant: sunken,
       # meta words, no shadow, no edge and no opacity, so it can't read as a
       # weak primary. A BUSY button (`admin--ui--busy` sets `aria-busy`) is
-      # disabled too but keeps its variant's look beside its spinner. The fill
+      # disabled too but keeps its variant's look beside its spinner. The same
+      # look is drawn for `aria-disabled="true"` (`aria-disabled:` beside every
+      # `disabled:`), which leaves the button focusable and its focus ring on;
+      # the caller shows the reason in words and joins it by `aria-describedby`. The fill
       # and the lift change over 120ms on `--cs-ease`, and at once under
       # reduced motion, where the primary's press does not move either (it is
       # told by its shadow going).
@@ -96,7 +100,7 @@ module Admin
                      "transition-[background-color,box-shadow] duration-120 ease-(--cs-ease) motion-reduce:transition-none " \
                      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " \
                      "disabled:cursor-not-allowed disabled:not-aria-busy:border-transparent disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta " \
-                     "disabled:not-aria-busy:shadow-none aria-busy:cursor-progress".freeze
+                     "disabled:not-aria-busy:shadow-none aria-disabled:cursor-not-allowed aria-disabled:border-transparent aria-disabled:bg-sunken aria-disabled:text-meta aria-disabled:shadow-none aria-busy:cursor-progress".freeze
 
       BASE_CLASS = "#{COMMON_CLASS} px-4 py-2".freeze
 

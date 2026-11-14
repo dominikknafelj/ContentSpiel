@@ -419,6 +419,11 @@ Rails.application.routes.draw do
       # the admin host alone, the host of the editor that frames it.
       get "diagram-renderer", to: "diagram_renderers#show", as: :diagram_renderer
 
+      # The Draw diagrams task (`Admin::DiagramDrawingsController`): `index`
+      # lists the diagrams to draw, `update` saves one block's drawing for one
+      # language.
+      resources :diagram_drawings, path: "diagram-drawings", only: %i[index update]
+
       # The audit log:
       # a paginated, filterable list plus one event's own page.
       # `resources` (plural, unlike `system_status`/`mind_graph` above) since

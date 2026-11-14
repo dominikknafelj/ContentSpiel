@@ -1,0 +1,54 @@
+# The Draw diagrams screen's own keys (docs/reference/i18n.md):
+# `admin.diagram_drawings.index` is the view's lazy-lookup scope
+# (`app/views/admin/diagram_drawings/index.html.erb`) and the scope of the
+# screen's head, notices and end-of-run card, which the screen's components
+# and its script (`admin--diagram--draw-all`, through `data-messages`) read by
+# full key. The rows say theirs as `admin.components.diagram_drawings_screen`.
+en:
+  admin:
+    diagram_drawings:
+      index:
+        title: "Draw diagrams"
+        lead: "Diagrams written outside CS Studio, by a loader, a script or MCP, have no drawing until a browser draws them. Each drawing is saved as a change; nothing is published."
+        # The head's count: the server's, and after a run the rows still to draw.
+        count:
+          one: "%{count} diagram to draw."
+          other: "%{count} diagrams to draw."
+        # One button: its label changes, so the focus never moves.
+        draw_all: "Draw all"
+        stop: "Stop"
+        stopping: "Stopping…"
+        # The visible line under the head during a run.
+        progress: "Drawing %{done} of %{total}…"
+        # What the live region says when a run starts.
+        started:
+          one: "Drawing %{count} diagram…"
+          other: "Drawing %{count} diagrams…"
+        # The end of a run: the parts that are not nought, joined with " · "
+        # (`separator`) and ended with "." (`end`). A run always ends a row, so one part at least is not nought.
+        summary:
+          drawn:
+            one: "%{count} drawn"
+            other: "%{count} drawn"
+          failed:
+            one: "%{count} doesn't draw"
+            other: "%{count} don't draw"
+          skipped:
+            one: "%{count} skipped"
+            other: "%{count} skipped"
+          separator: " · "
+          end: "."
+        # A row's reason when the save's answer is not JSON or names no reason.
+        failed_generic: "This drawing wasn't saved. Try again."
+        empty: "Every diagram is drawn. A diagram written outside CS Studio waits here until it is drawn."
+        # Over plain HTTP to a host other than localhost, where a browser
+        # offers no `crypto.subtle`: the notice above the list, and the reason
+        # under the disabled "Draw all".
+        insecure: "Diagrams are drawn only over HTTPS, or on localhost. Open CS Studio over HTTPS to draw them."
+        insecure_short: "Drawing needs HTTPS."
+        # The end-of-run card; its verb is Waiting for you's own
+        # (`admin.components.dashboard_screen.waiting_row.review`), since it
+        # opens the same dialog.
+        publish:
+          title: "Pages with new drawings"
+          line: "Saved, not published: the site doesn't show these drawings, and a scheduled page goes live without them."

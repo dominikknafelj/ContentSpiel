@@ -14,6 +14,16 @@ en:
           one: "%{passed} of %{count} check passed · last run %{time}"
           other: "%{passed} of %{count} checks passed · last run %{time}"
         run_again: "Run checks again"
+        # The "Content" card under the checks (`Admin::SystemStatusController
+        # #content_results`): what the content asks of someone, not checks.
+        content:
+          title: "Content"
+          diagrams:
+            label: "Diagrams"
+            to_draw:
+              one: "%{count} diagram to draw. Until it is drawn, the site shows its last drawing, or nothing."
+              other: "%{count} diagrams to draw. Until one is drawn, the site shows its last drawing, or nothing."
+            ok: "Every diagram is drawn."
       # The "CS Studio address" row (`Setup::SystemCheck#admin_address`), present
       # only when ADMIN_HOST is set.
       admin_address:

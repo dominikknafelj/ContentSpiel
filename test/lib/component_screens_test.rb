@@ -85,6 +85,10 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/admin/dashboard_controller.rb
       app/controllers/admin/note_inbox_controller.rb
     ], # note_inbox/_card is the Dashboard's Notes for you panel, which NoteInboxController redraws; the controller's index is the Notes inbox, whose view is notes_screen's
+    "diagram_drawings_screen" => %w[
+      app/views/admin/diagram_drawings
+      app/controllers/admin/diagram_drawings_controller.rb
+    ],
     "editor_screen" => %w[
       app/views/admin/pages
       app/views/admin/posts

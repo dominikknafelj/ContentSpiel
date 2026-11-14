@@ -1,0 +1,38 @@
+# The Draw diagrams screen's components, `app/components/admin/diagram_drawings_screen/`
+# (docs/reference/i18n.md). Keys are `admin.components.diagram_drawings_screen.<component>`;
+# the run's script reads them through `data-messages`.
+en:
+  admin:
+    components:
+      diagram_drawings_screen:
+        # `Admin::DiagramDrawingsScreen::PageGroupComponent`, a page's head.
+        page_group:
+          untitled: "(untitled)"
+        # `Admin::DiagramDrawingsScreen::RowComponent`, one diagram in one language.
+        row:
+          # A row's state in a word. The server draws the first two; a run
+          # writes the others.
+          states:
+            not_drawn: "Not drawn yet"
+            kept: "Last drawing kept"
+            waiting: "Waiting"
+            drawing: "Drawing…"
+            drawn: "Drawn"
+            failed: "Doesn't draw"
+            skipped: "Skipped"
+          # The verb the row ends in, describing its one link.
+          open: "Open"
+          # Why a run left a row undrawn. `too_large` is the Diagram card's
+          # own sentence (`admin.components.fields.mermaid_field.too_large`)
+          # and `invalid_drawing` the field's (`errors.messages.invalid_drawing`),
+          # both handed to the script as they are; `gone` stands for a
+          # refused permission too, and tells nothing of which. `held` with
+          # no holder is the hold strip's `refused.unknown`, and `held` by the
+          # viewer's own other tab the hold strip's `own_tab`. An answer that
+          # names no reason reads `admin.diagram_drawings.index.failed_generic`.
+          reasons:
+            does_not_draw: "This diagram doesn't draw: %{message}"
+            changed: "Changed since this list was drawn. Open it to draw it."
+            held: "Being edited by %{name}."
+            stopped: "Stopped before it was drawn."
+            gone: "No longer yours to draw, or no longer here."

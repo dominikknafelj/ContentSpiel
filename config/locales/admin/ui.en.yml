@@ -82,6 +82,7 @@ en:
           open_mail_settings: "Open Mail settings →"
           open_image_settings: "Open Image settings →"
           open_forms: "Open Forms →"
+          draw_diagrams: "Draw diagrams →"
           learn_more: "Learn more →"
 
         # The copy box's button, and what `admin--ui--clipboard` says after a

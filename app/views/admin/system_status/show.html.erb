@@ -21,10 +21,28 @@
           data: { turbo_prefetch: "false" } %>
   </div>
 
-  <div class="rounded-card bg-surface shadow-1">
+  <div id="system-checks" class="rounded-card bg-surface shadow-1">
     <%= render "setup/system_check_results", results: @results, copyable: true, list_class: "divide-y divide-line px-4",
           mail_settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage")),
           image_settings_href: (admin_settings_path(anchor: "images", **admin_url_options) if can?("settings.manage")),
           forms_href: (admin_forms_path(**admin_url_options) if %w[forms.manage form_submissions.view].any? { |key| can?(key) }) %>
   </div>
+
+  <%# The Content card: what the site's content asks of someone. Not checks
+      (nothing is wrong with the host), so it is neither in the summary's
+      count nor in the wizard; the controller hands it over only to a viewer
+      who may act on it (`pages.edit`). %>
+  <% if @content_results.any? %>
+    <section class="mt-6" aria-labelledby="content-heading">
+      <h2 id="content-heading" class="mb-2 text-h2 text-ink"><%= t(".content.title") %></h2>
+      <div id="content-checks" class="rounded-card bg-surface shadow-1">
+        <ul class="divide-y divide-line px-4">
+          <% @content_results.each_with_index do |result, index| %>
+            <%= render Admin::Ui::SystemCheckRowComponent.new(result: result, index: index,
+                  diagram_drawings_href: admin_diagram_drawings_path(**admin_url_options)) %>
+          <% end %>
+        </ul>
+      </div>
+    </section>
+  <% end %>
 </div>

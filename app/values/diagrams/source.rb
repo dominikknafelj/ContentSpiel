@@ -74,9 +74,17 @@ module Diagrams
 
     # The first keyword when it is on the list, as typed ("graph", "stateDiagram-v2"), else nil.
     def self.type(text)
-      _, line = keyword_line(text.to_s.delete_prefix(BOM).lines)
-      keyword = line&.split(/\s+/, 2)&.first
+      keyword = opening_line(text)&.split(/\s+/, 2)&.first
       keyword if TYPES.key?(keyword)
+    end
+
+    # The source's first line that is neither blank nor a `%%` comment,
+    # trimmed and without a leading BOM: the line that names the diagram's
+    # type, whether or not the type is on the list. Nil for a source of
+    # blanks and comments.
+    def self.opening_line(text)
+      _, line = keyword_line(text.to_s.delete_prefix(BOM).lines)
+      line
     end
 
     def self.refusals(text)

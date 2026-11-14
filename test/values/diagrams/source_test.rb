@@ -87,6 +87,12 @@ class Diagrams::SourceTest < ActiveSupport::TestCase
     assert_nil Diagrams::Source.type("")
   end
 
+  test "opening_line is the keyword's line, past a BOM, blank lines and comments" do
+    assert_equal "flowchart TD", Diagrams::Source.opening_line("\uFEFF\n%% note\n  flowchart TD  \n  A --> B")
+    assert_equal "notADiagram x", Diagrams::Source.opening_line("notADiagram x")
+    assert_nil Diagrams::Source.opening_line("\n%% only a comment\n")
+  end
+
   test "first_line is the first non-blank line after the keyword's" do
     assert_equal "A --> B", Diagrams::Source.first_line("flowchart LR\n\n  A --> B\n  B --> C")
     assert_nil Diagrams::Source.first_line("flowchart LR")

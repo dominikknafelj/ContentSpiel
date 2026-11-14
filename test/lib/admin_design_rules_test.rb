@@ -726,6 +726,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/ui/save_status_component.rb" => "the save status line stays mono capitals",
     "app/components/admin/editor_screen/tile_summary_component.rb" => "the Code block's tile shows its source as the mono look",
     "app/components/admin/fields/code_field.rb" => "the Code block's source field is code",
+    "app/components/admin/diagram_drawings_screen/row_component.rb" => "a Draw diagrams row with no description shows its Mermaid source's first line, which is code",
     "app/views/setup/token.html.erb" => "the setup token's input holds a key value, and the log's commands are code",
     "app/components/admin/ui/copy_value_component.html.erb" => "a value a person copies exactly: a token, an address, a command",
     "app/components/admin/audit_screen/row_component.html.erb" => "the event's action key (`event.action`)",
@@ -1591,7 +1592,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/javascript/rich_text/popover.js" => "a script-built button that cannot render the component",
     "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser",
     "app/components/admin/ui/save_bar_component.html.erb" => "the save bar's unsaved dot, beside its words",
-    "app/views/setup/_steps.html.erb" => "the wizard's progress bar"
+    "app/views/setup/_steps.html.erb" => "the wizard's progress bar",
+    "app/components/admin/diagram_drawings_screen/run_head_component.html.erb" => "the Draw diagrams run's progress bar"
   }.freeze
 
   test "only a button, the checkbox, a count pill, the unread bubble, a progress bar and the unsaved marks carry the accent fill" do
@@ -2215,11 +2217,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "var(--cs-accent)" ], lit.map(&:last).uniq, "the verb under the pointer or the focus"
     selectors = lit.flat_map(&:first)
     assert selectors.all? { |selector| selector.match?(/:(hover|focus-within|focus-visible)/) }, selectors.inspect
-    # The Waiting for you row, the draft tile, a Translations row and a table
-    # row of one link (`.admin-row-link`) around their stretched links, and
-    # the Notes for you row that is the link, each on hover and focus.
+    # The Waiting for you row, the draft tile, a Translations row, a Draw
+    # diagrams row and a table row of one link (`.admin-row-link`) around
+    # their stretched links, and the Notes for you row that is the link, each
+    # on hover and focus.
     assert_equal [ ".admin-waiting-row:hover .admin-row-verb", ".admin-waiting-row:focus-within .admin-row-verb",
                    ".admin-translation-row:hover .admin-row-verb", ".admin-translation-row:focus-within .admin-row-verb",
+                   ".admin-draw-row:hover .admin-row-verb", ".admin-draw-row:focus-within .admin-row-verb",
                    "tr:has(.admin-row-link):hover .admin-row-verb", "tr:has(.admin-row-link):focus-within .admin-row-verb",
                    ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
                    "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort

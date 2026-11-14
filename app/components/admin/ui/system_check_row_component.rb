@@ -23,9 +23,10 @@ module Admin
     # the page.
     #
     # A result may carry a `link` (a symbol: the model names no route):
-    # `:mail_settings`, `:image_settings` and `:forms`, drawn as "Open Mail
-    # settings →" at `mail_settings_href`, "Open Image settings →" at
-    # `image_settings_href` and "Open Forms →" at `forms_href`, which the
+    # `:mail_settings`, `:image_settings`, `:forms` and `:diagram_drawings`,
+    # drawn as "Open Mail settings →" at `mail_settings_href`, "Open Image
+    # settings →" at `image_settings_href`, "Open Forms →" at `forms_href` and
+    # "Draw diagrams →" at `diagram_drawings_href`, which the
     # screen hands over (System status, for a viewer who holds
     # `settings.manage`); without an address there is no link, whatever the
     # result says. The links, and "Learn more →" to a result's `docs`, are
@@ -38,12 +39,12 @@ module Admin
         motion: :reduced,
         content_edges: %i[long],
         widths: :from_container,
-        interface: %i[result index copyable mail_settings_href image_settings_href forms_href],
+        interface: %i[result index copyable mail_settings_href image_settings_href forms_href diagram_drawings_href],
         limits: [
           "Without copyable (the setup wizard) the command is selectable text with no Copy button."
         ],
         states: %i[ok warning off hover focus],
-        keys: %w[ok warning off copy_label open_mail_settings open_image_settings open_forms learn_more],
+        keys: %w[ok warning off copy_label open_mail_settings open_image_settings open_forms draw_diagrams learn_more],
         slots: [],
         controller: nil,
         keyboard: [ "test/system/admin/keyboard_feedback_test.rb", "a system check's Copy is the Tab stop after its command, and Enter on it copies the command and says so" ]
@@ -51,13 +52,14 @@ module Admin
 
       LINK_CLASS = Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)
 
-      def initialize(result:, index:, copyable: true, mail_settings_href: nil, image_settings_href: nil, forms_href: nil)
+      def initialize(result:, index:, copyable: true, mail_settings_href: nil, image_settings_href: nil, forms_href: nil, diagram_drawings_href: nil)
         @result = result
         @index = index
         @copyable = copyable
         @mail_settings_href = mail_settings_href
         @image_settings_href = image_settings_href
         @forms_href = forms_href
+        @diagram_drawings_href = diagram_drawings_href
       end
 
       private
@@ -69,6 +71,8 @@ module Admin
       def image_settings_link? = result.link == :image_settings && @image_settings_href.present?
 
       def forms_link? = result.link == :forms && @forms_href.present?
+
+      def diagram_drawings_link? = result.link == :diagram_drawings && @diagram_drawings_href.present?
 
       def copyable? = @copyable
 

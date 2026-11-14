@@ -33,7 +33,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
         end
       end
     end
-    assert_includes Admin::Ui::ButtonComponent.classes(:primary).split, "motion-reduce:not-disabled:active:translate-y-0"
+    assert_includes Admin::Ui::ButtonComponent.classes(:primary).split, "motion-reduce:not-disabled:not-aria-disabled:active:translate-y-0"
   end
 
   test "rejects an unknown variant" do
@@ -44,8 +44,8 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     render_inline Admin::Ui::ButtonComponent.new(label: "Save")
     classes = page.find("button")["class"].split
 
-    %w[bg-accent text-on-accent shadow-2 not-disabled:hover:bg-accent-hover not-disabled:hover:shadow-3
-       not-disabled:active:translate-y-px not-disabled:active:shadow-none].each { |name| assert_includes classes, name }
+    %w[bg-accent text-on-accent shadow-2 not-disabled:not-aria-disabled:hover:bg-accent-hover not-disabled:not-aria-disabled:hover:shadow-3
+       not-disabled:not-aria-disabled:active:translate-y-px not-disabled:not-aria-disabled:active:shadow-none].each { |name| assert_includes classes, name }
   end
 
   # The owner's decision of 2026-11-07: a tinted fill alone is no shape on
@@ -55,7 +55,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     render_inline Admin::Ui::ButtonComponent.new(label: "Preview", variant: :secondary)
     classes = page.find("button")["class"].split
 
-    %w[bg-accent-tint text-accent border-field-line not-disabled:hover:bg-accent-press not-disabled:hover:shadow-2].each { |name| assert_includes classes, name }
+    %w[bg-accent-tint text-accent border-field-line not-disabled:not-aria-disabled:hover:bg-accent-press not-disabled:not-aria-disabled:hover:shadow-2].each { |name| assert_includes classes, name }
     assert_not_includes classes, "border-transparent"
   end
 
@@ -63,7 +63,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     render_inline Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :tertiary)
     classes = page.find("button")["class"].split
 
-    %w[text-accent bg-transparent border-transparent not-disabled:hover:underline not-disabled:hover:bg-accent-press].each { |name| assert_includes classes, name }
+    %w[text-accent bg-transparent border-transparent not-disabled:not-aria-disabled:hover:underline not-disabled:not-aria-disabled:hover:bg-accent-press].each { |name| assert_includes classes, name }
     assert_empty classes.grep(/hover:shadow/), "a text button does not rise"
     assert_raises(ArgumentError) { Admin::Ui::ButtonComponent.new(label: "x", variant: :ghost) }
   end
@@ -81,7 +81,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
 
   test "a small tertiary is underlined at rest, 3px under its words, and its hover thickens the line to 2px" do
     small = Admin::Ui::ButtonComponent.classes(:tertiary, size: :small).split
-    %w[underline underline-offset-3 not-disabled:hover:decoration-2 not-disabled:hover:bg-accent-press].each { |name| assert_includes small, name }
+    %w[underline underline-offset-3 not-disabled:not-aria-disabled:hover:decoration-2 not-disabled:not-aria-disabled:hover:bg-accent-press].each { |name| assert_includes small, name }
     regular = Admin::Ui::ButtonComponent.classes(:tertiary).split
     assert_not_includes regular, "underline", "a regular tertiary is underlined only under the pointer"
   end
@@ -95,10 +95,10 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
         hovers = Admin::Ui::ButtonComponent.classes(variant, size: size).split.grep(/hover:/)
         assert_empty hovers.grep(/hover:(?:outline|ring|border|shadow-accent|drop-shadow|inset-shadow)/), "#{variant} #{size}: #{hovers.inspect}"
         shadows = hovers.grep(/hover:shadow/)
-        assert_empty shadows - %w[not-disabled:hover:shadow-2 not-disabled:hover:shadow-3], "#{variant} #{size}: a hover lift is a neutral elevation"
+        assert_empty shadows - %w[not-disabled:not-aria-disabled:hover:shadow-2 not-disabled:not-aria-disabled:hover:shadow-3], "#{variant} #{size}: a hover lift is a neutral elevation"
       end
     end
-    assert_equal %w[not-disabled:hover:shadow-3], Admin::Ui::ButtonComponent.classes(:primary).split.grep(/hover:shadow/), "the primary rises to shadow 3"
+    assert_equal %w[not-disabled:not-aria-disabled:hover:shadow-3], Admin::Ui::ButtonComponent.classes(:primary).split.grep(/hover:shadow/), "the primary rises to shadow 3"
   end
 
   test "a hover fades its fill and its lift over 120ms on --cs-ease" do
@@ -112,11 +112,11 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
         classes = Admin::Ui::ButtonComponent.classes(variant, size: size).split
         assert_includes classes, "motion-reduce:transition-none", "#{variant} #{size}"
         moves = classes.grep(/active:translate/)
-        assert_includes classes, "motion-reduce:not-disabled:active:translate-y-0", "#{variant} #{size}" if moves.any?
+        assert_includes classes, "motion-reduce:not-disabled:not-aria-disabled:active:translate-y-0", "#{variant} #{size}" if moves.any?
       end
     end
-    assert_includes Admin::Ui::ButtonComponent.classes(:primary).split, "not-disabled:active:translate-y-px", "the press moves where motion is allowed"
-    assert_includes Admin::Ui::ButtonComponent.classes(:primary).split, "not-disabled:active:shadow-none", "and under reduced motion it is told by the shadow alone"
+    assert_includes Admin::Ui::ButtonComponent.classes(:primary).split, "not-disabled:not-aria-disabled:active:translate-y-px", "the press moves where motion is allowed"
+    assert_includes Admin::Ui::ButtonComponent.classes(:primary).split, "not-disabled:not-aria-disabled:active:shadow-none", "and under reduced motion it is told by the shadow alone"
   end
 
   test "the danger confirm's words are the on-danger token, never a white literal" do
@@ -131,7 +131,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
   test "danger_text is red words on the sunken fill inside a field-line edge, hovered to the danger press fill; danger_outline is gone" do
     render_inline(Admin::Ui::ButtonComponent.new(label: "Move to trash", variant: :danger_text))
     assert_selector "button.bg-sunken.text-danger-ink.border-field-line", text: "Move to trash"
-    assert_selector "button[class~='not-disabled:hover:bg-danger-press'][class~='not-disabled:hover:shadow-2']"
+    assert_selector "button[class~='not-disabled:not-aria-disabled:hover:bg-danger-press'][class~='not-disabled:not-aria-disabled:hover:shadow-2']"
     assert_no_selector "button.bg-accent-tint"
     assert_raises(ArgumentError) { Admin::Ui::ButtonComponent.new(label: "x", variant: :danger_outline) }
   end
@@ -160,7 +160,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     assert_includes helper.setup_primary_button_class.split, "inline-flex"
   end
 
-  test "no variant answers the pointer while disabled: every hover is not-disabled:hover:" do
+  test "no variant answers the pointer while disabled: every hover is not-disabled:not-aria-disabled:hover:" do
     Admin::Ui::ButtonComponent::VARIANT_CLASSES.each do |variant, classes|
       assert_empty classes.split.grep(/\Ahover:/), variant
     end
@@ -181,6 +181,48 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     end
   end
 
+  # `aria-disabled="true"` is the disabled look for a button that stays
+  # focusable so the reason beside it is read (Draw all over plain HTTP).
+  test "an aria-disabled button has the disabled look: every disabled: class has its aria-disabled: counterpart" do
+    Admin::Ui::ButtonComponent::VARIANT_CLASSES.each_key do |variant|
+      %i[regular small].each do |size|
+        classes = Admin::Ui::ButtonComponent.classes(variant, size: size).split
+        disabled = classes.grep(/\Adisabled:/)
+        assert_not_empty disabled, "#{variant} #{size}"
+        disabled.each do |name|
+          counterpart = name.sub("disabled:not-aria-busy:", "disabled:").sub(/\Adisabled:/, "aria-disabled:")
+          assert_includes classes, counterpart, "#{variant} #{size}: #{name} has no #{counterpart}"
+        end
+        %w[aria-disabled:cursor-not-allowed aria-disabled:border-transparent aria-disabled:bg-sunken aria-disabled:text-meta aria-disabled:shadow-none].each do |name|
+          assert_includes classes, name, "#{variant} #{size}"
+        end
+      end
+    end
+  end
+
+  test "an aria-disabled button answers no hover or press: every one is not-disabled:not-aria-disabled:" do
+    Admin::Ui::ButtonComponent::VARIANT_CLASSES.each_key do |variant|
+      %i[regular small].each do |size|
+        classes = Admin::Ui::ButtonComponent.classes(variant, size: size).split
+        pointer = classes.grep(/(?:hover|active):/)
+        assert_not_empty pointer, "#{variant} #{size}"
+        pointer.each do |name|
+          assert_match(/not-disabled:not-aria-disabled:(?:hover|active):/, name, "#{variant} #{size}: #{name}")
+        end
+      end
+    end
+  end
+
+  test "the focus ring stays on an aria-disabled button" do
+    render_inline Admin::Ui::ButtonComponent.new(label: "Draw all", aria: { disabled: "true", describedby: "why" })
+    button = page.find("button[aria-disabled='true'][aria-describedby='why']")
+    classes = button["class"].split
+
+    %w[focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent].each { |name| assert_includes classes, name }
+    assert_empty classes.grep(/aria-disabled:(?:outline|focus)/), "no aria-disabled class takes the ring away"
+    assert_nil button["disabled"], "it is not disabled, so it is still reached with Tab"
+  end
+
   # A disabled button must not change size: the save bar's Save is toggled by
   # script, so every variant has its 1px border at rest and the disabled look
   # only recolours it.
@@ -199,7 +241,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     render_inline Admin::Ui::ButtonComponent.new(label: "Delete", variant: :danger)
     assert_selector "button.bg-danger", text: "Delete"
     classes = page.find("button")["class"].split
-    %w[not-disabled:hover:bg-danger-hover not-disabled:hover:shadow-2].each { |name| assert_includes classes, name }
+    %w[not-disabled:not-aria-disabled:hover:bg-danger-hover not-disabled:not-aria-disabled:hover:shadow-2].each { |name| assert_includes classes, name }
     assert_empty classes.grep(/opacity/), "the hover is a fill, never a fade"
   end
 
