@@ -334,10 +334,12 @@ module ContentModel
       # a mark this save was handed is refused (`raw`, and every language of
       # `translations`): a stored drawing that today's rules refuse reads back
       # as the mark (no drawing) and stops no save. Translated with its
-      # source, never offered to an AI provider, audited as a digest.
+      # source, never offered to an AI provider, audited as a digest, and
+      # not tracked for translation state: it is derived from the source,
+      # whose change is what makes a translation outdated.
       def diagram_drawing
         FieldType.new(
-          name: :diagram_drawing, translatable: false, audit: :digest,
+          name: :diagram_drawing, translatable: false, audit: :digest, tracked: false,
           cast: ->(value) { cast_drawing(value) },
           options: ->(options, _earlier) { refuse_choice_and_string_options(options) },
           validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|

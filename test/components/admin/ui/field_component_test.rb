@@ -134,8 +134,23 @@ class Admin::Ui::FieldComponentTranslationTest < ViewComponent::TestCase
       errors: [ "This drawing can't be shown on the site." ], id_prefix: "block-7")
 
     assert_selector "[data-field-name='drawing'] input[type=hidden]#block-7-drawing", visible: :all
+    wrapper = page.find("[data-field-name='drawing']", visible: :all)
+    assert_equal %w[admin-field admin-field--hidden], wrapper[:class].split, "no margin of its own"
+    assert_equal %w[input div], wrapper.all(:xpath, "./*", visible: :all).map(&:tag_name), "the input and its error slot, nothing else"
     assert_no_selector "label, [data-original-for], [data-translate-slot] *", visible: :all
     assert_no_text "svg"
     assert_selector "#block-7-drawing-errors", text: "This drawing can't be shown on the site."
+  end
+
+  # The form is a column with a gap between its items: the drawing's wrapper
+  # is no item until its error slot holds a message.
+  test "a hidden field takes no room in the form: its wrapper is not drawn while its error slot is empty" do
+    field = Field.new(name: "drawing", type: :diagram_drawing, options: { translated: true })
+    render_inline Admin::Ui::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "en", id_prefix: "block-7")
+
+    assert_selector ".admin-field--hidden #block-7-drawing-errors:not(:has(p))", visible: :all
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    assert_match(/^\.admin-field--hidden:not\(:has\(p\)\) \{ display: none; \}$/, css)
+    assert_includes Rails.root.join("app/views/admin/shared/_field_errors.html.erb").read, '<p class="flex gap-1.5">', "a message is a p, which the rule looks for"
   end
 end

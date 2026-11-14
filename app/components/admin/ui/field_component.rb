@@ -115,6 +115,11 @@ module Admin
       # question of the field's type name.
       def own_label? = input_class.own_label?(field)
 
+      # A hidden input nobody types in (`Fields::Base.hidden?`): drawn with
+      # its error slot alone, in `.admin-field--hidden`, which takes no room
+      # in the form until the slot holds an error.
+      def hidden? = input_class.hidden?(field)
+
       # A field whose input draws nothing (a theme choice with no choice
       # to make) draws no label or chrome either.
       def render? = input_class.respond_to?(:draws?) ? input_class.draws?(field, value) : true

@@ -21,6 +21,10 @@ module ContentModel
   #   digests and two lengths in an event's changes: `Audit::Snapshot`) or
   #   `:reference` (as it is, unless it is a `LinkReference`, which a person
   #   must never read: then as digests, which the log words "Changed").
+  # - `tracked`: whether a translated field of the type has a translation
+  #   state of its own (`Translations::Tracker`). A value derived from
+  #   another field (a Diagram block's drawing, from its source) is not:
+  #   the field it is derived from is. True unless a type says otherwise.
   # - `finish`: `->(field, fields) { ... }`, the type's refusals once every
   #   field of the definition is declared (`Definition#finish_fields!`, at
   #   registration), for an option that names a field declared after it
@@ -29,7 +33,7 @@ module ContentModel
   # It names no component: a type's input and its read-only display are its
   # `Admin::Fields::<Type>Field`, found by name, because the content model
   # sits below CS Studio (CLAUDE.md, Dependency order).
-  FieldType = Data.define(:name, :cast, :options, :validate, :translatable, :audit, :finish) do
-    def initialize(finish: ->(_field, _fields) { }, **attributes) = super(finish:, **attributes)
+  FieldType = Data.define(:name, :cast, :options, :validate, :translatable, :audit, :tracked, :finish) do
+    def initialize(tracked: true, finish: ->(_field, _fields) { }, **attributes) = super(tracked:, finish:, **attributes)
   end
 end

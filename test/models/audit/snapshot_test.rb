@@ -353,4 +353,44 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     assert_equal "open", ActiveSupport::ParameterFilter.new(ActiveRecord::Base.filter_attributes).filter_param("state", "open")
     assert_equal({ "state" => "open", "code" => "en", "nonce" => "n" }, Audit::Snapshot.scrub("state" => "open", "code" => "en", "nonce" => "n"))
   end
+
+  # A field type's `audit: :digest` holds in every language: a Diagram
+  # block's translated source and drawing are a digest and a length in the
+  # changes row, never the text or the SVG.
+  test "a Diagram-shaped block's save audits its translated source and drawing as digests only" do
+    saved_types = BlockTypes.all.dup
+    BlockTypes.register("test/diagram") do |t|
+      TestTypes.declare(t)
+      t.label "Diagram"
+      t.field :source, :mermaid, translated: true, drawing: :drawing
+      t.field :drawing, :diagram_drawing, translated: true
+      t.field :description, :text, translated: true
+      t.component TestQuoteComponent
+    end
+    with_locales(%w[en de], default: "en") do
+      svg = Diagram::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg
+      drawing = ->(source) { JSON.generate(svg: svg, from: Diagram::Drawing.digest(source)) }
+      saved = ContentBlocks::Save.call(create_page(title: "With a diagram").content_blocks.new,
+        attributes: { block_type: "test/diagram", settings: { "source" => "flowchart LR\n  SOURCE-EN --> B", "drawing" => drawing.("flowchart LR\n  SOURCE-EN --> B"), "description" => "Words" } })
+      assert saved.ok?, saved.errors.to_sentence
+      block = saved.record
+
+      assert ContentBlocks::Save.call(block, translations: { "de" => { settings: {
+        "source" => "flowchart LR\n  SOURCE-DE --> B", "drawing" => drawing.("flowchart LR\n  SOURCE-DE --> B"), "description" => "Wörter" } } }).ok?
+      event = Audit::Event.where(action: "block.updated").order(:id).last
+      changes = event.field_changes.to_json
+
+      assert_not_includes changes, "SOURCE-DE"
+      assert_not_includes changes, "SOURCE-EN"
+      assert_not_includes changes, "<svg"
+      before, after = event.field_changes.fetch("translated_settings")
+      assert_equal summary_of("flowchart LR\n  SOURCE-DE --> B"), after.dig("de", "source")
+      assert_equal %w[digest length], after.dig("de", "drawing").keys
+      assert_equal "Wörter", after.dig("de", "description"), "a field audited by its value stays as it is"
+      assert_equal after["en"], before["en"]
+    end
+  ensure
+    BlockTypes.reset!
+    saved_types.each { |definition| BlockTypes.registry_put(definition) }
+  end
 end

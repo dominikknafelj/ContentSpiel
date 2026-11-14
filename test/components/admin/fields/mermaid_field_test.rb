@@ -135,4 +135,19 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert_equal SOURCE, Admin::Fields::MermaidField.display(field, SOURCE).text
     assert_nil Admin::Fields::MermaidField.display(field, nil)
   end
+
+  # Held by someone else on a translation tab with no source of its own: the
+  # original's source, read-only, still said to be the starting text, so it
+  # never reads as this language's own.
+  test "a held card on a translation tab with no source of its own shows the original read-only with the starting line" do
+    render_field(nil, original: SOURCE, locale: "de")
+    held = Nokogiri::HTML5.fragment(Admin::EditorScreen::HeldFields.call(rendered_content))
+    textarea = held.at_css("textarea#block-7-source")
+
+    assert_equal "readonly", textarea["readonly"]
+    assert_nil textarea["name"]
+    assert_equal SOURCE, textarea.text
+    assert_equal "Starts from the English diagram. It becomes this language's own when you change it.", held.at_css("p#block-7-source-starting").text
+    assert_includes textarea["aria-describedby"].split, "block-7-source-starting"
+  end
 end

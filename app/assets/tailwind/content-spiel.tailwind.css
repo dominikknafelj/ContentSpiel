@@ -849,6 +849,10 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-mermaid-field__pair { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
 .admin-mermaid-field__pair > * { flex: 1 1 19.5rem; min-width: min(100%, 19.5rem); }
 .admin-mermaid-field__frame { min-height: 200px; border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
+/* A hidden field input (`Admin::Ui::FieldComponent#hidden?`, a Diagram
+   block's drawing): no box and no gap in its form's column, until its error
+   slot holds a message (a `p`, `admin/shared/_field_errors`). */
+.admin-field--hidden:not(:has(p)) { display: none; }
 /* The dashboard's heading row: the heading, then New page… and New post…
    at its end. It wraps, so on a narrow screen the buttons go under the
    heading rather than crushing it. */

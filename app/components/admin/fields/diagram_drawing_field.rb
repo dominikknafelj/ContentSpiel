@@ -16,15 +16,18 @@ module Admin
     # a drawing: the same promise as the source's starting text.
     #
     # No label of its own and none drawn for it (`own_label?`), no original
-    # beside it (`reference?`), and nothing to show read-only (`display`):
-    # the source's field shows the drawing. Its error slot stays, for a
-    # refused save (`errors.messages.invalid_drawing`).
+    # beside it (`reference?`), no room in the card (`hidden?`), and nothing
+    # to show read-only (`display`): the source's field shows the drawing.
+    # Its error slot stays, for a refused save
+    # (`errors.messages.invalid_drawing`), and shows when it holds one.
     class DiagramDrawingField < Base
       def self.display(_field, _value) = nil
 
       def self.own_label?(_field) = true
 
       def self.reference?(_field) = false
+
+      def self.hidden?(_field) = true
 
       def stored? = value.is_a?(Hash) && value["svg"].is_a?(String)
 

@@ -197,10 +197,14 @@ module Translations
 
     def translation_target_locales = Translations.target_locales
 
+    # The translated schema fields whose state is tracked: a field of a
+    # type that is derived from another field (`FieldType#tracked`, false for
+    # a Diagram block's drawing, which follows its source) is not, so a
+    # re-draw of the same source changes no language's state.
     def translation_schema_fields
       return [] unless translation_schema_reader && respond_to?(:definition)
 
-      definition&.fields.to_a.select(&:translated?)
+      definition&.fields.to_a.select { |field| field.translated? && field.field_type&.tracked != false }
     end
 
     def translation_schema_field(field)

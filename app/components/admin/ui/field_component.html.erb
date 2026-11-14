@@ -1,3 +1,10 @@
+<% if hidden? %>
+  <%# A hidden input and its error slot: no label, help, original or Translate button, and no room taken until an error shows (`#hidden?`). %>
+  <div class="admin-field admin-field--hidden" data-field-name="<%= field.name %>">
+    <%= render input_component %>
+    <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
+  </div>
+<% else %>
 <% translate = show_original? ? translate_button : nil %>
 <%# The suggestion box is shared by Translate (an empty field) and Suggest update (an outdated one, in
     its reference card): one id, `Admin::Ui::SuggestionComponent.dom_id(input_id)`, so either lands under the input. %>
@@ -30,3 +37,4 @@
 
   <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>
+<% end %>

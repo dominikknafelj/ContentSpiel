@@ -29,6 +29,12 @@ module Admin
       # nothing a translator compares, so it answers false.
       def self.reference?(_field) = true
 
+      # Whether the input is a hidden one nobody types in (a drawing the
+      # preview script writes): `Ui::FieldComponent` then draws the input and
+      # its error slot alone, in a wrapper that takes no room in the form (no
+      # box, no gap in its column) until the slot holds an error.
+      def self.hidden?(_field) = false
+
       # `id_prefix:` mirrors `Ui::FieldComponent`'s own (see its comment) --
       # forwarded here unchanged so `input_id` agrees with the wrapping
       # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a
