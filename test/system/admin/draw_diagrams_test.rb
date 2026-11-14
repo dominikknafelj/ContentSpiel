@@ -54,6 +54,8 @@ class Admin::DrawDiagramsSystemTest < ApplicationSystemTestCase
 
   def start_button = find("[data-admin--diagram--draw-all-target='start']", visible: :all)
 
+  def count_line = find("[data-admin--diagram--draw-all-target='count']", visible: :all)
+
   def summary = find("[data-admin--diagram--draw-all-target='summary']", visible: :all).text(:all).squish
 
   def drawing(block, locale = "en") = block.reload.translated_settings.to_h.dig(locale, "drawing")
@@ -102,6 +104,7 @@ class Admin::DrawDiagramsSystemTest < ApplicationSystemTestCase
     assert_current_drawing second, FLOW_LIVE
     assert_equal 2, @saves.size
     assert_no_selector "button", text: "Draw all", wait: 0
+    assert_not count_line.visible?, "nothing is left to draw, so no count"
     assert_no_selector "[aria-busy='true'][data-draw-row]"
     assert_equal "2 drawn.", find("[data-admin--diagram--draw-all-target='status']", visible: :all).text(:all).squish, "the live region speaks the end"
   end
@@ -136,6 +139,7 @@ class Admin::DrawDiagramsSystemTest < ApplicationSystemTestCase
     assert_current_drawing fine, FLOW
     assert_equal [ fine.id.to_s ], @saves, "a source that doesn't draw sends nothing"
     assert_equal "1 drawn · 1 doesn't draw.", summary
+    assert_equal "1 diagram to draw.", count_line.text, "the head counts the rows still to draw"
     assert_selector "button", exact_text: "Draw all", wait: 0
   end
 
@@ -155,25 +159,46 @@ class Admin::DrawDiagramsSystemTest < ApplicationSystemTestCase
     assert_equal "1 drawn · 1 skipped.", summary
   end
 
-  test "a live page is offered for review and publish" do
+  test "a block held in the viewer's own other tab says so, not their name" do
+    held = diagram(FLOW)
+    reserve(held, @page, users(:one), OTHER_TAB)
+    visit_list
+
+    press "Draw all"
+    assert_chip held, "Skipped"
+    assert_equal I18n.t("admin.components.editor_screen.hold_strip.own_tab"), reason(held)
+    assert_nil drawing(held)
+  end
+
+  # A scheduled page goes live with the copy taken when it was scheduled,
+  # so its new drawing waits for Publish changes as a live page's does.
+  test "a live page and a scheduled page are offered for review and publish, each with its status" do
     live = create_page(title: "Live flows", published: true)
     block = diagram(FLOW, page: live)
     publish_changes(live)
     copies = Publishing::Version.of(live).pluck(:id, :blocks)
+    scheduled = create_page(title: "Later flows", published: false)
+    assert Pages::Save.call(scheduled, attributes: { published_at: 3.days.from_now }).ok?
+    scheduled_block = diagram(FLOW, page: scheduled)
     draft_block = diagram(FLOW_LIVE)
     visit_list
     assert_no_selector "[data-admin--diagram--draw-all-target='publish']"
 
     press "Draw all"
     assert_chip block, "Drawn"
+    assert_chip scheduled_block, "Drawn"
     assert_chip draft_block, "Drawn"
 
     within "[data-admin--diagram--draw-all-target='publish']" do
-      assert_selector "h2", exact_text: "Live pages with new drawings"
-      assert_selector "li", count: 1
-      assert_selector "[data-part='title']", exact_text: "Live flows"
-      link = find("a", exact_text: "Review and publish…")
-      assert_equal admin_page_path(live, review: "publish"), URI(link[:href]).request_uri
+      assert_selector "h2", exact_text: "Pages with new drawings"
+      assert_selector "li", count: 2
+      { live => "Live", scheduled => "Scheduled" }.each do |listed, status|
+        item = find("li", text: listed.title)
+        assert_equal listed.title, item.find("[data-part='title']").text
+        assert_equal status, item.find("[data-part='status'] .admin-status-chip").text.squish
+        link = item.find("a", exact_text: "Review and publish…")
+        assert_equal admin_page_path(listed, review: "publish"), URI(link[:href]).request_uri
+      end
     end
     assert_equal copies, Publishing::Version.of(live).pluck(:id, :blocks), "nothing is published"
     assert live.reload.unpublished_changes?
@@ -242,6 +267,7 @@ class Admin::DrawDiagramsSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-draw-row] [data-part='reason']:not([hidden])"
     assert_no_selector "[data-admin--diagram--draw-all-target='publish']"
     assert_equal 0, page.evaluate_script("document.querySelector(\"[data-admin--diagram--draw-all-target='publishList']\").children.length")
+    assert_equal "3 diagrams to draw.", count_line.text, "the count is the server's again"
     assert_equal "", summary
     assert_equal "", find("[data-admin--diagram--draw-all-target='status']", visible: :all).text(:all)
     assert_no_selector "[data-admin--diagram--draw-all-target='progress']"

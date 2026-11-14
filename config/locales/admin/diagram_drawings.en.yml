@@ -10,6 +10,7 @@ en:
       index:
         title: "Draw diagrams"
         lead: "Diagrams written outside CS Studio, by a loader, a script or MCP, have no drawing until a browser draws them. Each drawing is saved as a change; nothing is published."
+        # The head's count: the server's, and after a run the rows still to draw.
         count:
           one: "%{count} diagram to draw."
           other: "%{count} diagrams to draw."
@@ -49,5 +50,5 @@ en:
         # (`admin.components.dashboard_screen.waiting_row.review`), since it
         # opens the same dialog.
         publish:
-          title: "Live pages with new drawings"
-          line: "Their drawings are saved, not on the site yet."
+          title: "Pages with new drawings"
+          line: "Saved, not published: the site doesn't show these drawings, and a scheduled page goes live without them."

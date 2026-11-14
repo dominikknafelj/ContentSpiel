@@ -24,16 +24,20 @@ import { headers } from "editing/requests"
 // and the answer awaited. An error is "Doesn't draw" with the frame's
 // sentence; a drawing is digested (`diagram/digest`) and sent through the
 // write queue (`enqueue`) as a PATCH to the row's `data-url` with `locale`,
-// `svg`, `from` and the block's base (`base_updated_at`), the CSRF token and
+// `svg`, `from` and the block's base (`base_updated_at`), as multipart
+// `FormData`, as the card's autosave sends it (a drawing near its 1 MB
+// limit, percent-encoded, could cross Rack's 4 MB limit on an urlencoded
+// body, which multipart does not share), the CSRF token and
 // the tab header (`editing/requests`' `headers()`), without which the
 // server's stale and held checks would not know this tab. The next row is
 // drawn only once the save has answered. A save's answer names the block's
 // new base, which every row of the same block (its other languages) takes,
 // or the next language would be refused as stale by the first.
 //
-// AN ANSWER is `{ ok: true, live, page_id, review_url, base }` or
-// `{ ok: false, reason, holder }`. A refusal is Skipped (changed since the
-// list, held, gone) or "Doesn't draw" (the drawing too large or refused by
+// AN ANSWER is `{ ok: true, published, status, page_id, review_url, base }`
+// or `{ ok: false, reason, holder, own_tab }`. A refusal is Skipped (changed
+// since the list, held, gone; held by the viewer's own other tab, `own_tab`,
+// reads the hold strip's sentence for it, never their own name) or "Doesn't draw" (the drawing too large or refused by
 // the sanitizer) with the reason's sentence (`REASONS`); anything else (a
 // 403 with no reason, an answer that is not JSON, no answer) is Skipped
 // with the generic sentence.
@@ -55,9 +59,12 @@ import { headers } from "editing/requests"
 // skipped (its text and its reason, as two lines), and at the end (the
 // summary), never per drawn row. The rows a Stop skips are said by the
 // summary alone. At the end: the summary notice (a clone of
-// `summaryNotice`, its parts that are nought left out), the card of live
-// pages that got a drawing (`publish`, one clone of `publishRow` per page,
-// its title and path taken from the page's group), and "Draw all" back
+// `summaryNotice`, its parts that are nought left out), the card of the
+// pages with a published copy, live or scheduled, that got a drawing
+// (`publish`, one clone of `publishRow` per page, its title and path taken
+// from the page's group, its status chip a clone of the `publishChip` of the
+// save's `status`), the head's count (`count`) of the rows still to draw, in
+// its served plural words, hidden when none is left, and "Draw all" back
 // while a row is still to draw.
 //
 // CAN'T DRAW HERE. Without `crypto.subtle` (plain HTTP to another host) no
@@ -68,8 +75,8 @@ import { headers } from "editing/requests"
 //
 // TAKE-BACK. `disconnect` and `turbo:before-cache` end the run (nothing is
 // sent after it), remove the frame and its slot, and put back every chip,
-// reason, mark, the progress, the live region, the summary, the card and
-// the button as the server drew them, so a copy Turbo keeps is the
+// reason, mark, the count, the progress, the live region, the summary, the
+// card and the button as the server drew them, so a copy Turbo keeps is the
 // server's. A row's base taken from a save stays: it is the block's as
 // stored, and a run from a restored copy would otherwise be refused.
 const REASONS = {
@@ -91,7 +98,7 @@ const FRAME_SLOT_STYLE = { position: "fixed", left: "-10000px", top: "0", width:
 
 export default class extends Controller {
   static targets = [ "start", "insecure", "chip", "summaryNotice", "colourProbe", "publish", "publishList", "publishRow",
-    "progress", "status", "summary", "row" ]
+    "publishChip", "count", "progress", "status", "summary", "row" ]
 
   static values = { rendererUrl: String, colours: Array, startClass: String, stopClass: String }
 
@@ -99,7 +106,8 @@ export default class extends Controller {
     this.generation = currentGeneration()
     this.run = null
     this.drawn = new Set()
-    this.livePages = new Map()
+    this.publishedPages = new Map()
+    this.servedCount = this.hasCountTarget ? this.countTarget.textContent : null
     this.served = new Map(this.rowTargets.map((row) => [ row, [ ...this.slot(row).childNodes ].map((node) => node.cloneNode(true)) ]))
     this.takeBack = () => this.close()
     this.leaving = (event) => this.leave(event)
@@ -236,7 +244,8 @@ export default class extends Controller {
 
   // The PATCH of one drawing; its parsed answer, or `{}` for one that is not JSON.
   async save(row, svg, from) {
-    const body = new URLSearchParams({ locale: row.dataset.locale, svg, from, base_updated_at: row.dataset.base })
+    const body = new FormData()
+    Object.entries({ locale: row.dataset.locale, svg, from, base_updated_at: row.dataset.base }).forEach(([ name, value ]) => body.append(name, value))
     try {
       const response = await fetch(row.dataset.url, { method: "PATCH", headers: headers(), body, credentials: "same-origin", signal: AbortSignal.timeout(SAVE_TIMEOUT) })
       if (response.redirected) return {}
@@ -251,13 +260,14 @@ export default class extends Controller {
       if (typeof answer.base === "string") {
         this.rowTargets.filter((other) => other.dataset.blockId === row.dataset.blockId).forEach((other) => { other.dataset.base = answer.base })
       }
-      if (answer.live === true && typeof answer.review_url === "string") {
-        this.livePages.set(String(answer.page_id), { url: answer.review_url, group: row.closest("[data-page-id]") })
+      if (answer.published === true && typeof answer.review_url === "string") {
+        this.publishedPages.set(String(answer.page_id), { url: answer.review_url, status: answer.status, group: row.closest("[data-page-id]") })
       }
       return { state: "drawn" }
     }
     const known = Object.hasOwn(REASONS, answer.reason) ? REASONS[answer.reason] : GENERIC
     if (answer.reason === "held") {
+      if (answer.own_tab === true) return { state: "skipped", reason: this.text("components.editor_screen.hold_strip.own_tab") }
       return { state: "skipped", reason: answer.holder ? this.text(known.key, { name: answer.holder }) : this.text("components.editor_screen.hold_strip.refused.unknown") }
     }
     return this.outcome(known)
@@ -276,8 +286,17 @@ export default class extends Controller {
     this.summaryTarget.replaceChildren(notice)
     this.say(summary)
     this.showPublish()
+    this.showCount()
     this.showButton("start")
     this.startTarget.hidden = this.rowTargets.every((row) => this.drawn.has(row))
+  }
+
+  // The rows still to draw: every row this run or an earlier one did not draw.
+  showCount() {
+    if (!this.hasCountTarget) return
+    const left = this.rowTargets.filter((row) => !this.drawn.has(row)).length
+    this.countTarget.textContent = left > 0 ? this.text("diagram_drawings.index.count", { count: left }) : ""
+    this.countTarget.hidden = left === 0
   }
 
   // Every run ends at least one row, so at least one part is not nought.
@@ -288,12 +307,14 @@ export default class extends Controller {
   }
 
   showPublish() {
-    if (this.livePages.size === 0) return
-    const items = [ ...this.livePages.values() ].map(({ url, group }) => {
+    if (this.publishedPages.size === 0) return
+    const items = [ ...this.publishedPages.values() ].map(({ url, status, group }) => {
       const item = this.publishRowTarget.content.firstElementChild.cloneNode(true)
       item.querySelector("[data-part='title']").textContent = group?.querySelector("[data-part='title']")?.textContent ?? ""
       item.querySelector("[data-part='path']").textContent = group?.querySelector("[data-part='path']")?.textContent ?? ""
       item.querySelector("[data-part='review']").href = url
+      const chip = this.publishChipTargets.find((template) => template.dataset.status === status)
+      if (chip) item.querySelector("[data-part='status']").replaceChildren(chip.content.firstElementChild.cloneNode(true))
       return item
     })
     this.publishListTarget.replaceChildren(...items)
@@ -371,7 +392,11 @@ export default class extends Controller {
     this.frameSlot?.remove()
     this.frameSlot = null
     this.drawn?.clear()
-    this.livePages?.clear()
+    this.publishedPages?.clear()
+    if (this.hasCountTarget && this.servedCount !== null) {
+      this.countTarget.textContent = this.servedCount
+      this.countTarget.hidden = false
+    }
     this.served?.forEach((nodes, row) => {
       this.slot(row).replaceChildren(...nodes.map((node) => node.cloneNode(true)))
       row.removeAttribute("aria-busy")

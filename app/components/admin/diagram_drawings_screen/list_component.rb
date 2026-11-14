@@ -34,14 +34,15 @@ module Admin
 
       # The words the script shows, as `messages_data` serves them.
       MESSAGES = [
-        *%w[draw_all stop stopping progress started insecure insecure_short
+        *%w[count draw_all stop stopping progress started insecure insecure_short
             summary.drawn summary.failed summary.skipped summary.separator summary.end failed_generic]
           .map { |key| "diagram_drawings.index.#{key}" },
         *%w[waiting drawing drawn failed skipped].map { |state| "components.diagram_drawings_screen.row.states.#{state}" },
         *%w[does_not_draw changed held stopped gone].map { |reason| "components.diagram_drawings_screen.row.reasons.#{reason}" },
         "components.fields.mermaid_field.too_large",
         "components.fields.mermaid_field.frame_title",
-        "components.editor_screen.hold_strip.refused.unknown"
+        "components.editor_screen.hold_strip.refused.unknown",
+        "components.editor_screen.hold_strip.own_tab"
       ].freeze
 
       # The script's key => the I18n key whose string it is handed: the

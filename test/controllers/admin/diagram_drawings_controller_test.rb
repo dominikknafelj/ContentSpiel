@@ -53,7 +53,7 @@ class Admin::DiagramDrawingsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :ok
     assert_equal({ "svg" => Diagrams::Drawing.clean(RAW).svg, "from" => from }, block.reload.translated_settings.dig("en", "drawing"))
-    assert_equal({ "ok" => true, "live" => false, "page_id" => @page.id, "page_title" => "Flows",
+    assert_equal({ "ok" => true, "published" => false, "status" => "draft", "page_id" => @page.id, "page_title" => "Flows",
                    "review_url" => admin_page_path(@page, review: "publish"), "base" => block.updated_at.iso8601(6) }, answer)
     assert_equal users(:one).id, Audit::Event.where(action: "block.updated").last.actor_id
   end
@@ -90,7 +90,7 @@ class Admin::DiagramDrawingsControllerTest < ActionDispatch::IntegrationTest
     assert_response :ok
   end
 
-  test "a live page answers live with its review url" do
+  test "a live page answers published with its review url" do
     live = create_page(title: "Live", published: true)
     block = diagram(live)
     sign_in_as users(:one)
@@ -98,9 +98,25 @@ class Admin::DiagramDrawingsControllerTest < ActionDispatch::IntegrationTest
     save_drawing(block)
 
     assert_response :ok
-    assert_equal true, answer["live"]
+    assert_equal true, answer["published"]
+    assert_equal "live", answer["status"]
     assert answer["review_url"].end_with?("?review=publish"), answer["review_url"]
     assert_equal admin_page_path(live, review: "publish"), answer["review_url"]
+  end
+
+  # A scheduled page goes live with the copy taken when it was scheduled
+  # (docs/reference/publishing.md), so the drawing misses the go-live too.
+  test "a scheduled page answers published, with its status" do
+    scheduled = create_page(title: "Later", published: false)
+    assert Pages::Save.call(scheduled, attributes: { published_at: 3.days.from_now }).ok?
+    block = diagram(scheduled)
+    sign_in_as users(:one)
+
+    save_drawing(block)
+
+    assert_response :ok
+    assert_equal true, answer["published"]
+    assert_equal "scheduled", answer["status"]
   end
 
   test "a block outside the scope is gone" do
@@ -112,6 +128,20 @@ class Admin::DiagramDrawingsControllerTest < ActionDispatch::IntegrationTest
 
     assert_no_difference -> { Audit::Event.count } do
       save_drawing(block)
+    end
+
+    assert_response :not_found
+    assert_equal({ "ok" => false, "reason" => "gone", "holder" => nil }, answer)
+    assert_nil block.reload.translated_settings.dig("en", "drawing")
+  end
+
+  test "a Diagram block on a trashed page is gone" do
+    block = diagram
+    assert Current.set(actor: users(:one), channel: :admin) { Trash::Move.call(@page) }.ok?
+    sign_in_as users(:one)
+
+    assert_no_difference -> { Audit::Event.count } do
+      save_drawing(block, from: Diagrams::Drawing.digest(EN), base: block.reload.updated_at.iso8601(6))
     end
 
     assert_response :not_found
@@ -158,6 +188,20 @@ class Admin::DiagramDrawingsControllerTest < ActionDispatch::IntegrationTest
     assert_equal({ "ok" => false, "reason" => "held", "holder" => PersonName.of(users(:two)) }, answer)
     assert_nil block.reload.translated_settings.dig("en", "drawing")
     assert_equal [ [ users(:two).id, OTHER_TAB ] ], Editing::Reservation.pluck(:user_id, :tab)
+  end
+
+  test "a block held in the viewer's own other tab is refused as their own tab, with no name" do
+    block = diagram
+    reserve(block, @page, users(:one), OTHER_TAB)
+    sign_in_as users(:one)
+
+    assert_no_difference -> { Audit::Event.count } do
+      save_drawing(block)
+    end
+
+    assert_response :conflict
+    assert_equal({ "ok" => false, "reason" => "held", "holder" => nil, "own_tab" => true }, answer)
+    assert_nil block.reload.translated_settings.dig("en", "drawing")
   end
 
   test "a save takes no claim of a block nobody holds" do

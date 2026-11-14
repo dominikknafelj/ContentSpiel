@@ -16,7 +16,7 @@ class Admin::DiagramDrawingsScreen::RunHeadComponentTest < ViewComponent::TestCa
     assert_selector "h1", text: "Draw diagrams"
     assert_text "Diagrams written outside CS Studio, by a loader, a script or MCP, have no drawing until a browser draws them. " \
                 "Each drawing is saved as a change; nothing is published."
-    assert_text "4 diagrams to draw."
+    assert_selector "[#{TARGET}='count']", text: "4 diagrams to draw."
 
     head(1)
     assert_text "1 diagram to draw."

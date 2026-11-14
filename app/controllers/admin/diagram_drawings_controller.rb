@@ -13,7 +13,9 @@ module Admin
   #   2. the base: the block changed since the list was drawn (`stale`, 409,
   #      compared as the block card's autosave compares, `Admin::StaleForm`);
   #   3. a hold of the block in ANOTHER tab (`held`, 409, with the holder's
-  #      short name). The task takes no claim (`held_elsewhere?`, as an
+  #      short name, or `own_tab` and no name when the other tab is the
+  #      viewer's own, which the script says in the hold strip's sentence).
+  #      The task takes no claim (`held_elsewhere?`, as an
   #      instant action asks), so a person who opens the card a moment later
   #      is not held off by it;
   #   4. `from`, the digest of the source the frame drew, against the
@@ -27,8 +29,11 @@ module Admin
   #
   # The answer is JSON, not a Turbo Stream: the list draws its own row
   # states, and each `reason` is a key its script reads a sentence for. A
-  # save never publishes: on a live page (`live`) the drawing is an
-  # unpublished change, which `review_url` opens Publish changes for. A
+  # save never publishes: on a page with a published copy, live or
+  # scheduled (`published`, `Publishing::State#published?`), the drawing is
+  # an unpublished change that the copy does not carry, so a scheduled page
+  # goes live without it; `review_url` opens Publish changes for it, and
+  # `status` ("live" or "scheduled") is the chip the end-of-run card shows. A
   # saved answer carries the block's new base (`base`, as the rows write
   # it), which the script hands the block's rows in its other languages:
   # without it the next language's save is refused as stale by this one.
@@ -54,7 +59,7 @@ module Admin
       return refuse(:stale, :conflict) if stale_form?(block, params[:base_updated_at])
 
       hold = held_elsewhere?(block)
-      return refuse(:held, :conflict, holder: hold.user && ::PersonName.of(hold.user)) if hold
+      return refuse_held(hold) if hold
 
       locale = params[:locale].to_s
       return refuse(:changed, :conflict) unless drawn_from_stored_source?(block, locale)
@@ -65,7 +70,8 @@ module Admin
       return refuse(drawing_refusal(result.record, locale), :unprocessable_entity) unless result.ok?
 
       page = block.owner
-      render json: { ok: true, live: ::Publishing::State.of(page).live?, page_id: page.id, page_title: page.title,
+      state = ::Publishing::State.of(page)
+      render json: { ok: true, published: state.published?, status: state.status, page_id: page.id, page_title: page.title,
                      review_url: admin_page_path(page, review: "publish"), base: result.record.updated_at.iso8601(6) }
     end
 
@@ -98,8 +104,17 @@ module Admin
 
     def text_param(name) = (value = params[name]).is_a?(String) ? value : nil
 
-    def refuse(reason, status, holder: nil)
-      render json: { ok: false, reason: reason.to_s, holder: holder }, status: status
+    # The viewer's own other tab is named as such, never by their own name.
+    def refuse_held(hold)
+      return refuse(:held, :conflict, own_tab: true) if hold.user_id == Current.user.id
+
+      refuse(:held, :conflict, holder: hold.user && ::PersonName.of(hold.user))
+    end
+
+    def refuse(reason, status, holder: nil, own_tab: false)
+      body = { ok: false, reason: reason.to_s, holder: holder }
+      body[:own_tab] = true if own_tab
+      render json: body, status: status
     end
   end
 end

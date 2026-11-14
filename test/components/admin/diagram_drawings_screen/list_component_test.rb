@@ -61,6 +61,8 @@ class Admin::DiagramDrawingsScreen::ListComponentTest < ViewComponent::TestCase
     assert_equal "Being edited by %{name}.", served.fetch("components.diagram_drawings_screen.row.reasons.held")
     assert_equal I18n.t("admin.components.editor_screen.hold_strip.refused.unknown"),
       served.fetch("components.editor_screen.hold_strip.refused.unknown")
+    assert_equal "You're editing this in another tab", served.fetch("components.editor_screen.hold_strip.own_tab")
+    assert_equal({ "one" => "%{count} diagram to draw.", "other" => "%{count} diagrams to draw." }, served.fetch("diagram_drawings.index.count"))
     assert_equal I18n.t("admin.components.fields.mermaid_field.too_large"), served.fetch("components.fields.mermaid_field.too_large")
     assert_equal "This drawing can't be shown on the site.", served.fetch("components.diagram_drawings_screen.row.reasons.invalid_drawing")
     assert_equal I18n.t("admin.components.fields.mermaid_field.frame_title"), served.fetch("components.fields.mermaid_field.frame_title")

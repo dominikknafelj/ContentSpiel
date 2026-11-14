@@ -60,6 +60,15 @@ class Publishing::StateTest < ActiveSupport::TestCase
     assert_equal :live, Publishing::State.of(scheduled, now: 4.days.from_now).state
   end
 
+  test "published is a time, live or scheduled, and asks the database nothing" do
+    { none: false, future: true, past: true }.each do |time, published|
+      record = record_with(time, false, false)
+      queries = capture_sql { assert_equal published, Publishing::State.of(record).published?, time.to_s }
+
+      assert_empty queries
+    end
+  end
+
   test "the cheap question, whether the rows moved on, reads the record and asks the database nothing" do
     live = record_with(:past, false, true)
     queries = capture_sql { assert Publishing::State.of(live).changes? }

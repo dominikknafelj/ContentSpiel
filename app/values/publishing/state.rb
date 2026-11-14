@@ -113,6 +113,11 @@ module Publishing
     # Live in any of its three states. No query.
     def live? = status == "live"
 
+    # Live or scheduled: the record has a time, so it has a published copy,
+    # in force or waiting for its time, which a save of its rows does not
+    # reach. No query.
+    def published? = !draft?
+
     # Exactly one of STATES.
     def state
       @state ||=

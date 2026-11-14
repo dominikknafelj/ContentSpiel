@@ -15,6 +15,11 @@ module Admin
     # server names none. Only the script knows whether this browser can draw
     # (a proxy may end TLS).
     #
+    # The count (`count`) is the server's; after a run the script writes the
+    # rows still to draw into it, in the same served words (`count`, plural),
+    # and hides it when none is left, and its take-back puts the server's
+    # words back.
+    #
     # Under the head, the parts a run writes, drawn empty or hidden: the
     # progress line (`progress`: its words and a bar, which is `aria-hidden`,
     # the words carrying it), the polite live region (`status`, which speaks
