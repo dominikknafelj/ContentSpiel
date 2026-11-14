@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.0 (2026-11-13)
+
 ### Added
 
 - Passkeys for CS Studio. A person signs in with a passkey alone ("Sign in with a passkey" on the sign-in page, no email first), or with their password followed by a passkey or a recovery code. At an IP address (a `PUBLIC_HOST` that is an IP, development at 127.0.0.1) no passkey is offered: a passkey belongs to a domain, and WebAuthn refuses an IP.
