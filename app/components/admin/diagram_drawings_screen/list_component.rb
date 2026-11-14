@@ -13,6 +13,9 @@ module Admin
     # probe (an empty element of the public diagram's class nobody sees or
     # hears) and posts to the frame: both as the Diagram card passes them
     # (`Admin::Fields::MermaidField`), so the screen's drawing is the card's.
+    # `start-class` and `stop-class`, the one button's two looks (the
+    # primary "Draw all", the secondary "Stop"), as `ButtonComponent` draws
+    # them, since the script swaps them in place.
     # `data-messages` holds every word the script shows (`MESSAGES`), with
     # the field's refusal of a drawing (`SENTENCES`), whose words are not
     # CS Studio's own.
@@ -66,6 +69,8 @@ module Admin
           controller: CONTROLLER,
           "#{CONTROLLER}-renderer-url-value": helpers.admin_diagram_renderer_path,
           "#{CONTROLLER}-colours-value": Admin::Fields::MermaidField.colour_names.to_json,
+          "#{CONTROLLER}-start-class-value": Admin::Ui::ButtonComponent.classes(:primary),
+          "#{CONTROLLER}-stop-class-value": Admin::Ui::ButtonComponent.classes(:secondary),
           messages: messages
         }
       end

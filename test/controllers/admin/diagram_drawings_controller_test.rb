@@ -54,7 +54,7 @@ class Admin::DiagramDrawingsControllerTest < ActionDispatch::IntegrationTest
     assert_response :ok
     assert_equal({ "svg" => Diagrams::Drawing.clean(RAW).svg, "from" => from }, block.reload.translated_settings.dig("en", "drawing"))
     assert_equal({ "ok" => true, "live" => false, "page_id" => @page.id, "page_title" => "Flows",
-                   "review_url" => admin_page_path(@page, review: "publish") }, answer)
+                   "review_url" => admin_page_path(@page, review: "publish"), "base" => block.updated_at.iso8601(6) }, answer)
     assert_equal users(:one).id, Audit::Event.where(action: "block.updated").last.actor_id
   end
 
@@ -68,6 +68,26 @@ class Admin::DiagramDrawingsControllerTest < ActionDispatch::IntegrationTest
     assert_response :ok
     assert_equal Diagrams::Drawing.digest(stored_source(block, "de")), block.reload.translated_settings.dig("de", "drawing", "from")
     assert_nil block.translated_settings.dig("en", "drawing")
+  end
+
+  # The list's rows of one block share its base: the first language's save
+  # moves it, and the next is sent on the base that save answered.
+  test "the base a save answers is the one the block's next language is saved on" do
+    block = diagram
+    ContentBlocks::Save.call(block, translations: { "de" => { settings: { "source" => DE } } }, actor: users(:one))
+    sign_in_as users(:one)
+    listed = block.reload.updated_at.iso8601(6)
+
+    save_drawing(block, base: listed)
+    assert_response :ok
+    answered = answer.fetch("base")
+    assert_equal block.reload.updated_at.iso8601(6), answered
+
+    save_drawing(block, locale: "de", base: listed)
+    assert_equal "stale", answer["reason"], "the list's base is older than the first save"
+
+    save_drawing(block, locale: "de", base: answered)
+    assert_response :ok
   end
 
   test "a live page answers live with its review url" do

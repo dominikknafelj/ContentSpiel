@@ -37,12 +37,14 @@ class Admin::DiagramDrawingsScreen::ListComponentTest < ViewComponent::TestCase
 
   def served = JSON.parse(root["data-messages"])
 
-  test "the root carries the controller, the renderer's address and the card's colours" do
+  test "the root carries the controller, the renderer's address, the card's colours and the button's two looks" do
     diagram
     list
 
     assert_equal "/#{ContentSpiel::ADMIN_PATH}/diagram-renderer", root["data-#{CONTROLLER}-renderer-url-value"]
     assert_equal Admin::Fields::MermaidField.colour_names, JSON.parse(root["data-#{CONTROLLER}-colours-value"])
+    assert_equal Admin::Ui::ButtonComponent.classes(:primary), root["data-#{CONTROLLER}-start-class-value"]
+    assert_equal Admin::Ui::ButtonComponent.classes(:secondary), root["data-#{CONTROLLER}-stop-class-value"]
     probe = page.find("[#{TARGET}='colourProbe']", visible: :all)
     assert_includes probe[:class], "content-block--diagram"
     assert_equal "true", probe["aria-hidden"]

@@ -28,7 +28,10 @@ module Admin
   # The answer is JSON, not a Turbo Stream: the list draws its own row
   # states, and each `reason` is a key its script reads a sentence for. A
   # save never publishes: on a live page (`live`) the drawing is an
-  # unpublished change, which `review_url` opens Publish changes for.
+  # unpublished change, which `review_url` opens Publish changes for. A
+  # saved answer carries the block's new base (`base`, as the rows write
+  # it), which the script hands the block's rows in its other languages:
+  # without it the next language's save is refused as stale by this one.
   class DiagramDrawingsController < BaseController
     include StaleForm
     include EditingClaims
@@ -63,7 +66,7 @@ module Admin
 
       page = block.owner
       render json: { ok: true, live: ::Publishing::State.of(page).live?, page_id: page.id, page_title: page.title,
-                     review_url: admin_page_path(page, review: "publish") }
+                     review_url: admin_page_path(page, review: "publish"), base: result.record.updated_at.iso8601(6) }
     end
 
     private
