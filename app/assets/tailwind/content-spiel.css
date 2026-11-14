@@ -373,6 +373,36 @@ html[data-surface="studio"] {
   scrollbar-gutter: stable;
 }
 
+/* The Diagram block's colours in CS Studio: the `--th-diagram-*` tokens a
+   site's theme defines, defined here once from CS Studio's own, on the
+   public diagram's class. Nothing in CS Studio paints with them: the block
+   card's script reads them off an element of that class (its colour probe)
+   and posts them to the renderer frame, which paints the drawing with the
+   site's stylesheet on these values, and the block's tile paints its small
+   drawing with the same. Both schemes follow, since every value is a
+   `var()` of a token both schemes define. The fill is the card's surface
+   and the ink its ink; a line a node's outline (the field line, the faintest
+   CS Studio line at 3:1 on the surface) and an edge dim; a group sunken, a
+   note the accent's tint; the six series grounds, a pie's slices or a
+   gantt's tasks, the icon chips' grounds, starting with the block's own
+   family (code), media and people, each holding the ink at 4.5:1
+   (`test/lib/admin_contrast_test.rb`). */
+html[data-surface="studio"] .content-block--diagram {
+  --th-diagram-ink: var(--cs-ink);
+  --th-diagram-fill: var(--cs-surface);
+  --th-diagram-line: var(--cs-field-line);
+  --th-diagram-edge: var(--cs-dim);
+  --th-diagram-group: var(--cs-sunken);
+  --th-diagram-note: var(--cs-accent-tint);
+  --th-diagram-accent: var(--cs-accent);
+  --th-diagram-series-1: var(--cs-ic-code-bg);
+  --th-diagram-series-2: var(--cs-ic-media-bg);
+  --th-diagram-series-3: var(--cs-ic-people-bg);
+  --th-diagram-series-4: var(--cs-ic-text-bg);
+  --th-diagram-series-5: var(--cs-ic-form-bg);
+  --th-diagram-series-6: var(--cs-ic-lists-bg);
+}
+
 /* The theme switch's cross-fade: the browser's own fade-out of the old
    snapshot and fade-in of the new, at the fade's length and easing. Only the
    duration and the timing function are set, never the `animation` shorthand,

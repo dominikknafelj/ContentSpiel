@@ -10,16 +10,20 @@ module Admin
     # its values stand on the field's wrapper, `Ui::FieldComponent`'s
     # `.admin-field` (`field_data`), so that one controller holds the source,
     # the preview and the hidden drawing's id wherever the preview stands.
-    # The server draws the parts empty and the script fills them: it builds
-    # the renderer frame (an `<iframe sandbox="allow-scripts">` at
+    # The server draws the parts empty or hidden and the script fills them:
+    # it builds the renderer frame (an `<iframe sandbox="allow-scripts">` at
     # `renderer-url`) into the `frameSlot`, posts the source to it, writes a
     # drawing that worked into the hidden `:diagram_drawing` input
     # (`drawing-field`, its id) and the error, once per new error, into
-    # `status`, the polite live region. It reads the line rules from `rules`
-    # (`Diagrams::Source.rules_json`) and the theme's colours from the
-    # `colourProbe`, an empty element of the public diagram's class that
-    # nobody sees or hears. Opening a card draws the preview and writes
-    # nothing.
+    # `status`, the polite live region, as a clone of the warn notice in
+    # `notice` (a `<template>`, so no box is built by hand). It shows the
+    # state's words the slot holds (`blank`, `kept`, `busy`) and marks the
+    # source's offending line (`line`). It reads the line rules from `rules`
+    # (`Diagrams::Source.rules_json`) and the theme's colours (`colours`, the
+    # names) from the `colourProbe`, an empty element of the public diagram's
+    # class that nobody sees or hears. Opening a card draws the preview and
+    # writes nothing. The counter under the source is the Code field's own
+    # script, `admin--editor--code-limit`, on the source's half.
     #
     # A TRANSLATION'S STARTING SOURCE. On a translation tab whose
     # language has no source of its own, the textarea shows the original's
@@ -49,10 +53,12 @@ module Admin
       CONTROLLER = "admin--diagram--preview".freeze
 
       # The card's words the script shows, under `admin.components.fields.mermaid_field`.
-      MESSAGES = %w[count over frame_title empty drawing no_description error_lead kept nothing_yet kept_badge]
+      MESSAGES = %w[frame_title empty drawing no_description error_lead kept nothing_yet kept_badge too_long too_large]
         .map { |key| "components.fields.mermaid_field.#{key}" }.freeze
 
-      # This field's script key => the `errors.messages` key whose sentence it is.
+      # The server's sentences the script shows: its key => the I18n key
+      # whose string it is handed (`messages`). `test/lib/script_messages_test.rb`
+      # reads this list as served.
       SENTENCES = {
         "refused.colours" => "diagram_colours",
         "refused.links" => "diagram_links",
@@ -61,7 +67,12 @@ module Admin
         "refused.maths" => "diagram_maths",
         "unsupported" => "diagram_unsupported",
         "no_type" => "diagram_no_type"
-      }.freeze
+      }.to_h { |key, error| [ "components.fields.mermaid_field.#{key}", "errors.messages.#{error}" ] }.freeze
+
+      # The `--th-diagram-*` tokens the script reads off the colour probe and
+      # posts to the frame: the Diagram block's themed tokens, which CS
+      # Studio's stylesheet defines on the probe's class from its own.
+      def self.colour_names = ::BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }
 
       # The source's own limit holds without a `max:` (`:mermaid`'s validation).
       def limit = [ field.options[:max], Diagrams::Source::MAX_CHARACTERS ].compact.min
@@ -97,22 +108,62 @@ module Admin
           "#{CONTROLLER}-drawing-name-value": "#{form_name}[#{drawing}]",
           "#{CONTROLLER}-source-name-value": input_name,
           "#{CONTROLLER}-starting-value": starting?,
-          "#{CONTROLLER}-limit-value": limit,
-          "#{CONTROLLER}-from-value": threshold,
+          "#{CONTROLLER}-colours-value": self.class.colour_names.to_json,
           messages: messages
         }
       end
 
-      def input_data = { "#{CONTROLLER}-target": "source" }
+      # The source target, the Code field's counter (`admin--editor--code-limit`,
+      # on the source's half, `wrapper_data`) and the preview's draw. In a form
+      # someone else holds only the counter's read survives (`HeldFields`).
+      def input_data
+        {
+          "#{CONTROLLER}-target": "source",
+          "admin--editor--code-limit-target": "input",
+          action: "input->admin--editor--code-limit#update input->#{CONTROLLER}#input"
+        }
+      end
 
-      # The empty frame slot and the status line.
+      def kept_badge = render(Admin::Ui::BadgeComponent.new(label: t(".kept_badge"), hidden: true, class: "admin-mermaid-field__kept", data: target("kept")))
+
+      # The warn notice the script clones into `status` for an error, its
+      # parts empty: the lead, the sentence, Mermaid's own message and what
+      # the site does. Inside the live region it has no role of its own.
+      def notice_template
+        notice = render(Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil)) do
+          safe_join([
+            tag.strong(class: "block font-semibold", data: { part: "lead" }),
+            tag.span(class: "block", data: { part: "sentence" }),
+            tag.pre(class: "mt-1.5 font-cs-mono text-xs whitespace-pre-wrap", data: { part: "message" }),
+            tag.span(class: "block", data: { part: "site" })
+          ])
+        end
+        tag.template(notice, data: target("notice"))
+      end
+
+      # The frame slot, the status line and the notice's template. The slot
+      # holds the script's renderer frame and, over it, the state's words,
+      # each drawn hidden for the script to show: the blank frame's line
+      # (`empty`, or `nothing_yet` beside an error), the kept drawing's
+      # badge, and "Drawing…", which only the eye needs (`status` speaks the
+      # errors alone).
       def preview
         tag.div(class: "admin-mermaid-field__preview min-w-0") do
-          safe_join([ tag.div(class: "admin-mermaid-field__frame", data: target("frameSlot")), tag.div(aria: { live: "polite" }, data: target("status")) ])
+          safe_join([
+            tag.div(class: "admin-mermaid-field__frame", data: target("frameSlot")) do
+              safe_join([
+                tag.p(class: "admin-mermaid-field__blank text-sm text-meta", hidden: true, data: target("blank")),
+                kept_badge,
+                tag.span(t(".drawing"), class: "admin-mermaid-field__busy text-label text-meta", hidden: true, aria: { hidden: true }, data: target("busy"))
+              ])
+            end,
+            tag.div(aria: { live: "polite" }, data: target("status")),
+            notice_template
+          ])
         end
       end
 
-      def below_pair = (tag.div(preview, class: "admin-mermaid-field__below mt-4") if paired?)
+      def below_pair =(tag.div(preview, class: "admin-mermaid-field__below mt-4") if paired?)
 
       def target(name) = { "#{CONTROLLER}-target": name }
 
@@ -120,7 +171,7 @@ module Admin
       # field's keys.
       def messages
         served = JSON.parse(messages_data(*MESSAGES))
-        SENTENCES.each { |key, error| served["components.fields.mermaid_field.#{key}"] = I18n.t("errors.messages.#{error}", raise: true) }
+        SENTENCES.each { |key, sentence| served[key] = I18n.t(sentence, raise: true) }
         served.to_json
       end
     end

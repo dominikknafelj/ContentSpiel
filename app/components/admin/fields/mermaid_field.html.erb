@@ -1,14 +1,20 @@
 <div class="admin-mermaid-field">
   <div class="admin-mermaid-field__pair">
-    <div class="min-w-0">
-      <%= tag.textarea shown, name: source_name, id: input_id, class: input_class, rows: rows, wrap: "off",
-            spellcheck: "false", autocapitalize: "off", autocomplete: "off", required: field.required?,
-            aria: { describedby: described_by }, data: input_data %>
-      <%= tag.p counter_text, id: counter_id, hidden: !counter_shown?, class: counter_class, data: target("counter") %>
+    <%= tag.div(class: "min-w-0", data: wrapper_data) do %>
+      <div class="admin-mermaid-field__well">
+        <%= tag.textarea shown, name: source_name, id: input_id, class: input_class, rows: rows, wrap: "off",
+              spellcheck: "false", autocapitalize: "off", autocomplete: "off", required: field.required?,
+              aria: { describedby: described_by }, data: input_data %>
+        <%# The band the script lays over the line the preview's error names; the sentence names the line in words. %>
+        <%= tag.span class: "admin-mermaid-field__line", hidden: true, aria: { hidden: true }, data: target("line") %>
+      </div>
+      <%= tag.p counter_text, id: counter_id, hidden: !counter_shown?, class: counter_class, data: { "admin--editor--code-limit-target": "output" } %>
+      <%# The counter's two announcements (`admin--editor--code-limit`); empty as the server draws it. %>
+      <%= tag.p "", class: "sr-only", aria: { live: "polite" }, data: { "admin--editor--code-limit-target": "announcer" } %>
       <% if starting? %>
         <%= tag.p starting_text, id: starting_id, class: "mt-1 text-sm text-meta" %>
       <% end %>
-    </div>
+    <% end %>
     <%# The script builds the renderer frame in the preview's slot; on a translation tab it stands under the pair (`#below_pair`). %>
     <%= preview unless paired? %>
   </div>

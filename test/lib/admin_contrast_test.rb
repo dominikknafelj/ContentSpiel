@@ -1022,4 +1022,37 @@ class AdminContrastTest < ActiveSupport::TestCase
       end
     end
   end
+
+  # The Diagram block's colours in CS Studio (`html[data-surface="studio"]
+  # .content-block--diagram` in content-spiel.css), which the block card
+  # posts to its renderer frame and the tile paints with: each a `var()` of a
+  # CS Studio token, measured in both schemes as the default theme's are in
+  # `design_tokens_test.rb`. The ink is a label's on every ground it stands
+  # on, 4.5:1; a node's outline and an edge are graphics on the fill, 3:1.
+  def diagram_colours
+    css = STYLESHEET.read.gsub(%r{/\*.*?\*/}m, "")
+    block = css[/html\[data-surface="studio"\] \.content-block--diagram\s*\{(.*?)\}/m, 1]
+    assert block, "content-spiel.css defines no diagram colours for CS Studio"
+    block.scan(/(--th-diagram-[\w-]+):\s*var\((--cs-[\w-]+)\);/).to_h
+  end
+
+  test "CS Studio defines every themed diagram token, each from a token of its own" do
+    names = BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }
+    assert_equal names.sort, diagram_colours.keys.sort
+    assert_equal Admin::Fields::MermaidField.colour_names.sort, names.sort, "the card posts the names CS Studio defines"
+    series = diagram_colours.select { |name, _| name.include?("series") }.values
+    assert_equal series.uniq, series, "the six series are six tokens"
+  end
+
+  test "a diagram's ink reads on its fill, group, note and every series, and its line and edge on the fill, in both schemes" do
+    tokens = diagram_colours
+    each_scheme do |scheme, colour|
+      diagram = ->(name) { colour.(tokens.fetch("--th-diagram-#{name}"), under: tokens.fetch("--th-diagram-fill")) }
+      ink = diagram.("ink")
+      (%w[fill group note] + (1..6).map { |n| "series-#{n}" }).each do |ground|
+        assert_ratio(4.5, ink, diagram.(ground), "the diagram's ink on its #{ground} (#{scheme})")
+      end
+      %w[line edge].each { |stroke| assert_ratio(3.0, diagram.(stroke), diagram.("fill"), "the diagram's #{stroke} on its fill (#{scheme})") }
+    end
+  end
 end

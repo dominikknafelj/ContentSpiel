@@ -9,7 +9,8 @@ require "test_helper"
 # a `messages_data` call renders: `Admin::MessagesHelper::SCRIPT_MESSAGES` (the
 # set on <body>), the literal arguments of a `messages_data(...)` call in a
 # view or component, or a constant list splatted into one (namespaced, or a
-# constant of the file's own class). A `${...}` in the script's key stands for one segment
+# constant of the file's own class); or that a component hands its script
+# beside one (`SENTENCES`, below). A `${...}` in the script's key stands for one segment
 # and is served if any served key fits it, a `#{...}` in the server's for a
 # placeholder (`components.ui.chip_input.nouns.#{noun}.create`).
 class ScriptMessagesTest < ActiveSupport::TestCase
@@ -45,7 +46,17 @@ class ScriptMessagesTest < ActiveSupport::TestCase
         owner ? owner.const_get(name) : []
       end
     end
-    (Admin::MessagesHelper::SCRIPT_MESSAGES + literals + splats).map { |key| key.gsub(/#\{.*?\}/, "x") }
+    (Admin::MessagesHelper::SCRIPT_MESSAGES + literals + splats + sentences.keys).map { |key| key.gsub(/#\{.*?\}/, "x") }
+  end
+
+  # A string from outside `admin` that a component hands its script under a
+  # key of its own, beside `messages_data` (`Admin::Fields::MermaidField`'s
+  # refusal sentences, `errors.messages.diagram_*`): a component's `SENTENCES`
+  # constant, the script's key => the I18n key whose string it is.
+  def sentences
+    Dir[Rails.root.join("app/components/**/*.rb")].select { |path| File.read(path).match?(/^\s*SENTENCES = /) }.map do |path|
+      Rails.autoloaders.main.cpath_expected_at(path).constantize.const_get(:SENTENCES, false)
+    end.reduce({}, :merge)
   end
 
   test "the scripts ask for keys, and for each the server serves it" do
@@ -68,5 +79,11 @@ class ScriptMessagesTest < ActiveSupport::TestCase
 
   test "every served key exists in the locale files" do
     Admin::MessagesHelper::SCRIPT_MESSAGES.each { |key| assert I18n.exists?("admin.#{key}"), key }
+  end
+
+  test "a component's sentences are read, and each names a string that exists" do
+    served_sentences = sentences
+    assert_includes served_sentences.keys, "components.fields.mermaid_field.refused.colours", "the guard no longer reads MermaidField's sentences"
+    served_sentences.each { |key, sentence| assert I18n.exists?(sentence), "#{key}: #{sentence}" }
   end
 end

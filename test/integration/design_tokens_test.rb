@@ -5,11 +5,21 @@ require "test_helper"
 class DesignTokensTest < ActionDispatch::IntegrationTest
   include ContrastMeasure
 
+  # But one rule: CS Studio's values of the Diagram block's themed tokens,
+  # on the public diagram's class, which the block card reads off its colour
+  # probe and posts to the renderer frame (content-spiel.css). They define
+  # those names from `--cs-*` tokens and nothing reads a theme token.
+  STUDIO_DIAGRAM = /html\[data-surface="?studio"?\]\s*\.content-block--diagram\s*\{([^}]*)\}/
+
   test "the product build carries product tokens and no theme tokens" do
     css = stylesheet("tailwind.css")
 
     assert_includes css, "--cs-paper"
-    assert_not_includes css, "--th-"
+    diagram = css[STUDIO_DIAGRAM, 1]
+    assert diagram, "CS Studio's diagram colours are in the product build"
+    assert_equal BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }.sort,
+      diagram.scan(/(--th-[\w-]+):\s*var\(--cs-[\w-]+\)/).flatten.sort, "each a CS Studio token"
+    assert_not_includes css.sub(STUDIO_DIAGRAM, ""), "--th-"
     assert_not_includes css, "cs-prose"
   end
 

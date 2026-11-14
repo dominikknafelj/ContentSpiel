@@ -22,13 +22,15 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
 
   def textarea_text = Nokogiri::HTML5.fragment(rendered_content).at_css("textarea").text
 
-  test "the Code field's textarea, named, with the source as typed, the source target and no action of its own" do
+  test "the Code field's textarea, named, with the source as typed, the source target, the counter's read and the preview's draw" do
     render_field(SOURCE)
 
     assert_selector "textarea#block-7-source[name='block[settings][source]'][wrap='off'][spellcheck='false'][autocapitalize='off'][autocomplete='off'][rows='12']"
     assert_selector "textarea.admin-code-input.font-cs-mono.whitespace-pre.overflow-auto#{target("source")}"
     assert_includes page.find("textarea")[:class].split, "[field-sizing:content]"
-    assert_no_selector "textarea[maxlength], [data-action]"
+    assert_no_selector "textarea[maxlength]"
+    assert_equal "input->admin--editor--code-limit#update input->#{CONTROLLER}#input", page.find("textarea")["data-action"]
+    assert_equal 1, page.all("[data-action]", visible: :all).size, "the textarea's are the field's only actions"
     assert_equal SOURCE, textarea_text
   end
 
@@ -42,13 +44,12 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert_equal "block[settings][drawing]", wrapper["data-#{CONTROLLER}-drawing-name-value"]
     assert_equal "block[settings][source]", wrapper["data-#{CONTROLLER}-source-name-value"]
     assert_equal "false", wrapper["data-#{CONTROLLER}-starting-value"]
-    assert_equal "10000", wrapper["data-#{CONTROLLER}-limit-value"]
-    assert_equal "9000", wrapper["data-#{CONTROLLER}-from-value"]
+    assert_equal BlockTypes.fetch(:diagram).themed_tokens.map { |name| "--th-#{name}" }, JSON.parse(wrapper["data-#{CONTROLLER}-colours-value"])
 
     served = JSON.parse(wrapper["data-messages"])
     assert_equal "Diagram preview", served.fetch("components.fields.mermaid_field.frame_title")
     assert_equal "Type a diagram to see it drawn.", served.fetch("components.fields.mermaid_field.empty")
-    %w[count over drawing no_description error_lead kept nothing_yet kept_badge].each { |key| assert served.key?("components.fields.mermaid_field.#{key}"), key }
+    %w[drawing no_description error_lead kept nothing_yet kept_badge too_long too_large].each { |key| assert served.key?("components.fields.mermaid_field.#{key}"), key }
   end
 
   # The sentences are written once, under `errors.messages`, and the
@@ -58,11 +59,12 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     render_field(SOURCE)
     served = JSON.parse(wrapper["data-messages"])
 
-    Admin::Fields::MermaidField::SENTENCES.each do |key, error|
-      assert_equal I18n.t("errors.messages.#{error}"), served.fetch("components.fields.mermaid_field.#{key}"), key
+    Admin::Fields::MermaidField::SENTENCES.each do |key, sentence|
+      assert_equal I18n.t(sentence), served.fetch(key), key
+      assert sentence.start_with?("errors.messages.diagram_"), sentence
     end
     assert_equal %w[refused.colours refused.directive refused.front_matter refused.links refused.maths no_type unsupported],
-      Admin::Fields::MermaidField::SENTENCES.keys.sort_by { |key| [ key.start_with?("refused") ? 0 : 1, key ] }
+      Admin::Fields::MermaidField::SENTENCES.keys.map { |key| key.delete_prefix("components.fields.mermaid_field.") }.sort_by { |key| [ key.start_with?("refused") ? 0 : 1, key ] }
 
     definition = ContentModel::BlockTypeDefinition.new("sample").tap do |t|
       t.field :source, :mermaid, drawing: :drawing
@@ -73,13 +75,29 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert_equal server, [ script ]
   end
 
-  test "the frame slot is empty, the status line is a polite region the server leaves empty, and the colour probe is hidden from everyone" do
+  test "the frame slot holds no frame and the state's words hidden, the status line is a polite region the server leaves empty, and the colour probe is hidden from everyone" do
     render_field(SOURCE)
 
-    assert_selector "#{target("frameSlot")}:empty", visible: :all
     assert_no_selector "iframe", visible: :all
+    slot = page.find(target("frameSlot"), visible: :all)
+    assert slot.has_css?("p#{target("blank")}[hidden]:empty", visible: :all)
+    assert slot.has_css?("span#{target("kept")}[hidden].bg-sunken.text-meta", text: "Last drawing that worked", visible: :all), "the neutral badge"
+    assert slot.has_css?("span#{target("busy")}[hidden][aria-hidden='true']", text: "Drawing…", visible: :all)
     assert_selector "#{target("status")}[aria-live='polite']:empty", visible: :all
     assert_selector "span.content-block--diagram[aria-hidden='true'][hidden]#{target("colourProbe")}:empty", visible: :all
+    assert_selector ".admin-mermaid-field__well > span#{target("line")}[hidden][aria-hidden='true']", visible: :all
+  end
+
+  # The script clones the notice and fills its parts: no box is built by hand.
+  test "the error's notice is the warn NoticeComponent in a template, compact, with no role of its own" do
+    render_field(SOURCE)
+
+    template = Nokogiri::HTML5.fragment(rendered_content).at_css("template#{target("notice")}")
+    box = template.children.find(&:element?)
+    assert_equal Admin::Ui::NoticeComponent.classes(:warn, size: :compact).split.sort, box["class"].split.sort
+    assert_nil box["role"], "the live region speaks, not the notice"
+    assert_equal %w[lead sentence message site], box.css("[data-part]").map { |part| part["data-part"] }
+    assert_equal "pre", box.at_css("[data-part='message']").name
   end
 
   # The pair is two equal columns while the field has 40rem, stacked below:
@@ -94,9 +112,11 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert halves.last.has_css?(target("frameSlot"), visible: :all)
   end
 
-  test "the counter is the Code field's, from nine tenths of the limit, and the counter target" do
+  test "the counter is the Code field's, from nine tenths of the limit, on its own script" do
     render_field("pie\n#{"x" * 8_000}")
-    assert_selector "p#block-7-source-count[hidden]#{target("counter")}", visible: :all
+    assert_selector "[data-controller='admin--editor--code-limit'][data-admin--editor--code-limit-limit-value='10000'][data-admin--editor--code-limit-from-value='9000'] textarea", visible: :all
+    assert_selector "p#block-7-source-count[hidden][data-admin--editor--code-limit-target='output']", visible: :all
+    assert_selector "p.sr-only[aria-live='polite'][data-admin--editor--code-limit-target='announcer']:empty", visible: :all
 
     render_field("pie\n#{"x" * 9_408}")
     assert_selector "p#block-7-source-count:not([hidden])", exact_text: "9,412 of 10,000 characters"
@@ -129,7 +149,7 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert_equal "readonly", held.at_css("textarea")["readonly"]
     assert held.at_css("[data-controller='#{CONTROLLER}']")
     assert held.at_css(target("frameSlot"))
-    assert_nil held.at_css("[data-action]")
+    assert_equal [ "input->admin--editor--code-limit#update" ], held.css("[data-action]").map { |node| node["data-action"] }, "only the counter's read survives"
   end
 
   test "it reads as code where it cannot be edited" do

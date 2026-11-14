@@ -114,6 +114,12 @@ pin_all_from "app/javascript/mind_graph", under: "mind_graph", preload: false
 # preloads it and a public page never fetches it.
 pin_all_from "app/javascript/passkeys", under: "passkeys", preload: false
 
+# The Diagram block card's modules, imported by `admin--diagram--preview`:
+# `diagram/frame`, the renderer frame and its protocol, and `diagram/digest`,
+# the drawing's `from`. Two small files the editor preloads with its
+# controllers; Mermaid itself is loaded only inside the frame.
+pin_all_from "app/javascript/diagram", under: "diagram", preload: "admin"
+
 pin "sortablejs", preload: false # @1.15.7
 # Vendored for the mind graph's layout WORKER, which imports the file by its
 # asset URL (an import map does not apply inside a worker). Nothing in a page
