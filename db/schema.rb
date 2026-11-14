@@ -517,7 +517,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_14_120000) do
     t.datetime "created_at", null: false
     t.index ["document"], name: "index_search_entries_on_document", using: :gin
     t.index ["published_version_id", "locale"], name: "index_search_entries_on_published_version_id_and_locale", unique: true
-    t.index ["published_version_id"], name: "index_search_entries_on_published_version_id"
     t.index ["record_type", "record_id", "locale", "live_at"], name: "idx_on_record_type_record_id_locale_live_at_58a55f020d"
   end
 

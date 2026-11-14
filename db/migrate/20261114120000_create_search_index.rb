@@ -4,11 +4,13 @@
 # (`ON DELETE CASCADE`: nothing ever refuses a copy's delete for its
 # entries). `search_index_states` is one row per backend, the background
 # build's. Both start empty: the documents are made by application code a
-# migration cannot freeze, and the first boot's check builds them.
+# migration cannot freeze, and the first boot's check builds them. The copy
+# is looked up by the unique (copy, language) index, whose first column it
+# is, so the reference has no index of its own.
 class CreateSearchIndex < ActiveRecord::Migration[8.1]
   def change
     create_table :search_entries do |t|
-      t.references :published_version, null: false, foreign_key: { on_delete: :cascade }
+      t.references :published_version, null: false, index: false, foreign_key: { on_delete: :cascade }
       t.string   :record_type, null: false
       t.bigint   :record_id, null: false
       t.string   :locale, null: false

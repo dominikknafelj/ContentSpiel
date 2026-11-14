@@ -126,8 +126,12 @@ module SiteSearch
     end
 
     # `setweight(to_tsvector(config, title), 'A') || setweight(…, 'B') || …`:
-    # every field with the document's configuration and its own weight.
+    # every field with the document's configuration and its own weight. A
+    # document always has fields (`SiteSearch::Documents` gives every one a
+    # title, even blank); one with none would make no vector, so it is refused.
     def vector_of(document, config)
+      raise ArgumentError, "a search document has no fields: #{document.key}" if document.fields.empty?
+
       regconfig = SqlNodes.cast(config, "regconfig")
       document.fields
         .map { |field| SqlNodes.function("setweight", SqlNodes.function("to_tsvector", regconfig, field.text), field.weight.to_s.upcase) }

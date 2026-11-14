@@ -170,9 +170,49 @@ class SiteSearch::Postgres::QueryTest < ActiveSupport::TestCase
     statements = capture_sql { search("albatross") }
 
     assert statements.any? { |sql| sql.match?(/\ASET LOCAL statement_timeout = \d+\z/) }
-    assert_not_equal "1ms", ActiveRecord::Base.connection.select_value("SHOW statement_timeout")
     before = ActiveRecord::Base.connection.select_value("SHOW statement_timeout")
     search("albatross", deadline: Process.clock_gettime(Process::CLOCK_MONOTONIC) + 0.25)
     assert_equal before, ActiveRecord::Base.connection.select_value("SHOW statement_timeout")
+  end
+
+  # A query whose clock is read from a list, one reading per call, for a
+  # test of what is left between the two statements.
+  class ClockedQuery < SiteSearch::Postgres::Query
+    def initialize(query, deadline:, readings:)
+      super(query, deadline: deadline)
+      @readings = readings
+    end
+
+    private
+
+    def clock = @readings.shift
+  end
+
+  def clocked(readings, deadline: 100.0)
+    query = SiteSearch::Query.new(text: "albatross", language: "en", page: 1, per_page: SiteSearch::Query::PER_PAGE, now: Time.current)
+    ClockedQuery.new(query, deadline: deadline, readings: readings)
+  end
+
+  test "the count is held to the time left after the page, not to the page's timeout" do
+    index(create_page(title: "Albatross"))
+
+    statements = capture_sql { assert_equal 1, clocked([ 97.0, 99.5 ]).results.total }
+
+    timeouts = statements.grep(/\ASET LOCAL statement_timeout/).map { |sql| sql[/\d+\z/].to_i }
+    assert_equal [ 3000, 500 ], timeouts
+    page, count = statements.index { |sql| sql.include?("ts_headline") }, statements.index { |sql| sql.include?("COUNT(*)") }
+    assert_operator page, :<, count
+    assert_match(/= 500\z/, statements[count - 1], "the count's own timeout is sent right before it")
+  end
+
+  test "no time left after the page: the count is not asked and the search raises" do
+    index(create_page(title: "Albatross"))
+
+    statements = capture_sql do
+      assert_raises(ActiveRecord::QueryCanceled) { clocked([ 97.0, 100.0 ]).results }
+    end
+
+    assert statements.any? { |sql| sql.include?("ts_headline") }
+    assert statements.none? { |sql| sql.include?("COUNT(*)") }
   end
 end

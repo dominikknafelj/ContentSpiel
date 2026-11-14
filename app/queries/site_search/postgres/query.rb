@@ -15,11 +15,11 @@ module SiteSearch
     #
     # The visitor's words reach the database only as the bind `q`
     # (`SqlNodes.bound`), never in the statement's text, so no log line holds
-    # them. Both statements run in a transaction of their own under a
-    # statement timeout of the time left before the deadline, and that
-    # transaction is rolled back, so the timeout ends with it whatever
-    # transaction the caller is in (a `SET LOCAL` released into a savepoint's
-    # parent would outlive the search).
+    # them. Both statements run in a transaction of their own, each under a
+    # statement timeout of the time left before the deadline when it starts
+    # (`in_time_left`), and that transaction is rolled back, so the timeout
+    # ends with it whatever transaction the caller is in (a `SET LOCAL`
+    # released into a savepoint's parent would outlive the search).
     class Query
       # `ts_rank_cd`'s weights for D, C, B and A, and normalisation 1, which
       # divides by the log of the length, so a long page does not win by size.
@@ -42,14 +42,10 @@ module SiteSearch
       end
 
       def results
-        timeout = self.class.timeout_in_ms(@deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC))
-        raise ActiveRecord::QueryCanceled, "the search's deadline passed before the database was asked" unless timeout
-
         answer = nil
         Entry.transaction(requires_new: true) do
-          # sql: Arel has no node for SET; the value is an Integer
-          Entry.connection.execute("SET LOCAL statement_timeout = #{timeout}") # version: none (a setting of the search's own transaction, which writes nothing)
-          answer = Results.new(hits: hits, total: total)
+          hits = in_time_left { page_of_hits }
+          answer = Results.new(hits: hits, total: in_time_left { total })
           raise ActiveRecord::Rollback
         end
         answer
@@ -120,9 +116,26 @@ module SiteSearch
 
       private
 
+      # The block's statement under a timeout of the time left now: Postgres
+      # times each statement on its own, so the page and the count are each
+      # held to what is left when they start, and neither starts once nothing
+      # is, which raises before the database is asked. Inside the search's
+      # own transaction (a lazy one: a raise before the first statement sends
+      # nothing at all).
+      def in_time_left
+        timeout = self.class.timeout_in_ms(@deadline - clock)
+        raise ActiveRecord::QueryCanceled, "the search's deadline passed before the database was asked" unless timeout
+
+        # sql: Arel has no node for SET; the value is an Integer
+        Entry.connection.execute("SET LOCAL statement_timeout = #{timeout}") # version: none (a setting of the search's own transaction, which writes nothing)
+        yield
+      end
+
+      def clock = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
       # The page's hits: ranked and cut in the inner query, and only those
       # rows given a headline, which is the expensive part.
-      def hits
+      def page_of_hits
         ranked = matches
           .select(entries[:record_type], entries[:record_id], entries[:published_version_id], entries[:text], rank.as("rank"))
           .order(rank.desc, entries[:record_type].asc, entries[:record_id].asc)
