@@ -56,6 +56,25 @@ class Admin::SectionsAddingSystemTest < Admin::SectionsSystemTestCase
     assert_no_selector "#block-picker-#{@section.id}-1 [role=menu] [role=menuitem]", text: "Section"
   end
 
+  # A lane's items are a chip and a name side by side, 8px apart, as the
+  # page's grid cells are: the plain list's `block` drew them touching.
+  test "a lane's picker leaves the gap between a type's chip and its name" do
+    open_editor
+    find("#block-picker-#{@section.id}-1 button[aria-haspopup=menu]").click
+    item = find("#block-picker-#{@section.id}-1 [role=menu] [role=menuitem]", text: "Rich text")
+
+    gap = page.evaluate_script(<<~JS, item)
+      (function (button) {
+        const chip = button.firstElementChild.getBoundingClientRect()
+        const range = document.createRange()
+        range.selectNodeContents(button.lastChild)
+        return range.getBoundingClientRect().left - chip.right
+      })(arguments[0])
+    JS
+
+    assert_in_delta 8, gap, 1
+  end
+
   # The keys of the grid: the menu walks its items one by one, in document
   # order, which in the three columns is reading order (left to right, then the
   # next row); Down and Up are the only arrows it answers (`admin--ui--menu`).
