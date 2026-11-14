@@ -185,24 +185,27 @@
   --th-form-done-ground: var(--th-band-strong);
   --th-form-done-line: color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong));
   /* A diagram on this band (Diagram block spec §4), as the Code block's:
-     the labels the band's text, a node, a group and a note the band's text
-     thinned out, outlines too, edges the band's dim and the accent the
-     band's. The series are the four hues over the band and two mixes of
-     them, so the band's light text reads on every slice in both schemes.
-     The computed tokens would otherwise keep the page's. */
+     the labels the band's text, edges the band's dim and the accent the
+     band's. A node, a group, a note and a node's outline are the band's
+     text mixed INTO the band, so each is opaque and nothing behind it shows
+     through (an edge under its label's box, a group under a node); the
+     outline at 55% is 3:1 against the band and against the fill in both
+     schemes. The band is a dark ground in both schemes, so the series are
+     the six dark grounds in both (`--th-diagram-dark-*`, tokens.css). The
+     computed tokens would otherwise keep the page's. */
   --th-diagram-ink: var(--th-on-band-strong);
-  --th-diagram-fill: color-mix(in srgb, var(--th-on-band-strong) 10%, transparent);
-  --th-diagram-line: color-mix(in srgb, var(--th-on-band-strong) 45%, transparent);
+  --th-diagram-fill: color-mix(in srgb, var(--th-on-band-strong) 10%, var(--th-band-strong));
+  --th-diagram-line: color-mix(in srgb, var(--th-on-band-strong) 55%, var(--th-band-strong));
   --th-diagram-edge: var(--th-on-band-strong-dim);
-  --th-diagram-group: color-mix(in srgb, var(--th-on-band-strong) 8%, transparent);
-  --th-diagram-note: color-mix(in srgb, var(--th-on-band-strong) 14%, transparent);
+  --th-diagram-group: color-mix(in srgb, var(--th-on-band-strong) 8%, var(--th-band-strong));
+  --th-diagram-note: color-mix(in srgb, var(--th-on-band-strong) 14%, var(--th-band-strong));
   --th-diagram-accent: var(--th-on-band-strong-accent);
-  --th-diagram-series-1: color-mix(in srgb, var(--th-on-band-strong-accent) 35%, var(--th-band-strong));
-  --th-diagram-series-2: color-mix(in srgb, var(--th-warn) 35%, var(--th-band-strong));
-  --th-diagram-series-3: color-mix(in srgb, var(--th-ok) 35%, var(--th-band-strong));
-  --th-diagram-series-4: color-mix(in srgb, var(--th-danger) 35%, var(--th-band-strong));
-  --th-diagram-series-5: color-mix(in srgb, var(--th-diagram-series-1) 50%, var(--th-diagram-series-4));
-  --th-diagram-series-6: color-mix(in srgb, var(--th-diagram-series-3) 50%, var(--th-diagram-series-1));
+  --th-diagram-series-1: var(--th-diagram-dark-1);
+  --th-diagram-series-2: var(--th-diagram-dark-2);
+  --th-diagram-series-3: var(--th-diagram-dark-3);
+  --th-diagram-series-4: var(--th-diagram-dark-4);
+  --th-diagram-series-5: var(--th-diagram-dark-5);
+  --th-diagram-series-6: var(--th-diagram-dark-6);
 }
 .content-section--strong .content-block--code { color-scheme: dark; }
 /* A form's native controls (the select's list, the checkbox, the radio)

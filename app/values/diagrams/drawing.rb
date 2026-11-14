@@ -247,9 +247,16 @@ module Diagrams
     #
     # The one `html_safe` of the Diagram block: what it marks is this file's
     # own serialisation of a tree it built, and the title as escaped text.
+    # Its input is `#untitled_markup`'s output as the public component reads
+    # it back from `Rails.cache` (Solid Cache in production, a table of the
+    # database), so that store is trusted as the database is; no other caller
+    # hands it a string. It refuses one that is not an SVG root holding the
+    # empty title once.
     def self.with_title(untitled, title:, title_id:)
       empty = %(<title id="#{title_id}"/>)
-      raise ArgumentError, "the markup has no empty title #{title_id.inspect}" unless title_id.match?(ID) && untitled.to_s.scan(empty).size == 1
+      unless title_id.match?(ID) && untitled.to_s.start_with?("<svg ") && untitled.to_s.scan(empty).size == 1
+        raise ArgumentError, "the markup is not an SVG root with the empty title #{title_id.inspect}"
+      end
 
       untitled.sub(empty) { %(<title id="#{title_id}">#{ERB::Util.html_escape(title.to_s)}</title>) }.html_safe
     end

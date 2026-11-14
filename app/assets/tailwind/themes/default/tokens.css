@@ -81,12 +81,14 @@
      the surface), the activation, a critical task and gantt's today line the
      accent. The six series colours (a pie's slices, a gantt's task states)
      are literals, as the syntax colours are: light grounds under the dark
-     ink here, dark ones under the light ink in the dark block. A strong band
-     re-values all thirteen (sections.css).
-     test/integration/design_tokens_test.rb holds the 90 pairs: the ink on
+     ink here, and in the dark block the six dark grounds of the `:root`
+     block below, under the light ink. A strong band re-values all thirteen
+     (sections.css).
+     test/integration/design_tokens_test.rb holds the 96 pairs: the ink on
      the fill, a group, a note and each series colour at 4.5:1, a line, an
-     edge and the accent at 3:1 on the ground and on a group, on the page, a
-     tinted band and a strong band, in both schemes. */
+     edge and the accent at 3:1 on the ground and on a group, and a line on
+     the node's fill, on the page, a tinted band and a strong band, in both
+     schemes. */
   --th-diagram-ink: var(--th-ink);
   --th-diagram-fill: var(--th-surface);
   --th-diagram-line: var(--th-dim);
@@ -220,7 +222,8 @@
   --th-syn-embed: oklch(0.76 0.11 25);
 
   /* The diagram's tokens again: the same definitions over the dark base,
-     and six dark series grounds under the light ink. */
+     and the six dark series grounds (`--th-diagram-dark-*`, below) under
+     the light ink. */
   --th-diagram-ink: var(--th-ink);
   --th-diagram-fill: var(--th-surface);
   --th-diagram-line: var(--th-dim);
@@ -228,12 +231,12 @@
   --th-diagram-group: var(--th-sunken);
   --th-diagram-note: color-mix(in srgb, var(--th-accent-tint) 60%, var(--th-surface));
   --th-diagram-accent: var(--th-accent);
-  --th-diagram-series-1: #2d4a78;
-  --th-diagram-series-2: #6e4521;
-  --th-diagram-series-3: #2c5a33;
-  --th-diagram-series-4: #723131;
-  --th-diagram-series-5: #533a78;
-  --th-diagram-series-6: #1f5553;
+  --th-diagram-series-1: var(--th-diagram-dark-1);
+  --th-diagram-series-2: var(--th-diagram-dark-2);
+  --th-diagram-series-3: var(--th-diagram-dark-3);
+  --th-diagram-series-4: var(--th-diagram-dark-4);
+  --th-diagram-series-5: var(--th-diagram-dark-5);
+  --th-diagram-series-6: var(--th-diagram-dark-6);
 
   /* The notes again: Note's 4% tint of the text colour, and 12% of the hue
      over the dark page for the other three. The lowest here is the accent
@@ -310,4 +313,14 @@
   /* The Diagram block's face: Archivo, the face Mermaid measured every box
      in when the drawing was made (CS Studio's renderer frame draws in it). */
   --th-diagram-font: "Archivo", system-ui, sans-serif;
+  /* The six dark series grounds of a diagram, the CMS's own
+     (`Theme::Contract::OWN_TOKENS`), written once for the two places that
+     draw on a dark ground in either scheme: the dark scheme's
+     `--th-diagram-series-*` and a strong band's (sections.css). */
+  --th-diagram-dark-1: #2d4a78;
+  --th-diagram-dark-2: #6e4521;
+  --th-diagram-dark-3: #2c5a33;
+  --th-diagram-dark-4: #723131;
+  --th-diagram-dark-5: #533a78;
+  --th-diagram-dark-6: #1f5553;
 }

@@ -762,6 +762,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   DIAGRAM_TOKENS = %w[ink fill line edge group note accent series-1 series-2 series-3 series-4 series-5 series-6].map { |name| "--th-diagram-#{name}" }.freeze
   DIAGRAM_SERIES = DIAGRAM_TOKENS.grep(/series/).freeze
   DIAGRAM_CSS = Rails.root.join("app/assets/tailwind/themes/default/diagram.css")
+  DIAGRAM_DARK_SERIES = %w[#2d4a78 #6e4521 #2c5a33 #723131 #533a78 #1f5553].freeze
 
   # The Diagram block's tokens (Diagram block spec §4): every one from the
   # base but the six series colours, which are literals as the syntax colours
@@ -774,7 +775,8 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     theme_tokens.each do |theme, tokens|
       DIAGRAM_TOKENS.each do |name|
         value = tokens.fetch(name) { flunk("#{name} is not defined for #{theme}") }
-        shape = DIAGRAM_SERIES.include?(name) ? /\A#\h{6}\z/ : /\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/
+        shape = /\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/
+        shape = /\A#\h{6}\z/ if DIAGRAM_SERIES.include?(name) && theme == :light
         assert_match shape, value, "#{theme} #{name} is #{value}"
       end
       { "--th-diagram-ink" => "var(--th-ink)", "--th-diagram-fill" => "var(--th-surface)", "--th-diagram-line" => "var(--th-dim)",
@@ -787,14 +789,29 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/--th-diagram-font:\s*"Archivo"/, fixed, "the face the boxes were measured in")
     assert_equal DIAGRAM_TOKENS.sort, band_values("strong").keys.grep(/--th-diagram-/).sort
     assert_equal %w[--th-diagram-group], band_values("tinted").keys.grep(/--th-diagram-/)
+
+    # The six dark series grounds are written once, as the CMS's own
+    # tokens: the dark scheme's series, and a strong band's in both schemes
+    # (it is a dark ground in both), under the band's light ink.
+    strong = band_values("strong")
+    dark = DIAGRAM_DARK_SERIES.each_with_index.to_h { |value, index| [ "--th-diagram-dark-#{index + 1}", value ] }
+    dark.each { |own, value| assert_match(/--th-diagram-dark-\d:\s*#{value};/, fixed, "#{own} is #{value}") }
+    (1..6).each do |k|
+      assert_equal "var(--th-diagram-dark-#{k})", theme_tokens[:dark].fetch("--th-diagram-series-#{k}")
+      assert_equal "var(--th-diagram-dark-#{k})", strong.fetch("--th-diagram-series-#{k}")
+    end
+    %w[fill 10 group 8 note 14 line 55].each_slice(2) do |name, share|
+      assert_equal "color-mix(in srgb, var(--th-on-band-strong) #{share}%, var(--th-band-strong))", strong.fetch("--th-diagram-#{name}"), "the band's #{name} is opaque"
+    end
   end
 
   # WCAG 1.4.3 and 1.4.11 for what a diagram draws: its labels (ink) on
   # every shape they stand on, the node's fill, a group's ground, a note and
   # each series colour, at 4.5:1; its lines (a node's outline, an edge, the
   # accent's activation, critical task and today line) at 3:1 on the ground
-  # the drawing stands on and on a group's. On the page, a tinted band and a
-  # strong band, in both schemes: (9 + 6) x 3 x 2 = 90.
+  # the drawing stands on and on a group's, and a node's outline on the
+  # node's own fill. On the page, a tinted band and a strong band, in both
+  # schemes: (9 + 6 + 1) x 3 x 2 = 96.
   test "ink on fill, group and note is 4.5:1; edge and line on every ground are 3:1; ink on each series colour is 4.5:1, in both schemes, on the page, a tinted and a strong band" do
     pairs = 0
     theme_tokens.each do |theme, tokens|
@@ -817,9 +834,14 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
             pairs += 1
           end
         end
+        fill = ground.("--th-diagram-fill")
+        ratio = contrast(fill, resolve_colour(tokens, "--th-diagram-line", inside: inside, under: fill))
+        puts "diagram #{theme} #{place} --th-diagram-line on the node's fill: #{ratio.round(2)}" if ENV["SHOW_RATIOS"]
+        assert_operator ratio, :>=, 3.0, "a node's outline on its own fill in #{place} (#{theme}) is #{ratio.round(2)}:1"
+        pairs += 1
       end
     end
-    assert_equal 90, pairs
+    assert_equal 96, pairs
   end
 
   # The stylesheet paints what Mermaid's dropped <style> painted, by the
@@ -862,16 +884,21 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/min-width:\s*var\(--diagram-min-width/, css, "the smallest width the component writes")
     assert_match(/overflow-x:\s*auto/, css)
     assert_match(/overscroll-behavior-x:\s*contain/, css)
+    assert_match(/^figure\.content-block--diagram \{ margin-block/, css, "the figure's margin, which the renderer frame's #diagram (the same class, a div) does not take")
+    assert_no_match(/^\.content-block--diagram \{/, css)
   end
 
   private
     def helpers = ActionController::Base.helpers
 
-    # `tokens.css`'s two colour blocks as { "--th-name" => "value" }.
+    # `tokens.css`'s two colour blocks as { "--th-name" => "value" }, each
+    # with the fixed `:root` block under it, which holds in both schemes.
     def theme_tokens
       css = Rails.root.join("app/assets/tailwind/themes/default/tokens.css").read
+      values = ->(block) { block.to_s.gsub(%r{/\*.*?\*/}m, "").scan(/(--th-[\w-]+):\s*([^;]+);/).to_h }
+      fixed = values.(css[/^:root \{(.*?)\}/m, 1])
       { light: css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1], dark: css[/\[data-theme="dark"\]\s*\{(.*?)\}/m, 1] }
-        .transform_values { |block| block.scan(/(--th-[\w-]+):\s*([^;]+);/).to_h }
+        .transform_values { |block| fixed.merge(values.(block)) }
     end
 
     # The custom properties a band gives what is inside it

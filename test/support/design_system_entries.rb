@@ -9,14 +9,14 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794577235-d559".freeze
+  VERSION = "1794647634-4849".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
-    ActionZone Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog FieldFrame FoundationComponentContract FoundationContrast
+    ActionZone Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog EditorDiagramBlock EditorDiagramError FieldFrame FoundationComponentContract FoundationContrast
     FoundationFocus FoundationIcons FoundationLayout FoundationMotion GroupFields IconChip ImageField Mails MediaPicker Menu NoteMarker Notice
     PasswordField PatternDestructiveActions PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation PatternNotifications PatternSaving Person
-    PrefixInput PresenceMarker RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage
+    PrefixInput PresenceMarker PublicDiagramBlock RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage
     SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
     StudioBlockCard StudioCommandPalette StudioDashboardCards StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms
     StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioRail

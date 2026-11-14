@@ -27,7 +27,7 @@
 
 /* ---- The figure, its scroll box and its size ---------------------------- */
 
-.content-block--diagram { margin-block: 2rem; }
+figure.content-block--diagram { margin-block: 2rem; }
 
 /* The drawing is scaled down to its column, never up (its natural width and
    height are attributes, from its viewBox), and no further than its
