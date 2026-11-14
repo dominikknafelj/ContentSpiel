@@ -15,6 +15,12 @@ module SqlNodes
   # `'value'`: a Ruby value as a quoted literal; a node is passed through.
   def quoted(value) = Arel.arel_node?(value) ? value : Arel::Nodes.build_quoted(value)
 
+  # `$1`: a value sent beside the statement as a bind named `name`, never
+  # written into its text, so the SQL log at debug names it and
+  # `filter_parameters` can hide it by that name (a visitor's search words,
+  # `q`).
+  def bound(value, name:) = Arel::Nodes::BindParam.new(ActiveRecord::Relation::QueryAttribute.new(name.to_s, value, ActiveModel::Type::Value.new))
+
   # `NAME(a, b)`: a SQL function over nodes and values.
   def function(name, *arguments) = Arel::Nodes::NamedFunction.new(name, arguments.map { |argument| quoted(argument) })
 

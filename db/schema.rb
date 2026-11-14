@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_090100) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_14_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -505,6 +505,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_090100) do
     t.index ["user_id", "digest"], name: "index_recovery_codes_on_user_id_and_digest", unique: true
   end
 
+  create_table "search_entries", force: :cascade do |t|
+    t.bigint "published_version_id", null: false
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.string "locale", null: false
+    t.string "config", null: false
+    t.datetime "live_at", null: false
+    t.tsvector "document", null: false
+    t.text "text", null: false
+    t.datetime "created_at", null: false
+    t.index ["document"], name: "index_search_entries_on_document", using: :gin
+    t.index ["published_version_id", "locale"], name: "index_search_entries_on_published_version_id_and_locale", unique: true
+    t.index ["published_version_id"], name: "index_search_entries_on_published_version_id"
+    t.index ["record_type", "record_id", "locale", "live_at"], name: "idx_on_record_type_record_id_locale_live_at_58a55f020d"
+  end
+
+  create_table "search_index_states", force: :cascade do |t|
+    t.string "backend", null: false
+    t.string "fingerprint"
+    t.string "status", null: false
+    t.integer "done", default: 0, null: false
+    t.integer "total", default: 0, null: false
+    t.datetime "started_at"
+    t.datetime "finished_at"
+    t.index ["backend"], name: "index_search_index_states_on_backend", unique: true
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
@@ -657,5 +684,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_090100) do
   add_foreign_key "presence_marks", "users", on_delete: :cascade
   add_foreign_key "published_versions", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "recovery_codes", "users"
+  add_foreign_key "search_entries", "published_versions", on_delete: :cascade
   add_foreign_key "sessions", "users"
 end

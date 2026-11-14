@@ -85,6 +85,17 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_equal %(EXISTS (SELECT 1 FROM jsonb_each_text("pages"."title") AS t WHERE "t"."value" ILIKE '%x%')), sql(node)
   end
 
+  test "bound is a bind param named for the log's filter" do
+    node = SqlNodes.bound("albatross", name: "q")
+
+    assert_kind_of Arel::Nodes::BindParam, node
+    assert_kind_of ActiveRecord::Relation::QueryAttribute, node.value
+    assert_equal [ "q", "albatross" ], [ node.value.name, node.value.value_before_type_cast ]
+    sql, binds = ActiveRecord::Base.connection.send(:to_sql_and_binds, Page.where(SqlNodes.function("lower", node).eq(@pages[:content_type])).arel)
+    assert_not_includes sql, "albatross"
+    assert_equal [ "q" ], binds.map(&:name)
+  end
+
   private
 
   # An attribute has no `to_sql` of its own; the connection's visitor renders any node.
