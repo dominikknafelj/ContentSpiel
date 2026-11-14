@@ -59,7 +59,7 @@ class Blocks::DiagramComponentTest < ActiveSupport::TestCase
     end
   end
 
-  test "a language without its own source shows the default's drawing, with its own description or else the default's" do
+  test "a language without its own source shows the default's drawing, with its own description or else the drawing's language's" do
     block = block_with({ "en" => english, "de" => { "description" => "Ein Entwurf geht zur Prüfung." } })
     render_in(:de, block)
     assert_equal "Ein Entwurf geht zur Prüfung.", page.find("svg > title", visible: :all).text(:all)
@@ -68,6 +68,20 @@ class Blocks::DiagramComponentTest < ActiveSupport::TestCase
     render_in(:es, block)
     assert_equal "A draft goes to review.", page.find("svg > title", visible: :all).text(:all)
     assert_equal "diagram-#{block.id}-es-title", page.find("svg")["aria-labelledby"]
+  end
+
+  test "a description from further down the chain never names a drawing: Spanish on the English drawing, with none in English and one in German, draws nothing" do
+    block = block_with({ "en" => english.except("description"), "de" => { "description" => "Ein Entwurf geht zur Prüfung." } })
+    render_in(:es, block)
+
+    assert_empty rendered_content.strip
+  end
+
+  test "a language with its own source and no description draws nothing, whatever the default's description" do
+    block = block_with({ "en" => english, "de" => { "source" => source("de"), "drawing" => drawing("de") } })
+    render_in(:de, block)
+
+    assert_empty rendered_content.strip
   end
 
   test "a language with its own source shows only its own drawing, never the default's" do

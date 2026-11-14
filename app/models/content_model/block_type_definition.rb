@@ -296,14 +296,6 @@ module ContentModel
       )
     end
 
-    def resolved(sample)
-      return if sample.nil?
-
-      translations = sample.translations.transform_values { |fields| fields.transform_values { |value| value.respond_to?(:call) ? value.call : value } }
-      sample.with(translations: translations.freeze)
-    end
-    private :resolved
-
     # "gallery" for "gallery/album": an outside type's names are its owner's.
     def owner = name.include?("/") ? name.split("/", 2).first : nil
 
@@ -384,6 +376,14 @@ module ContentModel
     end
 
     private
+
+    # The sample with every callable translated value called.
+    def resolved(sample)
+      return if sample.nil?
+
+      translations = sample.translations.transform_values { |fields| fields.transform_values { |value| value.respond_to?(:call) ? value.call : value } }
+      sample.with(translations: translations.freeze)
+    end
 
     # An outside type (a name with an owner) reaches only what has a seam
     # (block types spec, decisions 3 and 12): neither `:container`, which is

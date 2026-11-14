@@ -53,6 +53,10 @@ module DiagramFixtures
   # `sample_<locale>` -> the block type's sample source in that language.
   def self.samples = all_sources.select { |key, _| key.match?(SAMPLE) }
 
+  # What a sample drawing was drawn from: the digest of its source as the
+  # `:mermaid` cast stores it, written beside the drawing as its `.from`.
+  def self.sample_from(source) = Diagrams::Drawing.digest(ContentModel::FieldTypes.fetch(:mermaid).cast.call(source))
+
   # The vendored file's `version` line of mermaid.VERSION and its SHA-256 as
   # it is on disk, in MERMAID_VERSION's two lines.
   def self.version_text
@@ -62,7 +66,8 @@ module DiagramFixtures
 
   # Draws every source in the frame and writes each type's raw drawing,
   # MERMAID_VERSION, and the block type's sample drawings cleaned by
-  # `Diagrams::Drawing.clean`, as the sample stores them. Signs in with an owner made for the run, inside one
+  # `Diagrams::Drawing.clean`, as the sample stores them, each with the
+  # digest of the source it was drawn from. Signs in with an owner made for the run, inside one
   # transaction that the server's thread shares (a pinned connection, as a
   # browser test's) and that is rolled back at the end, so the test database
   # keeps nothing of it.
@@ -90,6 +95,9 @@ module DiagramFixtures
           path = SEEDS.join("sample-#{key[SAMPLE, :locale]}.svg")
           path.write(result.svg)
           log.puts "wrote #{path.relative_path_from(Rails.root)} (#{result.svg.bytesize} bytes)"
+          from = path.sub_ext(".from")
+          from.write("#{sample_from(samples.fetch(key))}\n")
+          log.puts "wrote #{from.relative_path_from(Rails.root)}"
         end
         VERSION_FILE.write(version_text)
         log.puts "wrote test/fixtures/diagrams/MERMAID_VERSION"

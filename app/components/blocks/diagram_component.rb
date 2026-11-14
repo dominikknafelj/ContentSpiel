@@ -8,8 +8,10 @@ module Blocks
   # of the first language on the visitor's fallback chain that has a source
   # of its own: a language with its own source shows only its own drawing
   # (none, if it has none or it fails on read), never another language's
-  # beside its source. The description and the caption fall back on their
-  # own, as every translated text does.
+  # beside its source. The description names that drawing: the visitor's
+  # language's own, or else that of the language whose drawing is shown,
+  # and none from further down the chain, which would name another drawing.
+  # The caption falls back on its own, as every translated text does.
   class DiagramComponent < ApplicationComponent
     include Blocks::Contract
 
@@ -22,7 +24,7 @@ module Blocks
       words: [],
       limits: [
         "Nothing is drawn without a drawing that passes on read or without a description: there is no error text and no empty box.",
-        "The drawing is sized from its viewBox and is not yet scaled to its column."
+        "The drawing keeps the width and height of its viewBox: nothing scales it to its column."
       ]
     )
 
@@ -51,17 +53,25 @@ module Blocks
       end
     end
 
-    def description = settings&.description
+    # The visitor's language's own description, or else that of the language
+    # whose drawing is shown.
+    def description
+      return @description if defined?(@description)
+
+      @description = [ I18n.locale.to_s, drawing_locale ].compact.uniq.lazy.filter_map { |code| block.settings_object(locale: code)&.description.presence }.first
+    end
 
     def caption = translated(block, :caption)
 
-    # The settings in the visitor's language, with the site's fallback.
-    def settings = @settings ||= block.settings_object(fallback: true)
+    # The first language on the visitor's fallback chain with a source of
+    # its own: the one whose drawing is shown.
+    def drawing_locale
+      return @drawing_locale if defined?(@drawing_locale)
 
-    # The stored drawing of the language whose source is shown.
-    def drawing_value
-      code = ::Locales.fallback_chain(I18n.locale).find { |candidate| block.translated_settings.to_h.dig(candidate.to_s, "source").present? }
-      code && block.settings_object(locale: code)&.drawing
+      @drawing_locale = ::Locales.fallback_chain(I18n.locale).map(&:to_s).find { |code| block.translated_settings.to_h.dig(code, "source").present? }
     end
+
+    # The stored drawing of that language, read with no fallback.
+    def drawing_value = drawing_locale && block.settings_object(locale: drawing_locale)&.drawing
   end
 end

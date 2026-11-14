@@ -86,11 +86,11 @@ module BlockTypes
     end
 
     # The sample's drawing in a language: the cleaned SVG `diagram:fixtures`
-    # wrote, and the digest of the source as the `:mermaid` cast stores it,
-    # which is what a drawing's `from` is compared with.
+    # wrote and, as its `from`, the digest of the source it was drawn from,
+    # which the task wrote beside it. A source changed without drawing it
+    # again leaves the drawing not current for it.
     def self.sample_drawing(locale)
-      stored = ContentModel::FieldTypes.fetch(:mermaid).cast.call(SAMPLE_SOURCES.fetch(locale))
-      { "svg" => SAMPLE_DRAWINGS.join("sample-#{locale}.svg").read, "from" => Diagrams::Drawing.digest(stored) }
+      { "svg" => SAMPLE_DRAWINGS.join("sample-#{locale}.svg").read, "from" => SAMPLE_DRAWINGS.join("sample-#{locale}.from").read.strip }
     end
   end
 end

@@ -53,9 +53,9 @@ class BlockTypes::DiagramTest < ActiveSupport::TestCase
       assert drawing.current?(stored), "the #{locale} drawing was not drawn from its source: run RAILS_ENV=test bin/rails diagram:fixtures"
       assert_nil drawing.reason, locale
       assert_equal values[:drawing]["svg"], Diagrams::Drawing.clean(values[:drawing]["svg"]).svg, "the #{locale} drawing is stored cleaned"
-      # `from` is the source's digest by construction; that the SVG is the
-      # one drawn from this source is held by the fixtures' copy of it
-      # (below) and, here, by the source's accDescr standing in the drawing.
+      # `from` is the digest the task wrote of the source it drew, so a source
+      # changed without drawing it again fails above; the accDescr standing
+      # in the drawing ties the SVG to the source as well.
       assert_equal stored[/accDescr: (.+)$/, 1], Nokogiri::XML(values[:drawing]["svg"]).at_xpath("//*[local-name()='desc']")&.text, locale
       assert values[:description].present?, locale
       assert values[:caption].present?, locale
