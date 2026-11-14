@@ -12,9 +12,23 @@ class Diagram::SourceTest < ActiveSupport::TestCase
     end
   end
 
-  test "a first line not on the list is refused as :type, naming the word" do
+  test "another Mermaid diagram's keyword is refused as :type, naming the word" do
     assert_equal [ Refusal.new(line: 1, rule: :type, word: "mindmap") ], refusals("mindmap\n  root")
     assert_nil Diagram::Source.type("mindmap\n  root")
+  end
+
+  test "a first word that is no Mermaid diagram is refused as :no_type, naming the word" do
+    assert_equal [ Refusal.new(line: 1, rule: :no_type, word: "hello") ], refusals("hello world")
+  end
+
+  test "%% comment lines are skipped before the keyword, as blank lines are" do
+    assert_empty refusals("%% a note\n\n%% another\nflowchart LR")
+    assert_equal "flowchart", Diagram::Source.type("%% a note\nflowchart LR")
+    assert_equal [ Refusal.new(line: 2, rule: :no_type, word: "hello") ], refusals("%% a note\nhello")
+  end
+
+  test "a %%{ first line is refused as :directive alone, never also as a type" do
+    assert_equal [ Refusal.new(line: 1, rule: :directive, word: "%%{") ], refusals("%%{init: {}}%%\nflowchart LR")
   end
 
   test "a leading BOM and blank lines are skipped before the keyword" do
@@ -29,10 +43,10 @@ class Diagram::SourceTest < ActiveSupport::TestCase
 
   test "--- as the first non-blank line is :front_matter" do
     assert_equal [ Refusal.new(line: 2, rule: :front_matter, word: "---") ], refusals("\n---\ntitle: x\n---\nflowchart LR").first(1)
-    assert_equal [], refusals("flowchart LR\n---").map(&:rule) - [ :front_matter ]
+    assert_empty refusals("flowchart LR\n---")
   end
 
-  test "classDef, class with a style name after :::, :::, cssClass, style and linkStyle are :colours" do
+  test "classDef, cssClass, style, linkStyle and ::: are :colours" do
     [ "classDef a fill:#f00", "cssClass \"A\" a", "style A fill:#f00", "linkStyle 0 stroke:red", "  style A fill:#f00" ].each do |line|
       assert_equal [ :colours ], refusals("flowchart LR\n#{line}").map(&:rule), line
     end
@@ -42,6 +56,11 @@ class Diagram::SourceTest < ActiveSupport::TestCase
 
   test "class Foo in a class diagram is not refused" do
     assert_empty refusals("classDiagram\n  class Animal")
+  end
+
+  test "class is :colours in a flowchart and in a state diagram" do
+    assert_equal [ Refusal.new(line: 2, rule: :colours, word: "class") ], refusals("flowchart LR\n  class A warm")
+    assert_equal [ Refusal.new(line: 2, rule: :colours, word: "class") ], refusals("stateDiagram-v2\n  class Idle warm")
   end
 
   test "click, link, links, href and call are :links" do
@@ -79,7 +98,10 @@ class Diagram::SourceTest < ActiveSupport::TestCase
     assert_equal Diagram::Source::TYPES, json["types"]
     assert_equal Diagram::Source::MERMAID_TYPES, json["mermaid_types"]
     assert_equal Diagram::Source::MAX_CHARACTERS, json["max_characters"]
-    assert_equal %w[classDef cssClass style linkStyle], json["rules"]["colours"]["first_words"]
+    assert_equal %w[classDef class cssClass style linkStyle], json["rules"]["colours"]["first_words"]
+    assert_equal({ "class" => [ "classDiagram" ] }, json["rules"]["colours"]["except_types"])
+    assert_equal Diagram::Source::OTHER_MERMAID_TYPES, json["other_mermaid_types"]
+    assert_equal "---", json["front_matter"]
     assert_equal [ ":::" ], json["rules"]["colours"]["markers"]
     assert_equal [ "%%{" ], json["rules"]["directive"]["markers"]
     assert_equal %w[click link links href call], json["rules"]["links"]["first_words"]
