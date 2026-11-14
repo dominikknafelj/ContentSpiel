@@ -263,7 +263,7 @@ class Admin::DiagramDrawingsControllerTest < ActionDispatch::IntegrationTest
     assert_select "[data-draw-row]", count: 0
   end
 
-  test "a viewer without pages.edit is refused" do
+  test "a viewer without pages_edit is refused" do
     diagram
     sign_in_as users(:reader)
 

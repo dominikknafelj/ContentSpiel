@@ -1,7 +1,7 @@
 require "test_helper"
 
 # `Admin::DiagramDrawingsScreen::PageGroupComponent`: a page's head on the
-# Draw diagrams list (its title, its path in mono and its list state; not a
+# Draw diagrams list (its title, its path and its list state; not a
 # link) over its rows.
 class Admin::DiagramDrawingsScreen::PageGroupComponentTest < ViewComponent::TestCase
   include ContentHelper

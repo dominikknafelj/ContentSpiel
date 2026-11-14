@@ -62,7 +62,7 @@ class Admin::DiagramDrawingsScreen::ListComponentTest < ViewComponent::TestCase
     assert_equal I18n.t("admin.components.fields.mermaid_field.too_large"), served.fetch("components.fields.mermaid_field.too_large")
     assert_equal "This drawing can't be shown on the site.", served.fetch("components.diagram_drawings_screen.row.reasons.invalid_drawing")
     assert_equal I18n.t("admin.components.fields.mermaid_field.frame_title"), served.fetch("components.fields.mermaid_field.frame_title")
-    assert served.key?("components.diagram_drawings_screen.row.reasons.failed")
+    assert_equal "This drawing wasn't saved. Try again.", served.fetch("diagram_drawings.index.failed_generic")
     %w[waiting drawing drawn failed skipped].each { |state| assert served.key?("components.diagram_drawings_screen.row.states.#{state}"), state }
   end
 

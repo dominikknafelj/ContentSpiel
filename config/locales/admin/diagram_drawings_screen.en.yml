@@ -27,12 +27,11 @@ en:
           # and `invalid_drawing` the field's (`errors.messages.invalid_drawing`),
           # both handed to the script as they are; `gone` stands for a
           # refused permission too, and tells nothing of which. `held` with
-          # no holder is the hold strip's `refused.unknown`. `failed` is any
-          # answer that names no reason.
+          # no holder is the hold strip's `refused.unknown`. An answer that
+          # names no reason reads `admin.diagram_drawings.index.failed_generic`.
           reasons:
             does_not_draw: "This diagram doesn't draw: %{message}"
             changed: "Changed since this list was drawn. Open it to draw it."
             held: "Being edited by %{name}."
             stopped: "Stopped before it was drawn."
             gone: "No longer yours to draw, or no longer here."
-            failed: "This drawing wasn't saved. Try again."

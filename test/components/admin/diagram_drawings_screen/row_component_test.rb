@@ -55,6 +55,12 @@ class Admin::DiagramDrawingsScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "[data-part='text'].font-cs-mono", exact_text: EN.lines.first.strip
   end
 
+  test "the source's line skips the blank lines, a BOM and the comments before its keyword" do
+    draw(diagram, source: "\uFEFF\n%% note\nflowchart TD\n  A --> B")
+
+    assert_selector "[data-part='text'].font-cs-mono", exact_text: "flowchart TD"
+  end
+
   test "the language column is drawn only beside other languages" do
     block = diagram
     draw(block)

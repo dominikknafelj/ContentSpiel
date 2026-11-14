@@ -3,8 +3,11 @@ module Admin
     # One diagram in one language on the Draw diagrams list (`row:`, a
     # `Diagrams::ToDraw::Row`; the Design System's StudioDrawDiagrams): its
     # state as a chip, the block's description in that language (or, with
-    # none, the source's first line in mono), the language's name (only
-    # beside other languages, `language_column:`) and the verb "Open".
+    # none, the source's opening line in mono), the language's name (only
+    # beside other languages, `language_column:`) and the verb "Open". The
+    # source's line is its opening line (`Diagrams::Source.opening_line`:
+    # blank lines, a BOM and `%%` comments before the keyword skipped), as a
+    # loader or a script may write them.
     #
     # THE ONE LINK. The text is the row's link (`.admin-row-link`, stretched
     # over the row) to the block's tile in its page's editor, in the row's
@@ -64,7 +67,7 @@ module Admin
 
       def description = block.translated_settings.to_h.dig(row.locale, "description").presence
 
-      def text = description || row.source.lines.first.to_s.strip
+      def text = description || ::Diagrams::Source.opening_line(row.source).to_s
 
       def text_class = description ? "truncate text-sm font-medium text-ink" : "truncate font-cs-mono text-small text-ink"
 

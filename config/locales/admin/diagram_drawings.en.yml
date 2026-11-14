@@ -38,6 +38,8 @@ en:
           separator: " · "
           end: "."
           none: "Nothing was drawn."
+        # A row's reason when the save's answer is not JSON or names no reason.
+        failed_generic: "This drawing wasn't saved. Try again."
         empty: "Every diagram is drawn. A diagram written outside CS Studio waits here until it is drawn."
         # Over plain HTTP to a host other than localhost, where a browser
         # offers no `crypto.subtle`: the notice above the list, and the reason
