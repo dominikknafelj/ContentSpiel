@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.0 (2026-11-14)
+
 ### Added
 
 - The Draw diagrams screen (`<ADMIN_PATH>/diagram-drawings`, for `pages.edit`): every Diagram block's language that has a source of its own and no drawing of it (or a drawing of an older source, which the site keeps showing), by page in the page tree's order, each row with the source's opening line. "Draw all" draws them one after another in this browser, in one frame out of sight, and saves each as the card would (cleaned, size-checked, audited), never publishing: a live or scheduled page that got a drawing is offered Publish changes at the end, since a scheduled page goes live without it. Stop ends the run after the row in hand; a row that changed since it was listed, or is held in another tab, is skipped, and one that does not draw is marked "Doesn't draw", each with its reason. Without a secure context (plain HTTP to another host) it says so and does not run (`docs/reference/content-blocks-and-types.md`, "The Diagram block").
