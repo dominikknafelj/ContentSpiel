@@ -407,7 +407,6 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
       get address, headers: { "If-None-Match" => etag }
       assert_response :success, address
       assert_equal "private, no-store", response.headers["Cache-Control"], address
-      assert_nil response.headers["ETag"], address
       assert_includes response.body, "Home"
     end
 
@@ -415,8 +414,14 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     assert_response :not_found
     assert_equal "private, no-store", response.headers["Cache-Control"], "a 404 with q"
 
-    get "/?q=%20%20"
-    assert_equal "max-age=0, public, must-revalidate", response.headers["Cache-Control"], "a blank q is no query"
+    get "/en?q=albatross"
+    assert_response :found
+    assert_equal "private, no-store", response.headers["Cache-Control"], "the default language's redirect with q"
+
+    [ "%20%20", "%00%01", "%EE%80%80" ].each do |typed|
+      get "/?q=#{typed}"
+      assert_equal "max-age=0, public, must-revalidate", response.headers["Cache-Control"], "#{typed}: no words, no query"
+    end
 
     get "/", headers: { "If-None-Match" => etag }
     assert_response :not_modified

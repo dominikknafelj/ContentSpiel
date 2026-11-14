@@ -66,19 +66,27 @@ module PublicPageRendering
     after_action :forget_late_code
 
     # A request with a query is answered for that request alone (search spec
-    # §8.1), whatever it comes to: a page, a 404, a redirect, a 429. Set
-    # first, so no answer of either controller leaves without it.
+    # §8.1): every answer this concern's controller gives it once its
+    # callbacks run, the page, a 404, the default language's redirect and a
+    # 429. An answer given before them is not: `allow_browser`'s 406 and the
+    # preview's sign-in redirect, which draw no page and hold no result.
     before_action :answer_search_privately, if: :search_requested?
 
     helper_method :search_requested?, :search_answer
   end
 
-  # Whether the request asks a search: `q` is a String with something in it.
-  # An Array or a Hash (`?q[]=a`, `?q[x]=1`) is no search, and is neither
-  # counted (`SiteSearch::QueryLimit`) nor kept from caches.
+  # Whether the request asks a search: `q` is a String with words left once
+  # normalised (`SiteSearch::Query.normalise`). An Array or a Hash
+  # (`?q[]=a`, `?q[x]=1`), and a `q` of nothing but spaces, control or
+  # marker characters, are no search, and are neither counted
+  # (`SiteSearch::QueryLimit`) nor kept from caches.
+  #
+  # `q` arrives as bytes (`param_encoding … Encoding::BINARY` in both
+  # controllers): a query that is no UTF-8 (`caf%E9` from an old link or a
+  # Latin-1 form) would otherwise be refused by Rails' encoding check with a
+  # 400 whose logged message holds the value. `normalise` scrubs it.
   def search_requested?
-    query = params[:q]
-    query.is_a?(String) && query.present?
+    SiteSearch::Query.normalise(params[:q]).present?
   end
 
   # The request's `SiteSearch::Answer`, for a Search block: searched the

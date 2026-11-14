@@ -23,6 +23,10 @@ class PagesController < PublicController
   # once, there.
   include SiteSearch::QueryLimit
 
+  # `q` as the bytes it came in (`PublicPageRendering#search_requested?`
+  # says why).
+  param_encoding :show, :q, Encoding::BINARY
+
   # The content version is read before anything it stands for: ahead of the
   # resolver, the record and the settings row. A write that commits while
   # this request runs is then seen as new content under the old version -- a

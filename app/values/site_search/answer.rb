@@ -23,7 +23,8 @@ module SiteSearch
     PER_PAGE = Query::PER_PAGE
 
     # `raw_query` and `raw_page` as the request handed them, whatever their
-    # type (a parameter can be an Array); `limited` the rate limit's mark.
+    # type (a parameter can be an Array) and encoding (`q` arrives as bytes:
+    # `PublicPageRendering#search_requested?`); `limited` the rate limit's mark.
     # The page is read with no total first, so junk is page 1 and a number
     # past the last page stays as asked: the backend then finds nothing on
     # it, and the answer, rebuilt with the backend's total, is past the end.
@@ -33,7 +34,7 @@ module SiteSearch
       quiet = ->(state, query = text) { new(query: query, state: state, results: [], total: 0, pagination: asked, live_note: live_note) }
       return quiet.(:empty) if text.nil?
       return quiet.(:limited) if limited
-      return quiet.(:too_long, raw_query) if text.length > Query::MAX_LENGTH
+      return quiet.(:too_long, raw_query.dup.force_encoding(Encoding::UTF_8).scrub("")) if text.length > Query::MAX_LENGTH
 
       found = SiteSearch.search(Query.new(text: text, language: locale.to_s, page: asked.page, per_page: PER_PAGE, now: now))
       return quiet.(:unavailable) if found == UNAVAILABLE

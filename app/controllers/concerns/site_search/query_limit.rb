@@ -7,10 +7,14 @@ module SiteSearch
   # - 600 searches in a minute across the site, the flood limit. Its cost,
   #   named: during a flood a real search is refused with the rest.
   #
-  # ONLY A SEARCH COUNTS: a request whose `q` is a String and not blank
-  # (`PublicPageRendering#search_requested?`). A page view is never counted,
-  # whatever page it is and whether it holds a Search block, and neither is
-  # a `q` that is an Array or a Hash, which is no search.
+  # ONLY A SEARCH COUNTS: a request whose `q` is a String with words left
+  # once normalised (`PublicPageRendering#search_requested?`). A page view is never counted,
+  # and neither is a `q` that is an Array or a Hash, or holds no words.
+  #
+  # ANY PAGE WITH `q` COUNTS, one without a Search block too: the limit is
+  # decided before the page's blocks are read, as the no-store answer is.
+  # Its cost, named: a link or a crawler that adds `q` to pages with no
+  # search spends the visitor's twenty all the same.
   #
   # OVER EITHER, NOTHING HALTS: `with:` marks the request, the page is drawn
   # with status 429 and its Search block in `:limited`, and no backend is

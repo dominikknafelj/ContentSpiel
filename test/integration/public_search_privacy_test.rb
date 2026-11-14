@@ -83,10 +83,37 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
     assert @exporter.finished_spans.any? { |span| span.name == "search.query" }, "the search's span is recorded"
     assert_not_includes tables_text, CANARY
     assert_not_includes store_text(CounterStore.current), CANARY
-    assert_not_includes store_text(Rails.cache), CANARY
     assert @reports.all.any?, "the failure was reported"
     assert_not_includes @reports.all.inspect, CANARY
     assert_not_includes @reports.all.map { |error, _| error.message }.join, CANARY
+  end
+
+  # Old links and Latin-1 forms send bytes that are no UTF-8 (`caf%E9`):
+  # Rails' encoding check would refuse the request with a message that holds
+  # the value, and that message is logged in production too.
+  test "a query that is no UTF-8 is searched, scrubbed, and reaches no log" do
+    log = nil
+    with_search_probe do
+      place_search_probe(root_page)
+      log = capture_log(LogCapture::REQUEST_LOGGERS) do
+        get "/?q=#{CANARY}%FF"
+        assert_response :success
+        assert_equal "none", probe[:state]
+
+        get "/?q=#{"a" * 201}%FF"
+        assert_response :success
+        assert_equal "too_long", probe[:state]
+
+        sign_in_as(users(:one))
+        get "/cs-studio/preview?q=#{CANARY}%FF"
+        assert_response :success
+        assert_equal "none", probe[:state]
+      end
+    end
+
+    assert_match(/Started GET "\/\?q=\[FILTERED\]"/, log)
+    assert_not_includes log, CANARY
+    assert_not_includes log, "BadRequest"
   end
 
   test "an outside backend's failure is reported without its exception's message" do

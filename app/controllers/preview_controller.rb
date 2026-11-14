@@ -8,6 +8,8 @@ class PreviewController < ApplicationController
   include Admin::PasskeyEnrolment
   # An editor's searches count with the visitors' (search spec §7.2).
   include SiteSearch::QueryLimit
+  # `q` as the bytes it came in (`PublicPageRendering#search_requested?`).
+  param_encoding :show, :q, Encoding::BINARY
 
   # Same reason as PublicController's own before_action: an Accept header
   # naming another format would otherwise reach a missing template and a 500.

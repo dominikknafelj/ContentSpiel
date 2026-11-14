@@ -48,7 +48,6 @@ require_relative "../lib/telemetry/work_sampler"
 # And this one because the middleware stack below names it while the
 # application is configured.
 require_relative "../lib/content_spiel/diagram_font_cors"
-require_relative "../lib/content_spiel/no_store_without_etag"
 
 module ContentSpiel
   class Application < Rails::Application
@@ -66,10 +65,6 @@ module ContentSpiel
     # stands after it: production's precompiled files and development's
     # served ones answer with the header alike.
     config.middleware.insert_before ActionDispatch::Static, ContentSpiel::DiagramFontCors, prefix: config.assets.prefix
-
-    # A `no-store` response leaves with no ETag (lib/content_spiel/no_store_without_etag.rb): between
-    # `Rack::ConditionalGet` and `Rack::ETag`, so the weak ETag the second writes is gone before the first reads it.
-    config.middleware.insert_before Rack::ETag, ContentSpiel::NoStoreWithoutEtag
 
     # Turbo's historical-location routes answer a native client's redirect; this app has none, so they are unreachable.
     config.turbo.draw_routes = false

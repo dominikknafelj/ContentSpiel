@@ -38,6 +38,11 @@ class SiteSearch::AnswerTest < ActiveSupport::TestCase
       assert_empty answer.results
     end
     assert_equal :none, answer("a" * 200).state, "200 characters are searched"
+
+    bytes = "caf\xE9 #{"a" * 201}".b
+    kept = answer(bytes).query
+    assert_equal "caf #{"a" * 201}", kept, "bytes that are no UTF-8, as a request hands them, are scrubbed"
+    assert_equal Encoding::UTF_8, kept.encoding
   end
 
   test "limited asks no backend" do
