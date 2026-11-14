@@ -10,6 +10,8 @@
 #   SiteSearch::Fake.new(sleep_for: 5)                        # slow; past the deadline it raises Timeout::Error at the deadline
 #
 # `documents` is every stored document by key, for a test to read.
+# `installed { … }` makes this fake the site's backend inside the block, as
+# a gem's would be (registered as "test/fake", chosen by SEARCH_BACKEND).
 class SiteSearch::Fake
   WEIGHTS = { a: 1.0, b: 0.4, c: 0.2, d: 0.1 }.freeze
   WORD = /[[:alnum:]]+/
@@ -21,6 +23,21 @@ class SiteSearch::Fake
     @raise_with = raise_with
     @sleep_for = sleep_for
     @documents = {}
+  end
+
+  NAME = "test/fake".freeze
+
+  def installed
+    fake = self
+    SiteSearch::Backends.register NAME, label: "Fake", backend: -> { fake }
+    was = ENV["SEARCH_BACKEND"]
+    ENV["SEARCH_BACKEND"] = NAME
+    SiteSearch::Backends.forget!
+    yield self
+  ensure
+    was.nil? ? ENV.delete("SEARCH_BACKEND") : ENV["SEARCH_BACKEND"] = was
+    SiteSearch::Backends.forget!
+    Rails.application.reloader.prepare!
   end
 
   def index(documents)
@@ -91,18 +108,25 @@ class SiteSearch::Fake
   end
 
   # A window of the first text (the body's first) that holds a word, from
-  # shortly before that word, with every whole occurrence of a word inside
-  # it marked.
+  # shortly before that word's first whole occurrence, with every whole
+  # occurrence of a word inside it marked. The words are found in the text
+  # itself and compared downcased one by one, so an offset is always the
+  # text's (a downcase can be longer than its word: "İ" is two characters).
   def snippet_of(document, words)
     text = [ document.text, *document.fields.map(&:text) ].find { |each| (each.downcase.scan(WORD) & words).any? } || ""
-    first = words.filter_map { |word| text.downcase.index(word) }.min || 0
+    first = whole_words(text, words).first&.first || 0
     window = text[[ first - 40, 0 ].max, SNIPPET]
+    SiteSearch::Snippet.new(text: window, marks: whole_words(window, words))
+  end
+
+  # `[start, length]` of each whole word of `text` that is one of `words`.
+  def whole_words(text, words)
     marks = []
-    window.downcase.scan(WORD) do
+    text.scan(WORD) do
       match = Regexp.last_match
-      marks << [ match.begin(0), match[0].length ] if words.include?(match[0])
+      marks << [ match.begin(0), match[0].length ] if words.include?(match[0].downcase)
     end
-    SiteSearch::Snippet.new(text: window, marks: marks)
+    marks
   end
 
   def trouble!(deadline = nil)

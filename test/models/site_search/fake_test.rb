@@ -24,4 +24,23 @@ class SiteSearch::FakeTest < ActiveSupport::TestCase
     assert_raises(Timeout::Error) { fake.search(query("a"), deadline: start + 0.1) }
     assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - start, :<, 1
   end
+
+  # The fake's snippet is what the callers' tests draw, so its marks must
+  # stand on the words of its own text: a word inside another ("art" in
+  # "Cartography") is no match, and a character whose downcase is longer
+  # ("İ", two characters downcased) must not shift the marks.
+  test "the snippet starts at the first whole word and marks the words of its own text" do
+    long = "Cartography #{"plain " * 30}art and more art"
+    backend.index([ contract_document(title: "Atlas", body: long), contract_document(title: "City", body: "İstanbul art fair") ])
+
+    snippets = backend.search(query("art"), deadline: deadline_in(1)).hits.map(&:snippet)
+
+    assert_equal 2, snippets.size
+    snippets.each do |snippet|
+      assert_not_empty snippet.marks
+      snippet.marks.each { |start, length| assert_equal "art", snippet.text[start, length] }
+    end
+    city = snippets.find { |snippet| snippet.text.start_with?("İstanbul") }
+    assert_equal [ [ 9, 3 ] ], city.marks
+  end
 end

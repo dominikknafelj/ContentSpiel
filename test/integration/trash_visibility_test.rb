@@ -279,6 +279,29 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :ok
   end
 
+  # The search is a list over pages and posts: the built-in's query leaves a
+  # trashed record out, and an outside engine's stale hit for one is dropped
+  # by the re-check (`SiteSearch::Shown`).
+  test "the site's search finds a kept page and post and never a trashed one, from the built-in or a stale outside index" do
+    found = ->(words) { SiteSearch::Answer.for(raw_query: words, raw_page: nil, locale: :en, limited: false, live_note: false).results.map(&:record) }
+
+    assert_equal [ @kept_page.id ], found.("kept page").map(&:id)
+    assert_equal [ @kept_post.id ], found.("kept post").map(&:id)
+    assert_empty found.("gone page")
+    assert_empty found.("gone post")
+
+    fake = SiteSearch::Fake.new
+    [ @gone_page, @gone_post ].each do |record|
+      copy = Publishing::Version.of(record).order(:id).last
+      fake.index(SiteSearch::Documents.for(copy, now: Time.current))
+    end
+    assert_equal 2, fake.documents.values.map(&:record_id).uniq.size, "the stale index holds both"
+    fake.installed do
+      assert_empty found.("gone page")
+      assert_empty found.("gone post")
+    end
+  end
+
   # --- CS Studio --------------------------------------------------------------
 
   test "CS Studio 404s a trashed page, post and image by id, and autosave can't revive one" do
