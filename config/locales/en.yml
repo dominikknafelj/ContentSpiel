@@ -74,6 +74,22 @@ en:
       # formatted ("2,000").
       table_too_large: "A table can have at most %{columns} columns and %{rows} rows."
       table_cell_too_long: "A cell can have at most %{characters} characters."
+      # A Diagram block's source and drawing (`ContentModel::FieldTypes`,
+      # `:mermaid` and `:diagram_drawing`), one sentence per `Diagram::Source`
+      # rule. These are also the sentences the editor's card shows before a
+      # save (`Admin::Fields::MermaidField::SENTENCES` hands them to the
+      # script), so they are written here once. `%{word}` is what the line
+      # holds; the directive's word is its marker, `%%{`, because a `%%`
+      # written here would be read as an escaped `%`. `%{types}` arrives
+      # joined ("flowchart, sequenceDiagram, …").
+      diagram_colours: "Line %{line}: colours come from the site's theme, so %{word} isn't used here."
+      diagram_links: "Line %{line}: a diagram can't hold links or actions, so %{word} isn't used here."
+      diagram_directive: "Line %{line}: settings in %{word} } aren't used here, so the drawing follows the site."
+      diagram_front_matter: "Line %{line}: settings in --- front matter aren't used here, so the drawing follows the site."
+      diagram_maths: "Line %{line}: maths can't be drawn here, so $$ isn't used."
+      diagram_unsupported: "%{type} diagrams aren't supported yet. Use one of: %{types}."
+      diagram_no_type: "The first line names the diagram's type, like flowchart or sequenceDiagram."
+      invalid_drawing: "This drawing can't be shown on the site."
 
   # A Section's anchor (`BlockTypes::Section`): whole sentences, shown under the
   # field with no prefix (`activerecord.errors.models.content_block` below).

@@ -215,6 +215,34 @@ class Translations::StatusTest < ActiveSupport::TestCase
     end
   end
 
+  # `translation_required:` (Diagram block plan, R4): the image alt's rule for
+  # a schema field, required in a language only where the original has one.
+  test "a translation_required field blank in a language is missing only when the primary language has a value" do
+    saved = BlockTypes.all.dup
+    BlockTypes.register("test/described") do |t|
+      TestTypes.declare(t)
+      t.label "Described"
+      t.field :description, :text, translated: true, translation_required: true
+      t.component TestQuoteComponent
+    end
+    with_locales(%w[en de es], default: "en") do
+      page = create_page(title: "About", translations: { "de" => { title: "Über uns" }, "es" => { title: "Sobre" } })
+      result = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "test/described" })
+      assert result.ok?, result.errors.to_sentence
+      assert_empty Translations::Status.missing_locales(page), "no original, nothing to translate"
+
+      block = result.record
+      assert ContentBlocks::Save.call(block, attributes: { settings: { description: "A diagram" } },
+        translations: { "de" => { settings: { description: "Ein Diagramm" } } }).ok?
+      assert_equal %w[es], Translations::Status.missing_locales(page)
+      assert_equal({ "de" => :complete, "es" => :missing }, Translations::Status.for([ page ])[page])
+      assert_equal 1, Translations::Status.counts([ page ])[page]["es"][:missing]
+    end
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
   test "an unavailable block type is never treated as missing" do
     with_locales(%w[de en], default: "de") do
       page = create_page(title: "Über uns", translations: { "en" => { title: "About" } })

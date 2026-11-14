@@ -123,4 +123,19 @@ class Admin::Ui::FieldComponentTranslationTest < ViewComponent::TestCase
 
     assert_selector "input[placeholder='Note']"
   end
+
+  # A drawing is written by the preview script only: on a translation tab it
+  # has no original to read beside it, no label and no Translate button, and
+  # keeps its error slot.
+  test "a drawing on a translation tab is its hidden input and error slot, with no label and no reference card" do
+    field = Field.new(name: "drawing", type: :diagram_drawing, options: { translated: true })
+    original = { "svg" => "<svg/>", "from" => "a" * 64 }
+    render_inline Admin::Ui::FieldComponent.new(field:, form_name: "block[settings]", value: nil, original: original, locale: "de",
+      errors: [ "This drawing can't be shown on the site." ], id_prefix: "block-7")
+
+    assert_selector "[data-field-name='drawing'] input[type=hidden]#block-7-drawing", visible: :all
+    assert_no_selector "label, [data-original-for], [data-translate-slot] *", visible: :all
+    assert_no_text "svg"
+    assert_selector "#block-7-drawing-errors", text: "This drawing can't be shown on the site."
+  end
 end

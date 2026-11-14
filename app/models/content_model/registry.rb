@@ -51,6 +51,7 @@ module ContentModel
         taken = registry.values.filter_map { |other| other.colour_index if other.respond_to?(:colour_index) }
         definition.colour_index = (1..).find { |index| taken.exclude?(index) }
       end
+      definition.finish_fields!
       definition.finalize!
       admit!(definition)
       registry[definition.name] = definition

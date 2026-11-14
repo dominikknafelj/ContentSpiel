@@ -96,4 +96,16 @@ class Admin::EditorScreen::SharedFieldsComponentTest < ViewComponent::TestCase
       assert_equal text, Nokogiri::HTML5.fragment(Admin::EditorScreen::HeldFields.call(rendered_content)).at_css("dd pre").text, "held: #{text.inspect}"
     end
   end
+
+  # The source's own field shows the drawing; a drawing read flat is nothing.
+  test "SharedFieldsComponent shows nothing for the drawing on a translation tab" do
+    field = Field.new(name: "drawing", type: :diagram_drawing, options: {})
+    stored = { "svg" => "<svg><path d='M0 0'/></svg>", "from" => "a" * 64 }
+
+    assert_nil Admin::EditorScreen::SharedFieldsComponent.display(field, stored)
+    render_inline(Admin::EditorScreen::SharedFieldsComponent.new(fields: [ [ "Drawing", Admin::EditorScreen::SharedFieldsComponent.display(field, stored) ] ]))
+    assert_no_text "svg"
+    assert_no_text "path"
+    assert_text "—"
+  end
 end

@@ -14,6 +14,26 @@ en:
         code_field:
           count: "%{used} of %{limit} characters"
           over: "%{used} of %{limit} characters · %{over} over"
+        # The Diagram block's source (`Admin::Fields::MermaidField`) and its
+        # preview (EditorDiagramBlock, EditorDiagramError), shown by
+        # `admin--diagram--preview`. The counter's two lines are the Code
+        # field's. A refused line, an unsupported type and a first line that
+        # names none are said in the server's own sentences,
+        # `errors.messages.diagram_*` (config/locales/en.yml), which the
+        # component hands the script under `refused.*`, `unsupported` and
+        # `no_type`: they are not written here.
+        mermaid_field:
+          count: "%{used} of %{limit} characters"
+          over: "%{used} of %{limit} characters · %{over} over"
+          frame_title: Diagram preview
+          empty: Type a diagram to see it drawn.
+          drawing: Drawing…
+          no_description: The site shows this diagram once it has a description.
+          starting: "Starts from the %{language} diagram. It becomes this language's own when you change it."
+          error_lead: "This diagram doesn't draw:"
+          kept: The site keeps the last drawing that worked.
+          nothing_yet: Nothing is drawn yet.
+          kept_badge: Last drawing that worked
         # A link field's other half: a page or a post chosen by its title
         # (`Admin::Fields::LinkField`). `unavailable` is one answer for a target
         # outside the viewer's scope, in the trash or gone: it must tell none.

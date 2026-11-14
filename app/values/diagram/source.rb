@@ -67,6 +67,11 @@ module Diagram
 
     BOM = "﻿".freeze
 
+    # The first keyword of each type, as an editor is told the list
+    # ("flowchart, sequenceDiagram, …"): `graph` and `stateDiagram-v2` are
+    # the second spellings of a type already named.
+    def self.keywords = TYPES.keys.uniq { |keyword| TYPES[keyword] }
+
     # The first keyword when it is on the list, as typed ("graph", "stateDiagram-v2"), else nil.
     def self.type(text)
       _, line = keyword_line(text.to_s.delete_prefix(BOM).lines)

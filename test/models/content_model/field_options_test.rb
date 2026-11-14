@@ -88,4 +88,14 @@ class ContentModel::FieldOptionsTest < ActiveSupport::TestCase
     assert_equal [ "is too long (maximum is 5 characters)" ], object.errors[:title], "said once"
     assert ContentModel::FieldSet.for(definition).new({}, { "en" => { "title" => "short" }, "de" => { "title" => "kurz" } }, locale: "en").valid?
   end
+
+  test "translation_required without translated is refused at registration" do
+    field = define { |t| t.field :description, :text, translated: true, translation_required: true }.fields.sole
+
+    assert field.translation_required?
+    assert_not define { |t| t.field :description, :text, translated: true }.fields.sole.translation_required?
+    error = assert_raises(ArgumentError) { define { |t| t.field :description, :text, translation_required: true } }
+    assert_includes error.message, "translated: true"
+    assert_raises(ArgumentError) { define { |t| t.field :description, :text, translated: true, translation_required: "yes" } }
+  end
 end

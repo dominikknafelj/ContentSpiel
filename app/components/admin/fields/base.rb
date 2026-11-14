@@ -23,6 +23,12 @@ module Admin
       # of buttons with its legend), so `Ui::FieldComponent` draws none.
       def self.own_label?(_field) = false
 
+      # Whether a translation tab draws the original beside this input (the
+      # reference card, with its Translate and Suggest update buttons). An
+      # input nobody types in (a drawing the preview script writes) has
+      # nothing a translator compares, so it answers false.
+      def self.reference?(_field) = true
+
       # `id_prefix:` mirrors `Ui::FieldComponent`'s own (see its comment) --
       # forwarded here unchanged so `input_id` agrees with the wrapping
       # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a

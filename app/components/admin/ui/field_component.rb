@@ -124,8 +124,9 @@ module Admin
 
       # True once the caller has handed over something to compare against --
       # see the class comment for why that's the caller's call, not this
-      # component re-deriving "non-default locale and translated" itself.
-      def show_original? = original.present?
+      # component re-deriving "non-default locale and translated" itself --
+      # and the input is one a translator compares (`Fields::Base.reference?`).
+      def show_original? = original.present? && input_class.reference?(field)
 
       # The card showing the primary-language original beside (or above) the
       # input -- see `Admin::Columns::Base#reference_card`.

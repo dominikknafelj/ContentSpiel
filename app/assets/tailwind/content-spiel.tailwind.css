@@ -839,6 +839,16 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-section-lanes { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }
   .admin-section-lane__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
+/* A Diagram block's source and its preview (`Admin::Fields::MermaidField`):
+   two equal columns 1rem apart while the field is at least 40rem wide (two
+   halves of 19.5rem and the gap fit on one line), the preview wrapped under
+   the source below that, each then the field's width. A wrapping row and
+   no container query: no size container may stand inside the post form,
+   whose sources include every field input (`test/lib/admin_design_rules_test.rb`).
+   The frame slot is where the preview script builds its renderer frame. */
+.admin-mermaid-field__pair { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+.admin-mermaid-field__pair > * { flex: 1 1 19.5rem; min-width: min(100%, 19.5rem); }
+.admin-mermaid-field__frame { min-height: 200px; border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
 /* The dashboard's heading row: the heading, then New page… and New post…
    at its end. It wraps, so on a narrow screen the buttons go under the
    heading rather than crushing it. */

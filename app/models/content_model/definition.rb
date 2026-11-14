@@ -46,7 +46,16 @@ module ContentModel
     # where the model's locale entry for the field says `format: "%{message}"`
     # (the anchor's, `activerecord.errors.models.content_block/settings`); without
     # one it reads after the field's label.
-    OPTIONS = %i[required default min max translated options of blank label control help placeholder_from format format_message].freeze
+    #
+    # `translation_required:` is the image alt's rule for a translated field:
+    # blank in a target language, it reads missing there when the primary
+    # language's value is present (`Translations::Status`), and is never
+    # required for a save. It needs `translated: true`.
+    #
+    # `drawing:` names the `:diagram_drawing` field a `:mermaid` source's
+    # drawing is written into (`ContentModel::FieldTypes`, checked once every
+    # field is declared).
+    OPTIONS = %i[required default min max translated translation_required options of blank label control help placeholder_from format format_message drawing].freeze
     CONTROLS = %i[segmented].freeze
 
     # One field in the schema: `options` carries everything but name/type
@@ -58,6 +67,7 @@ module ContentModel
     Field = Data.define(:name, :type, :options) do
       def translated? = options[:translated] == true
       def required? = options[:required] == true
+      def translation_required? = options[:translation_required] == true
       def group? = GROUP_TYPES.include?(type)
       # Of a type only a built-in block type may declare (`FieldTypes::BLOCK_ONLY`).
       def block_only? = FieldTypes::BLOCK_ONLY.include?(type)
@@ -105,6 +115,9 @@ module ContentModel
       raise ArgumentError, "#{type} fields need `of:` naming a field group" if GROUP_TYPES.include?(type) && options[:of].blank?
       raise ArgumentError, "#{type} fields can't have a default (there's no one canonical default for a nested value)" if GROUP_TYPES.include?(type) && options.key?(:default)
       raise ArgumentError, "`label:` is the field's name as a person reads it, a string" if options.key?(:label) && !(options[:label].is_a?(String) && options[:label].present?)
+      if options.key?(:translation_required) && !(options[:translation_required] == true && options[:translated] == true)
+        raise ArgumentError, "`translation_required: true` is for a field that is also `translated: true`"
+      end
       refuse_type!(type)
       scalar ? scalar.options.call(options, @fields) : FieldTypes.refuse_choice_and_string_options(options)
 
@@ -115,6 +128,13 @@ module ContentModel
     # (`FieldTypes::BLOCK_ONLY`); raises `ArgumentError`.
     def refuse_type!(_type); end
     private :refuse_type!
+
+    # Each field type's refusals that need every field declared
+    # (`FieldType#finish`): called by `ContentModel::Registry#register`
+    # before `finalize!`.
+    def finish_fields!
+      fields.each { |field| field.field_type&.finish&.call(field, fields) }
+    end
 
     def uses(*columns) = @uses_columns.concat(columns.map(&:to_s))
     def capability(*names) = @capabilities.concat(names)
