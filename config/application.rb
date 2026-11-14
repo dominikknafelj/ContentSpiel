@@ -45,6 +45,10 @@ require_relative "../lib/telemetry"
 require_relative "../lib/telemetry/path_scrubber"
 require_relative "../lib/telemetry/work_sampler"
 
+# And this one because the middleware stack below names it while the
+# application is configured.
+require_relative "../lib/content_spiel/diagram_font_cors"
+
 module ContentSpiel
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
@@ -54,6 +58,13 @@ module ContentSpiel
     # Rails' own prepended mount at `/cable` is switched off: `/cable` is a
     # public page's address like any other.
     config.action_cable.mount_path = nil
+
+    # The Diagram block's renderer frame loads the four Archivo faces from an
+    # opaque origin, which needs CORS (lib/content_spiel/diagram_font_cors.rb). Before
+    # `ActionDispatch::Static`, so it also wraps `Propshaft::Server`, which
+    # stands after it: production's precompiled files and development's
+    # served ones answer with the header alike.
+    config.middleware.insert_before ActionDispatch::Static, ContentSpiel::DiagramFontCors, prefix: config.assets.prefix
 
     # Turbo's historical-location routes answer a native client's redirect; this app has none, so they are unreachable.
     config.turbo.draw_routes = false

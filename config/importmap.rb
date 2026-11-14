@@ -120,6 +120,14 @@ pin "sortablejs", preload: false # @1.15.7
 # imports it, so it is not preloaded; the pin stays so `bin/importmap audit`
 # and `outdated` still see the package.
 pin "d3-force", preload: false # @3.0.0
+# Vendored for the Diagram block's renderer frame (`Admin::DiagramRenderersController`),
+# which loads `dist/mermaid.min.js` (an IIFE that sets the global `mermaid`)
+# by its asset URL as a classic script: the frame has an opaque origin and
+# could not load the app's module scripts without CORS. Nothing imports it,
+# so it is never preloaded and never on a public page; the pin stays so
+# `bin/importmap audit` and `outdated` see the package. Its size and SHA-256
+# are in `vendor/javascript/mermaid.VERSION`.
+pin "mermaid", preload: false # @12.2.0
 # Tiptap 3 and its ProseMirror dependencies, vendored by
 # `bin/importmap pin @tiptap/core @tiptap/starter-kit @tiptap/extension-link`
 # and, for the Table block's grid (table spec decision 11), `bin/importmap pin
