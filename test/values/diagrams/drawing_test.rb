@@ -263,6 +263,25 @@ class Diagrams::DrawingTest < ActiveSupport::TestCase
     assert_equal "diagram-12-de-title", parsed(markup).root.element_children.first["id"]
   end
 
+  # The public component caches the markup without its title, which is the
+  # description and changes on its own, and puts the title in on each read.
+  test "markup is the untitled markup with its title put in: the title as escaped text, no parse, and the smallest width three fifths of the natural one" do
+    svg = clean(drawing(%(<path d="M0 0"/>), root: "")).svg
+    drawing = Diagrams::Drawing.new("svg" => svg, "from" => "x")
+    untitled = drawing.untitled_markup(prefix: "diagram-12-de-", title_id: "diagram-12-de-title")
+
+    assert_not_kind_of ActiveSupport::SafeBuffer, untitled
+    assert_includes untitled, %(<title id="diagram-12-de-title"/>)
+    assert_equal "--diagram-min-width: 120px", parsed(untitled).root["style"], "0.6 of the viewBox's 200"
+    titled = with_singleton_override(Diagrams::Drawing, :read, ->(*) { raise "parsed" }) do
+      Diagrams::Drawing.with_title(untitled, title: %(<b>"&'), title_id: "diagram-12-de-title")
+    end
+    assert_kind_of ActiveSupport::SafeBuffer, titled
+    assert_equal drawing.markup(prefix: "diagram-12-de-", title: %(<b>"&'), title_id: "diagram-12-de-title"), titled
+    assert_equal %(<b>"&'), parsed(titled).at_xpath("//*[local-name()='title']").text
+    assert_raises(ArgumentError) { Diagrams::Drawing.with_title(untitled, title: "t", title_id: "diagram-12-de-other") }
+  end
+
   test "markup keeps Mermaid's desc as the description and drops Mermaid's title" do
     raw = fixture("flowchart").sub(%(<desc id=), %(<title id="chart-title-diagram-1">Mermaid's own title</title><desc id=))
     markup = Diagrams::Drawing.new("svg" => clean(raw).svg, "from" => "x").markup(prefix: "diagram-1-en-", title: "The block's description", title_id: "diagram-1-en-title")

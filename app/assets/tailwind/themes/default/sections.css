@@ -87,6 +87,9 @@
      light theme, where the line above reads it as dim. */
   --th-table-ground: var(--th-band-tinted);
   --th-table-caption: var(--th-dim);
+  /* A diagram's group (a subgraph, a composite state, a gantt section) is
+     the sunken ground, which is this band: here it is a step darker. */
+  --th-diagram-group: color-mix(in srgb, var(--th-ink) 6%, var(--th-band-tinted));
 }
 /* Strong is the strongest step of its scheme -- the page inverted in light,
    a raised dark ground in dark -- with its own three text colours. `color` is
@@ -181,6 +184,25 @@
   --th-form-error: color-mix(in srgb, var(--th-danger) 60%, var(--th-on-band-strong));
   --th-form-done-ground: var(--th-band-strong);
   --th-form-done-line: color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong));
+  /* A diagram on this band (Diagram block spec §4), as the Code block's:
+     the labels the band's text, a node, a group and a note the band's text
+     thinned out, outlines too, edges the band's dim and the accent the
+     band's. The series are the four hues over the band and two mixes of
+     them, so the band's light text reads on every slice in both schemes.
+     The computed tokens would otherwise keep the page's. */
+  --th-diagram-ink: var(--th-on-band-strong);
+  --th-diagram-fill: color-mix(in srgb, var(--th-on-band-strong) 10%, transparent);
+  --th-diagram-line: color-mix(in srgb, var(--th-on-band-strong) 45%, transparent);
+  --th-diagram-edge: var(--th-on-band-strong-dim);
+  --th-diagram-group: color-mix(in srgb, var(--th-on-band-strong) 8%, transparent);
+  --th-diagram-note: color-mix(in srgb, var(--th-on-band-strong) 14%, transparent);
+  --th-diagram-accent: var(--th-on-band-strong-accent);
+  --th-diagram-series-1: color-mix(in srgb, var(--th-on-band-strong-accent) 35%, var(--th-band-strong));
+  --th-diagram-series-2: color-mix(in srgb, var(--th-warn) 35%, var(--th-band-strong));
+  --th-diagram-series-3: color-mix(in srgb, var(--th-ok) 35%, var(--th-band-strong));
+  --th-diagram-series-4: color-mix(in srgb, var(--th-danger) 35%, var(--th-band-strong));
+  --th-diagram-series-5: color-mix(in srgb, var(--th-diagram-series-1) 50%, var(--th-diagram-series-4));
+  --th-diagram-series-6: color-mix(in srgb, var(--th-diagram-series-3) 50%, var(--th-diagram-series-1));
 }
 .content-section--strong .content-block--code { color-scheme: dark; }
 /* A form's native controls (the select's list, the checkbox, the radio)

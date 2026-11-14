@@ -177,6 +177,11 @@
   const shown = document.getElementById("diagram")
   let drawings = 0
 
+  // The drawing in `#diagram` is painted by the Diagram block's public
+  // stylesheet, inlined in `#diagram-paint` with the default theme's light
+  // values of the `--th-diagram-*` tokens on `:root`. The colours the card
+  // posts (CS Studio's) are set on the root element itself, so they win over
+  // those defaults; a message with none leaves the defaults.
   const paint = (colours) => {
     const style = document.documentElement.style
     for (const name of Array.from(style)) if (name.startsWith("--th-diagram-")) style.removeProperty(name)

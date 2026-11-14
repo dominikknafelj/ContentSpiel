@@ -1,12 +1,229 @@
-/* The diagram block's public styles. Every colour is a --th- token:
-   a built-in's token values are written in tokens.css, light and dark, and
-   declared in the type's `tokens` (block types spec, decision 3). A block's
-   token is defined from the theme's base tokens (var(--th-ink),
-   color-mix() of --th-accent and --th-surface, ...) wherever one is right,
-   so a theme that re-colours its base re-colours the block, and holds a
-   literal only where no base token is.
-   Written by bin/rails generate block_type: while this line stands, bin/rails
-   destroy block_type diagram removes this file. Take it out once the
-   stylesheet is yours. */
-.content-block--diagram {
+/* The Diagram block (Diagram block spec §4 and §6; `Blocks::DiagramComponent`).
+
+   PLAIN CSS, NO UTILITIES. The class names come from the drawing, which is
+   data, so nothing here is a Tailwind utility or an @apply, and CS Studio's
+   renderer frame inlines this same file to paint the drawing it shows
+   (`Admin::DiagramRenderersController`): one set of rules for the editor and
+   the site.
+
+   EVERY COLOUR IS A --th-diagram-* TOKEN, defined in tokens.css from the base
+   tokens (the six series colours are literals there) and re-valued by a
+   strong band in sections.css. Mermaid's own <style> and its presentation
+   attributes never reach a page (`Diagrams::Drawing` drops them), so this
+   file paints the drawing by the class names Mermaid writes. They are
+   Mermaid's, not the CMS's: a Mermaid upgrade that renames one is found by
+   the fixtures (`test/fixtures/diagrams/`), and this file follows it.
+
+   IT CARRIES MERMAID'S LAYOUT TOO, which the dropped <style> held: the font
+   sizes by class, the dash patterns, the text anchors that are not written
+   on the element, a milestone's turn, and the pie's and the gantt's colours
+   by position and by state. A theme that replaces this stylesheet keeps
+   those rules, or its labels leave their boxes.
+
+   The type of a drawing is its root's class where Mermaid writes one
+   (`flowchart`, `classDiagram`, `statediagram`, `erDiagram`) and its
+   `aria-roledescription` where it writes none (`sequence`, `gantt`, `pie`).
+   Class, state and ER diagrams share the flowchart's edge and node classes. */
+
+/* ---- The figure, its scroll box and its size ---------------------------- */
+
+.content-block--diagram { margin-block: 2rem; }
+
+/* The drawing is scaled down to its column, never up (its natural width and
+   height are attributes, from its viewBox), and no further than its
+   smallest width, `--diagram-min-width` (three fifths of its natural width,
+   written on the root by `Diagrams::Drawing`). Narrower than that it keeps
+   that width and the box scrolls sideways, inside the figure, round the
+   drawing only, so the caption stays put and the page never scrolls. */
+.content-block--diagram__scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  max-width: 100%;
 }
+.content-block--diagram__scroll:focus-visible { outline: 2px solid var(--th-accent); outline-offset: 2px; }
+.content-block--diagram svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  min-width: var(--diagram-min-width, 0);
+  font-family: var(--th-diagram-font);
+  font-size: 16px;
+}
+.content-block--diagram figcaption {
+  margin-top: var(--th-sp-2);
+  font-family: var(--th-font);
+  font-size: var(--th-t-small);
+  line-height: 1.5;
+  color: var(--th-meta);
+}
+
+/* ---- What every type shares --------------------------------------------- */
+
+.content-block--diagram svg text { fill: var(--th-diagram-ink); stroke: none; font-family: var(--th-diagram-font); }
+
+/* A marker (an arrowhead, a cross, a dot) is the edge's colour; the class
+   and ER diagrams' open ones are painted again below. */
+.content-block--diagram svg marker path,
+.content-block--diagram svg marker circle,
+.content-block--diagram svg marker polygon { fill: var(--th-diagram-edge); stroke: var(--th-diagram-edge); }
+
+/* A node: a rectangle, a circle, a diamond or a path, filled and outlined.
+   A shape Mermaid draws in two paths (`.outer-path`: a filled one, then its
+   outline) is painted as such, so the outline's open strokes are not filled. */
+.content-block--diagram .node rect,
+.content-block--diagram .node circle,
+.content-block--diagram .node polygon,
+.content-block--diagram .node path { fill: var(--th-diagram-fill); stroke: var(--th-diagram-line); stroke-width: 1px; }
+.content-block--diagram .node .outer-path > path:first-child { stroke: none; }
+.content-block--diagram .node .outer-path > path + path { fill: none; }
+/* A label's own boxes hold no drawing of their own. */
+.content-block--diagram .node .label rect { fill: none; stroke: none; }
+
+/* An edge and its pattern. The order is Mermaid's: a path carries a normal
+   and a thick width, or a solid and a dotted pattern, and the later rule wins. */
+.content-block--diagram .edgePaths path,
+.content-block--diagram .flowchart-link,
+.content-block--diagram .relation,
+.content-block--diagram .transition,
+.content-block--diagram .relationshipLine { fill: none; stroke: var(--th-diagram-edge); }
+.content-block--diagram .edge-thickness-normal { stroke-width: 1.5px; }
+.content-block--diagram .edge-thickness-thick { stroke-width: 3.5px; }
+.content-block--diagram .edge-pattern-solid { stroke-dasharray: none; }
+.content-block--diagram .edge-pattern-dashed { stroke-dasharray: 3; }
+.content-block--diagram .edge-pattern-dotted { stroke-dasharray: 2; }
+
+/* An edge's label stands on a box of the node's fill, over the edge. */
+.content-block--diagram .edgeLabel rect { fill: var(--th-diagram-fill); stroke: none; }
+
+/* A group: a subgraph, with its label. */
+.content-block--diagram .cluster rect { fill: var(--th-diagram-group); stroke: var(--th-diagram-line); stroke-width: 1px; }
+.content-block--diagram .cluster-label rect { fill: none; stroke: none; }
+
+/* ---- Flowchart ---------------------------------------------------------- */
+
+/* A node's label is written from its centre in a flowchart only: class,
+   state and ER labels start where they are written, and a rule for every
+   `.node .label text` would push theirs out of their boxes. */
+.content-block--diagram svg.flowchart .node .label text { text-anchor: middle; }
+.content-block--diagram .flowchartTitleText,
+.content-block--diagram .classTitleText,
+.content-block--diagram .statediagramTitleText { text-anchor: middle; font-size: 18px; }
+.content-block--diagram svg.flowchart .marker.cross path { fill: none; }
+
+/* ---- Sequence ----------------------------------------------------------- */
+
+.content-block--diagram rect.actor { fill: var(--th-diagram-fill); stroke: var(--th-diagram-line); stroke-width: 1px; }
+.content-block--diagram text.actor { text-anchor: middle; }
+.content-block--diagram .actor-line { stroke: var(--th-diagram-edge); stroke-width: 1px; }
+.content-block--diagram .actor-man line,
+.content-block--diagram .actor-man circle { fill: var(--th-diagram-fill); stroke: var(--th-diagram-edge); stroke-width: 2px; }
+.content-block--diagram .messageLine0,
+.content-block--diagram .messageLine1 { fill: none; stroke: var(--th-diagram-edge); stroke-width: 1.5px; }
+.content-block--diagram .messageLine1 { stroke-dasharray: 2, 2; }
+.content-block--diagram .activation0,
+.content-block--diagram .activation1,
+.content-block--diagram .activation2 { fill: var(--th-diagram-group); stroke: var(--th-diagram-accent); stroke-width: 1px; }
+.content-block--diagram rect.note { fill: var(--th-diagram-note); stroke: var(--th-diagram-line); stroke-width: 1px; }
+.content-block--diagram .labelBox { fill: var(--th-diagram-fill); stroke: var(--th-diagram-line); stroke-width: 1px; }
+.content-block--diagram .loopLine { fill: none; stroke: var(--th-diagram-line); stroke-width: 2px; stroke-dasharray: 2, 2; }
+
+/* ---- Class -------------------------------------------------------------- */
+
+.content-block--diagram svg.classDiagram .label-group text { font-weight: bolder; }
+.content-block--diagram .divider path { fill: none; stroke: var(--th-diagram-line); stroke-width: 1px; }
+.content-block--diagram .edgeTerminals { font-size: 11px; }
+/* The open markers: an aggregation's diamond, an extension's triangle and a
+   lollipop's circle stand on the node's fill. */
+.content-block--diagram svg.classDiagram marker.aggregation path,
+.content-block--diagram svg.classDiagram marker.extension path,
+.content-block--diagram svg.classDiagram marker.extension polygon,
+.content-block--diagram svg.classDiagram marker.lollipop circle { fill: var(--th-diagram-fill); }
+
+/* ---- State -------------------------------------------------------------- */
+
+.content-block--diagram .node circle.state-start { fill: var(--th-diagram-edge); stroke: var(--th-diagram-edge); }
+/* A composite state: its head is a node's fill, its body a group's. */
+.content-block--diagram .statediagram-cluster rect.outer { fill: var(--th-diagram-fill); stroke: var(--th-diagram-line); stroke-width: 1px; rx: 5px; ry: 5px; }
+.content-block--diagram .statediagram-cluster rect.inner { fill: var(--th-diagram-group); stroke: var(--th-diagram-line); stroke-width: 1px; }
+.content-block--diagram .statediagram-state .divider { stroke: var(--th-diagram-line); }
+.content-block--diagram .statediagram-state rect.divider { fill: var(--th-diagram-group); stroke-dasharray: 10, 10; }
+.content-block--diagram .note-cluster rect { fill: none; stroke: none; }
+.content-block--diagram .note-edge { stroke-dasharray: 5; }
+.content-block--diagram .statediagram-note rect,
+.content-block--diagram .statediagram-note path,
+.content-block--diagram .statediagram-note .outer-path > path:first-child { fill: var(--th-diagram-note); }
+.content-block--diagram .statediagram-note .outer-path > path + path { fill: none; stroke: var(--th-diagram-line); }
+
+/* ---- ER ----------------------------------------------------------------- */
+
+/* An entity's rows alternate between the node's fill and a group's. */
+.content-block--diagram .row-rect-odd > path:first-child { fill: var(--th-diagram-fill); stroke: none; }
+.content-block--diagram .row-rect-even > path:first-child { fill: var(--th-diagram-group); stroke: none; }
+.content-block--diagram .row-rect-odd > path + path,
+.content-block--diagram .row-rect-even > path + path { fill: none; stroke: var(--th-diagram-line); }
+.content-block--diagram svg.erDiagram .edgeLabel .label { font-size: 14px; }
+/* The crow's feet are strokes; a "zero" is an open circle on the fill. */
+.content-block--diagram svg.erDiagram marker path { fill: none; }
+.content-block--diagram svg.erDiagram marker circle { fill: var(--th-diagram-fill); }
+
+/* ---- Gantt -------------------------------------------------------------- */
+
+.content-block--diagram svg[aria-roledescription="gantt"] .titleText { text-anchor: middle; font-size: 18px; }
+/* The sections' bands, every other one a group's ground. */
+.content-block--diagram .section { stroke: none; }
+.content-block--diagram .section0,
+.content-block--diagram .section2 { fill: var(--th-diagram-group); }
+.content-block--diagram .section1,
+.content-block--diagram .section3 { fill: none; }
+.content-block--diagram .grid .tick line { stroke: var(--th-diagram-line); stroke-opacity: 0.3; }
+.content-block--diagram .grid path { stroke: none; fill: none; }
+.content-block--diagram .today { fill: none; stroke: var(--th-diagram-accent); stroke-width: 2px; }
+.content-block--diagram .vert { stroke: var(--th-diagram-edge); }
+.content-block--diagram .vertText { text-anchor: middle; font-size: 15px; }
+
+/* A task by its state, whatever its section (`0` to `3`): plain the first
+   series colour, active the second, done the third, critical the fourth
+   with the accent's outline. */
+.content-block--diagram .task { stroke-width: 2px; }
+.content-block--diagram .task0, .content-block--diagram .task1,
+.content-block--diagram .task2, .content-block--diagram .task3 { fill: var(--th-diagram-series-1); stroke: var(--th-diagram-line); }
+.content-block--diagram .active0, .content-block--diagram .active1,
+.content-block--diagram .active2, .content-block--diagram .active3 { fill: var(--th-diagram-series-2); stroke: var(--th-diagram-line); }
+.content-block--diagram .done0, .content-block--diagram .done1,
+.content-block--diagram .done2, .content-block--diagram .done3 { fill: var(--th-diagram-series-3); stroke: var(--th-diagram-line); }
+.content-block--diagram .crit0, .content-block--diagram .crit1,
+.content-block--diagram .crit2, .content-block--diagram .crit3,
+.content-block--diagram .activeCrit0, .content-block--diagram .activeCrit1,
+.content-block--diagram .activeCrit2, .content-block--diagram .activeCrit3,
+.content-block--diagram .doneCrit0, .content-block--diagram .doneCrit1,
+.content-block--diagram .doneCrit2, .content-block--diagram .doneCrit3 { fill: var(--th-diagram-series-4); stroke: var(--th-diagram-accent); }
+/* A milestone is a square turned on its own centre: the turn's origin was
+   an attribute the sanitizer drops. */
+.content-block--diagram .milestone { transform: rotate(45deg) scale(0.8, 0.8); transform-box: fill-box; transform-origin: center; }
+.content-block--diagram .milestoneText { font-style: italic; }
+.content-block--diagram .taskText { text-anchor: middle; font-size: 11px; }
+.content-block--diagram .taskTextOutsideRight { text-anchor: start; font-size: 11px; }
+.content-block--diagram .taskTextOutsideLeft { text-anchor: end; font-size: 11px; }
+
+/* ---- Pie ---------------------------------------------------------------- */
+
+.content-block--diagram .pieTitleText { text-anchor: middle; font-size: 25px; }
+.content-block--diagram .slice { text-anchor: middle; font-size: 17px; }
+.content-block--diagram .legend text { font-size: 17px; }
+.content-block--diagram .pieOuterCircle { fill: none; stroke: var(--th-diagram-edge); stroke-width: 2px; }
+.content-block--diagram .pieCircle { stroke: var(--th-diagram-fill); stroke-width: 2px; }
+/* The slices are siblings in their order (the outer circle is the one
+   circle among them), and a legend's entry is the (k + 1)th group of its
+   parent, after the pie's own: the six series colours, round again. */
+.content-block--diagram .pieCircle:nth-of-type(6n+1) { fill: var(--th-diagram-series-1); }
+.content-block--diagram .pieCircle:nth-of-type(6n+2) { fill: var(--th-diagram-series-2); }
+.content-block--diagram .pieCircle:nth-of-type(6n+3) { fill: var(--th-diagram-series-3); }
+.content-block--diagram .pieCircle:nth-of-type(6n+4) { fill: var(--th-diagram-series-4); }
+.content-block--diagram .pieCircle:nth-of-type(6n+5) { fill: var(--th-diagram-series-5); }
+.content-block--diagram .pieCircle:nth-of-type(6n+6) { fill: var(--th-diagram-series-6); }
+.content-block--diagram .legend:nth-of-type(6n+2) rect { fill: var(--th-diagram-series-1); }
+.content-block--diagram .legend:nth-of-type(6n+3) rect { fill: var(--th-diagram-series-2); }
+.content-block--diagram .legend:nth-of-type(6n+4) rect { fill: var(--th-diagram-series-3); }
+.content-block--diagram .legend:nth-of-type(6n+5) rect { fill: var(--th-diagram-series-4); }
+.content-block--diagram .legend:nth-of-type(6n+6) rect { fill: var(--th-diagram-series-5); }
+.content-block--diagram .legend:nth-of-type(6n+1) rect { fill: var(--th-diagram-series-6); }

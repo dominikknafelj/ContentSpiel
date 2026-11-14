@@ -85,6 +85,27 @@ class Admin::DiagramRenderersControllerTest < ActionDispatch::IntegrationTest
     assert_select "style#diagram-paint", count: 1
   end
 
+  # The frame paints the drawing it shows with the public stylesheet itself,
+  # inlined, and, until the card posts CS Studio's colours, with the default
+  # theme's light values of the diagram's tokens, read from tokens.css.
+  test "the frame's style holds diagram.css as it is, and the diagram's tokens as the default theme's light values" do
+    sign_in_as(users(:one))
+
+    get admin_diagram_renderer_path
+
+    style = css_select("style#diagram-paint").first.text
+    assert_includes style, BlockTypes.fetch(:diagram).stylesheet_path.read, "the file's text, whole"
+    assert_select "#diagram.content-block--diagram", count: 1, text: ""
+    defaults = style[/:root \{(.*?)\}/m, 1] or flunk("no :root rule of defaults")
+    values = defaults.scan(/(--th-[\w-]+):\s*([^;]+);/).to_h
+    tokens = BlockTypes.fetch(:diagram).then { |type| (type.themed_tokens + type.fixed_tokens).map { |name| "--th-#{name}" } }
+    assert_equal tokens.sort, values.keys.sort
+    assert_equal "#141417", values["--th-diagram-ink"], "--th-ink's light value, not a var() the frame cannot resolve"
+    assert_equal "color-mix(in srgb, oklch(0.95 0.025 250) 60%, #ffffff)", values["--th-diagram-note"]
+    assert_match(/\A"Archivo"/, values["--th-diagram-font"])
+    values.each_value { |value| assert_no_match(/var\(/, value) }
+  end
+
   test "an Archivo font file answers Access-Control-Allow-Origin: *" do
     %w[400 500 600 700].each do |weight|
       get helpers.asset_path("archivo-latin-#{weight}-normal.woff2")

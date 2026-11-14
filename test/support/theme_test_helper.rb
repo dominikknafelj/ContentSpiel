@@ -24,6 +24,16 @@ module ThemeTestHelper
 
   def with_code_theme(&block) = Theme.with(code_theme, &block)
 
+  # A tenth theme, of two files (`test/fixtures/themes/diagram`): its own
+  # template for the Diagram block, written from the reference's section
+  # alone (docs/reference/theming.md, "The Diagram block"), and a stylesheet
+  # that re-colours the diagram's tokens for both schemes.
+  DIAGRAM = Rails.root.join("test/fixtures/themes/diagram")
+
+  def diagram_theme = Theme.load(ThemeFolder.new(DIAGRAM))
+
+  def with_diagram_theme(&block) = Theme.with(diagram_theme, &block)
+
   # A fourth theme, of two files (`test/fixtures/themes/note`): its own
   # template for the Note block, written from the reference's section alone
   # (docs/reference/theming.md, "The Note block"), and a stylesheet for it.

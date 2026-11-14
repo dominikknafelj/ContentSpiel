@@ -68,6 +68,14 @@ module BlockTypes
         # `description` and `caption` are the block's words in the visitor's
         # language.
         t.theme_methods :block, :page, :svg, :description, :caption
+        # What diagram.css paints a drawing with, by Mermaid's class names:
+        # from the theme's base tokens in tokens.css but the six series
+        # colours (a pie's slices, a gantt's task states), which are literals
+        # as the syntax colours are; re-valued by a strong band in
+        # sections.css. The font is fixed: Mermaid measured every box in it.
+        t.tokens themed: %w[diagram-ink diagram-fill diagram-line diagram-edge diagram-group diagram-note diagram-accent
+                            diagram-series-1 diagram-series-2 diagram-series-3 diagram-series-4 diagram-series-5 diagram-series-6],
+                 fixed: %w[diagram-font]
         t.stylesheet "diagram.css"
         t.sample settings: {},
                  translations: {

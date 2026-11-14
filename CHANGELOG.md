@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- The theme contract's Diagram block: the line `blocks/diagram_component` (`block`, `page`, `svg`, `description`, `caption`), thirteen themed tokens (`--th-diagram-ink`, `-fill`, `-line`, `-edge`, `-group`, `-note`, `-accent`, `-series-1` to `-series-6`) and the fixed `--th-diagram-font`, and the type's stylesheet `diagram.css`, which a theme that replaces it keeps the layout rules of (`docs/reference/theming.md`, "The Diagram block").
+
 ### Breaking
 
 - A new top-level name, `Diagrams` (`app/values/diagrams.rb`): a gem whose hook owner is `diagrams` is refused at boot. A gem with such an owner renames it.

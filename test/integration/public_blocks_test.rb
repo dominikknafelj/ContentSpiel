@@ -585,6 +585,25 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "figure.content-block--code pre", text: "second = 2"
   end
 
+  test "a diagram is drawn inline, at the top level and in a column of a section, and an empty one draws nothing" do
+    sample = BlockTypes.fetch(:diagram).sample.translations.fetch("en")
+    values = { "source" => sample[:source], "drawing" => sample[:drawing], "description" => "A draft goes to review." }
+    section = @root.content_blocks.create!(block_type: :section, position: 0, settings: { "layout" => "two" })
+    top = @root.content_blocks.create!(block_type: :diagram, position: 1, translated_settings: { "en" => values })
+    inner = @root.content_blocks.create!(block_type: :diagram, position: 0, section: section, section_column: 2, translated_settings: { "en" => values })
+    @root.content_blocks.create!(block_type: :diagram, position: 2)
+
+    get "/"
+
+    assert_response :success
+    assert_select "main figure.content-block--diagram", count: 2
+    [ top, inner ].each do |block|
+      assert_select "figure.content-block--diagram .content-block--diagram__scroll[tabindex='0'] > svg[role=img][aria-labelledby='diagram-#{block.id}-en-title']"
+    end
+    assert_select ".content-section__column figure.content-block--diagram svg > title", text: "A draft goes to review."
+    assert_select "figure.content-block--diagram svg[style^='--diagram-min-width:']", count: 2
+  end
+
   test "an empty code block draws nothing on the page" do
     @root.content_blocks.create!(block_type: :code, position: 0)
 

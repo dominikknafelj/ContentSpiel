@@ -38,6 +38,43 @@ module Admin
 
     SCRIPT = "diagram-renderer.js".freeze
 
+    # The default theme's tokens, where the diagram's are defined.
+    TOKENS = Rails.root.join(ThemeCss::DEFAULT).dirname.join("tokens.css")
+
+    # What the frame paints the drawing it shows with: the Diagram block's
+    # public stylesheet, whole (plain CSS by design, so one file paints the
+    # editor's drawing and the site's), after the diagram's tokens as the
+    # default theme's light values. Those stand until the card posts CS
+    # Studio's colours, which the frame sets on its root and which win. A
+    # token's `var()` of a base token is written as the base's value, from
+    # the same tokens.css, since the frame defines no base token. Read once
+    # per process.
+    def self.paint
+      @paint ||= begin
+        type = BlockTypes.fetch(:diagram)
+        css = type.stylesheet_path.read
+        raise "#{type.stylesheet_path} holds `</`, which would end the frame's <style>" if css.include?("</")
+
+        names = (type.themed_tokens + type.fixed_tokens).map { |name| "--th-#{name}" }
+        defaults = names.map { |name| "  #{name}: #{light_value(name)};" }.join("\n")
+        ":root {\n#{defaults}\n}\n#{css}".freeze
+      end
+    end
+
+    # A token's light value with every `var(--th-…)` in it written out:
+    # the light block of tokens.css, then its fixed block.
+    def self.light_value(name, depth = 0)
+      raise "#{name}: var() nested too deep in #{TOKENS.basename}" if depth > 8
+
+      @light_tokens ||= begin
+        text = TOKENS.read
+        [ text[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1], text[/^:root \{(.*?)\}/m, 1] ]
+          .map { |block| block.to_s.gsub(%r{/\*.*?\*/}m, "").scan(/(--th-[\w-]+):\s*([^;]+);/).to_h }.reduce(:merge)
+      end
+      value = @light_tokens.fetch(name) { raise "#{name} is not defined in #{TOKENS.basename}" }
+      value.gsub(/var\((--th-[\w-]+)\)/) { light_value(Regexp.last_match(1), depth + 1) }.strip
+    end
+
     layout false
 
     before_action { request.content_security_policy = POLICY }

@@ -82,6 +82,23 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     assert_equal Theme::Contract::RICH_TEXT.sort, rows("Rich text selectors").keys.sort
   end
 
+  # The Diagram block's section: what its template is handed, held to its
+  # line of the ledger, its tokens named, and the four things a theme must
+  # be told: a replacing stylesheet keeps the layout rules, the font sized
+  # the boxes, Mermaid's class names follow its upgrades, svg is printed as
+  # given.
+  test "the Diagram block's table names exactly the methods of its entry, and the section names its tokens and what a theme must keep" do
+    section = section("The Diagram block")
+
+    assert_equal ContractLedger::COMPONENTS.fetch("blocks/diagram_component").sort, section.scan(/^\| `([^`]+)` \|/).flatten.sort
+    type = BlockTypes.fetch(:diagram)
+    (type.themed_tokens + type.fixed_tokens).each { |token| assert_includes section, "--th-#{token}" }
+    [ "A stylesheet that replaces `diagram.css` keeps its layout rules", "`--th-diagram-font` is the face the boxes were measured in",
+      "a theme that styles them follows Mermaid's upgrades", "`svg` is printed as given", "scoped to `svg.flowchart`" ].each do |sentence|
+      assert_includes section, sentence
+    end
+  end
+
   # The Note block's section: what its template is handed, held to its line
   # of the ledger, and its sixteen tokens named.
   test "the Note block's table names exactly the methods of its entry, and the section names its tokens" do

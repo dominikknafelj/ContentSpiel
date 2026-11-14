@@ -49,8 +49,15 @@ module Diagrams
     # A full 10,000-character source draws about 770 KB once cleaned.
     MAX_BYTES = 1_048_576
     MAX_ELEMENTS = 5_000
-    # Bump when a list changes: a cached read keeps the rules it was cleaned under.
+    # Bump when a list changes or what `#untitled_markup` writes does: the
+    # public component's cache keeps a read under the rules and the markup it
+    # was made with (`Blocks::DiagramComponent.cache_key`).
     REVISION = 1
+    # A drawing scales down to its column to three fifths of its natural
+    # width at most, where its 14px labels fall to about 9px; narrower, it
+    # keeps that width and scrolls in its own box (`diagram.css` reads
+    # `--diagram-min-width`, which `#untitled_markup` writes on the root).
+    MIN_SCALE = 0.6
 
     # `svg` is the cleaned drawing, or nil with `reason`, a Symbol:
     # :not_xml :doctype :entity :processing_instruction :roots :element
@@ -197,12 +204,17 @@ module Diagrams
     # The drawing as a public page inlines it: the root an image named by
     # the `<title>` written here (the block's description, as escaped text),
     # described by Mermaid's `<desc>` when it has one, sized by its viewBox
-    # (an inline SVG with no size fills its column), and every id prefixed.
-    # Nil when the drawing fails on read.
-    #
-    # The one `html_safe` of the Diagram block: what it marks is this file's
-    # own serialisation of a tree it built.
+    # (an inline SVG with no size fills its column) with its smallest width
+    # (MIN_SCALE), and every id prefixed. Nil when the drawing fails on read.
     def markup(prefix:, title:, title_id:)
+      untitled = untitled_markup(prefix: prefix, title_id: title_id)
+      untitled && self.class.with_title(untitled, title: title, title_id: title_id)
+    end
+
+    # `#markup` with its `<title>` empty: a plain String, which the public
+    # component caches by the stored drawing, since the title (the block's
+    # description) changes on its own. Nil when the drawing fails on read.
+    def untitled_markup(prefix:, title_id:)
       raise ArgumentError, "prefix #{prefix.inspect} is not the start of an id" unless prefix.match?(ID)
       raise ArgumentError, "title id #{title_id.inspect} is not an id" unless title_id.match?(ID)
       if title_id.start_with?("#{prefix}d-") || title_id == "#{prefix}desc"
@@ -222,12 +234,24 @@ module Diagrams
       end
       root["width"] = number(width)
       root["height"] = number(height)
+      root["style"] = "--diagram-min-width: #{number(width * MIN_SCALE)}px"
+      root.prepend_child(document.create_element("title", id: title_id))
 
-      heading = document.create_element("title", id: title_id)
-      heading.content = title.to_s
-      root.prepend_child(heading)
+      self.class.serialize(document)
+    end
 
-      self.class.serialize(document).html_safe
+    # Writes the title's text into untitled markup's one empty `<title>`,
+    # with no parse: the markup is this file's own serialisation, whose root
+    # starts with that element and which holds no other `<title>` (Mermaid's
+    # is dropped), and the title id is id-shaped.
+    #
+    # The one `html_safe` of the Diagram block: what it marks is this file's
+    # own serialisation of a tree it built, and the title as escaped text.
+    def self.with_title(untitled, title:, title_id:)
+      empty = %(<title id="#{title_id}"/>)
+      raise ArgumentError, "the markup has no empty title #{title_id.inspect}" unless title_id.match?(ID) && untitled.to_s.scan(empty).size == 1
+
+      untitled.sub(empty) { %(<title id="#{title_id}">#{ERB::Util.html_escape(title.to_s)}</title>) }.html_safe
     end
 
     private
