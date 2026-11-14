@@ -62,6 +62,7 @@ module BlockTypes
         t.stylesheet "note.css"
         t.summary ->(block, locale:) { Note.summary(block, locale: locale) }
         t.preview ->(block, locale:) { Note.preview(block, locale: locale) }
+        t.search_text ->(block, locale:) { Note.search_text(block, locale: locale) }
         # The guide's own example (a Tip with a title of its own), with the
         # title in the canary's three languages and a text the canary reads.
         t.sample settings: { "kind" => "tip" },
@@ -75,6 +76,18 @@ module BlockTypes
     # note's text as plain text. The kind's word is a fallback, not the
     # block's content: a note with no title and no text has no preview, and
     # its tile says "Empty" on its summary line.
+    # The heading as drawn (the title, or the kind's word under none) and
+    # the body; nothing for an empty body, which is not drawn
+    # (`Blocks::NoteComponent`).
+    def self.search_text(block, locale:)
+      body = ::Locales.read(block, :body, locale: locale)
+      return [] if body.blank?
+
+      settings = block.settings_object(locale: locale, fallback: true)
+      title = settings&.title.to_s.strip.presence
+      [ title || PublicStrings.read("public.blocks.note.kinds.#{kind_of(settings&.kind)}", locale: locale), *SiteSearch.paragraphs(body) ]
+    end
+
     def self.preview(block, locale:)
       settings = block.settings_object(locale: locale)
       text = block.body_document(locale: locale).plain_paragraphs.join(" ")

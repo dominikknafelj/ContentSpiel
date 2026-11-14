@@ -14,6 +14,7 @@ module BlockTypes
         t.uses :body
         t.component Blocks::RichTextComponent
         t.preview ->(block, locale:) { RichText.preview(block, locale: locale) }
+        t.search_text ->(block, locale:) { SiteSearch.paragraphs(::Locales.read(block, :body, locale: locale)) }
         t.theme_methods :block, :page
         t.sample body: "Sample paragraph with **strong words**.", shows: [ "Sample paragraph with", "<strong>strong words</strong>" ]
       end

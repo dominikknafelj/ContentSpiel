@@ -19,7 +19,8 @@ module ContentModel
     # `theme_methods` and `tokens` by `Theme::Contract`, `stylesheet` by the
     # public stylesheet's build (`BlockTypes.theme_css_blocks`), `summary`,
     # `preview` and `tile_picture` by the editor's tile, `read_only_actions`
-    # by the held form's allow-list, `sample` by the shared tests. A
+    # by the held form's allow-list, `sample` by the shared tests,
+    # `search_text` by the search documents (`SiteSearch::Documents`). A
     # declaration nothing reads would be documentation in code; none of
     # these is.
 
@@ -249,6 +250,29 @@ module ContentModel
       @tile_picture = callable
     end
 
+    SEARCH_TEXT_KINDS = { nil => :body, code: :code }.freeze
+
+    # The words a block of the type gives the site's search (search spec
+    # §4.3): a callable taking the block AS THE PUBLISHED COPY HOLDS IT (a
+    # rebuilt, read-only `ContentBlock`) and `locale:`, answering an Array of
+    # plain Strings, the text the type's public component draws in that
+    # language, read with the same fallback-aware readers. Plain text goes to
+    # the document's body field (weight C); `search_text :code, ->…` to its
+    # code field (weight D), the Code block's alone. A type that declares
+    # none gives nothing, which is a decision a built-in states (the guard in
+    # test/models/site_search/block_text_test.rb). Read by
+    # `SiteSearch::Documents` alone.
+    def search_text(kind_or_callable = nil, callable = nil)
+      kind, callable = kind_or_callable.is_a?(Symbol) ? [ kind_or_callable, callable ] : [ nil, kind_or_callable ]
+      refuse "search_text's kind is :code (the code field, weight D) or none (the body, weight C): #{kind.inspect}" unless SEARCH_TEXT_KINDS.key?(kind)
+      refuse "`search_text` is a callable taking the block and `locale:`" unless callable.respond_to?(:call) && takes_block_and_locale?(callable)
+
+      @search_texts = search_texts.merge(SEARCH_TEXT_KINDS.fetch(kind) => callable).freeze
+    end
+
+    # The declared texts by field: `:body`, `:code`, or empty for a type with none.
+    def search_texts = @search_texts || {}
+
     # The type's editor-script actions that only read or move focus: they
     # survive in a form someone else holds (decision 10).
     def read_only_actions(*ids)
@@ -433,6 +457,12 @@ module ContentModel
         refuse "a block type from outside may not declare a :#{field.type} field: #{ContentModel::FieldTypes::BLOCK_ONLY.dig(field.type, :outside)}"
       end
       refuse "a block type from outside holds rich text only: `body_content :table` is the CMS's own" unless body_content == :rich
+      # D is the built-in Code block's weight, so prose outranks a listing
+      # that mentions a thing; a gem's text is body text.
+      if search_texts.key?(:code)
+        refuse "a block type from outside declares no :code search text: the code field is the Code block's own; " \
+               "its words go in `search_text ->(block, locale:) { … }`"
+      end
       if tile_picture
         refuse "a block type from outside draws no tile picture: the tile prints its answer as markup, unescaped, " \
                "on every editor page holding a block of the type"

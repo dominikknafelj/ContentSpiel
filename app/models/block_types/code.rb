@@ -43,6 +43,8 @@ module BlockTypes
         t.stylesheet "code.css"
         t.summary ->(block, locale:) { Code.summary(block, locale: locale) }
         t.preview ->(block, locale:) { Code.preview(block, locale: locale) }
+        t.search_text ->(block, locale:) { Code.search_text(block, locale: locale) }
+        t.search_text :code, ->(block, locale:) { [ block.settings_object(locale: locale, fallback: true)&.code ] }
         # The counter under the code field reads the field and writes nothing
         # but its own line.
         t.read_only_actions "admin--editor--code-limit#update"
@@ -60,6 +62,15 @@ module BlockTypes
     # first three lines of the code in the monospace face. The language is a
     # fallback, not the block's content: a block with no file name and no
     # code has no preview, and its tile says "Empty" on its summary line.
+    # The file name and caption, drawn only with code (`Blocks::CodeComponent`):
+    # prose around a listing, found above the code itself.
+    def self.search_text(block, locale:)
+      settings = block.settings_object(locale: locale, fallback: true)
+      return [] if settings&.code.blank?
+
+      [ settings.filename, ::Locales.read(block, :caption, locale: locale) ]
+    end
+
     def self.preview(block, locale:)
       settings = block.settings_object(locale: locale)
       return if settings&.filename.blank? && settings&.code.blank?

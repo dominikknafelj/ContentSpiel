@@ -36,6 +36,7 @@ module BlockTypes
         t.theme_methods :block, :page, :title, :text, :link, :icon, :icon_name, :image
         t.summary ->(block, locale:) { Card.summary(block, locale: locale) }
         t.preview ->(block, locale:) { Card.preview(block, locale: locale) }
+        t.search_text ->(block, locale:) { Card.search_text(block, locale: locale) }
         t.tokens themed: %w[card-ground card-line card-icon]
         t.stylesheet "card.css"
         # The icon is one of the default theme's; the link is a site address,
@@ -49,6 +50,16 @@ module BlockTypes
     end
 
     # The tile's preview: the card's title over its text.
+    # The title, the text and the block's own alt override of its image; the
+    # library image's alt is the asset's, in no copy, as the Image block's
+    # (`BlockTypes::Image.search_text`). The link's target is another record,
+    # found on its own.
+    def self.search_text(block, locale:)
+      settings = block.settings_object(locale: locale, fallback: true)
+      alt = ::Locales.read(block, :alt, locale: locale) if block.media_asset&.file&.attached?
+      [ settings&.title, settings&.text, alt ]
+    end
+
     def self.preview(block, locale:)
       settings = block.settings_object(locale: locale)
       ContentModel::Preview.new(heading: settings&.title, text: settings&.text)

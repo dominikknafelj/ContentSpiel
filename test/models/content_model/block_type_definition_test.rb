@@ -419,6 +419,42 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_match(/\Agallery\/flag: a block type from outside draws no tile picture/, error.message)
   end
 
+  test "search_text is refused unless it takes the block and locale:" do
+    d = definition
+    assert_equal({}, d.search_texts)
+    text = ->(_block, locale:) { [ locale ] }
+    code = ->(_block, locale:) { [ locale ] }
+    d.search_text text
+    d.search_text :code, code
+    assert_equal({ body: text, code: code }, d.search_texts)
+
+    [ "words", ->(block) { block }, ->(locale:) { locale } ].each do |bad|
+      error = assert_raises(ArgumentError) { definition.search_text bad }
+      assert_match(/\Atest_shape: `search_text` is a callable taking the block and `locale:`/, error.message)
+    end
+    assert_raises(ArgumentError) { definition.search_text :code }
+    assert_raises(ArgumentError) { definition.search_text }
+  end
+
+  test "search_text's kind is :code or none" do
+    error = assert_raises(ArgumentError) { definition.search_text :title, ->(_block, locale:) { [] } }
+    assert_match(/\Atest_shape: search_text's kind is :code/, error.message)
+  end
+
+  # D is the built-in Code block's weight: a gem's code would outrank no
+  # prose, and its listing would sit beside the CMS's own.
+  test "an outside type may not declare :code search text" do
+    outside = ContentModel::BlockTypeDefinition.new("gallery/listing")
+    outside.search_text ->(_block, locale:) { [] }
+    outside.theme_methods :block, :page
+    outside.sample shows: [ "content-block" ]
+    outside.finalize!
+
+    outside.search_text :code, ->(_block, locale:) { [] }
+    error = assert_raises(ArgumentError) { outside.finalize! }
+    assert_match(/\Agallery\/listing: a block type from outside declares no :code search text/, error.message)
+  end
+
   test "a type that declares no preview answers nil" do
     assert_nil definition.preview
   end
