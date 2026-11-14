@@ -443,6 +443,19 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{field_selector(block)} [data-admin--diagram--preview-target='importStatus'] [role]"
   end
 
+  # A fence may stand up to three spaces in, as CommonMark allows (a list
+  # item's); its lines lose that indentation, as CommonMark takes them.
+  test "a .md file's mermaid fence indented up to three spaces is taken" do
+    block = diagram_of
+    visit_editor(@page)
+
+    import_file(block, "indented.md")
+    taken = "flowchart LR\n  Asked --> Answered"
+    assert_eventually(message: "the indented fence's lines, outdented, are the source") { source_value(block) == taken }
+    await_frame_text(block, "Answered")
+    within(import_status(block)) { assert_selector "p", exact_text: "Imported from indented.md." }
+  end
+
   test "a file with no Mermaid says so and changes nothing" do
     block = diagram_of("en" => { "source" => FLOW })
     visit_editor(@page)

@@ -46,8 +46,9 @@ module Admin
     # preview stands under the whole pair (`below_pair`).
     #
     # IMPORT FILE… (EditorDiagramBlock, "Importing") stands at the end of
-    # the label's row (`label_end`) wherever the source can be changed now,
-    # never in a held form or for a reader (`editable?`): a small tertiary
+    # the label's row (`label_end`) only where the caller asks for it
+    # (`importable?`: the block card, where the source can be changed now,
+    # never in a held form or for a reader): a small tertiary
     # button that opens a hidden file input with no `name`, so no form ever
     # sends the file; the script reads it in the browser and puts its text
     # into the source as if typed. What an import says goes into
@@ -134,7 +135,7 @@ module Admin
           "#{CONTROLLER}-starting-value": starting?,
           "#{CONTROLLER}-colours-value": self.class.colour_names.to_json,
           "#{CONTROLLER}-description-field-value": description_id,
-          "#{CONTROLLER}-replace-dialog-value": (self.class.replace_dialog_id(input_id) if editable?),
+          "#{CONTROLLER}-replace-dialog-value": (self.class.replace_dialog_id(input_id) if importable?),
           messages: messages
         }.compact
       end
@@ -143,7 +144,7 @@ module Admin
       # can be changed now. The input takes no Tab stop: the button is the
       # way in.
       def label_end
-        return unless editable?
+        return unless importable?
 
         tag.span(class: "admin-mermaid-field__import") do
           safe_join([
@@ -162,7 +163,7 @@ module Admin
       # The polite region an import speaks in, and the three boxes the
       # script clones into it.
       def import_status
-        return unless editable?
+        return unless importable?
 
         safe_join([
           tag.div(aria: { live: "polite" }, data: target("importStatus")),

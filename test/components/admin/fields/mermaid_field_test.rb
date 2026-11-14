@@ -12,8 +12,8 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
 
   def field(**options) = Field.new(name: "source", type: :mermaid, options: { translated: true, drawing: :drawing, max: 10_000 }.merge(options))
 
-  def render_field(value, original: nil, locale: "en", editable: true, **options)
-    render_inline Admin::Ui::FieldComponent.new(field: field(**options), form_name: "block[settings]", value: value, original: original, locale: locale, id_prefix: "block-7", editable: editable)
+  def render_field(value, original: nil, locale: "en", importable: true, **options)
+    render_inline Admin::Ui::FieldComponent.new(field: field(**options), form_name: "block[settings]", value: value, original: original, locale: locale, id_prefix: "block-7", importable: importable)
   end
 
   def target(name) = "[data-#{CONTROLLER}-target='#{name}']"
@@ -228,8 +228,8 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert_equal "-1", file["tabindex"], "the button is the one stop"
   end
 
-  test "a source that cannot be edited draws no Import control and no file input" do
-    render_field(SOURCE, editable: false)
+  test "a source not drawn as importable draws no Import control and no file input" do
+    render_field(SOURCE, importable: false)
 
     assert_no_selector ".admin-mermaid-field__import, input[type='file'], .admin-field__label-row", visible: :all
     assert_no_text "Import file…"
@@ -266,5 +266,18 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
       "import_too_long" => "%{file} is too long: its diagram has %{count} characters, and the limit is %{limit}.",
       "import_unreadable" => "%{file} couldn't be read. Use a .mmd or .md text file."
     }.each { |key, words| assert_equal words, served.fetch("components.fields.mermaid_field.#{key}"), key }
+  end
+
+  # Importing is opt-in: a caller that does not ask for it (a post form, a
+  # group's row, any caller that draws no replace confirmation outside its
+  # form) gets no button with nothing behind it.
+  test "a :mermaid field drawn without importable: has no Import control and no dialog" do
+    render_inline Admin::Ui::FieldComponent.new(field: field, form_name: "post[fields]", value: SOURCE, locale: "en", id_prefix: "post-1")
+
+    assert_selector "textarea#post-1-source"
+    assert_no_selector ".admin-mermaid-field__import, input[type='file'], .admin-field__label-row, dialog", visible: :all
+    assert_no_selector target("importStatus"), visible: :all
+    assert_no_text "Import file…"
+    assert_nil wrapper["data-#{CONTROLLER}-replace-dialog-value"]
   end
 end

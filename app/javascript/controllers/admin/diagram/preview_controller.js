@@ -407,6 +407,12 @@ export default class extends Controller {
 
   // Opens the replace confirmation by id, with the file's name in its
   // sentence, and replaces only when it closes with REPLACE.
+  //
+  // The dialog is drawn wherever the button is: both are drawn only for a
+  // field the caller made importable (`importable:`, the block card alone),
+  // which draws `MermaidField.outside_form` after its form, and
+  // `replaceDialog` is set only then. A missing dialog therefore cannot
+  // happen; were it to, nothing is replaced rather than replaced unasked.
   ask(name, replace) {
     const dialog = this.replaceDialogValue ? document.getElementById(this.replaceDialogValue) : null
     if (!dialog || dialog.open) return

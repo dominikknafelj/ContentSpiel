@@ -11,9 +11,12 @@ module Admin
     # whichever one it dispatches to without a type-by-type special case.
     # `placeholder:` is what the caller hands a field that shows one
     # (`Admin::Fields::StringField`); every other type ignores it.
-    # `editable:` false is a field that can't be changed now (held by
-    # someone else, or drawn for a reader): an input draws no control that
-    # only changes it (`label_end`).
+    # `importable:` true is a caller that can take a file into the field
+    # now: one that may change it (not held by someone else, not drawn for a
+    # reader) and draws what an import needs outside the form
+    # (`outside_form`). Only then does an input draw its import control
+    # (`label_end`); it is false unless asked for, so no other caller draws
+    # a control with nothing behind it.
     class Base < Admin::AdminComponent
       # How a value of this type reads where it cannot be edited (a
       # translation tab's "Shared fields", `EditorScreen::SharedFieldsComponent`):
@@ -62,7 +65,7 @@ module Admin
       # forwarded here unchanged so `input_id` agrees with the wrapping
       # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a
       # caller supplied.
-      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil, placeholder: nil, editable: true)
+      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil, placeholder: nil, importable: false)
         @field = field
         @form_name = form_name
         @value = value
@@ -71,14 +74,14 @@ module Admin
         @errors = errors
         @id_prefix = id_prefix || Admin::Ui::FieldComponent.dom_id_prefix(form_name)
         @placeholder = placeholder
-        @editable = editable
+        @importable = importable
       end
 
       private
 
       attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :placeholder
 
-      def editable? = @editable
+      def importable? = @importable
 
       def input_name = "#{form_name}[#{field.name}]"
 
