@@ -290,12 +290,12 @@ module ContentModel
 
       # A Diagram block's Mermaid source (Diagram block spec §1 and §5), cast
       # as `:code` is. The editor's script hashes the same normalised text for
-      # the drawing's `from` (`Diagram::Drawing.digest`), so a drawing is
+      # the drawing's `from` (`Diagrams::Drawing.digest`), so a drawing is
       # current for the source as stored. Unlike code it may be translated,
       # and like code it is never offered to an AI provider. `max:` counts
       # characters, and the source's own limit
-      # (`Diagram::Source::MAX_CHARACTERS`) holds without one; both are
-      # refused in the Code field's words. Every line `Diagram::Source` refuses
+      # (`Diagrams::Source::MAX_CHARACTERS`) holds without one; both are
+      # refused in the Code field's words. Every line `Diagrams::Source` refuses
       # is one sentence naming the line (`errors.messages.diagram_*`, the
       # sentences the editor's card shows). A block's settings are validated
       # in the default language alone (`ContentBlock#settings_are_valid`), so
@@ -327,7 +327,7 @@ module ContentModel
 
       # The drawing of a Diagram block (spec §1 and §3): `{ "svg", "from" }`,
       # sent by the editor's script as JSON, read back from jsonb as a Hash.
-      # The cast cleans the SVG (`Diagram::Drawing.clean`, the security
+      # The cast cleans the SVG (`Diagrams::Drawing.clean`, the security
       # boundary) and keeps `from`, the digest of the source the frame drew,
       # as it was given: it cannot see the source. A value that is no such
       # pair or does not clean casts to the `DRAWING_REFUSED` mark, and only
@@ -502,19 +502,19 @@ module ContentModel
         )
       end
 
-      # One error per refusal of `Diagram::Source`, said once however many
+      # One error per refusal of `Diagrams::Source`, said once however many
       # languages share it. The limit is the smaller of `max:` and the
       # source's own, in the Code field's sentence.
       def refuse_mermaid(field, text, errors)
-        limit = [ field.options[:max], Diagram::Source::MAX_CHARACTERS ].compact.min
+        limit = [ field.options[:max], Diagrams::Source::MAX_CHARACTERS ].compact.min
         if text.length > limit
           add_once(errors, field.name, :too_long, count: limit, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(limit))
           return
         end
 
-        Diagram::Source.refusals(text).each do |refusal|
+        Diagrams::Source.refusals(text).each do |refusal|
           if refusal.rule == :type
-            add_once(errors, field.name, :diagram_unsupported, type: refusal.word, types: Diagram::Source.keywords.join(", "))
+            add_once(errors, field.name, :diagram_unsupported, type: refusal.word, types: Diagrams::Source.keywords.join(", "))
           else
             add_once(errors, field.name, :"diagram_#{refusal.rule}", line: refusal.line, word: refusal.word)
           end
@@ -531,7 +531,7 @@ module ContentModel
         return pair.slice(DRAWING_REFUSED) if pair.is_a?(Hash) && pair.key?(DRAWING_REFUSED)
         return { DRAWING_REFUSED => "shape" } unless pair.is_a?(Hash) && pair["svg"].is_a?(String) && pair["from"].is_a?(String)
 
-        result = Diagram::Drawing.clean(pair["svg"])
+        result = Diagrams::Drawing.clean(pair["svg"])
         result.svg ? { "svg" => result.svg, "from" => pair["from"] } : { DRAWING_REFUSED => result.reason.to_s }
       end
 

@@ -15,9 +15,9 @@ class DiagramFixturesTest < ActiveSupport::TestCase
   }.freeze
 
   test "every allowed type has a fixture" do
-    assert_equal Diagram::Source::MERMAID_TYPES.sort, KEYS.values.sort
+    assert_equal Diagrams::Source::MERMAID_TYPES.sort, KEYS.values.sort
     assert_equal KEYS.keys, DiagramFixtures.sources.keys
-    assert_equal Diagram::Source::TYPES.values.uniq.size, KEYS.size
+    assert_equal Diagrams::Source::TYPES.values.uniq.size, KEYS.size
 
     KEYS.each_key do |key|
       file = DiagramFixtures::DIR.join("#{key}.svg")
@@ -32,8 +32,8 @@ class DiagramFixturesTest < ActiveSupport::TestCase
 
   test "every sample source is of its type and passes the line rules" do
     DiagramFixtures.sources.each do |key, source|
-      assert Diagram::Source.type(source), "#{key} names no type on the list"
-      assert_empty Diagram::Source.refusals(source), key
+      assert Diagrams::Source.type(source), "#{key} names no type on the list"
+      assert_empty Diagrams::Source.refusals(source), key
       assert_includes source, "accDescr", key
     end
   end

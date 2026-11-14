@@ -73,7 +73,7 @@ class Admin::DiagramRendererTest < ApplicationSystemTestCase
   test "a source over the limit is refused as too_long, never drawn" do
     count_mermaid_calls
     source = "flowchart LR\n" + ("  A --> B\n" * 1_000)
-    assert_operator source.length, :>, Diagram::Source::MAX_CHARACTERS
+    assert_operator source.length, :>, Diagrams::Source::MAX_CHARACTERS
 
     answer = draw("long", source)
 
@@ -89,12 +89,12 @@ class Admin::DiagramRendererTest < ApplicationSystemTestCase
     assert_equal({ "kind" => "refused", "line" => 2, "rule" => "directive", "word" => "%%{" }, answer["error"].except("message"))
   end
 
-  # Each source's first refusal is decided by `Diagram::Source` in Ruby and
+  # Each source's first refusal is decided by `Diagrams::Source` in Ruby and
   # by the frame's port of it, and the two agree: the cases are the rules'
   # edges (a word allowed in one type alone, what is skipped before the
   # keyword, whitespace JavaScript reads otherwise, a first word that is the
   # name of an object's property, a length in code points).
-  test "the frame decides every line rule as Diagram::Source does" do
+  test "the frame decides every line rule as Diagrams::Source does" do
     cases = {
       "class_in_class" => "classDiagram\n  class Page\n  Page <|-- Post",
       "class_in_flowchart" => "flowchart LR\n  A --> B\n  class A red",
@@ -115,27 +115,27 @@ class Admin::DiagramRendererTest < ApplicationSystemTestCase
     }
 
     cases.each do |key, source|
-      ruby = Diagram::Source.refusals(source).first
+      ruby = Diagrams::Source.refusals(source).first
       answer = draw(key, source)
       error = answer["error"]
 
       if ruby
         expected = { "kind" => ruby.rule == :too_long ? "too_long" : "refused", "line" => ruby.line, "rule" => ruby.rule.to_s, "word" => ruby.word }
-        assert_equal expected, error&.except("message"), "#{key}: the frame does not refuse as Diagram::Source does"
+        assert_equal expected, error&.except("message"), "#{key}: the frame does not refuse as Diagrams::Source does"
       else
-        assert(error.nil? || %w[parse type too_large].include?(error["kind"]), "#{key}: Diagram::Source lets it through, the frame answered #{error.inspect}")
+        assert(error.nil? || %w[parse type too_large].include?(error["kind"]), "#{key}: Diagrams::Source lets it through, the frame answered #{error.inspect}")
       end
     end
   end
 
-  # A length is counted in code points, as `Diagram::Source` counts it, and
+  # A length is counted in code points, as `Diagrams::Source` counts it, and
   # Mermaid's own limit (UTF-16 units) is set past anything that count lets
   # through, so it never draws its stand-in for a source within the limit.
   test "a source of 6,000 emoji is under the limit and is not refused as too_long" do
     source = "flowchart LR\n  A[\"#{"😀" * 6_000}\"] --> B"
-    assert_operator source.length, :<=, Diagram::Source::MAX_CHARACTERS
-    assert_operator source.encode("UTF-16LE").bytesize / 2, :>, Diagram::Source::MAX_CHARACTERS
-    assert_empty Diagram::Source.refusals(source)
+    assert_operator source.length, :<=, Diagrams::Source::MAX_CHARACTERS
+    assert_operator source.encode("UTF-16LE").bytesize / 2, :>, Diagrams::Source::MAX_CHARACTERS
+    assert_empty Diagrams::Source.refusals(source)
 
     answer = draw("emoji", source)
 

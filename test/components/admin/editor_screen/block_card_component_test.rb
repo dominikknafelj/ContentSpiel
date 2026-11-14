@@ -666,7 +666,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     with_locales(%w[en de], default: "en") do
       page = create_page(title: "Diagram tab")
       block = page.content_blocks.create!(block_type: "test/shared_diagram", position: 0,
-        settings: { "source" => "flowchart LR\n  A --> B", "drawing" => { "svg" => Diagram::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg, "from" => "a" * 64 } })
+        settings: { "source" => "flowchart LR\n  A --> B", "drawing" => { "svg" => Diagrams::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg, "from" => "a" * 64 } })
 
       render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")
 

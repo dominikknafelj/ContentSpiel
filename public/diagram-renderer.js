@@ -4,7 +4,7 @@
 // The frame is sandboxed to an opaque origin, so this is a classic script
 // from public/ (no module script of the app's loads there without CORS), and
 // everything it knows comes from two JSON values in its document
-// (`#diagram-rules`, `Diagram::Source.rules_json`; `#diagram-frame`, the
+// (`#diagram-rules`, `Diagrams::Source.rules_json`; `#diagram-frame`, the
 // drawing's limits and the font files) and from its parent's messages.
 //
 // THE PROTOCOL. The parent posts `{ id, source, colours }` with target '*'
@@ -15,7 +15,7 @@
 //     `svg: ""` and clears the drawing;
 //   - `{ id, error: { kind, line, message, ... } }`, `kind` one of
 //     `too_long` (over the source's limit in code points; line 0), `refused` (a line rule of
-//     `Diagram::Source`, with its `rule` and `word`; `line` is 1-based, 0 for a
+//     `Diagrams::Source`, with its `rule` and `word`; `line` is 1-based, 0 for a
 //     directive Mermaid found that no line names), `parse` (Mermaid's own
 //     error), `type` (Mermaid read a diagram off the list) and `too_large`
 //     (the cleaned drawing over either limit, with its `bytes` and
@@ -30,7 +30,7 @@
 // every directive and front matter and whose `diagramType` must be on the
 // list. Only then does Mermaid draw.
 //
-// THE LINE RULES are `Diagram::Source`'s, read from its JSON, and this port
+// THE LINE RULES are `Diagrams::Source`'s, read from its JSON, and this port
 // must decide every source as the Ruby does. Hence Ruby's own notions below
 // and not JavaScript's: `strip` and the word split are ASCII whitespace
 // (JavaScript's `trim` and `\s` also take a no-break space and the BOM),
@@ -38,7 +38,7 @@
 // type or rule is looked up with `Object.hasOwn` (a first word
 // `constructor` is not on the list).
 //
-// THE CLEANING drops what `Diagram::Drawing` drops quietly, with DOM APIs,
+// THE CLEANING drops what `Diagrams::Drawing` drops quietly, with DOM APIs,
 // so the size measured is at most the size stored: the server renames the
 // ids to shorter ones and serialises the drawing itself. It refuses
 // nothing: the server's sanitizer is the boundary, and the line rules keep
@@ -62,7 +62,7 @@
   const CLASS_TOKEN = /^[A-Za-z][\w-]*$/
   const COLOUR_NAME = /^--th-diagram-[a-z0-9-]+$/
 
-  // ---- The line rules, as `Diagram::Source.refusals` reads them.
+  // ---- The line rules, as `Diagrams::Source.refusals` reads them.
 
   const strip = (text) => text.replace(STRIP, "")
   const firstWord = (line) => {
@@ -120,7 +120,7 @@
     return found
   }
 
-  // ---- Cleaning, as `Diagram::Drawing` drops quietly.
+  // ---- Cleaning, as `Diagrams::Drawing` drops quietly.
 
   // `title` is Mermaid's `accTitle`: the component writes the one title.
   const DROPPED_ELEMENTS = new Set([ "style", "filter", "feDropShadow", "linearGradient", "stop", "symbol", "title" ])
@@ -208,7 +208,7 @@
   const draw = async ({ id, source, colours, raw }) => {
     paint(colours)
     // The refusals first, so a blank source over the limit is too long, as
-    // `Diagram::Source` says; a blank one within it has no refusal.
+    // `Diagrams::Source` says; a blank one within it has no refusal.
     const found = refusals(source)
     if (found.length) return { id, error: refusal(found[0]) }
 
@@ -268,7 +268,7 @@
       // Twice the source's limit: Mermaid counts UTF-16 units and draws a
       // stand-in diagram past it, and a source within the limit in code
       // points (the length is counted in code points everywhere, as
-      // `Diagram::Source` counts it) is at most twice that in UTF-16 units.
+      // `Diagrams::Source` counts it) is at most twice that in UTF-16 units.
       maxTextSize: 2 * RULES.max_characters,
       theme: "base",
       fontFamily: "Archivo",

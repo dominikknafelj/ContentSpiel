@@ -75,7 +75,7 @@ en:
       table_too_large: "A table can have at most %{columns} columns and %{rows} rows."
       table_cell_too_long: "A cell can have at most %{characters} characters."
       # A Diagram block's source and drawing (`ContentModel::FieldTypes`,
-      # `:mermaid` and `:diagram_drawing`), one sentence per `Diagram::Source`
+      # `:mermaid` and `:diagram_drawing`), one sentence per `Diagrams::Source`
       # rule. These are also the sentences the editor's card shows before a
       # save (`Admin::Fields::MermaidField::SENTENCES` hands them to the
       # script), so they are written here once. `%{word}` is what the line

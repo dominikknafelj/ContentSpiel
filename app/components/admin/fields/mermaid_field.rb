@@ -16,7 +16,7 @@ module Admin
     # drawing that worked into the hidden `:diagram_drawing` input
     # (`drawing-field`, its id) and the error, once per new error, into
     # `status`, the polite live region. It reads the line rules from `rules`
-    # (`Diagram::Source.rules_json`) and the theme's colours from the
+    # (`Diagrams::Source.rules_json`) and the theme's colours from the
     # `colourProbe`, an empty element of the public diagram's class that
     # nobody sees or hears. Opening a card draws the preview and writes
     # nothing.
@@ -64,7 +64,7 @@ module Admin
       }.freeze
 
       # The source's own limit holds without a `max:` (`:mermaid`'s validation).
-      def limit = [ field.options[:max], Diagram::Source::MAX_CHARACTERS ].compact.min
+      def limit = [ field.options[:max], Diagrams::Source::MAX_CHARACTERS ].compact.min
 
       # The original's source shown in a language that has none of its own.
       def starting? = value.blank? && original.present?
@@ -92,7 +92,7 @@ module Admin
         {
           controller: CONTROLLER,
           "#{CONTROLLER}-renderer-url-value": helpers.admin_diagram_renderer_path,
-          "#{CONTROLLER}-rules-value": Diagram::Source.rules_json,
+          "#{CONTROLLER}-rules-value": Diagrams::Source.rules_json,
           "#{CONTROLLER}-drawing-field-value": "#{id_prefix}-#{drawing}",
           "#{CONTROLLER}-drawing-name-value": "#{form_name}[#{drawing}]",
           "#{CONTROLLER}-source-name-value": input_name,

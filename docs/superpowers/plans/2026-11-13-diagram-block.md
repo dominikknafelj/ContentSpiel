@@ -5,7 +5,7 @@
 **Goal:** A Diagram block. An editor types Mermaid and sees it drawn in a sandboxed frame. The cleaned SVG is stored with the block, and a visitor's page shows it inline in the theme's colours, with no script.
 
 **Architecture:**
-- `Diagram::Source` holds the line rules and `Diagram::Drawing` is the sanitizer, the only reader of a drawing. Both are plain values in `app/values/diagram/`.
+- `Diagrams::Source` holds the line rules and `Diagrams::Drawing` is the sanitizer, the only reader of a drawing. Both are plain values in `app/values/diagrams/`.
 - Two new field types, `:mermaid` and `:diagram_drawing`, carry the values through `translated_settings`. `BlockTypes::Diagram` is generated with `bin/rails generate block_type diagram` and filled in like the Code block.
 - Mermaid runs only in `GET <admin>/diagram-renderer`, a frame with an opaque origin. The card's Stimulus controller talks to the frame by `postMessage` and writes the hidden drawing field, so autosave sends the source and the drawing together.
 
@@ -59,8 +59,8 @@
   - `maxTextSize: 10_000`, `theme: "base"`;
   - `fontFamily` and `themeVariables.fontFamily` set to `"Archivo"`;
   - `gantt.useWidth: 720`.
-- **Limits:** `Diagram::Source::MAX_CHARACTERS = 10_000`; `Diagram::Drawing::MAX_BYTES = 1_048_576`; `Diagram::Drawing::MAX_ELEMENTS = 5_000`.
-- **Types** (`Diagram::Source::TYPES`, first keyword → label): `flowchart`/`graph` "Flowchart", `sequenceDiagram` "Sequence", `classDiagram` "Class", `stateDiagram`/`stateDiagram-v2` "State", `erDiagram` "Entity relationship", `gantt` "Gantt", `pie` "Pie". Mermaid's `diagramType` values: `flowchart-v2`, `sequence`, `classDiagram`, `stateDiagram`, `er`, `gantt`, `pie`.
+- **Limits:** `Diagrams::Source::MAX_CHARACTERS = 10_000`; `Diagrams::Drawing::MAX_BYTES = 1_048_576`; `Diagrams::Drawing::MAX_ELEMENTS = 5_000`.
+- **Types** (`Diagrams::Source::TYPES`, first keyword → label): `flowchart`/`graph` "Flowchart", `sequenceDiagram` "Sequence", `classDiagram` "Class", `stateDiagram`/`stateDiagram-v2` "State", `erDiagram` "Entity relationship", `gantt` "Gantt", `pie` "Pie". Mermaid's `diagramType` values: `flowchart-v2`, `sequence`, `classDiagram`, `stateDiagram`, `er`, `gantt`, `pie`.
 - **Ids:** stored drawings use `d-<n>`. On a public page they are `diagram-<block id>-<locale>-d-<n>`, and in a tile `diagram-tile-<block id>-<locale>-d-<n>`.
 - **Comments state invariants, never history or plan steps.** Two parts doing one job become one component. No compatibility code.
 - New admin strings are keys. Public words: none (`words: []`).
@@ -78,22 +78,22 @@
 
 ---
 
-### Task 1: `Diagram::Source`, the line rules
+### Task 1: `Diagrams::Source`, the line rules
 
 **Files:**
-- Create: `app/values/diagram.rb` (the module, one line saying what the namespace holds), `app/values/diagram/source.rb`
-- Test: `test/values/diagram/source_test.rb`
-- Modify: `CHANGELOG.md` (`## Unreleased` → `### Breaking`: the new top-level name `Diagram`, which refuses a gem's hook owner `diagram` at boot)
+- Create: `app/values/diagrams.rb` (the module, one line saying what the namespace holds), `app/values/diagrams/source.rb`
+- Test: `test/values/diagrams/source_test.rb`
+- Modify: `CHANGELOG.md` (`## Unreleased` → `### Breaking`: the new top-level name `Diagrams`, which refuses a gem's hook owner `diagrams` at boot)
 
 **Interfaces:**
 - Produces:
-  - `Diagram::Source::MAX_CHARACTERS` (10_000).
-  - `Diagram::Source::TYPES`, a frozen hash of keyword → label (Global Constraints).
-  - `Diagram::Source::MERMAID_TYPES` (the seven `diagramType` strings).
-  - `Diagram::Source.type(text) -> String | nil`: the first keyword, or nil.
-  - `Diagram::Source.refusals(text) -> Array<Refusal>`, where `Refusal = Data.define(:line, :rule, :word)`. `rule` is one of `:directive :front_matter :colours :links :maths :type :too_long`.
-  - `Diagram::Source.first_line(text) -> String | nil`: the first line after the keyword, for the tile.
-  - `Diagram::Source.rules_json -> String`: what the frame and the card read, so the rules are written once.
+  - `Diagrams::Source::MAX_CHARACTERS` (10_000).
+  - `Diagrams::Source::TYPES`, a frozen hash of keyword → label (Global Constraints).
+  - `Diagrams::Source::MERMAID_TYPES` (the seven `diagramType` strings).
+  - `Diagrams::Source.type(text) -> String | nil`: the first keyword, or nil.
+  - `Diagrams::Source.refusals(text) -> Array<Refusal>`, where `Refusal = Data.define(:line, :rule, :word)`. `rule` is one of `:directive :front_matter :colours :links :maths :type :too_long`.
+  - `Diagrams::Source.first_line(text) -> String | nil`: the first line after the keyword, for the tile.
+  - `Diagrams::Source.rules_json -> String`: what the frame and the card read, so the rules are written once.
 
 - [ ] **Step 1: Write the failing tests.** Each test name is its assertion:
   - "a source whose first keyword is on the list has no refusal": one per keyword, including `graph TD` and `stateDiagram-v2`.
@@ -107,13 +107,13 @@
   - "$$ anywhere is :maths".
   - "over MAX_CHARACTERS is one :too_long refusal at line 0, and the text is not cut".
   - "rules_json parses to the types, the mermaid types, the limit and each rule's words and markers".
-- [ ] **Step 2: Run them.** Run: `PGGSSENCMODE=disable bin/rails test test/values/diagram/source_test.rb`. Expected: FAIL, `uninitialized constant Diagram`.
-- [ ] **Step 3: Implement `Diagram::Source`.**
+- [ ] **Step 2: Run them.** Run: `PGGSSENCMODE=disable bin/rails test test/values/diagrams/source_test.rb`. Expected: FAIL, `uninitialized constant Diagrams`.
+- [ ] **Step 3: Implement `Diagrams::Source`.**
   - A rule is data: a hash of rule → `{ first_words: [...], markers: [...] }`, read by both `refusals` and `rules_json`.
   - Matching is case-sensitive except for `%%{`.
   - Write the CHANGELOG `### Breaking` line.
 - [ ] **Step 4: Run.** The tests pass, and so do `PGGSSENCMODE=disable bin/rails test test/lib/admin_namespace_shadow_test.rb` and `bin/rails zeitwerk:check`.
-- [ ] **Step 5: Commit** `app/values/diagram.rb app/values/diagram/source.rb test/values/diagram/source_test.rb CHANGELOG.md`.
+- [ ] **Step 5: Commit** `app/values/diagrams.rb app/values/diagrams/source.rb test/values/diagrams/source_test.rb CHANGELOG.md`.
 
 ### Task 2: Vendored Mermaid, the renderer frame and the fixtures
 
@@ -131,11 +131,11 @@
 - Test: `test/controllers/admin/diagram_renderers_controller_test.rb`, `test/lib/diagram_fixtures_test.rb`, `test/system/admin/diagram_renderer_test.rb`
 
 **Interfaces:**
-- Consumes: `Diagram::Source.rules_json`.
+- Consumes: `Diagrams::Source.rules_json`.
 - Produces:
   - **The frame's protocol.** The parent posts `{ id, source, colours }` with target `'*'`. The frame answers `{ id, svg, bytes, elements }` or `{ id, error: { kind, line, message } }`.
     - `kind` is one of `refused | parse | type | too_large | too_long`.
-    - `svg` is the frame's own **cleaned** string (the same drop lists as `Diagram::Drawing`, done with DOM APIs), so `bytes` and `elements` are measured on what the server will store.
+    - `svg` is the frame's own **cleaned** string (the same drop lists as `Diagrams::Drawing`, done with DOM APIs), so `bytes` and `elements` are measured on what the server will store.
   - `admin_diagram_renderer_path`.
 
 - [ ] **Step 1: Vendor.**
@@ -182,22 +182,22 @@
 - [ ] **Step 7: Run** the controller and fixture tests, then the browser file once (machine quiet). Everything passes.
 - [ ] **Step 8: Commit** by path: the vendored file and VERSION, controller, view, route, importmap, frame script, middleware, rake task, fixtures and tests.
 
-### Task 3: `Diagram::Drawing`, the sanitizer
+### Task 3: `Diagrams::Drawing`, the sanitizer
 
 **Files:**
-- Create: `app/values/diagram/drawing.rb`
-- Test: `test/values/diagram/drawing_test.rb`
+- Create: `app/values/diagrams/drawing.rb`
+- Test: `test/values/diagrams/drawing_test.rb`
 
 **Interfaces:**
 - Consumes: the fixtures of Task 2, and its "allowlist addition" names (each named in the code's list with a one-line comment saying which type writes it).
 - Produces:
-  - `Diagram::Drawing::MAX_BYTES`, `MAX_ELEMENTS` and `REVISION` (starting at 1).
-  - `Diagram::Drawing.clean(svg_string) -> Result`, where `Result = Data.define(:svg, :reason)`: `svg` is the cleaned string with ids `d-<n>`, or nil with `reason` a Symbol (`:not_xml :doctype :entity :processing_instruction :roots :element :attribute :url :value :too_large :too_many_elements`).
-  - `Diagram::Drawing.new(value_hash)`, where the value is `{ "svg" => String, "from" => hex }`:
+  - `Diagrams::Drawing::MAX_BYTES`, `MAX_ELEMENTS` and `REVISION` (starting at 1).
+  - `Diagrams::Drawing.clean(svg_string) -> Result`, where `Result = Data.define(:svg, :reason)`: `svg` is the cleaned string with ids `d-<n>`, or nil with `reason` a Symbol (`:not_xml :doctype :entity :processing_instruction :roots :element :attribute :url :value :too_large :too_many_elements`).
+  - `Diagrams::Drawing.new(value_hash)`, where the value is `{ "svg" => String, "from" => hex }`:
     - `#current?(source) -> Boolean` (SHA-256 hex of the cast source equals `from`);
     - `#markup(prefix:, title:, title_id:) -> ActiveSupport::SafeBuffer | nil`. It writes the root's `role="img"`, `aria-labelledby`, an `aria-describedby` only with a `<desc>`, the `<title>` holding the escaped `title`, `width` and `height` from the `viewBox`, and the ids prefixed. Nil when the drawing fails on read.
     - `#width`, `#height` (Floats from the `viewBox`).
-  - `Diagram::Drawing.digest(source) -> String`.
+  - `Diagrams::Drawing.digest(source) -> String`.
 
 - [ ] **Step 1: Write the failing tests.**
   - "each fixture cleans to an svg with no style, fill, stroke, filter, symbol, style attribute or data-*, and keeps its geometry and classes".
@@ -209,7 +209,7 @@
   - "markup prefixes the ids, writes role, the title as escaped text and width and height from the viewBox": a title `<b>&` comes out `&lt;b&gt;&amp;`.
   - "markup keeps Mermaid's desc as the description and drops Mermaid's title".
   - "current? is true only for the source the drawing was made from".
-  - "only Diagram::Drawing parses SVG": a source test over `app/` and `lib/` finds `Nokogiri::XML` beside `svg` in no other file.
+  - "only Diagrams::Drawing parses SVG": a source test over `app/` and `lib/` finds `Nokogiri::XML` beside `svg` in no other file.
 - [ ] **Step 2: Run.** Expected: FAIL.
 - [ ] **Step 3: Implement.** Nokogiri strict: `Nokogiri::XML(svg) { |c| c.strict.nonet.nonoent(false).noent(false) }`, with the DTD and the entity checks done on the parsed document. Then:
   - walk the tree and build a new document element by element;
@@ -217,7 +217,7 @@
   - add the root's `xmlns`.
   - Put a comment over `REVISION`: "Bump when a list changes: a cached read keeps the rules it was cleaned under."
 - [ ] **Step 4: Run.** The tests pass.
-- [ ] **Step 5: Commit** `app/values/diagram/drawing.rb test/values/diagram/drawing_test.rb`.
+- [ ] **Step 5: Commit** `app/values/diagrams/drawing.rb test/values/diagrams/drawing_test.rb`.
 
 ### Task 4: The two field types, the option `translation_required`, and their inputs
 
@@ -226,7 +226,7 @@
   - `app/models/content_model/field_types.rb` (register `:mermaid` and `:diagram_drawing` after `:code`);
   - `app/models/content_model/definition.rb` (`OPTIONS` gains `:translation_required`, refused unless `translated: true`);
   - `app/models/translations/status.rb` (a `translation_required` blank in a target language counts as missing when the primary language's value is present);
-  - `config/locales/en.yml` (`errors.messages`: one key per `Diagram::Source` rule, plus `invalid_drawing` "This drawing can't be shown on the site.").
+  - `config/locales/en.yml` (`errors.messages`: one key per `Diagrams::Source` rule, plus `invalid_drawing` "This drawing can't be shown on the site.").
 - Create: `app/components/admin/fields/mermaid_field.rb` and `.html.erb`, `app/components/admin/fields/diagram_drawing_field.rb` and `.html.erb`
 - Modify: `config/locales/admin/fields.en.yml` (the preview's words, Task 7)
 - Test:
@@ -238,7 +238,7 @@
   - `test/models/translations/status_test.rb` (the option).
 
 **Interfaces:**
-- Consumes: `Diagram::Source.refusals`, `Diagram::Drawing.clean`.
+- Consumes: `Diagrams::Source.refusals`, `Diagrams::Drawing.clean`.
 - Produces:
   - `:mermaid`: cast like `:code`; may be `translated: true`; `translatable: false`; `audit: :digest`; `max:`; `validate` adds one error per refusal, with the line and the rule's sentence.
   - `:diagram_drawing`: cast takes a Hash or a JSON String `{ svg, from }` and runs `Drawing.clean`. A failure is the error `:invalid_drawing` (never a nil). It is `translatable: false` and `audit: :digest`, `own_label?` true, and `display` nil.
@@ -281,7 +281,7 @@
   ```ruby
   t.label "Diagram"
   t.icon "diagram", family: :code
-  t.field :source, :mermaid, translated: true, max: Diagram::Source::MAX_CHARACTERS
+  t.field :source, :mermaid, translated: true, max: Diagrams::Source::MAX_CHARACTERS
   t.field :drawing, :diagram_drawing, translated: true
   t.field :description, :text, translated: true, translation_required: true, label: "Description",
           help: "Describe what the diagram shows, for people who can't see it. The diagram shows on the site only with a description."
@@ -294,7 +294,7 @@
   - `settings: {}`;
   - `translations` for `en`, `de` and `es`, each with a flowchart `source` (labels in the language), a `drawing`, a `description` and a `caption`;
   - `shows`: the en description and caption.
-  - **The sample drawings** live in `db/seeds/diagrams/sample-{en,de,es}.svg`, not `test/`, because the sample is registered in every environment and the showcase seed draws it. `diagram:fixtures` writes them from three sources in `sources.yml`, already cleaned by `Diagram::Drawing.clean`. `BlockTypes::Diagram.sample_drawing(locale)` reads one and answers `{ "svg" => …, "from" => Diagram::Drawing.digest(source) }`.
+  - **The sample drawings** live in `db/seeds/diagrams/sample-{en,de,es}.svg`, not `test/`, because the sample is registered in every environment and the showcase seed draws it. `diagram:fixtures` writes them from three sources in `sources.yml`, already cleaned by `Diagrams::Drawing.clean`. `BlockTypes::Diagram.sample_drawing(locale)` reads one and answers `{ "svg" => …, "from" => Diagrams::Drawing.digest(source) }`.
 
 - [ ] **Step 1: Generate**, then write the failing declaration tests:
   - "diagram is three translated settings and a caption, nothing required, the source never offered to the AI";
@@ -322,13 +322,13 @@
   - cases in `test/integration/design_tokens_test.rb`, `test/integration/public_blocks_test.rb`, `test/integration/theme_pages_test.rb` and `test/lib/theming_reference_test.rb`.
 
 **Interfaces:**
-- Consumes: `Diagram::Drawing#markup`, `#width`.
+- Consumes: `Diagrams::Drawing#markup`, `#width`.
 - Produces:
   - `Blocks::DiagramComponent#svg`: the markup with `prefix: "diagram-#{block.id}-#{locale}"`, `title: description`, or nil.
   - `#description`, `#caption`.
   - `render?` is `svg.present? && description.present?`.
   - **Fallback:** a language with no source uses the default language's source, drawing and that language's description (or the default's). A language with its own source uses only its own drawing.
-  - The read is cached in `Rails.cache` under `["diagram", sha256(stored svg), block.id, locale, Diagram::Drawing::REVISION]`.
+  - The read is cached in `Rails.cache` under `["diagram", sha256(stored svg), block.id, locale, Diagrams::Drawing::REVISION]`.
   - A failure on read logs once per block and reason (`Rails.logger.warn` with the block id and the reason, never the content), using the cache key as the "logged" mark.
   - The tokens: `diagram-ink diagram-fill diagram-line diagram-edge diagram-group diagram-note diagram-accent diagram-series-1 … diagram-series-6` themed, and `diagram-font` fixed. Their defaults are the spec's §4 table.
 

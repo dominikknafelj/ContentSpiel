@@ -98,7 +98,7 @@ These are the owner's decisions, in his words and mine:
   - Its input, `Admin::Fields::MermaidField`, is the Code field's textarea (the same attributes, the same CSS-only height, and Tab leaves it). Beside it, it holds the preview frame, the error line and the counter.
 - **`:diagram_drawing`**
   - Its cast runs the sanitizer (§3). A value that does not pass is an error, `:invalid_drawing`, never a quiet nil.
-  - It refuses more than `Diagram::Drawing::MAX_BYTES`.
+  - It refuses more than `Diagrams::Drawing::MAX_BYTES`.
   - It is not `translatable` and is audited as `:digest`.
   - Its input is hidden, written by the preview script only. `own_label?` is true and it draws no label.
   - Its `display` on a translation tab is nothing, because the source's field shows the drawing.
@@ -126,7 +126,7 @@ These are the owner's decisions, in his words and mine:
   - **`securityLevel: "strict"`** (spike, 2026-11-11). Sandbox mode lays out in a nested iframe whose `contentDocument` is null inside an opaque-origin frame, so every type fails there.
   - **`gantt.useWidth` at a fixed figure** near the content column's width (spike, 2026-11-11). Without it a gantt is laid out at the frame's width, so a stored gantt would depend on how wide the editor's frame happened to be.
 - **Before Mermaid draws,** the frame makes three checks, in this order (spike, 2026-11-11):
-  1. the text's length: over `Diagram::Source::MAX_CHARACTERS` is refused by the frame itself, because Mermaid does not throw for an over-long text but draws a stand-in diagram ("Maximum text size in diagram exceeded");
+  1. the text's length: over `Diagrams::Source::MAX_CHARACTERS` is refused by the frame itself, because Mermaid does not throw for an over-long text but draws a stand-in diagram ("Maximum text size in diagram exceeded");
   2. the same line rules as the server (§5): the type list and the refused constructs, so a refused source never reaches the parser and the `classDef` path of the CVE never reaches Mermaid at all;
   3. `mermaid.parse(text)`, refusing when its `config` is non-empty (every directive and front matter shows there) or its `diagramType` is not on the list.
 - **After Mermaid draws,** the frame cleans the SVG as the server will (§3), checks the **cleaned size** and element count against `MAX_BYTES` and `MAX_ELEMENTS`, and shows the "too large" state (§7) instead of handing the drawing back, so that a save is never left to be refused (owner, 2026-11-11). It paints with the same class rules on CS Studio's colours, which the card posts in with the source. Light and dark follow CS Studio's theme. In CS Studio the preview therefore follows the backend's look and has the site's shape (the owner's answer of 2026-10-13: "for the backend it follows the backend").
@@ -138,7 +138,7 @@ These are the owner's decisions, in his words and mine:
 - A save that the source's own keystroke sends first carries the old drawing. The next save carries the new one.
 - On `connect` the script draws, but writes nothing. Opening a card never saves, which keeps live editing and the stale check as they are.
 
-**The server checks the digest.** It stores `from` as sent, and `Diagram::Drawing#current?(source)` compares it with the saved source's digest. A drawing whose `from` is not the source's digest is *the last drawing that worked*: the card and the tile say so (§7), and the public page still draws it (§6).
+**The server checks the digest.** It stores `from` as sent, and `Diagrams::Drawing#current?(source)` compares it with the saved source's digest. A drawing whose `from` is not the source's digest is *the last drawing that worked*: the card and the tile say so (§7), and the public page still draws it (§6).
 
 **What the frame and the card take back.**
 - At `disconnect`, the card removes the frame and forgets its listener.
@@ -147,9 +147,9 @@ These are the owner's decisions, in his words and mine:
 
 **A card held by someone else** draws at `connect` and writes nothing: its textarea is `readonly` (`HeldFields`), and no action of the script stays in a held form. So the type declares no `read_only_actions`.
 
-### 3. The server's sanitizer: `Diagram::Drawing`
+### 3. The server's sanitizer: `Diagrams::Drawing`
 
-`Diagram::Drawing` (`app/values/diagram/drawing.rb`) is **the one file that reads a drawing**. It answers data and markup that it builds itself.
+`Diagrams::Drawing` (`app/values/diagrams/drawing.rb`) is **the one file that reads a drawing**. It answers data and markup that it builds itself.
 
 - **How it parses:**
   - Nokogiri's strict XML parser, with `NONET`, no DTD loading and no entity expansion.
@@ -243,7 +243,7 @@ The line goes into the ledger (`test/support/contract_ledger.rb`), the tables of
 
 ### 5. Allowed diagram types, refused constructs and limits
 
-**The first list** is `Diagram::Source::TYPES`, by the source's first keyword:
+**The first list** is `Diagrams::Source::TYPES`, by the source's first keyword:
 - `flowchart` / `graph`;
 - `sequenceDiagram`;
 - `classDiagram`;
@@ -275,7 +275,7 @@ Each refusal names the line and says why, in words (§7).
 **This is the editor's rule and the frame's first wall, not the security boundary.** The sanitizer is the boundary. The line rules are coarse on purpose: a `class` line that declares a class in a class diagram is allowed.
 
 **Limits:**
-- the source holds at most **10,000 characters** (`Diagram::Source::MAX_CHARACTERS`), refused and never cut, with the Code block's counter from nine tenths;
+- the source holds at most **10,000 characters** (`Diagrams::Source::MAX_CHARACTERS`), refused and never cut, with the Code block's counter from nine tenths;
 - a drawing holds at most **1 MB** after cleaning (`Drawing::MAX_BYTES` = 1_048_576) and **5,000 elements** (`MAX_ELEMENTS`) (owner, 2026-11-11, replacing 300 KB: the spike measured a full 10,000-character flowchart at 770 KB cleaned, 716 KB with coordinates rounded to 2 places, 4,024 elements, gzip about 130 KB). The frame checks the cleaned size and shows the "too large" state (§7) before a save would be refused;
 - each language's drawing counts separately, so a block in three languages can hold three drawings in its row, in its published copy and in its audit snapshot. An audit event's changes are digests, by the field types.
 
@@ -299,7 +299,7 @@ Each refusal names the line and says why, in words (§7).
 - **The accessible name is the block's description**: in the visitor's language, tracked by translation state and written by the server as escaped text.
 - **Mermaid's `accDescr`**, if it survives the frame and the sanitizer, is kept as `<desc>` and becomes the description. Mermaid's `accTitle` is dropped, since the block's description is the name. Both survive in strict mode as `<title id="chart-title-…">` and `<desc id="chart-desc-…">`, referenced by Mermaid's root `aria-labelledby` and `aria-describedby`, and pass the element list (spike, 2026-11-11). Without an `accDescr` the markup has no `<desc>`.
 - **Size:** a cleaned root has no `width`, `height` or `style` (§3), and an inline SVG then fills its column, so small diagrams would be blown up several times. The component therefore **must** write `width` and `height` from the `viewBox` (spike, 2026-11-11: required, not cosmetic). The drawing keeps its natural `width` and `height` from the `viewBox`. CSS gives it `max-width: 100%` and `height: auto`, so a wide diagram scales down to its column. With `role="img"` its labels are not read one by one, so the description is the whole text alternative.
-- **The one `html_safe`** in the component is `Drawing`'s output. A source test holds that nothing else in the component or its template marks a string safe, and that only `Diagram::Drawing` parses SVG.
+- **The one `html_safe`** in the component is `Drawing`'s output. A source test holds that nothing else in the component or its template marks a string safe, and that only `Diagrams::Drawing` parses SVG.
 - **No public words:** `words: []`. The component draws nothing rather than say something.
 
 ### 7. The editor
@@ -356,7 +356,7 @@ The error is a polite live region, announced once per new error, never per keyst
   - "The Diagram block" in `docs/reference/theming.md`;
   - the reference index in `CLAUDE.md`;
   - the two `REVISION` rules and the "no guard" items of §3 and §4 under "Rules a change can break silently";
-  - `CHANGELOG.md`'s `## Unreleased` gets the new block, the ledger lines (a contract change) and, under `### Breaking`, the new top-level name `Diagram`, which refuses a gem owner of that name (`TopLevelNames.owners`).
+  - `CHANGELOG.md`'s `## Unreleased` gets the new block, the ledger lines (a contract change) and, under `### Breaking`, the new top-level name `Diagrams`, which refuses a gem owner of that name (`TopLevelNames.owners`).
 
 ### 9. The spike, before the plan
 
@@ -398,7 +398,7 @@ The design agent draws these first:
 3. **One pull request** for the block, following "Adding a block type" step by step:
    - the generator;
    - the two field types;
-   - `Diagram::Source` and `Diagram::Drawing` with their tests;
+   - `Diagrams::Source` and `Diagrams::Drawing` with their tests;
    - the renderer route and frame;
    - the card's script;
    - the component, stylesheet and tokens;
@@ -436,7 +436,7 @@ The design agent draws these first:
 13. **The drawing is scaled to its column,** down to about 60% of its drawn size (where labels would fall under 9px); below that it keeps that size and scrolls sideways inside its own figure box. The page never scrolls sideways. *(Owner, 2026-11-11, replacing "never scrolled".)*
 14. **The tile shows a small preview:** the stored, cleaned SVG scaled down, with no script, painted by the same tokens, beside the summary line; "No description" and "Last drawing kept" as before. *(Owner, 2026-11-11, replacing "text only".)*
 15. **Archivo is the drawing's font,** fixed by a token (`--th-diagram-font`), because the boxes are measured in it.
-16. **The new top-level name is `Diagram`** (`Diagram::Source`, `Diagram::Drawing`), named under `### Breaking`.
+16. **The new top-level name is `Diagrams`** (`Diagrams::Source`, `Diagrams::Drawing`), named under `### Breaking`.
 17. **Non-Latin scripts are a named limit of this block,** with the general fix on the roadmap as issue #246. *(Owner, 2026-11-11.)*
 18. **The frame checks before it draws:** text length, the line rules, then `mermaid.parse`; and after: the cleaned size. It refuses over-long text itself because Mermaid draws a stand-in diagram instead of failing. *(Spike, 2026-11-11.)*
 

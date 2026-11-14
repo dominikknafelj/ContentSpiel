@@ -256,14 +256,14 @@ class Translations::StatusTest < ActiveSupport::TestCase
       t.component TestQuoteComponent
     end
     with_locales(%w[en de], default: "en") do
-      svg = Diagram::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg
+      svg = Diagrams::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg
       source = "flowchart LR\n  A --> B"
       drawing = ->(from) { JSON.generate(svg: svg, from: from) }
       page = create_page(title: "About", translations: { "de" => { title: "Über uns" } })
-      result = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "test/drawn", settings: { source: source, drawing: drawing.(Diagram::Drawing.digest(source)) } })
+      result = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "test/drawn", settings: { source: source, drawing: drawing.(Diagrams::Drawing.digest(source)) } })
       assert result.ok?, result.errors.to_sentence
       block = result.record
-      assert ContentBlocks::Save.call(block, translations: { "de" => { settings: { source: "flowchart LR\n  A --> C", drawing: drawing.(Diagram::Drawing.digest("flowchart LR\n  A --> C")) } } }).ok?
+      assert ContentBlocks::Save.call(block, translations: { "de" => { settings: { source: "flowchart LR\n  A --> C", drawing: drawing.(Diagrams::Drawing.digest("flowchart LR\n  A --> C")) } } }).ok?
       assert_not_includes ContentBlock.translation_tracked_fields(block.reload), "drawing"
       assert_includes ContentBlock.translation_tracked_fields(block), "source"
       before = Translations::Status.for([ page ])[page]

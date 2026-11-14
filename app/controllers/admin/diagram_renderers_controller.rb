@@ -9,7 +9,7 @@ module Admin
   # It holds no data and is the same document for everyone who may open CS
   # Studio: no layout (no CSRF meta, no name, no flash read), and the frame
   # learns everything it draws from the card's messages. The line rules
-  # (`Diagram::Source.rules_json`), the drawing's limits and the font files'
+  # (`Diagrams::Source.rules_json`), the drawing's limits and the font files'
   # addresses are written into it as JSON for `public/diagram-renderer.js`.
   #
   # Both scripts are classic scripts, Mermaid's IIFE build by its asset URL
@@ -34,7 +34,7 @@ module Admin
     # The most a drawing may hold after cleaning: the frame refuses a larger
     # one as too large instead of handing it back, so a save is never left
     # for the server's sanitizer to refuse.
-    LIMITS = { max_bytes: Diagram::Drawing::MAX_BYTES, max_elements: Diagram::Drawing::MAX_ELEMENTS }.freeze
+    LIMITS = { max_bytes: Diagrams::Drawing::MAX_BYTES, max_elements: Diagrams::Drawing::MAX_ELEMENTS }.freeze
 
     SCRIPT = "diagram-renderer.js".freeze
 

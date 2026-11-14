@@ -2,7 +2,7 @@
 # what the vendored Mermaid draws for each sample source of
 # test/fixtures/diagrams/sources.yml, raw, drawn by the real renderer frame in
 # headless Chrome. Run after every Mermaid upgrade, then read the new
-# drawings' elements, attributes and classes against `Diagram::Drawing`'s
+# drawings' elements, attributes and classes against `Diagrams::Drawing`'s
 # lists and `diagram.css`:
 #   RAILS_ENV=test bin/rails diagram:fixtures
 # Under the test environment only: it boots the test's server, signs in with

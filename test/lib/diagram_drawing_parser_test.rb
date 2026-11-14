@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Only `Diagram::Drawing` parses a drawing (Diagram block spec, §3 and §6).
+# Only `Diagrams::Drawing` parses a drawing (Diagram block spec, §3 and §6).
 # It is the sanitizer: what a public page prints of a drawing is what it
 # wrote from its own parse tree, so a second reader of the stored SVG (a
 # component that pulls its size out, a helper that adds a class) would be a
@@ -14,7 +14,7 @@ require "test_helper"
 # A FILE IS EXEMPT ONLY BY ITS ENTRY IN `ALLOWED`, with the reason. An entry
 # that matches no file fails, so the list cannot outlive what it excuses.
 class DiagramDrawingParserTest < ActiveSupport::TestCase
-  OWNER = "app/values/diagram/drawing.rb".freeze
+  OWNER = "app/values/diagrams/drawing.rb".freeze
 
   ALLOWED = {
     "app/values/theme/icon_file.rb" =>
@@ -28,7 +28,7 @@ class DiagramDrawingParserTest < ActiveSupport::TestCase
     end.sort
   end
 
-  test "only Diagram::Drawing parses SVG" do
+  test "only Diagrams::Drawing parses SVG" do
     parsers = self.class.parsers
     assert_includes parsers, OWNER, "the sanitizer moved: this guard is looking for the wrong file"
     assert_equal [], parsers - [ OWNER ] - ALLOWED.keys

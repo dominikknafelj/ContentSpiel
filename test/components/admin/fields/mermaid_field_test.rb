@@ -37,7 +37,7 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
 
     assert_selector ".admin-field[data-field-name='source'][data-controller='#{CONTROLLER}'] > .admin-mermaid-field"
     assert_equal "/cs-studio/diagram-renderer", wrapper["data-#{CONTROLLER}-renderer-url-value"]
-    assert_equal Diagram::Source.rules_json, wrapper["data-#{CONTROLLER}-rules-value"]
+    assert_equal Diagrams::Source.rules_json, wrapper["data-#{CONTROLLER}-rules-value"]
     assert_equal "block-7-drawing", wrapper["data-#{CONTROLLER}-drawing-field-value"]
     assert_equal "block[settings][drawing]", wrapper["data-#{CONTROLLER}-drawing-name-value"]
     assert_equal "block[settings][source]", wrapper["data-#{CONTROLLER}-source-name-value"]

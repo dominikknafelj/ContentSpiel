@@ -1,14 +1,14 @@
 require "test_helper"
 
 # The `:diagram_drawing` field type (Diagram block spec, §1 and §3): the SVG the
-# renderer frame drew, cleaned by `Diagram::Drawing` on the way in, with the
+# renderer frame drew, cleaned by `Diagrams::Drawing` on the way in, with the
 # digest of the source it was drawn from. A drawing that does not clean is
 # refused, never dropped.
 class ContentModel::DiagramDrawingFieldTest < ActiveSupport::TestCase
   include TestTypes
 
   RAW = Rails.root.join("test/fixtures/diagrams/flowchart.svg").read
-  FROM = Diagram::Drawing.digest("flowchart LR\n  A --> B")
+  FROM = Diagrams::Drawing.digest("flowchart LR\n  A --> B")
   SCRIPT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><script>alert(1)</script></svg>'
 
   def definition
@@ -21,7 +21,7 @@ class ContentModel::DiagramDrawingFieldTest < ActiveSupport::TestCase
   def fields(values, translations = {}, options = {}) = definition.field_set.new({}, translations, locale: options.fetch(:locale, "en")).assign(values)
 
   test "diagram_drawing cleans on cast and a drawing that fails is :invalid_drawing" do
-    clean = Diagram::Drawing.clean(RAW).svg
+    clean = Diagrams::Drawing.clean(RAW).svg
 
     from_json = fields("drawing" => JSON.generate(svg: RAW, from: FROM))
     assert from_json.valid?, from_json.errors.full_messages.inspect
@@ -65,7 +65,7 @@ class ContentModel::DiagramDrawingFieldTest < ActiveSupport::TestCase
     end
     Current.actor = users(:one)
     block = ContentBlock.create!(owner: Page.create!(title: "Home", slug: ""), block_type: "test/diagram", position: 0,
-      translated_settings: { "en" => { "source" => "flowchart LR\n  A --> B", "drawing" => { "svg" => Diagram::Drawing.clean(RAW).svg, "from" => FROM } } })
+      translated_settings: { "en" => { "source" => "flowchart LR\n  A --> B", "drawing" => { "svg" => Diagrams::Drawing.clean(RAW).svg, "from" => FROM } } })
 
     result = ContentBlocks::Save.call(block, attributes: { settings: { "drawing" => JSON.generate(svg: SCRIPT, from: FROM) } })
 

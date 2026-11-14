@@ -1,11 +1,11 @@
 require "test_helper"
 require_relative "../../support/diagram_fixtures"
 
-class Diagram::DrawingTest < ActiveSupport::TestCase
+class Diagrams::DrawingTest < ActiveSupport::TestCase
   SVG = "http://www.w3.org/2000/svg".freeze
-  Result = Diagram::Drawing::Result
+  Result = Diagrams::Drawing::Result
 
-  def clean(svg) = Diagram::Drawing.clean(svg)
+  def clean(svg) = Diagrams::Drawing.clean(svg)
 
   # A hand-made drawing: the root Mermaid writes, around `body`.
   def drawing(body, root: "")
@@ -217,17 +217,17 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
   end
 
   test "over MAX_BYTES after cleaning is :too_large; over MAX_ELEMENTS is :too_many_elements" do
-    long = "x" * (Diagram::Drawing::MAX_BYTES + 1)
+    long = "x" * (Diagrams::Drawing::MAX_BYTES + 1)
     assert_refused :too_large, drawing(%(<text>#{long}</text>))
     # Within the bytes, past the elements: the root and MAX_ELEMENTS paths.
-    assert_refused :too_many_elements, drawing(%(<path d="M0 0"/>) * Diagram::Drawing::MAX_ELEMENTS)
-    assert_nil clean(drawing(%(<path d="M0 0"/>) * (Diagram::Drawing::MAX_ELEMENTS - 1))).reason
+    assert_refused :too_many_elements, drawing(%(<path d="M0 0"/>) * Diagrams::Drawing::MAX_ELEMENTS)
+    assert_nil clean(drawing(%(<path d="M0 0"/>) * (Diagrams::Drawing::MAX_ELEMENTS - 1))).reason
     # Dropped presentation counts for neither.
-    assert_nil clean(drawing(%(<style>#{"x" * Diagram::Drawing::MAX_BYTES}</style><path d="M0 0"/>))).reason
+    assert_nil clean(drawing(%(<style>#{"x" * Diagrams::Drawing::MAX_BYTES}</style><path d="M0 0"/>))).reason
   end
 
   test "an input far past MAX_BYTES is refused before it is parsed" do
-    assert_refused :too_large, drawing(%(<style>#{"x" * (4 * Diagram::Drawing::MAX_BYTES)}</style>))
+    assert_refused :too_large, drawing(%(<style>#{"x" * (4 * Diagrams::Drawing::MAX_BYTES)}</style>))
   end
 
   test "ids are renamed d-1, d-2… and every url(#…) and aria reference follows" do
@@ -238,7 +238,7 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
     assert_equal "url(#d-3)", path["marker-end"]
     assert_equal "url(#d-3)", path["marker-start"]
 
-    markup = Diagram::Drawing.new("svg" => result.svg, "from" => "x").markup(prefix: "diagram-12-de-", title: "A flow", title_id: "diagram-12-de-title")
+    markup = Diagrams::Drawing.new("svg" => result.svg, "from" => "x").markup(prefix: "diagram-12-de-", title: "A flow", title_id: "diagram-12-de-title")
     root = parsed(markup).root
     assert_equal "diagram-12-de-d-2", root["aria-describedby"]
     assert_equal "About", parsed(markup).at_xpath("//*[@id='diagram-12-de-d-2']").text
@@ -247,7 +247,7 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
 
   test "markup prefixes the ids, writes role, the title as escaped text and width and height from the viewBox" do
     svg = clean(drawing(%(<marker id="m"><path d="M0 0"/></marker><path marker-end="url(#m)"/>), root: "")).svg
-    markup = Diagram::Drawing.new("svg" => svg, "from" => "x").markup(prefix: "diagram-12-de-", title: "<b>&", title_id: "diagram-12-de-title")
+    markup = Diagrams::Drawing.new("svg" => svg, "from" => "x").markup(prefix: "diagram-12-de-", title: "<b>&", title_id: "diagram-12-de-title")
 
     assert_kind_of ActiveSupport::SafeBuffer, markup
     assert_includes markup, %(<title id="diagram-12-de-title">&lt;b&gt;&amp;</title>)
@@ -265,7 +265,7 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
 
   test "markup keeps Mermaid's desc as the description and drops Mermaid's title" do
     raw = fixture("flowchart").sub(%(<desc id=), %(<title id="chart-title-diagram-1">Mermaid's own title</title><desc id=))
-    markup = Diagram::Drawing.new("svg" => clean(raw).svg, "from" => "x").markup(prefix: "diagram-1-en-", title: "The block's description", title_id: "diagram-1-en-title")
+    markup = Diagrams::Drawing.new("svg" => clean(raw).svg, "from" => "x").markup(prefix: "diagram-1-en-", title: "The block's description", title_id: "diagram-1-en-title")
     document = parsed(markup)
 
     titles = document.xpath("//*[local-name()='title']")
@@ -277,25 +277,25 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
   end
 
   test "width and height are the viewBox's, as Floats" do
-    drawing = Diagram::Drawing.new("svg" => clean(fixture("flowchart")).svg, "from" => "x")
+    drawing = Diagrams::Drawing.new("svg" => clean(fixture("flowchart")).svg, "from" => "x")
     assert_equal 1107.21484375, drawing.width
     assert_equal 219.8243408203125, drawing.height
     assert_includes drawing.markup(prefix: "p-", title: "t", title_id: "p-title"), %(width="1107.215" height="219.824")
   end
 
   test "a drawing that fails on read has no markup and no size, and says why" do
-    drawing = Diagram::Drawing.new("svg" => drawing(%(<script>alert(1)</script>)), "from" => "x")
+    drawing = Diagrams::Drawing.new("svg" => drawing(%(<script>alert(1)</script>)), "from" => "x")
     assert_nil drawing.markup(prefix: "p-", title: "t", title_id: "p-title")
     assert_nil drawing.width
     assert_nil drawing.height
     assert_equal :element, drawing.reason
 
-    assert_nil Diagram::Drawing.new("svg" => nil, "from" => nil).markup(prefix: "p-", title: "t", title_id: "p-title")
-    assert_nil Diagram::Drawing.new("svg" => clean(fixture("pie")).svg, "from" => "x").reason
+    assert_nil Diagrams::Drawing.new("svg" => nil, "from" => nil).markup(prefix: "p-", title: "t", title_id: "p-title")
+    assert_nil Diagrams::Drawing.new("svg" => clean(fixture("pie")).svg, "from" => "x").reason
   end
 
   test "markup takes only an id-shaped prefix and title id" do
-    drawing = Diagram::Drawing.new("svg" => clean(fixture("pie")).svg, "from" => "x")
+    drawing = Diagrams::Drawing.new("svg" => clean(fixture("pie")).svg, "from" => "x")
     assert_raises(ArgumentError) { drawing.markup(prefix: %(x" onload="), title: "t", title_id: "p-title") }
     assert_raises(ArgumentError) { drawing.markup(prefix: "p-", title: "t", title_id: "a b") }
     assert_raises(ArgumentError) { drawing.markup(prefix: "p-", title: "t", title_id: "a.b") }
@@ -309,11 +309,11 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
 
   test "current? is true only for the source the drawing was made from" do
     source = "flowchart LR\n  A --> B"
-    drawing = Diagram::Drawing.new("svg" => clean(fixture("flowchart")).svg, "from" => Digest::SHA256.hexdigest(source))
-    assert_equal Digest::SHA256.hexdigest(source), Diagram::Drawing.digest(source)
+    drawing = Diagrams::Drawing.new("svg" => clean(fixture("flowchart")).svg, "from" => Digest::SHA256.hexdigest(source))
+    assert_equal Digest::SHA256.hexdigest(source), Diagrams::Drawing.digest(source)
     assert drawing.current?(source)
     assert_not drawing.current?("flowchart LR\n  A --> C")
     assert_not drawing.current?(nil)
-    assert_not Diagram::Drawing.new("svg" => nil, "from" => nil).current?("")
+    assert_not Diagrams::Drawing.new("svg" => nil, "from" => nil).current?("")
   end
 end

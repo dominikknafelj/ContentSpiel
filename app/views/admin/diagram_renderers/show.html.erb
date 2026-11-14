@@ -13,7 +13,7 @@
 </head>
 <body>
 <div id="diagram"></div>
-<script type="application/json" id="diagram-rules"><%= json_escape(Diagram::Source.rules_json).html_safe %></script>
+<script type="application/json" id="diagram-rules"><%= json_escape(Diagrams::Source.rules_json).html_safe %></script>
 <script type="application/json" id="diagram-frame"><%= json_escape(JSON.generate(@frame)).html_safe %></script>
 <script src="<%= asset_path("mermaid.js") %>"></script>
 <script src="<%= @script_url %>"></script>

@@ -4,7 +4,7 @@
 
 ### Breaking
 
-- A new top-level name, `Diagram` (`app/values/diagram.rb`): a gem whose hook owner is `diagram` is refused at boot. A gem with such an owner renames it.
+- A new top-level name, `Diagrams` (`app/values/diagrams.rb`): a gem whose hook owner is `diagrams` is refused at boot. A gem with such an owner renames it.
 
 ## 0.4.0 (2026-11-13)
 

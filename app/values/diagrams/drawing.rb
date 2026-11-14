@@ -1,6 +1,6 @@
 require "digest"
 
-module Diagram
+module Diagrams
   # A Diagram block's drawing: the SVG Mermaid drew in CS Studio's renderer
   # frame, and the one file that reads it. It is the security boundary of the
   # block. The editor's browser is not trusted, so every drawing it sends is
@@ -31,7 +31,7 @@ module Diagram
   #     marker in this drawing, a value holding `javascript:`, `data:` or
   #     `//`), and anything else no list names. A refusal is the frame and
   #     the server disagreeing, or a hand-made request: the line rules of
-  #     `Diagram::Source` keep a source that draws one from reaching Mermaid.
+  #     `Diagrams::Source` keep a source that draws one from reaching Mermaid.
   #   What is dropped is still looked through: an element inside a dropped
   #   one is refused when no list names it, and an attribute on it when it
   #   can fetch or run, so a `<symbol>` cannot carry a script past the walk.

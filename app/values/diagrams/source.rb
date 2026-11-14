@@ -1,4 +1,4 @@
-module Diagram
+module Diagrams
   # The rules a Diagram block's Mermaid source is held to, read line by line.
   #
   # Mermaid is drawn in the visitor's browser under the theme's colours, so a

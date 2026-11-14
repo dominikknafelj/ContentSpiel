@@ -368,8 +368,8 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       t.component TestQuoteComponent
     end
     with_locales(%w[en de], default: "en") do
-      svg = Diagram::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg
-      drawing = ->(source) { JSON.generate(svg: svg, from: Diagram::Drawing.digest(source)) }
+      svg = Diagrams::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg
+      drawing = ->(source) { JSON.generate(svg: svg, from: Diagrams::Drawing.digest(source)) }
       saved = ContentBlocks::Save.call(create_page(title: "With a diagram").content_blocks.new,
         attributes: { block_type: "test/diagram", settings: { "source" => "flowchart LR\n  SOURCE-EN --> B", "drawing" => drawing.("flowchart LR\n  SOURCE-EN --> B"), "description" => "Words" } })
       assert saved.ok?, saved.errors.to_sentence

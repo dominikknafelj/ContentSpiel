@@ -1,7 +1,7 @@
 require "test_helper"
 
 # The `:mermaid` field type (Diagram block spec, §1 and §5): a Mermaid source,
-# kept as typed like `:code`, held to `Diagram::Source`'s line rules, each
+# kept as typed like `:code`, held to `Diagrams::Source`'s line rules, each
 # refusal its own sentence, in every language the object holds.
 class ContentModel::MermaidFieldTest < ActiveSupport::TestCase
   def define(**source_options)
@@ -46,7 +46,7 @@ class ContentModel::MermaidFieldTest < ActiveSupport::TestCase
       t.field :source, :mermaid, drawing: :drawing
       t.field :drawing, :diagram_drawing
     end
-    over = unlimited.field_set.new({}).assign("source" => "pie\n#{"x" * Diagram::Source::MAX_CHARACTERS}").tap(&:valid?)
+    over = unlimited.field_set.new({}).assign("source" => "pie\n#{"x" * Diagrams::Source::MAX_CHARACTERS}").tap(&:valid?)
     assert_equal [ "is too long (maximum is 10,000 characters)" ], over.errors[:source]
   end
 
@@ -73,10 +73,10 @@ class ContentModel::MermaidFieldTest < ActiveSupport::TestCase
   test "a source cast by mermaid and Drawing.digest of it agree with a drawing whose from was hashed from the same cast text" do
     typed = "\r\nflowchart LR\r\n  A --> B\r\n\r\n"
     stored = fields("source" => typed).source
-    drawing = Diagram::Drawing.new({ "svg" => "<svg/>", "from" => Diagram::Drawing.digest("flowchart LR\n  A --> B") })
+    drawing = Diagrams::Drawing.new({ "svg" => "<svg/>", "from" => Diagrams::Drawing.digest("flowchart LR\n  A --> B") })
 
     assert drawing.current?(stored)
-    assert_equal Diagram::Drawing.digest(stored), Diagram::Drawing.digest("flowchart LR\n  A --> B")
+    assert_equal Diagrams::Drawing.digest(stored), Diagrams::Drawing.digest("flowchart LR\n  A --> B")
     assert_not drawing.current?(typed), "the text as sent is not what was hashed"
   end
 
