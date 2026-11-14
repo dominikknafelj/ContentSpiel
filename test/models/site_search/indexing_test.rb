@@ -73,4 +73,23 @@ class SiteSearch::IndexingTest < ActiveSupport::TestCase
     assert_equal [ [ "Post", other.id ], [ "Post", post.id ] ].sort, found("maritime").sort
     assert_empty found("seafaring")
   end
+
+  test "a block type's search_text that raises leaves the publish standing and is reported" do
+    page = create_page(title: "Lighthouse", published: false)
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" },
+      translations: { "en" => { body: rich_doc("The lamp turns") } }).ok?
+    definition = BlockTypes.fetch("rich_text")
+    raising = { body: ->(*, **) { raise ArgumentError, "the lamp's secret" } }
+
+    report = assert_error_reported(SiteSearch::BlockTextFailed) do
+      with_singleton_override(definition, :search_texts, -> { raising }) do
+        assert Pages::Save.call(page.reload, attributes: { published: true }).ok?
+      end
+    end
+
+    assert page.reload.live?
+    assert_equal "rich_text: ArgumentError", report.error.message
+    assert_equal [ [ "Page", page.id ] ], found("lighthouse"), "the page is indexed by its other words"
+    assert_empty found("lamp")
+  end
 end

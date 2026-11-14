@@ -16,6 +16,11 @@ module SiteSearch
   #   forget the record's documents of these copies (nil: of every copy) in
   #   these languages (nil: in every language). A copy withdrawn, a record
   #   purged, a language switched off.
+  # - `prune_record(record_type:, record_id:, except_copy_ids:)`: forget the
+  #   record's documents of every copy not in `except_copy_ids` (an empty
+  #   list: all of them). Sent after `index`, so the documents of a copy
+  #   withdrawn or superseded go without the record ever standing with none,
+  #   and a failing `index` leaves the old ones in place.
   # - `clear`: forget everything (a backend's own tests, a reset by hand).
   #
   # Querying, asked by `SiteSearch.search` alone:
@@ -36,6 +41,6 @@ module SiteSearch
   # alone, never its message, which for an engine may hold the address it
   # asked and so the query. A backend never logs the query text.
   module Backend
-    METHODS = %i[index remove clear search health].freeze
+    METHODS = %i[index remove prune_record clear search health].freeze
   end
 end

@@ -7,10 +7,14 @@ require "test_helper"
 # gem's would be.
 class SiteSearch::SyncJobTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
+  include LogCapture
 
   # The fake counts the calls that reach it, failed ones included.
+  # `failing_index` makes `index` alone raise, as an engine that takes
+  # removals and refuses new documents.
   class CountingFake < SiteSearch::Fake
     attr_reader :calls
+    attr_accessor :failing_index
 
     def initialize(...)
       super
@@ -18,6 +22,13 @@ class SiteSearch::SyncJobTest < ActiveSupport::TestCase
     end
 
     def index(documents)
+      @calls += 1
+      raise IOError, "http://engine/update?doc=secret" if failing_index
+
+      super
+    end
+
+    def prune_record(**)
       @calls += 1
       super
     end
@@ -139,12 +150,25 @@ class SiteSearch::SyncJobTest < ActiveSupport::TestCase
     page = create_page(title: "Lighthouse")
     @fake = CountingFake.new(raise_with: RuntimeError.new("http://engine/select?q=secret"))
     SiteSearch::Backends.forget!
+    exporter = Rails.application.config.x.otel_test_exporter
+    exporter.reset
 
-    report = assert_error_reported(SiteSearch::Unavailable) do
-      perform_enqueued_jobs(only: SiteSearch::SyncJob) { SiteSearch::SyncJob.perform_later("Page", page.id) }
+    report = nil
+    log = capture_log do
+      report = assert_error_reported(SiteSearch::Unavailable) do
+        perform_enqueued_jobs(only: SiteSearch::SyncJob) { SiteSearch::SyncJob.perform_later("Page", page.id) }
+      end
     end
 
     assert_equal 5, @fake.calls, "five attempts"
+    assert_includes log, "SiteSearch::Unavailable", "the retries are logged, by the scrubbed error"
+    assert_not_includes log, "secret"
+    spans = exporter.finished_spans
+    assert_equal 5, spans.count { |span| span.name == "search.index" }
+    written = spans.map { |span| [ span.name, span.attributes.to_a, span.status&.description, Array(span.events).map { |event| [ event.name, event.attributes.to_a ] } ].flatten.compact.join(" ") }.join("\n")
+    assert_includes written, "SiteSearch::Unavailable", "the span records the scrubbed error"
+    assert_not_includes written, "secret"
+    assert_nil report.error.cause
     assert_equal "test/fake: RuntimeError", report.error.message
     assert_not_includes report.error.message, "secret"
     assert_equal "test/fake", report.error.backend
@@ -164,5 +188,73 @@ class SiteSearch::SyncJobTest < ActiveSupport::TestCase
     assert_equal job.span_id, span.parent_span_id, "under the job's consumer span"
     assert_equal "test/fake", span.attributes["search.backend"]
     assert_equal Locales.enabled.size, span.attributes["search.documents"]
+  end
+
+  test "a failing index leaves the record's old documents in place" do
+    page = perform_enqueued_jobs(only: SiteSearch::SyncJob) { create_page(title: "Lighthouse") }
+    before = documents_of(page).map(&:key).sort
+    @fake.failing_index = true
+
+    assert_error_reported(SiteSearch::Unavailable) do
+      perform_enqueued_jobs(only: SiteSearch::SyncJob) do
+        assert Pages::Save.call(page.reload, translations: { "en" => { title: "Foghorn" } }).ok?
+        publish_changes(page)
+      end
+    end
+
+    assert_equal before, documents_of(page).map(&:key).sort, "the documents sent before stand until new ones are taken"
+  end
+
+  test "a page's change enqueues its subpages too" do
+    parent = create_page(title: "Coast")
+    child = create_page(title: "Lighthouse", parent: parent)
+    grandchild = create_page(title: "Lamp room", parent: child)
+    clear_enqueued_jobs
+
+    assert Trash::Move.call(parent.reload).ok?
+
+    [ parent, child, grandchild ].each { |page| assert_enqueued_with(job: SiteSearch::SyncJob, args: [ "Page", page.id ]) }
+  end
+
+  test "a page moved enqueues its job" do
+    page = create_page(title: "Lighthouse")
+    other = create_page(title: "Coast")
+    clear_enqueued_jobs
+
+    assert Pages::Move.call(page.reload, parent: other.reload, position: 0).ok?
+
+    assert_enqueued_with(job: SiteSearch::SyncJob, args: [ "Page", page.id ])
+  end
+
+  test "a record rescheduled with no copy taken resends its documents from the new time" do
+    first = 1.day.from_now.change(usec: 0)
+    later = 3.days.from_now.change(usec: 0)
+    page = perform_enqueued_jobs(only: SiteSearch::SyncJob) do
+      page = create_page(title: "Lighthouse", published: false)
+      assert Pages::Save.call(page.reload, attributes: { published_at: first }).ok?
+      page
+    end
+    assert documents_of(page).all? { |document| document.shown_from == first }
+    copies = Publishing::Version.of(page).count
+
+    perform_enqueued_jobs(only: SiteSearch::SyncJob) { assert Pages::Save.call(page.reload, attributes: { published_at: later }).ok? }
+
+    assert_equal copies, Publishing::Version.of(page).count, "a reschedule takes no copy"
+    assert_not_empty documents_of(page)
+    assert documents_of(page).all? { |document| document.shown_from == later }
+  end
+
+  test "an enqueue that raises after the commit is reported and the write stands" do
+    page = create_page(title: "Lighthouse", published: false)
+
+    report = assert_error_reported(SiteSearch::Unavailable) do
+      with_singleton_override(SiteSearch::SyncJob, :perform_later, ->(*) { raise ActiveRecord::ConnectionNotEstablished, "queue at postgres://secret" }) do
+        assert Pages::Save.call(page.reload, attributes: { published: true }).ok?
+      end
+    end
+
+    assert page.reload.live?
+    assert copied?(page)
+    assert_equal "test/fake: ActiveRecord::ConnectionNotEstablished", report.error.message
   end
 end

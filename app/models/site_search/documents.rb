@@ -95,10 +95,22 @@ module SiteSearch
     end
     private_class_method :post_text
 
+    # A type's `search_text` that raises gives its block no words and is
+    # reported by the type's name and the error's class: a copy becomes
+    # words inside the publish that takes it (`SiteSearch::Indexing`), and a
+    # gem's declaration must not refuse a publish or the Publish changes
+    # dialog.
     def block_texts(blocks, kind, locale)
       blocks.flat_map do |block|
         callable = block.definition&.search_texts&.dig(kind)
-        callable ? Array(callable.call(block, locale: locale)) : []
+        next [] unless callable
+
+        begin
+          Array(callable.call(block, locale: locale))
+        rescue StandardError => error
+          Reports.report_block_text(block_type: block.block_type, error: error)
+          []
+        end
       end
     end
     private_class_method :block_texts

@@ -88,6 +88,11 @@ module SiteSearch
       nil
     end
 
+    def prune_record(record_type:, record_id:, except_copy_ids:)
+      Entry.where(record_type: record_type, record_id: record_id).where.not(published_version_id: except_copy_ids).delete_all # version: none (the search index is no part of a page: results are never cached, §8.1)
+      nil
+    end
+
     def clear
       Entry.delete_all # version: none (the search index is no part of a page: results are never cached, §8.1)
       nil

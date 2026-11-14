@@ -116,6 +116,21 @@ module SiteSearchBackendContract
       assert_empty contract_search("albatross", language: "de").hits
     end
 
+    test "contract: prune_record keeps the listed copies and with none forgets the record" do
+      one = contract_document(title: "Albatross one")
+      two = contract_document(title: "Albatross two")
+      backend.index([ one, two ])
+
+      backend.prune_record(record_type: one.record_type, record_id: one.record_id, except_copy_ids: [ one.copy_id ])
+      assert_equal [ one.key, two.key ].sort, contract_keys("albatross").sort, "the listed copy stays"
+      backend.prune_record(record_type: one.record_type, record_id: one.record_id, except_copy_ids: [ one.copy_id + 1_000 ])
+      assert_equal [ two.key ], contract_keys("albatross"), "a copy not listed goes"
+
+      backend.index([ one ])
+      backend.prune_record(record_type: one.record_type, record_id: one.record_id, except_copy_ids: [])
+      assert_equal [ two.key ], contract_keys("albatross"), "an empty list forgets the record, and only it"
+    end
+
     test "contract: clear forgets everything" do
       backend.index([ contract_document(title: "Albatross"), contract_document(title: "Albatross", language: "de") ])
       backend.clear

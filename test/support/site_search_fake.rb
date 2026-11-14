@@ -38,6 +38,14 @@ class SiteSearch::Fake
     nil
   end
 
+  def prune_record(record_type:, record_id:, except_copy_ids:)
+    trouble!
+    @documents.delete_if do |_key, document|
+      document.record_type == record_type && document.record_id == record_id && !except_copy_ids.include?(document.copy_id)
+    end
+    nil
+  end
+
   def clear
     @documents.clear
     nil

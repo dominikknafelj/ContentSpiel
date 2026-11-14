@@ -30,7 +30,15 @@ module SiteSearch
   # there: the trial copy of `PublicSite::Paths.foresee`, taken in a
   # savepoint that is always rolled back, enqueues nothing. The job reads
   # the record as it is then, so two events of one write cost two
-  # idempotent jobs and nothing more.
+  # idempotent jobs and nothing more. An enqueue that raises (the queue's
+  # database unreachable) is reported, never raised: the write it follows
+  # has committed, and its answer is not a 500.
+  #
+  # An outside engine's document `url` can be stale: a subpage's after its
+  # parent's slug changes, a listed post's after its listing page is
+  # unpublished, since neither is an event of theirs. The `url` is
+  # informational; `SiteSearch::Shown` reads every drawn hit's address from
+  # `public_paths`, which keeps the results honest.
   module Indexing
     RECORDS = %w[Page Post].freeze
 
@@ -107,7 +115,11 @@ module SiteSearch
 
     # `still:` is asked after the commit, before the enqueue.
     def enqueue_sync(record_type, record_id, &still)
-      ActiveRecord.after_all_transactions_commit { SyncJob.perform_later(record_type, record_id) if still.call }
+      ActiveRecord.after_all_transactions_commit do
+        SyncJob.perform_later(record_type, record_id) if still.call
+      rescue StandardError => error
+        Reports.report(backend: Backends.current_name, error: error)
+      end
     end
     private_class_method :enqueue_sync
 

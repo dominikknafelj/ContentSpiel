@@ -7,7 +7,7 @@ require "test_helper"
 # one writer of `search_entries`, a derived table nobody writes by hand.
 # Read in `app/` and `lib/`, comment lines skipped.
 class SiteSearchGuardsTest < ActiveSupport::TestCase
-  # path => why it may ask a backend to index or remove.
+  # path => why it may ask a backend to index, remove or prune.
   INDEXERS = {
     "app/models/site_search/indexing.rb" => "the entry point, for the built-in in the caller's transaction",
     "app/jobs/site_search/sync_job.rb" => "the job Indexing enqueues for an outside backend after the commit"
@@ -15,7 +15,7 @@ class SiteSearchGuardsTest < ActiveSupport::TestCase
 
   # An index or a remove asked of a backend: a receiver named like one, or the
   # registry's chosen one.
-  ASKS = /\b(?:backend|Backends\.current)\.(?:index|remove)\b/
+  ASKS = /\b(?:backend|Backends\.current)\.(?:index|remove|prune_record)\b/
 
   WRITES = /\.(?:update_all|update_columns|update_column|update!?|upsert|upsert_all|insert_all!?|insert!?|create!?|delete_all|delete_by|delete|destroy_all|destroy_by|destroy!?|touch_all|touch)\b/
 
@@ -34,7 +34,7 @@ class SiteSearchGuardsTest < ActiveSupport::TestCase
   end
 
   test "the asking pattern catches a backend's index and remove and lets the rest through" do
-    [ "backend.index(documents)", "SiteSearch::Backends.current.remove(record_type: \"Page\", record_id: 1)", "Backends.current.index([])" ].each { |line| assert_match ASKS, line }
+    [ "backend.index(documents)", "SiteSearch::Backends.current.remove(record_type: \"Page\", record_id: 1)", "Backends.current.index([])", "backend.prune_record(record_type: \"Page\", record_id: 1, except_copy_ids: [])" ].each { |line| assert_match ASKS, line }
     [ "text.index(\"a\")", "list.remove(1)", "Entry.where(id: 1)", "Backends.current_name" ].each { |line| assert_no_match ASKS, line }
   end
 
