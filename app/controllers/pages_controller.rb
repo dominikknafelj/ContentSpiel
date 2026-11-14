@@ -19,6 +19,10 @@ class PagesController < PublicController
   # old default takes effect on the very next request, not after a deploy.
   before_action :redirect_default_locale_prefix
 
+  # After the redirect, so a search sent to its canonical address counts
+  # once, there.
+  include SiteSearch::QueryLimit
+
   # The content version is read before anything it stands for: ahead of the
   # resolver, the record and the settings row. A write that commits while
   # this request runs is then seen as new content under the old version -- a
@@ -50,6 +54,16 @@ class PagesController < PublicController
       # not the page's weight.
       light = result.record.is_a?(Page) # public: rows (the resolver's record is only asked its class here)
       return render(:not_found, status: :not_found) unless light || assign_record(result.record) # public: rows (assign_record reads the copy through as_published)
+
+      # A search is rendered every time, with no ETag and no `stale?`
+      # (`answer_search_privately` set its headers): a 304 would be
+      # decided before the page's blocks are, and the answer is the
+      # visitor's own.
+      if search_requested?
+        assign_record(result.record) if light # public: rows (assign_record reads the copy through as_published)
+        preload_page_images(@page)
+        return render(:show, status: search_status)
+      end
 
       # `stale?` answers a matching `If-None-Match` with a bare 304 itself --
       # `render :show` below only ever runs for a genuinely stale request.

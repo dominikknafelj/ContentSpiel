@@ -26,7 +26,9 @@ module ContentModel
 
     # The capabilities something in the CMS asks for (`capability?`): a type
     # claiming another is refused at registration, since nothing would read it.
-    CAPABILITIES = %i[container lists_posts].freeze
+    # `:search` is a block that draws its request's search
+    # (`PublicPageRendering#search_answer`, search spec §7.1).
+    CAPABILITIES = %i[container lists_posts search].freeze
 
     # The count every tile's text, and a type's own tile line (`summary`), is
     # cut at. It lives here because a model may not name a component: the
@@ -428,9 +430,13 @@ module ContentModel
     # (block types spec, decisions 3 and 12): neither `:container`, which is
     # bound to the section classes and `BlockOutline`, nor `:lists_posts`,
     # bound to `BlockTypes::PostList`'s criteria, which decide posts'
-    # addresses; tokens named after its owner, so two gems cannot claim one
-    # name and none a built-in's; a stylesheet of its own, given as an
-    # absolute path, whose colours are the theme's base tokens; and no
+    # addresses; nor `:search`, whose block is handed the request's search
+    # answer: the request's limit, its no-store answer and the query's
+    # privacy are the CMS's (search spec §8), and only the built-in
+    # component is handed them; tokens named after its owner, so two gems
+    # cannot claim one name and none a built-in's; a stylesheet of its own,
+    # given as an absolute path, whose colours are the theme's base tokens;
+    # and no
     # `read_only_actions`: the held form's allow-list is one list for every
     # form of the site (`HeldFields.allowed_actions`), an outside type has no
     # editor script of its own until step 2, so any action it named would be
@@ -440,7 +446,7 @@ module ContentModel
     # stylesheet is read here, once, at registration: one that is not there
     # stops the boot as this type's, not as a bare system error.
     def refuse_outside!
-      %i[container lists_posts].each do |capability|
+      %i[container lists_posts search].each do |capability|
         refuse "a block type from outside may not claim :#{capability} (it has no seam for one yet)" if capability?(capability)
       end
       if read_only_actions.any?

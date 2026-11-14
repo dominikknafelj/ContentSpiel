@@ -455,6 +455,24 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_match(/\Agallery\/listing: a block type from outside declares no :code search text/, error.message)
   end
 
+  # A `:search` block makes its page's request search (spec §8): the
+  # request's limit, its no-store answer and the query's privacy are the
+  # CMS's, and a gem's block would be a second door to them with no seam.
+  test "an outside type may not claim :search" do
+    outside = ContentModel::BlockTypeDefinition.new("gallery/finder")
+    TestTypes.declare(outside)
+    outside.capability :search
+
+    error = assert_raises(ArgumentError) { outside.finalize! }
+    assert_match(/\Agallery\/finder: a block type from outside may not claim :search/, error.message)
+
+    built_in = ContentModel::BlockTypeDefinition.new("finder")
+    TestTypes.declare(built_in)
+    built_in.capability :search
+    built_in.finalize!
+    assert built_in.capability?(:search)
+  end
+
   test "a type that declares no preview answers nil" do
     assert_nil definition.preview
   end

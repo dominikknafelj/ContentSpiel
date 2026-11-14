@@ -64,6 +64,32 @@ module PublicPageRendering
     # follows when it was spent.
     before_action { CodeHighlight.start_request }
     after_action :forget_late_code
+
+    # A request with a query is answered for that request alone (search spec
+    # §8.1), whatever it comes to: a page, a 404, a redirect, a 429. Set
+    # first, so no answer of either controller leaves without it.
+    before_action :answer_search_privately, if: :search_requested?
+
+    helper_method :search_requested?, :search_answer
+  end
+
+  # Whether the request asks a search: `q` is a String with something in it.
+  # An Array or a Hash (`?q[]=a`, `?q[x]=1`) is no search, and is neither
+  # counted (`SiteSearch::QueryLimit`) nor kept from caches.
+  def search_requested?
+    query = params[:q]
+    query.is_a?(String) && query.present?
+  end
+
+  # The request's `SiteSearch::Answer`, for a Search block: searched the
+  # first time a block asks and kept for the render, so two blocks on a page
+  # search once, and a page with none never searches. The preview's says
+  # its results come from the live site (`search_live_note?`), which they
+  # do in both: `SiteSearch.search` reads the published copies at the
+  # clock, never the rows the preview draws.
+  def search_answer
+    @search_answer ||= SiteSearch::Answer.for(raw_query: params[:q], raw_page: params[:page], locale: I18n.locale,
+      limited: @search_limited == true, live_note: search_live_note?)
   end
 
   # A page on which a Code block was drawn plain only because the request's
@@ -80,6 +106,24 @@ module PublicPageRendering
   end
 
   private
+
+  # A search's answer is the visitor's own (search spec §8.1): no cache, the
+  # CDN's included, keeps it under its URL, which holds the query
+  # (`no-store`, and no ETag: the including controller renders it in full
+  # and never asks `stale?`); no search engine indexes a results page; and
+  # the next page a visitor opens is told only this site's origin in its
+  # `Referer`, never the address with the query.
+  def answer_search_privately
+    response.set_header("Cache-Control", "private, no-store")
+    response.set_header("X-Robots-Tag", "noindex")
+    response.set_header("Referrer-Policy", "origin")
+  end
+
+  # A search over a limit draws the page all the same, with its Search block
+  # in `:limited` (`SiteSearch::QueryLimit`).
+  def search_status = @search_limited ? :too_many_requests : :ok
+
+  def search_live_note? = false
 
   # A post renders inside its canonical listing page, as before. Returns
   # false -- and the caller renders the 404 -- for a post with no canonical

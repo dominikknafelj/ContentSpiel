@@ -6,6 +6,8 @@ class PreviewController < ApplicationController
   include PublicPageRendering
   # A person the passkey policy covered at sign-in adds a passkey first.
   include Admin::PasskeyEnrolment
+  # An editor's searches count with the visitors' (search spec §7.2).
+  include SiteSearch::QueryLimit
 
   # Same reason as PublicController's own before_action: an Accept header
   # naming another format would otherwise reach a missing template and a 500.
@@ -32,7 +34,7 @@ class PreviewController < ApplicationController
 
       @preview_record = @post || @page
       preload_page_images(@page)
-      render "pages/show"
+      render "pages/show", status: search_status
     when :redirect
       redirect_to result.location, status: :found
     else
@@ -41,6 +43,9 @@ class PreviewController < ApplicationController
   end
 
   private
+
+  # The preview's Search block searches the live site, and says so.
+  def search_live_note? = true
 
   # Preview shows the working version (drafts spec D4).
   def as_published(record) = record
