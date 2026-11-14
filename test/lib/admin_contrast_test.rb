@@ -482,7 +482,7 @@ class AdminContrastTest < ActiveSupport::TestCase
   # A hover is a stronger fill (and a neutral lift): the fill alone has to be
   # seen to change, 1.2:1 from the rest it replaces, and its words stay text.
   test "a hover fill moves 1.2:1 or more from its rest and keeps its words at 4.5:1" do
-    hover_fill = ->(variant) { Admin::Ui::ButtonComponent::VARIANT_CLASSES.fetch(variant)[/not-disabled:hover:bg-([\w-]+)/, 1].then { |name| "--cs-#{name}" } }
+    hover_fill = ->(variant) { Admin::Ui::ButtonComponent::VARIANT_CLASSES.fetch(variant)[/not-disabled:not-aria-disabled:hover:bg-([\w-]+)/, 1].then { |name| "--cs-#{name}" } }
     assert_equal "--cs-accent-press", hover_fill.(:secondary)
     assert_equal "--cs-accent-press", hover_fill.(:tertiary)
     assert_equal "--cs-danger-press", hover_fill.(:danger_text)
