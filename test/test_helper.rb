@@ -76,6 +76,7 @@ require_relative "support/passkey_helper"
 require_relative "support/oidc_helper"
 require_relative "support/site_search_fake"
 require_relative "support/site_search_backend_contract"
+require_relative "support/search_build_lock"
 
 # What tests themselves print -- the statements a migration test runs
 # ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise

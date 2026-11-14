@@ -5,7 +5,11 @@ module SiteSearch
   # `SiteSearch::IndexCheckJob`, so nobody runs a task after an upgrade or a
   # change of `SEARCH_BACKEND`. A console, a rake task (`db:prepare`,
   # `assets:precompile`, `search:reindex` itself) and the test environment
-  # enqueue nothing.
+  # enqueue nothing; every other boot counts as serving: the web server,
+  # the queue's own process (`bin/jobs`), `bin/rails runner` and
+  # `bin/rails generate`. Each of those enqueues one check, which writes
+  # nothing, and the reindex job's limit and its state check make several
+  # cost one build.
   #
   # A boot never fails because of search: a queue whose table is not there
   # yet is skipped, and an enqueue that raises (the queue's database

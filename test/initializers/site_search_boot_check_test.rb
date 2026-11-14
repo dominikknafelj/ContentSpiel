@@ -5,6 +5,7 @@ require "test_helper"
 # nothing else does. A boot never fails because of search.
 class SiteSearchBootCheckTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
+  include LogCapture
 
   test "a console, a rake task and the test environment enqueue no check" do
     assert_not SiteSearch::BootCheck.serving?(env: "test", console: nil, rake: false)
@@ -29,7 +30,11 @@ class SiteSearchBootCheckTest < ActiveSupport::TestCase
     assert_no_enqueued_jobs
 
     refused = ->(*) { raise ActiveRecord::ConnectionNotEstablished, "postgres://queue@db/secret" }
-    with_singleton_override(SiteSearch::IndexCheckJob, :perform_later, refused) { assert_nil SiteSearch::BootCheck.run(serving: true) }
+    logged = capture_log do
+      with_singleton_override(SiteSearch::IndexCheckJob, :perform_later, refused) { assert_nil SiteSearch::BootCheck.run(serving: true) }
+    end
+    assert_match "ActiveRecord::ConnectionNotEstablished", logged
+    assert_no_match "secret", logged
   end
 
   test "the boot names the chosen backend" do

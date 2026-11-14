@@ -27,6 +27,7 @@ class CreateSearchIndex < ActiveRecord::Migration[8.1]
     create_table :search_index_states do |t|
       t.string :backend, null: false, index: { unique: true }
       t.string :fingerprint
+      t.jsonb :languages
       t.string :status, null: false
       t.integer :done, null: false, default: 0
       t.integer :total, null: false, default: 0

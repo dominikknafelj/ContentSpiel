@@ -3,6 +3,11 @@ module SiteSearch
   # `SiteSearch::ReindexJob` runs in the background and `search:reindex` in
   # the foreground. Answers the number of records indexed.
   #
+  # ONE BUILD AT A TIME PER BACKEND, whoever runs it: the build holds a
+  # session advisory lock on the backend's name for its length, and a second
+  # one raises `Busy` without touching anything (the job retries later, the
+  # task says a build is running).
+  #
   # It marks the backend's state row `building` with the total, then
   # replaces the documents record by record, `BATCH` records at a time:
   # each kept published or scheduled page's and post's copy in force and
@@ -13,61 +18,118 @@ module SiteSearch
   # way leaves every record with documents. `done` is written after every
   # batch, for System status.
   #
-  # At the end the documents of every language not enabled go, of every
-  # page and post (a draft's built-in entries included: they stay with its
-  # copies), and the row is marked `ready` with the fingerprint read at the
-  # start: a change of the languages made during the build leaves the row
-  # stale, and the job that enqueued this build sees it (`ReindexJob`).
+  # A COPY TAKEN DURING THE BUILD IS NEVER LOST. A record's documents are
+  # built right before they are sent, never ahead for a batch. For the
+  # built-in (written inline) each record is read again `FOR SHARE` in a
+  # transaction of its own; `take!` of `Publishing::Version` locks the same
+  # row `FOR UPDATE` first, so the two wait for each other and the
+  # documents sent are of the copies that stand. An outside backend is never called
+  # inside a transaction (a row lock held open on the network), so there
+  # the copies to keep are read again after the send, right before the
+  # prune: a copy taken in between is kept, and the copy it superseded goes;
+  # its own `SyncJob`, enqueued after its commit, sends its documents.
+  #
+  # At the end the documents of the languages switched off since the last
+  # finished build go (the row's `languages`, what that build indexed; a
+  # backend with no finished build sweeps every language not enabled), of
+  # every page and post, a draft's built-in entries included: they stay
+  # with its copies. A language enabled and switched off again between two
+  # builds can leave documents behind; no visitor reads them, since a
+  # search is in an enabled language, and enabling it again rebuilds them.
+  # Then the row is marked `ready` with the fingerprint read at the start
+  # and the languages indexed: a change of the languages made during the
+  # build leaves the row stale, and the job that ran it sees it
+  # (`ReindexJob`).
   #
   # Every call to the backend is scrubbed (`Unavailable.scrubbing`): a
   # failure comes out as `SiteSearch::Unavailable`, the row left `building`.
   class Rebuild
     BATCH = 100
     RECORDS = [ Page, Post ].freeze
+    ADVISORY_NAMESPACE = 0x5EA2C4
+    INT4 = 2**31
+
+    # Another build of the same backend holds the lock.
+    class Busy < StandardError
+      def initialize(name) = super("a build of the #{name} search index is already running")
+    end
 
     def initialize(name: Backends.current_name, backend: Backends.current)
       @name = name.to_s
       @backend = backend
+      @inline = Backends.inline?(@name)
     end
 
     def call
+      connection = IndexState.connection
+      raise Busy, @name unless try_lock(connection)
+
+      begin
+        build
+      ensure
+        unlock(connection)
+      end
+    end
+
+    private
+
+    def build
       fingerprint = IndexState.fingerprint(@name)
+      indexed_before = IndexState.for(@name)&.languages
       state = IndexState.start!(@name, total: RECORDS.sum { |model| kept(model).count })
       done = 0
 
       RECORDS.each do |model|
         kept(model).in_batches(of: BATCH) do |batch|
-          now = Time.current
-          records = batch.to_a
-          documents = records.to_h { |record| [ record, Documents.for_record(record, now: now) ] }
-          send_batch(documents)
-          done += records.size
+          ids = batch.ids
+          send_batch(model, ids)
+          done += ids.size
           state.progress!(done)
         end
       end
 
-      drop_languages_switched_off
-      state.ready!(fingerprint, done: done)
+      drop_languages(Array(indexed_before || SUPPORTED_LOCALES.keys) - Locales.enabled)
+      state.ready!(fingerprint, languages: Locales.enabled.sort, done: done)
       done
     end
 
-    private
-
     def kept(model) = model.kept.where.not(published_at: nil)
 
-    def send_batch(documents)
-      Telemetry.in_span("search.index", attributes: { "search.backend" => @name, "search.documents" => documents.values.sum(&:size) }) do
-        Unavailable.scrubbing(backend: @name) do
-          documents.each do |record, sent|
-            @backend.index(sent) if sent.any?
-            @backend.prune_record(record_type: record.class.polymorphic_name, record_id: record.id, except_copy_ids: sent.map(&:copy_id).uniq)
-          end
-        end
+    def send_batch(model, ids)
+      Telemetry.in_span("search.index", attributes: { "search.backend" => @name }) do |span|
+        sent = Unavailable.scrubbing(backend: @name) { ids.sum { |id| send_record(model, id) } }
+        Telemetry.record(span, "search.documents" => sent)
       end
     end
 
-    def drop_languages_switched_off
-      off = SUPPORTED_LOCALES.keys - Locales.enabled
+    # The number of documents sent.
+    def send_record(model, id)
+      return send_record_now(model.find_by(id: id)) unless @inline
+
+      model.transaction { send_record_now(kept(model).lock("FOR SHARE").find_by(id: id)) }
+    end
+
+    def send_record_now(record)
+      return 0 if record.nil?
+
+      now = Time.current
+      documents = Documents.for_record(record, now: now)
+      @backend.index(documents) if documents.any?
+      keep = kept_copy_ids(record)
+      @backend.prune_record(record_type: record.class.polymorphic_name, record_id: record.id, except_copy_ids: keep)
+      documents.size
+    end
+
+    # The copies that stand now, read after the send: by the clock of the
+    # read, so a copy taken since the documents were built is in force here.
+    def kept_copy_ids(record)
+      return [] if record.trashed? || record.published_at.nil?
+
+      now = Time.current
+      [ Publishing.current(record, now: now), Publishing.pending(record, now: now) ].compact.map(&:id)
+    end
+
+    def drop_languages(off)
       return if off.empty?
 
       Unavailable.scrubbing(backend: @name) do
@@ -77,6 +139,20 @@ module SiteSearch
           end
         end
       end
+    end
+
+    def lock_key = [ ADVISORY_NAMESPACE, Zlib.crc32(@name) % INT4 ]
+
+    # Uncached: the query cache, on in a job and a request, would answer a
+    # second try with the first one's result.
+    def try_lock(connection)
+      # sql: Arel has no node for Postgres' advisory lock functions
+      connection.uncached { connection.select_value(IndexState.sanitize_sql_array([ "SELECT pg_try_advisory_lock(?, ?)", *lock_key ])) }
+    end
+
+    def unlock(connection)
+      # sql: Arel has no node for Postgres' advisory lock functions
+      connection.uncached { connection.select_value(IndexState.sanitize_sql_array([ "SELECT pg_advisory_unlock(?, ?)", *lock_key ])) }
     end
   end
 end

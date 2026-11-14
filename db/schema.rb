@@ -523,6 +523,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_14_120000) do
   create_table "search_index_states", force: :cascade do |t|
     t.string "backend", null: false
     t.string "fingerprint"
+    t.jsonb "languages"
     t.string "status", null: false
     t.integer "done", default: 0, null: false
     t.integer "total", default: 0, null: false

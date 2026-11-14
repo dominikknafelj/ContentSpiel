@@ -45,7 +45,8 @@ module SiteSearch
         state.nil? || !state.ready? || state.fingerprint != fingerprint(name, site: site)
       end
 
-      # The row of `name`, marked `building` from nothing done of `total`.
+      # The row of `name`, marked `building` from nothing done of `total`;
+      # its `languages` stay those of the last finished build.
       def start!(name, total:, now: Time.current)
         upsert({ backend: name.to_s, status: BUILDING, fingerprint: nil, done: 0, total: total, started_at: now, finished_at: nil }, unique_by: :backend) # version: none (the search index is no part of a page: results are never cached, §8.1)
         self.for(name)
@@ -65,8 +66,10 @@ module SiteSearch
       update_columns(done: done) # version: none (the search index is no part of a page: results are never cached, §8.1)
     end
 
-    def ready!(fingerprint, done:, now: Time.current)
-      update_columns(status: READY, fingerprint: fingerprint, done: done, finished_at: now) # version: none (the search index is no part of a page: results are never cached, §8.1)
+    # `languages`: the languages the build indexed, from which the next
+    # build knows which were switched off since (`Rebuild`).
+    def ready!(fingerprint, languages:, done:, now: Time.current)
+      update_columns(status: READY, fingerprint: fingerprint, languages: languages, done: done, finished_at: now) # version: none (the search index is no part of a page: results are never cached, §8.1)
     end
   end
 end

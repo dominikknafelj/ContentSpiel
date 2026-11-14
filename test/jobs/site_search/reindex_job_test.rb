@@ -7,6 +7,7 @@ require "test_helper"
 # after its commit (§6.5).
 class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
+  include SearchBuildLock
 
   # The built-in, wrapped: each `index` is counted, `on_index` is called
   # with the count before the real one, and `raise_on` makes that call
@@ -131,6 +132,7 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
     create_page(title: "Lighthouse")
     SiteSearch::ReindexJob.perform_now("postgres")
     finished = state.finished_at
+    clear_enqueued_jobs
 
     assert_no_changes -> { SiteSearch::Entry.maximum(:created_at) } do
       SiteSearch::ReindexJob.perform_now("postgres")
@@ -186,6 +188,85 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
     assert_enqueued_with(job: SiteSearch::ReindexJob, args: [ "postgres" ])
     job = enqueued_jobs.find { |each| each["job_class"] == "SiteSearch::ReindexJob" }
     assert job["scheduled_at"], "enqueued for later, once this run has let go of its limit"
+  end
+
+  test "a copy taken during the build keeps its documents" do
+    first = create_page(title: "Lighthouse")
+    later = create_page(title: "Foghorn")
+    publish_later = lambda do |count|
+      next unless count == 1
+
+      assert Pages::Save.call(later.reload, translations: { "en" => { title: "Beacon" } }).ok?
+      publish_changes(later)
+    end
+
+    SiteSearch::Rebuild.new(backend: Wrapped.new(on_index: publish_later)).call
+
+    assert_equal [ [ "Page", first.id ] ], found("lighthouse")
+    assert_equal [ [ "Page", later.id ] ], found("beacon"), "the copy taken mid-build is found"
+    assert_empty found("foghorn")
+    assert_equal [ Publishing.current(later).id ], entries_of(later).distinct.pluck(:published_version_id)
+  end
+
+  test "an outside backend keeps a copy taken during the build and forgets the one it superseded" do
+    first = create_page(title: "Lighthouse")
+    later = create_page(title: "Foghorn")
+    old = Publishing.current(later)
+
+    with_fake do |fake|
+      sent = 0
+      # Another editor publishes the later page while the build sends the
+      # first, and its SyncJob has already sent the new copy.
+      publish_later = lambda do
+        assert Pages::Save.call(later.reload, translations: { "en" => { title: "Beacon" } }).ok?
+        publish_changes(later)
+        fake.index(SiteSearch::Documents.for_record(later.reload, now: Time.current))
+      end
+      wrapped = Object.new
+      wrapped.define_singleton_method(:index) do |documents|
+        sent += 1
+        publish_later.call if sent == 1
+        fake.index(documents)
+      end
+      wrapped.define_singleton_method(:prune_record) { |**args| fake.prune_record(**args) }
+      wrapped.define_singleton_method(:remove) { |**args| fake.remove(**args) }
+
+      SiteSearch::Rebuild.new(name: "test/fake", backend: wrapped).call
+
+      copies = fake.documents.values.select { |document| document.record_id == later.id && document.record_type == "Page" }.map(&:copy_id).uniq
+      assert_equal [ Publishing.current(later).id ], copies
+      assert_not_equal old.id, copies.first
+      assert fake.documents.values.any? { |document| document.record_id == first.id }
+    end
+  end
+
+  test "a second build while one holds the backend raises Busy and touches nothing" do
+    create_page(title: "Lighthouse")
+
+    holding_build_lock("postgres") do
+      assert_raises(SiteSearch::Rebuild::Busy) { SiteSearch::Rebuild.new.call }
+      assert_nil state
+    end
+
+    SiteSearch::Rebuild.new.call
+    assert state.ready?
+  end
+
+  test "a build drops the languages switched off since the last one, and only those" do
+    create_page(title: "Lighthouse")
+    SiteSearch::Rebuild.new.call
+    assert_equal %w[de en es], state.languages
+
+    removed = []
+    counting = Wrapped.new
+    counting.define_singleton_method(:remove) { |**args| removed << args[:languages] }
+    SiteSearch::Rebuild.new(backend: counting).call
+    assert_empty removed, "nothing was switched off since the last build"
+
+    assert Locales::Disable.call("es", actor: nil).ok?
+    SiteSearch::Rebuild.new(backend: counting).call
+    assert_equal [ [ "es" ] ], removed.uniq
+    assert_equal %w[de en], state.reload.languages
   end
 
   test "a job for a backend the site no longer uses does nothing" do
