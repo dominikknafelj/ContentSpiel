@@ -179,6 +179,7 @@ module Trash
         # polymorphic, so no FK cascade would ever remove them.
         [ page, *blocks ].each { |owner| Media::UsageIndex.refresh(owner) }
         Translations::StateIndex.remove(page)
+        SiteSearch::Indexing.record_purged("Page", page.id)
       end
       true
     end
@@ -203,6 +204,7 @@ module Trash
       # design spec §5.1) -- `refresh` computes none for a destroyed record.
       Media::UsageIndex.refresh(@record)
       Translations::StateIndex.remove(@record)
+      SiteSearch::Indexing.record_purged("Post", @record.id)
       true
     end
 

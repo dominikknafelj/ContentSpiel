@@ -71,6 +71,7 @@ module Telemetry
     auth.sso.token
     auth.sso.recheck
     auth.sso.recheck_run
+    search.index
   ].freeze
 
   ATTRIBUTES = %w[
@@ -100,6 +101,8 @@ module Telemetry
     auth.sso.recheck.revoked
     auth.sso.recheck.unavailable
     auth.refused_by_rule
+    search.backend
+    search.documents
     server.address
     http.response.status_code
     error.type

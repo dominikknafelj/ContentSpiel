@@ -117,7 +117,11 @@ module Pages
         # wait for `Publishing::PublishChanges`.
         # The page's list blocks are public from here on, or from its time:
         # a post they take to an address another record holds yields.
-        Publishing::Version.take!(@page, by: actor_user) if was_unpublished && @page.published_at.present?
+        taking = was_unpublished && @page.published_at.present?
+        Publishing::Version.take!(@page, by: actor_user) if taking
+        # Unpublished or moved to another time: what the search shows of the
+        # page moves with no copy (a copy taken is indexed by itself).
+        SiteSearch::Indexing.record_changed(@page) if pending.key?("published_at") && !taking
         record_events(creating, Audit::Snapshot.field_changes_for(@page, pending))
         true
       end

@@ -37,6 +37,11 @@ class SiteSearch::PostgresTest < ActiveSupport::TestCase
       [ page, copy ]
     end
     assert_equal page.id, copy.record_id
+    # Taking a copy indexes it in every language (`SiteSearch::Indexing`):
+    # the contract indexes its document itself, so only a scheduled change's
+    # entry in the document's language is kept.
+    backend.remove(record_type: "Page", record_id: page.id, languages: Locales.enabled - [ language ])
+    backend.remove(record_type: "Page", record_id: page.id, copy_ids: [ copy.id ])
 
     SiteSearch::Documents.for(copy, now: contract_now).find { |document| document.language == language }
   end
@@ -53,6 +58,7 @@ class SiteSearch::PostgresTest < ActiveSupport::TestCase
   test "an entry is built with its locale's configuration, the fallback text included" do
     page = publish_changes(create_page(title: "Running"))
     copy = Publishing.current(page)
+    backend.clear
 
     backend.index(SiteSearch::Documents.for(copy, now: Time.current))
 
@@ -86,6 +92,7 @@ class SiteSearch::PostgresTest < ActiveSupport::TestCase
   test "entry_count counts the records with an entry, not the entries" do
     page = publish_changes(create_page(title: "Harbour"))
     post = publish_changes(create_post(title: "Tides"))
+    backend.clear
     backend.index(SiteSearch::Documents.for(Publishing.current(page), now: Time.current))
     backend.index(SiteSearch::Documents.for(Publishing.current(post), now: Time.current))
 

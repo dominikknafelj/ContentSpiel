@@ -33,6 +33,8 @@ module Pages
         # clearing `saved_changes` (see `Audit::Snapshot.field_changes_for`).
         pending = @page.changes_to_save
         @page.save || raise(ActiveRecord::Rollback)
+        # Under a draft page, or out from under one, the branch is shown or not.
+        SiteSearch::Indexing.record_changed(@page)
 
         record_event("page.moved", subject: @page, field_changes: Audit::Snapshot.field_changes_for(@page, pending))
         true

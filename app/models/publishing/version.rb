@@ -88,7 +88,9 @@ module Publishing
         live_at = [ live_at || now, now ].max
         mine = of(row)
         number = (mine.maximum(:number) || 0) + 1
+        replaced = mine.pending(now).ids
         mine.pending(now).delete_all
+        SiteSearch::Indexing.copies_withdrawn(row, copy_ids: replaced) if replaced.any?
         data = Snapshot.of(row, row: row)
         version = create!(record_type: row.class.polymorphic_name, record_id: row.id, number: number, live_at: live_at,
           snapshot: data.except("blocks"), blocks: data.fetch("blocks", []), lists_posts: Snapshot.lists_posts?(data),
@@ -116,6 +118,9 @@ module Publishing
         # record has an address); it is left unsettled, and becomes due when
         # the record goes live.
         Publishing.keep_address!(row, now: now, shown: shown) if live_at <= now
+        # Last, in this transaction: a publish refused for its address above
+        # indexes nothing, and the built-in's entries roll back with the copy.
+        SiteSearch::Indexing.copy_taken(version, now: now)
 
         version
       end
@@ -131,9 +136,12 @@ module Publishing
     # copy has given no address and is no part of the content version.
     def self.withdraw_pending!(record, now: Time.current)
       waiting = of(record).pending(now)
-      numbers = waiting.pluck(:number)
-      waiting.delete_all if numbers.any? # version: none (a pending copy was never public)
-      numbers
+      copies = waiting.pluck(:id, :number)
+      return [] if copies.empty?
+
+      waiting.delete_all # version: none (a pending copy was never public)
+      SiteSearch::Indexing.copies_withdrawn(record, copy_ids: copies.map(&:first))
+      copies.map(&:last)
     end
 
     # THE COPIES THAT ARE DUE: showing by the clock and not acted on yet.
@@ -226,7 +234,9 @@ module Publishing
     # own beyond the rows it writes. `to` is the caller's LOCKED row: its
     # name is the one the rows show.
     def self.repoint_tag!(from:, to:)
+      rewritten = []
       unscoped.where(SqlNodes.array_contains(arel_table[:tag_ids], [ from.id ])).pluck(:id, :tag_ids, :snapshot).each do |id, tag_ids, snapshot|
+        rewritten << id
         shown = snapshot.key?("tags") ? snapshot.merge("tags" => merged_tags(snapshot["tags"], from, to)) : snapshot
         unscoped.where(id: id).update_all(tag_ids: ((tag_ids - [ from.id ]) | [ to.id ]).sort, snapshot: shown) # version: none (Tags::Merge, the one caller, bumps for the whole merge)
       end
@@ -238,7 +248,12 @@ module Publishing
           block.merge("listed_tag_id" => to.id, "settings" => (block["settings"] || {}).merge("tag" => to.name))
         end
         unscoped.where(id: id).update_all(blocks: blocks) # version: none (Tags::Merge, the one caller, bumps for the whole merge)
+        rewritten << id
       end
+
+      # The tag's name is a post's words (its `tags` field), and the copies
+      # that show it are rewritten here alone.
+      SiteSearch::Indexing.copies_rewritten(rewritten.uniq)
     end
 
     # A copy's tags (`[{ "id" =>, "name" => }, ...]`) after `from` was merged

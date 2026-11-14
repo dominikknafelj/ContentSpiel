@@ -30,7 +30,7 @@ class TelemetrySpansTest < ActiveSupport::TestCase
     "lib/telemetry/path_scrubber.rb" => "the scrubber's processor rewrites a path or a query an instrumentation started a span with, to what may be sent"
   }.freeze
 
-  PREFIXES = %w[auth. server. http. error.].freeze
+  PREFIXES = %w[auth. search. server. http. error.].freeze
 
   test "no file but lib/telemetry.rb starts a span" do
     starters = sources.select { |_path, code| code.match?(STARTS) }.keys
@@ -63,7 +63,7 @@ class TelemetrySpansTest < ActiveSupport::TestCase
     WRITERS.each_value { |reason| assert reason.present? }
   end
 
-  test "every span name and attribute key is auth., server., http. or error." do
+  test "every span name and attribute key is auth., search., server., http. or error." do
     offenders = (Telemetry::SPANS + Telemetry::ATTRIBUTES).reject { |name| name.start_with?(*PREFIXES) }
 
     assert_empty offenders
