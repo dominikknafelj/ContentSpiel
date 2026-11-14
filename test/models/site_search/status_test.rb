@@ -60,14 +60,109 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
     assert_equal :building, SiteSearch::Status.read(job_running: -> { false }).state
   end
 
-  test "the built-in ready counts its records and names the limited languages switched on" do
-    SiteSearch::IndexState.start!(SiteSearch::Backends::BUILT_IN, total: 0).ready!("x", languages: [], done: 0)
+  test "the built-in ready counts the kept and published records and names the limited languages switched on" do
     Locales::Enable.call("ja")
+    create_page(title: "Counted")
+    indexed = SiteSearch::Rebuild.new(name: SiteSearch::Backends::BUILT_IN, backend: SiteSearch::Backends.current).call
+    expected = [ Page, Post ].sum { |model| model.kept.count { |record| Publishing::State.of(record).timed? } }
 
     status = SiteSearch::Status.read
 
     assert_equal :ready, status.state
-    assert_kind_of Integer, status.count
+    assert_operator indexed, :>, 0
+    assert_equal indexed, status.count
+    assert_equal expected, status.count
     assert_equal %w[ja], status.limited
   end
+
+  test "no row, no job and a process up for over an hour reads not_built; inside the hour, or with a job, it does not" do
+    SiteSearch::IndexState.where(backend: SiteSearch::Backends::BUILT_IN).delete_all
+    long_ago = 2.hours.ago
+
+    assert_equal :not_built, SiteSearch::Status.read(job_running: -> { false }, booted_at: long_ago).state
+    assert_equal :ready, SiteSearch::Status.read(job_running: -> { true }, booted_at: long_ago).state
+    assert_equal :ready, SiteSearch::Status.read(job_running: -> { false }, booted_at: 5.minutes.ago).state
+  end
+
+  test "a ready row of another fingerprint with no job reads out_of_date; with a job it reads ready" do
+    SiteSearch::IndexState.start!(SiteSearch::Backends::BUILT_IN, total: 0).ready!("another", languages: [], done: 0)
+
+    assert_equal :out_of_date, SiteSearch::Status.read(job_running: -> { false }).state
+    assert_equal :ready, SiteSearch::Status.read(job_running: -> { true }).state
+
+    ready_index
+    assert_equal :ready, SiteSearch::Status.read(job_running: -> { false }).state
+  end
+
+  test "a backend that ignores its deadline reads timeout within about the timeout, and its thread is left alone" do
+    hanging = Class.new(SiteSearch::Fake) do
+      def health(deadline:)
+        sleep 1.5
+        SiteSearch::Health.new(status: :ok)
+      end
+    end
+    hanging.new.installed do
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      status = SiteSearch::Status.read(timeout: 0.2)
+
+      assert_equal :timeout, status.state
+      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 1
+    end
+  end
+
+  test "an :ok that comes after the deadline is no answer" do
+    late = Class.new(SiteSearch::Fake) do
+      def health(deadline:)
+        sleep 0.4
+        SiteSearch::Health.new(status: :ok, detail: "late")
+      end
+    end
+    late.new.installed do
+      assert_equal :timeout, SiteSearch::Status.read(timeout: 0.1).state
+    end
+  end
+
+  test "an outside backend's detail is kept on a ready status" do
+    detailed = Class.new(SiteSearch::Fake) do
+      def health(deadline:) = SiteSearch::Health.new(status: :ok, detail: "3 nodes")
+    end
+    detailed.new.installed do
+      status = SiteSearch::Status.read
+
+      assert_equal :ready, status.state
+      assert_equal "3 nodes", status.health.detail
+    end
+  end
+
+  test "an outside backend gets no limited languages, whatever is switched on" do
+    Locales::Enable.call("ja")
+
+    SiteSearch::Fake.new.installed { assert_empty SiteSearch::Status.read.limited }
+  end
+
+  # Solid Queue's tables are not in the test database: the queue schema is
+  # loaded inside the test's transaction (Postgres rolls DDL back).
+  test "a failed reindex job is no running job: the row reads stopped" do
+    load Rails.root.join("db/queue_schema.rb")
+    was = ActiveJob::Base.queue_adapter
+    ActiveJob::Base.queue_adapter = :solid_queue
+    SiteSearch::IndexState.start!(SiteSearch::Backends::BUILT_IN, total: 10, now: 2.hours.ago)
+    job = SolidQueue::Job.create!(queue_name: "default", class_name: SiteSearch::ReindexJob.name, arguments: {})
+
+    assert_equal :building, SiteSearch::Status.read.state
+
+    SolidQueue::FailedExecution.create!(job_id: job.id, error: "RuntimeError")
+    assert_equal :stopped, SiteSearch::Status.read.state
+
+    job.update_columns(finished_at: Time.current)
+    assert_equal :stopped, SiteSearch::Status.read.state
+  ensure
+    ActiveJob::Base.queue_adapter = was
+  end
+
+  private
+    def ready_index
+      SiteSearch::IndexState.start!(SiteSearch::Backends::BUILT_IN, total: 0)
+        .ready!(SiteSearch::IndexState.fingerprint(SiteSearch::Backends::BUILT_IN), languages: [], done: 0)
+    end
 end

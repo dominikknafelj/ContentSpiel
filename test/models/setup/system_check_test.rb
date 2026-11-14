@@ -42,16 +42,37 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_equal "Typesense did not answer in 3 seconds. Visitors see “Search isn't available right now.”", late.message
   end
 
-  test "an outside backend's own warning is its sentence" do
-    health = SiteSearch::Health.new(status: :failed, detail: "The collection is missing.")
+  test "an outside backend's own warning is its sentence, cut to one line, and without one says no more" do
+    health = SiteSearch::Health.new(status: :failed, detail: "The collection is missing.\nSecond line.")
     row = result("Search", run_check(search: search_status(label: "Typesense", state: :unhealthy, count: nil, health: health)))
 
     assert_equal :warning, row.status
-    assert_equal "Typesense: The collection is missing.", row.message
+    assert_equal "Typesense reports a problem: The collection is missing.", row.message
 
     bare = SiteSearch::Health.new(status: :warn)
     plain = result("Search", run_check(search: search_status(label: "Typesense", state: :unhealthy, count: nil, health: bare)))
-    assert_equal "Typesense reports a problem.", plain.message
+    assert_equal :warning, plain.status
+    assert_equal "Typesense reports a problem but says no more. Check the engine itself.", plain.message
+  end
+
+  test "an outside backend that is OK and says something shows it, and the built-in shows its count" do
+    health = SiteSearch::Health.new(status: :ok, detail: "3 nodes")
+    row = result("Search", run_check(search: search_status(label: "Typesense", count: nil, health: health)))
+
+    assert row.ok?
+    assert_equal "Typesense answers: 3 nodes", row.message
+  end
+
+  test "an index never built, and one built for other languages, are warnings that offer search:reindex" do
+    missing = result("Search", run_check(search: search_status(state: :not_built, count: nil)))
+    assert_equal :warning, missing.status
+    assert_equal "The search index isn't built yet, so search finds nothing. Run this to build it:", missing.message
+    assert_equal "bin/rails search:reindex", missing.command
+
+    old = result("Search", run_check(search: search_status(state: :out_of_date, count: nil)))
+    assert_equal :warning, old.status
+    assert_equal "The search index is out of date: the site's languages changed since it was built. Run this to rebuild it:", old.message
+    assert_equal "bin/rails search:reindex", old.command
   end
 
   test "the limited note names only those of Japanese, Chinese, Thai and Korean switched on, and only with the built-in" do
@@ -61,8 +82,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_equal "Search is limited in Japanese and Korean: a word is found only as part of the whole run of text it stands in.", row.note
 
     assert_nil result("Search", run_check(search: search_status)).note
-    outside = SiteSearch::Status.read(name: "postgres").limited # the built-in's own list
-    assert_kind_of Array, outside
+
+    Locales::Enable.call("ja")
+    SiteSearch::Fake.new.installed do
+      status = SiteSearch::Status.read
+      assert_empty status.limited
+      assert_nil result("Search", run_check(search: status)).note
+    end
   end
 
   test "in production with the request's facts, HTTPS comes second" do

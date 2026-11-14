@@ -45,22 +45,25 @@ en:
           issuer_mismatch: "its document names another issuer"
           missing_endpoint: "its document lacks an endpoint sign-in needs"
       # The "Search" row (`Setup::SystemCheck#search`, `SiteSearch::Status`): `building`
-      # and `stopped` with the build's progress, `ready_builtin` (plural by the
+      # and `stopped` with the build's progress, `not_built` and `out_of_date` (both with the command), `ready_builtin` (plural by the
       # pages and posts found, `number` the same with its delimiters) or `ready`
-      # for an outside backend, `timeout`, `unhealthy` (a backend's own warning, its
-      # `Health` sentence: `unhealthy_plain` when it gave none) and `limited`, the note
+      # for an outside backend, `timeout`, `problem_detail` (a backend's own warning, its
+      # `Health` sentence, cut to one line) or `problem` when it gave none, and `ready_detail` for an OK one that gave one and `limited`, the note
       # under the row for the languages the built-in finds only whole runs of text in.
       search:
         label: "Search"
         building: "Building the search index: %{done} of %{total} records."
         stopped: "The search index stopped building at %{done} of %{total} records. Run this to finish it:"
+        not_built: "The search index isn't built yet, so search finds nothing. Run this to build it:"
+        out_of_date: "The search index is out of date: the site's languages changed since it was built. Run this to rebuild it:"
         ready_builtin:
           one: "Search finds 1 page or post (built-in)."
           other: "Search finds %{number} pages and posts (built-in)."
         ready: "%{backend} answers."
+        ready_detail: "%{backend} answers: %{detail}"
         timeout: "%{backend} did not answer in 3 seconds. Visitors see “Search isn't available right now.”"
-        unhealthy: "%{backend}: %{detail}"
-        unhealthy_plain: "%{backend} reports a problem."
+        problem: "%{backend} reports a problem but says no more. Check the engine itself."
+        problem_detail: "%{backend} reports a problem: %{detail}"
         limited: "Search is limited in %{languages}: a word is found only as part of the whole run of text it stands in."
       # The "Visitor address" row (`Setup::SystemCheck#visitor_address`):
       # OK with no Cloudflare header, OK when the header is the address the

@@ -59,6 +59,9 @@ module Setup
     # builds the index in the foreground. A fixed string.
     SEARCH_REINDEX_COMMAND = "bin/rails search:reindex".freeze
 
+    # The longest sentence of a search backend's own that its row shows.
+    DETAIL_LENGTH = 200
+
     # The header Cloudflare names the visitor's address in, which both
     # screens hand over as `cf_connecting_ip`.
     CLOUDFLARE_HEADER = "CF-Connecting-IP".freeze
@@ -458,7 +461,8 @@ module Setup
 
       # Public search (spec §10): one row, in the words of `admin.system_status.search`.
       # While the index is built it is a warning with the progress, and a
-      # build that stopped offers `search:reindex` to finish it. Ready, the
+      # build that stopped, an index never built and one built for other
+      # languages offer `search:reindex`. Ready, the
       # built-in says how many pages and posts it finds and an outside backend
       # that it answers; a backend that answered `:warn` or `:failed` is its
       # own sentence, from its `Health` (never an error's message), and one
@@ -473,15 +477,28 @@ module Setup
         case s.state
         when :building then Result.new(label:, status: :warning, message: t.call(:building, **progress), note:)
         when :stopped then Result.new(label:, status: :warning, message: t.call(:stopped, **progress), command: SEARCH_REINDEX_COMMAND, note:)
+        when :not_built then Result.new(label:, status: :warning, message: t.call(:not_built), command: SEARCH_REINDEX_COMMAND, note:)
+        when :out_of_date then Result.new(label:, status: :warning, message: t.call(:out_of_date), command: SEARCH_REINDEX_COMMAND, note:)
         when :timeout then Result.new(label:, status: :warning, message: t.call(:timeout, backend: s.label), note:)
         when :unhealthy
-          detail = s.health.detail.presence
-          message = detail ? t.call(:unhealthy, backend: s.label, detail: detail) : t.call(:unhealthy_plain, backend: s.label)
+          detail = one_line(s.health.detail)
+          message = detail ? t.call(:problem_detail, backend: s.label, detail: detail) : t.call(:problem, backend: s.label)
           Result.new(label:, status: :warning, message:, note:)
         else
-          message = s.count ? t.call(:ready_builtin, count: s.count, number: delimited(s.count)) : t.call(:ready, backend: s.label)
+          detail = one_line(s.health&.detail)
+          message =
+            if s.count then t.call(:ready_builtin, count: s.count, number: delimited(s.count))
+            elsif detail then t.call(:ready_detail, backend: s.label, detail: detail)
+            else t.call(:ready, backend: s.label)
+            end
           Result.new(label:, status: :ok, message:, note:)
         end
+      end
+
+      # A backend's own sentence is shown as one line: its first, no longer
+      # than `DETAIL_LENGTH`.
+      def one_line(detail)
+        detail.to_s.lines.first.to_s.squish.truncate(DETAIL_LENGTH).presence
       end
 
       def delimited(number) = ActiveSupport::NumberHelper.number_to_delimited(number.to_i)
