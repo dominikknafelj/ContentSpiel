@@ -52,27 +52,23 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
 
   test "a query reaches no log, span, table, cache or error report, at debug either" do
     log = nil
-    with_search_probe do
-      place_search_probe(root_page)
-      create_page(title: "Albatross")
+    place_search_block(root_page)
+    create_page(title: "Albatross")
 
-      log = capture_log(LogCapture::REQUEST_LOGGERS) do
-        Rails.logger.level = :debug
-        get "/", params: { q: CANARY }
-        assert_response :success
-        assert_equal "none", probe[:state], "the backend was asked"
+    log = capture_log(LogCapture::REQUEST_LOGGERS) do
+      Rails.logger.level = :debug
+      get "/", params: { q: CANARY }
+      assert_response :success
+      assert_equal "none", search_drawn[:state], "the backend was asked"
 
-        get "/en", params: { q: CANARY }
-        assert_response :found
-        assert_includes response.location, CANARY, "the redirect keeps the query for the visitor"
-      end
+      get "/en", params: { q: CANARY }
+      assert_response :found
+      assert_includes response.location, CANARY, "the redirect keeps the query for the visitor"
     end
 
     SiteSearch::Fake.new(raise_with: RuntimeError.new("http://engine/select?q=#{CANARY}")).installed do
-      with_search_probe do
-        log += capture_log(LogCapture::REQUEST_LOGGERS) { get "/", params: { q: CANARY } }
-        assert_equal "unavailable", probe[:state]
-      end
+      log += capture_log(LogCapture::REQUEST_LOGGERS) { get "/", params: { q: CANARY } }
+      assert_equal "unavailable", search_drawn[:state]
     end
 
     assert_match(/Started GET "\/\?q=\[FILTERED\]"/, log)
@@ -93,22 +89,20 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
   # the value, and that message is logged in production too.
   test "a query that is no UTF-8 is searched, scrubbed, and reaches no log" do
     log = nil
-    with_search_probe do
-      place_search_probe(root_page)
-      log = capture_log(LogCapture::REQUEST_LOGGERS) do
-        get "/?q=#{CANARY}%FF"
-        assert_response :success
-        assert_equal "none", probe[:state]
+    place_search_block(root_page)
+    log = capture_log(LogCapture::REQUEST_LOGGERS) do
+      get "/?q=#{CANARY}%FF"
+      assert_response :success
+      assert_equal "none", search_drawn[:state]
 
-        get "/?q=#{"a" * 201}%FF"
-        assert_response :success
-        assert_equal "too_long", probe[:state]
+      get "/?q=#{"a" * 201}%FF"
+      assert_response :success
+      assert_equal "too_long", search_drawn[:state]
 
-        sign_in_as(users(:one))
-        get "/cs-studio/preview?q=#{CANARY}%FF"
-        assert_response :success
-        assert_equal "none", probe[:state]
-      end
+      sign_in_as(users(:one))
+      get "/cs-studio/preview?q=#{CANARY}%FF"
+      assert_response :success
+      assert_equal "none", search_drawn[:state]
     end
 
     assert_match(/Started GET "\/\?q=\[FILTERED\]"/, log)
@@ -117,16 +111,14 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
   end
 
   test "an outside backend's failure is reported without its exception's message" do
-    with_search_probe { place_search_probe(root_page) }
+    place_search_block(root_page)
 
     SiteSearch::Fake.new(raise_with: RuntimeError.new("http://engine/select?q=#{CANARY}")).installed do
-      with_search_probe do
-        report = assert_error_reported(SiteSearch::Unavailable) { get "/", params: { q: CANARY } }
-        assert_response :success
-        assert_equal "#{SiteSearch::Fake::NAME}: RuntimeError", report.error.message
-        assert_nil report.error.cause
-        assert_nil report.error.backtrace&.find { |line| line.include?(CANARY) }
-      end
+      report = assert_error_reported(SiteSearch::Unavailable) { get "/", params: { q: CANARY } }
+      assert_response :success
+      assert_equal "#{SiteSearch::Fake::NAME}: RuntimeError", report.error.message
+      assert_nil report.error.cause
+      assert_nil report.error.backtrace&.find { |line| line.include?(CANARY) }
     end
   end
 end

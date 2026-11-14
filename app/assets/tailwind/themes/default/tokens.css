@@ -175,6 +175,14 @@
   --th-card-ground: color-mix(in srgb, var(--th-accent) 5%, var(--th-paper));
   --th-card-line: var(--th-meta);
   --th-card-icon: var(--th-accent);
+
+  /* The Search block's mark around a match in a snippet: a warm tint, the
+     warn hue at 22% over the page (not the accent, which is a result's
+     link), and the text colour on it. The ground is not the only cue: a
+     marked word is also --th-ink at weight 500 in --th-dim words.
+     test/integration/design_tokens_test.rb holds the ink on the mark. */
+  --th-search-mark: color-mix(in srgb, var(--th-warn) 22%, var(--th-paper));
+  --th-search-mark-ink: var(--th-ink);
 }
 
 [data-theme="dark"] {
@@ -289,6 +297,11 @@
   --th-card-ground: color-mix(in srgb, var(--th-accent) 5%, var(--th-paper));
   --th-card-line: var(--th-meta);
   --th-card-icon: var(--th-accent);
+
+  /* The Search block's mark again: the warn hue at 30%, since 22% of it
+     barely shows on the dark page. */
+  --th-search-mark: color-mix(in srgb, var(--th-warn) 30%, var(--th-paper));
+  --th-search-mark-ink: var(--th-ink);
 }
 
 :root {

@@ -9,7 +9,8 @@ class SiteSearch::BlockTextTest < ActiveSupport::TestCase
   NO_TEXT = {
     "section" => "a container holds no text of its own",
     "post_list" => "the posts are documents of their own",
-    "form" => "field labels are an interface, not content"
+    "form" => "field labels are an interface, not content",
+    "search" => "the block is a field, not content"
   }.freeze
 
   setup { @page = create_page(title: "Words") }

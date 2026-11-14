@@ -28,6 +28,11 @@ module ContractLedger
     # six themed tokens below; and the markup the `form-send` script reads
     # (docs/reference/theming.md, "The Form block").
     "blocks/form_component" => %w[block page form_name fields action locale page_id drawn honeypot submit_label thank_you unavailable string],
+    # Release note (search): added the Search block's line, its two themed
+    # tokens below, and what each of its results answers (`title`,
+    # `url_path`, `kind`, `where`, `date`, `snippet`;
+    # docs/reference/theming.md, "The Search block").
+    "blocks/search_component" => %w[block page label query state results total pagination action live_note? string],
     "blocks/card_component" => %w[block page title text link icon icon_name image],
     "blocks/post_list_component" => %w[block page list_component],
     "blocks/section_component" => %w[block page columns layout background width style anchor],
@@ -75,6 +80,7 @@ module ContractLedger
     note-warning-ground note-warning-line note-warning-ink note-warning-border
     table-rule table-line table-head table-caption table-ground
     form-field-ground form-field-line form-field-focus form-error form-done-ground form-done-line
+    search-mark search-mark-ink
     card-ground card-line card-icon
   ].freeze
 

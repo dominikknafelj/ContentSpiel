@@ -38,6 +38,29 @@ en:
         copy_code: "Copy code"
         copied: "Copied"
         failed: "Not copied"
+      # The Search block (`Blocks::SearchComponent#string`): the field's
+      # label where the editor typed none, the button, the count, the pager
+      # and the one line of each other outcome. `%{query}` is handed in its
+      # quote's element (`<q>`), so the words hold no quote marks of their
+      # own; `%{results}` in `past_end` is the count's sentence. `live_note`
+      # is said in the preview only.
+      search:
+        label: "Search this site"
+        button: "Search"
+        results:
+          one: "%{count} result for %{query}"
+          other: "%{count} results for %{query}"
+        page: "Page %{page}"
+        pages: "Pages of results"
+        previous: "Previous"
+        next: "Next"
+        none: "Nothing found for %{query}. Check the spelling, or try fewer or other words."
+        past_end: "%{results}, but there is no page %{page}."
+        first_page: "Go to the first page"
+        too_long: "That search is too long. Use at most %{max} characters."
+        limited: "Too many searches. Please wait a minute, then try again."
+        unavailable: "Search isn't available right now. Please try again later."
+        live_note: "Results come from the live site."
     # A form's own words: what a visitor reads that no editor
     # typed, read through `PublicStrings.read` (`Forms::PublicField#word`,
     # `Forms::BuiltInFieldTypes`). `yes` and `no` are what a checkbox answer

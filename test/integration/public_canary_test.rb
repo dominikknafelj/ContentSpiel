@@ -31,7 +31,7 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
   # Public controller routes (every route whose controller is a
   # `PublicController`) and how this test requests each.
   LISTED_ROUTES = {
-    "pages#show" => "every `public_paths` row in every language, the home page of each language and a 404; and all of them again under the second theme, which draws what a theme may ask of the page tree (`PublicSite::Branch`)"
+    "pages#show" => "every `public_paths` row in every language, the home page of each language and a 404, and, on a page with a Search block, a search for the canary word in each language; and all of them again under the second theme, which draws what a theme may ask of the page tree (`PublicSite::Branch`)"
   }.freeze
 
   # Columns that say where a row is or when it was written, not what it shows.
@@ -140,6 +140,19 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
   end
 
   def every_look = urls.index_with { |path| look(path) }
+
+  # A search of the samples page (which holds a Search block, at the top
+  # level and in each column) for `text` in `locale`, and the response with
+  # the query's own echoes taken out: the field's value and the count's or
+  # the message's quote. What is left is what the search drew of the site.
+  def searched(text, locale)
+    get PublicSite::Urls.new.path_for(@samples, locale), params: { q: text }
+    assert_response :success
+    page = Nokogiri::HTML5(response.body)
+    page.css("input[name=q]").each { |input| input["value"] = "" }
+    page.css(".search__summary q, .search__message q").each(&:remove)
+    page.to_html
+  end
 
   # The WHOLE response of a URL, not the parts `look` keeps: the menu, the
   # footer and the rest of the head are drawn outside `main`, and a reader
@@ -258,6 +271,13 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
       assert_not_includes response.body, "Added block"
       assert_not_includes response.headers.to_h.values.join, CANARY
     end
+    # A search finds what is published, never the rows: the canary word is
+    # in no result in any language.
+    LOCALES.each do |locale|
+      drawn = searched(CANARY, locale)
+      assert_equal "none", search_drawn[:state], "a search in #{locale} found the rows"
+      assert_not_includes drawn, CANARY, "a search in #{locale} shows the rows"
+    end
     assert_equal sitemap_before.scan(%r{<loc>[^<]*</loc>}), sitemap.scan(%r{<loc>[^<]*</loc>})
     assert_not_includes sitemap, CANARY
     assert_equal sitemap_before.scan(%r{<lastmod>[^<]*</lastmod>}), sitemap.scan(%r{<lastmod>[^<]*</lastmod>}), "a row's date reached the sitemap"
@@ -292,6 +312,10 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
       end
     end
     assert_includes samples_main, CANARY
+    # And publishing brings the word into the search: the test above cannot
+    # pass by a search that finds nothing.
+    searched(CANARY, "en")
+    assert_equal "results", search_drawn[:state], "the published word is found"
 
     assert_every_type_built
   end

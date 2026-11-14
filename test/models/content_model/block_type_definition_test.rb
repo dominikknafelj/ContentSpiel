@@ -310,7 +310,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
 
   test "every built-in block type declares the family the design gives it" do
     families = { "rich_text" => :text, "note" => :text, "image" => :media, "card" => :media, "code" => :code, "diagram" => :code, "table" => :code,
-                 "form" => :form, "post_list" => :lists, "section" => :structure }
+                 "form" => :form, "search" => :form, "post_list" => :lists, "section" => :structure }
     assert_equal families, BlockTypes.all.to_h { |type| [ type.name, type.family ] }.slice(*BuiltInBlockTypes.names)
   end
 

@@ -67,7 +67,7 @@ require_relative "support/invites"
 require_relative "support/smtp_stub"
 require_relative "support/encryption_keys"
 require_relative "support/form_sends"
-require_relative "support/search_probe"
+require_relative "support/search_block"
 require_relative "support/log_capture"
 require_relative "support/sanitizer_parses"
 require_relative "support/contrast_measure"
@@ -153,10 +153,9 @@ module ActiveSupport
     # `aged_drawn(form)`, `clear_form_send_limits`, `place_form(page, form)`:
     # a visitor's send -- see test/support/form_sends.rb.
     include FormSends
-    # `with_search_probe { … }` and `place_search_probe(page)`: a test-only
-    # block that draws the request's `search_answer` as text, and `probe`,
-    # what it drew -- see test/support/search_probe.rb.
-    include SearchProbe
+    # `place_search_block(page)` and `search_drawn`, what the response's
+    # Search block drew -- see test/support/search_block.rb.
+    include SearchBlock
 
     # `with_plain_theme { ... }`: the second theme for a block -- see
     # test/support/theme_test_helper.rb.

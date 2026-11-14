@@ -43,11 +43,12 @@ module ContentModel
     # Ruling 6): each is a branch of CS Studio's icon partial
     # (`app/views/admin/shared/_icon.html.erb`, Lucide), which a model may
     # not name; `block_icon_component_test.rb` draws every one. A type names
-    # one or none; an outside type picks from the same list. The last four
-    # are the Note block's kinds (note block plan, rulings 11 and 12), which
-    # its blocks' cards and tiles draw through `for_block:`; `table`
-    # is the Table block's and `diagram` the Diagram block's.
-    ICONS = %w[pilcrow image code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list].freeze
+    # one or none; an outside type picks from the same list. `info` to
+    # `triangle_alert` are the Note block's kinds (note block plan, rulings
+    # 11 and 12), which its blocks' cards and tiles draw through
+    # `for_block:`; `table` is the Table block's, `diagram` the Diagram
+    # block's and `search` the Search block's.
+    ICONS = %w[pilcrow image code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list search].freeze
 
     # The hue families an icon may be drawn in: the chip behind a
     # type's icon takes the family's colour pair

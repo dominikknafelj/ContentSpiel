@@ -12,43 +12,39 @@ class PreviewSearchTest < ActionDispatch::IntegrationTest
   def preview_search(text) = get("/cs-studio/preview", params: { q: text })
 
   test "words in a page's rows are not found in the preview, and the note is drawn" do
-    with_search_probe do
-      place_search_probe(root_page)
-      page = create_page(title: "Albatross")
-      assert Pages::Save.call(page.reload, translations: { "en" => { title: "Pelican" } }).ok?
+    place_search_block(root_page)
+    page = create_page(title: "Albatross")
+    assert Pages::Save.call(page.reload, translations: { "en" => { title: "Pelican" } }).ok?
 
-      preview_search "pelican"
-      assert_response :success
-      assert_equal "none", probe[:state]
-      assert_equal "true", probe[:live_note]
+    preview_search "pelican"
+    assert_response :success
+    assert_equal "none", search_drawn[:state]
+    assert search_drawn[:live_note], "the preview says its results are the live site's"
 
-      preview_search "albatross"
-      assert_equal [ [ "Albatross", "/albatross" ] ], probe[:results], "the live title, at its public address"
-      assert_equal "private, no-store", response.headers["Cache-Control"]
-      assert_equal "noindex", response.headers["X-Robots-Tag"]
-      assert_equal "origin", response.headers["Referrer-Policy"]
+    preview_search "albatross"
+    assert_equal [ [ "Albatross", "/albatross" ] ], search_drawn[:results], "the live title, at its public address"
+    assert_equal "private, no-store", response.headers["Cache-Control"]
+    assert_equal "noindex", response.headers["X-Robots-Tag"]
+    assert_equal "origin", response.headers["Referrer-Policy"]
 
-      get "/", params: { q: "albatross" }
-      assert_equal "false", probe[:live_note], "the public site draws no note"
-    end
+    get "/", params: { q: "albatross" }
+    assert_not search_drawn[:live_note], "the public site draws no note"
   end
 
   test "an editor's searches in the preview count against the visitor limit" do
-    with_search_probe do
-      place_search_probe(root_page)
-      half = SiteSearch::QueryLimit::VISITOR_LIMIT / 2
+    place_search_block(root_page)
+    half = SiteSearch::QueryLimit::VISITOR_LIMIT / 2
 
-      half.times { preview_search "albatross" }
-      (SiteSearch::QueryLimit::VISITOR_LIMIT - half).times do
-        get "/", params: { q: "albatross" }
-        assert_response :success
-      end
-
-      preview_search "albatross"
-      assert_response :too_many_requests
-      assert_equal "limited", probe[:state]
+    half.times { preview_search "albatross" }
+    (SiteSearch::QueryLimit::VISITOR_LIMIT - half).times do
       get "/", params: { q: "albatross" }
-      assert_response :too_many_requests, "the same counter, whichever door counted"
+      assert_response :success
     end
+
+    preview_search "albatross"
+    assert_response :too_many_requests
+    assert_equal "limited", search_drawn[:state]
+    get "/", params: { q: "albatross" }
+    assert_response :too_many_requests, "the same counter, whichever door counted"
   end
 end

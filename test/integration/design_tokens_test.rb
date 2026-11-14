@@ -512,6 +512,41 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_equal 24, pairs
   end
 
+  SEARCH_TOKENS = %w[--th-search-mark --th-search-mark-ink].freeze
+
+  # The Search block's mark: the warn hue mixed into the page (never the
+  # accent, a result's link), and the text colour on it, in both schemes.
+  test "the search mark's tokens are defined from the theme's base tokens in both schemes, never a literal, and search.css draws with them" do
+    theme_tokens.each do |theme, tokens|
+      assert_match(/\Acolor-mix\(in srgb, var\(--th-warn\) \d+%, var\(--th-paper\)\)\z/, tokens.fetch("--th-search-mark") { flunk("--th-search-mark is not defined for #{theme}") })
+      assert_equal "var(--th-ink)", tokens.fetch("--th-search-mark-ink")
+    end
+    assert_equal SEARCH_TOKENS.map { |name| name.delete_prefix("--th-") }, BlockTypes.fetch(:search).themed_tokens
+    bare = Rails.root.join("app/assets/tailwind/themes/default/search.css").read.gsub(%r{/\*.*?\*/}m, "")
+    refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, bare)
+    SEARCH_TOKENS.each { |name| assert_includes bare, "var(#{name})", "search.css draws with #{name}" }
+    assert_match(/font-size:\s*1rem/, bare, "the field's text is 16px: below it a phone zooms the page on focus")
+    assert_no_match(/data-theme/, bare, "nothing in search.css names a scheme: the tokens follow it")
+  end
+
+  # The marked word (--th-search-mark-ink) at 4.5:1 on the mark, on the
+  # page, in a tinted band and in a strong band, in both schemes: 6 pairs.
+  test "a search's mark is readable on the page, a tinted band and a strong band, in both themes" do
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      { "the page" => [ {}, "--th-paper" ], "a tinted band" => [ band_values("tinted"), "--th-band-tinted" ],
+        "a strong band" => [ band_values("strong"), "--th-band-strong" ] }.each do |place, (inside, around)|
+        outside = resolve_colour(tokens, around, inside: inside)
+        mark = resolve_colour(tokens, "--th-search-mark", inside: inside, under: outside)
+        ratio = contrast(mark, resolve_colour(tokens, "--th-search-mark-ink", inside: inside, under: mark))
+        puts "search mark #{theme} #{place}: #{ratio.round(2)}" if ENV["SHOW_RATIOS"]
+        assert_operator ratio, :>=, 4.5, "the marked word on the mark in #{place} (#{theme}) is #{ratio.round(2)}:1"
+        pairs += 1
+      end
+    end
+    assert_equal 6, pairs
+  end
+
   test "the measuring reads a colour mixed of two tokens as the two mixed" do
     tokens = { "--th-paper" => "#ffffff", "--th-ink" => "#000000",
                "--th-quarter" => "color-mix(in srgb, var(--th-ink) 25%, var(--th-paper))",

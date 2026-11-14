@@ -172,6 +172,23 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     BlockTypes.fetch(:form).themed_tokens.each { |token| assert_includes section, "--th-#{token}" }
   end
 
+  # The Search block's own section: what its template is handed, its
+  # fourteen words and what each result answers, each held to the code it
+  # describes, and its two tokens named.
+  test "the Search block's table names exactly the methods of its entry, its fourteen words and what a result answers" do
+    section = section("The Search block")
+    cells = section.scan(/^\| `([^`]+)` \|/).flatten
+    methods = ContractLedger::COMPONENTS.fetch("blocks/search_component").map { |name| name == "string" ? "string(key)" : name }
+    words = Blocks::SearchComponent::STRINGS.map { |key| "string(:#{key})" }
+
+    assert_equal 14, Blocks::SearchComponent::STRINGS.size
+    assert_equal (methods + words).sort, cells.sort
+    readers = section[/\*\*What each result answers\*\*(.*?)\n/m, 1] or flunk("no paragraph \"What each result answers\"")
+    assert_equal %w[date kind snippet title url_path where], (Blocks::SearchComponent::Result.public_instance_methods(false) - [ :initialize ]).map(&:to_s).sort
+    Blocks::SearchComponent::Result.public_instance_methods(false).each { |name| assert_includes readers, "`#{name}`" }
+    BlockTypes.fetch(:search).themed_tokens.each { |token| assert_includes section, "--th-#{token}" }
+  end
+
   test "CLAUDE.md's reference index points here" do
     assert Rails.root.join("CLAUDE.md").read.include?("docs/reference/theming.md"), "CLAUDE.md's reference index has no line for docs/reference/theming.md"
   end
