@@ -133,7 +133,8 @@ module Setup
     #
     # `search` is the Search row's facts (`SiteSearch::Status.read`: the index's
     # build, the backend's answer, the limited languages), handed in so a test
-    # can say them.
+    # can say them; read when the row is drawn (`run`), never at construction,
+    # since reading asks the backend.
     #
     # `theme` is the theme that draws the site (`Theme.current`), handed in so
     # a test can say it. `stylesheet_probe` answers whether the public
@@ -151,7 +152,7 @@ module Setup
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil, remote_ip: nil, cf_connecting_ip: nil,
       mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false,
       sso_provider: SignIn::Sso::Provider.current, sso_required: SignIn::Sso.required?,
-      search: SiteSearch::Status.read)
+      search: nil)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -469,7 +470,7 @@ module Setup
       # that did not answer in time says what visitors see. The limited
       # languages are a note under the message and leave the chip as it is.
       def search
-        s = @search
+        s = @search || SiteSearch::Status.read
         t = ->(key, **values) { I18n.t("admin.system_status.search.#{key}", **values) }
         progress = { done: delimited(s.done), total: delimited(s.total) }
         note = (t.call(:limited, languages: s.limited.map { |code| Locales.name(code) }.to_sentence) if s.limited.any?)

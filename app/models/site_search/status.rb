@@ -3,8 +3,8 @@ module SiteSearch
   #
   # - `state`: `:building` (the index is being built), `:stopped` (a build
   #   left `building` for over `IndexState::STALLED_AFTER` with no job at
-  #   work), `:not_built` (no row, no job at work, and the process up for over
-  #   that hour: the boot's build never came), `:out_of_date` (a ready row whose
+  #   work), `:not_built` (no row and no reindex job waiting or running: a job
+  #   queued with no row yet reads `:building`), `:out_of_date` (a ready row whose
   #   fingerprint no longer matches, with no job at work), `:ready`,
   #   `:timeout` (the backend did not answer in `TIMEOUT` seconds, or raised)
   #   or `:unhealthy` (it answered `:warn` or `:failed`).
@@ -28,11 +28,6 @@ module SiteSearch
   class Status
     TIMEOUT = 3
 
-    # When this process started: a missing index row is a build that never
-    # came only once the process has been up for `IndexState::STALLED_AFTER`,
-    # the time the boot's check has had to enqueue it.
-    BOOTED_AT = Time.current
-
     # Whether a reindex job is waiting or running, so a build left `building`
     # is told from one still going. A job that failed keeps no `finished_at`
     # but has a failed execution: it is not running. Where Solid Queue is not
@@ -49,7 +44,7 @@ module SiteSearch
       true
     end
 
-    def self.read(now: Time.current, job_running: JOB_RUNNING, timeout: TIMEOUT, booted_at: BOOTED_AT)
+    def self.read(now: Time.current, job_running: JOB_RUNNING, timeout: TIMEOUT)
       name = Backends.current_name
       label = Backends.label(name)
       limited = name == Backends::BUILT_IN ? Postgres::LIMITED & Locales.enabled : []
@@ -60,10 +55,12 @@ module SiteSearch
         state = row.stopped?(now: now, job_running: job_running.call) ? :stopped : :building
         return new(**facts, state:, done: row.done, total: row.total, count: nil, health: nil)
       end
-      if row.nil? && booted_at < now - IndexState::STALLED_AFTER && !job_running.call
-        return new(**facts, state: :not_built, done: nil, total: nil, count: nil, health: nil)
+      if row.nil?
+        return new(**facts, state: :not_built, done: nil, total: nil, count: nil, health: nil) unless job_running.call
+
+        return new(**facts, state: :building, done: 0, total: 0, count: nil, health: nil)
       end
-      if row && IndexState.empty_or_stale?(name) && !job_running.call
+      if IndexState.empty_or_stale?(name) && !job_running.call
         return new(**facts, state: :out_of_date, done: row.done, total: row.total, count: nil, health: nil)
       end
 
@@ -72,13 +69,17 @@ module SiteSearch
 
     # The thread is abandoned when it does not answer in time, never killed: a
     # killed thread can leave a client's connection half used. It ends when
-    # the backend's own call does.
+    # the backend's own call does, so while a backend hangs every visit of
+    # System status (or the wizard's check) leaves one thread behind: the leak
+    # is bounded by how often those pages are opened, and accepted.
     def self.asked(name:, label:, limited:, row:, timeout:)
       backend = Backends.current
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
       answer = {}
       thread = Thread.new do
-        answer[:health] = Unavailable.scrubbing(backend: name) { backend.health(deadline: deadline) }
+        Rails.application.executor.wrap do
+          answer[:health] = Unavailable.scrubbing(backend: name) { backend.health(deadline: deadline) }
+        end
       rescue StandardError
         answer[:failed] = true
       end

@@ -85,6 +85,8 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
     Locales::Enable.call("ja")
     SiteSearch::Fake.new.installed do
+      SiteSearch::IndexState.start!(SiteSearch::Fake::NAME, total: 0)
+        .ready!(SiteSearch::IndexState.fingerprint(SiteSearch::Fake::NAME), languages: [], done: 0)
       status = SiteSearch::Status.read
       assert_empty status.limited
       assert_nil result("Search", run_check(search: status)).note

@@ -3,6 +3,7 @@ require "test_helper"
 class SiteSearch::StatusTest < ActiveSupport::TestCase
   test "a health past the deadline reads timeout" do
     SiteSearch::Fake.new(sleep_for: 10).installed do
+      ready_index(SiteSearch::Fake::NAME)
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       status = SiteSearch::Status.read
 
@@ -14,6 +15,7 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
 
   test "a backend that raises reads timeout and its message is nowhere in the status" do
     SiteSearch::Fake.new(raise_with: RuntimeError.new("http://engine/select?q=secret")).installed do
+      ready_index(SiteSearch::Fake::NAME)
       status = SiteSearch::Status.read
 
       assert_equal :timeout, status.state
@@ -26,6 +28,7 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
       def health(deadline:) = SiteSearch::Health.new(status: :warn, detail: "The index is behind.")
     end
     warned.new.installed do
+      ready_index(SiteSearch::Fake::NAME)
       status = SiteSearch::Status.read
 
       assert_equal :unhealthy, status.state
@@ -36,6 +39,7 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
 
   test "an outside backend that answers is ready, with no count" do
     SiteSearch::Fake.new.installed do
+      ready_index(SiteSearch::Fake::NAME)
       status = SiteSearch::Status.read
 
       assert_equal :ready, status.state
@@ -75,13 +79,11 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
     assert_equal %w[ja], status.limited
   end
 
-  test "no row, no job and a process up for over an hour reads not_built; inside the hour, or with a job, it does not" do
+  test "no row and no job reads not_built at once; a job queued or running with no row yet reads building" do
     SiteSearch::IndexState.where(backend: SiteSearch::Backends::BUILT_IN).delete_all
-    long_ago = 2.hours.ago
 
-    assert_equal :not_built, SiteSearch::Status.read(job_running: -> { false }, booted_at: long_ago).state
-    assert_equal :ready, SiteSearch::Status.read(job_running: -> { true }, booted_at: long_ago).state
-    assert_equal :ready, SiteSearch::Status.read(job_running: -> { false }, booted_at: 5.minutes.ago).state
+    assert_equal :not_built, SiteSearch::Status.read(job_running: -> { false }).state
+    assert_equal :building, SiteSearch::Status.read(job_running: -> { true }).state
   end
 
   test "a ready row of another fingerprint with no job reads out_of_date; with a job it reads ready" do
@@ -102,6 +104,7 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
       end
     end
     hanging.new.installed do
+      ready_index(SiteSearch::Fake::NAME)
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       status = SiteSearch::Status.read(timeout: 0.2)
 
@@ -118,6 +121,7 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
       end
     end
     late.new.installed do
+      ready_index(SiteSearch::Fake::NAME)
       assert_equal :timeout, SiteSearch::Status.read(timeout: 0.1).state
     end
   end
@@ -127,6 +131,7 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
       def health(deadline:) = SiteSearch::Health.new(status: :ok, detail: "3 nodes")
     end
     detailed.new.installed do
+      ready_index(SiteSearch::Fake::NAME)
       status = SiteSearch::Status.read
 
       assert_equal :ready, status.state
@@ -137,7 +142,10 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
   test "an outside backend gets no limited languages, whatever is switched on" do
     Locales::Enable.call("ja")
 
-    SiteSearch::Fake.new.installed { assert_empty SiteSearch::Status.read.limited }
+    SiteSearch::Fake.new.installed do
+      ready_index(SiteSearch::Fake::NAME)
+      assert_empty SiteSearch::Status.read.limited
+    end
   end
 
   # Solid Queue's tables are not in the test database: the queue schema is
@@ -157,12 +165,16 @@ class SiteSearch::StatusTest < ActiveSupport::TestCase
     job.update_columns(finished_at: Time.current)
     assert_equal :stopped, SiteSearch::Status.read.state
   ensure
+    # The transaction rolls the queue tables back; what the models and the
+    # schema cache learned of them must go too, or `table_exists?` stays true
+    # for later tests in this worker.
     ActiveJob::Base.queue_adapter = was
+    ActiveRecord::Base.connection_pool.schema_cache.clear!
+    [ SolidQueue::Job, SolidQueue::FailedExecution ].each(&:reset_column_information)
   end
 
   private
-    def ready_index
-      SiteSearch::IndexState.start!(SiteSearch::Backends::BUILT_IN, total: 0)
-        .ready!(SiteSearch::IndexState.fingerprint(SiteSearch::Backends::BUILT_IN), languages: [], done: 0)
+    def ready_index(name = SiteSearch::Backends::BUILT_IN)
+      SiteSearch::IndexState.start!(name, total: 0).ready!(SiteSearch::IndexState.fingerprint(name), languages: [], done: 0)
     end
 end
