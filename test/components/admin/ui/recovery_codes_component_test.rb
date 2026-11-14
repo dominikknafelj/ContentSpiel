@@ -32,6 +32,9 @@ class Admin::Ui::RecoveryCodesComponentTest < ViewComponent::TestCase
     assert_selector "h1.text-h1", text: "Save your recovery codes"
     assert_no_selector "dialog", visible: :all
     assert_selector "a[href='/cs-studio/account'][aria-disabled=true]", text: "Done"
+    done = page.find("a[href='/cs-studio/account']", text: "Done")[:class].split
+    assert_includes done, "aria-disabled:pointer-events-none"
+    assert_empty done.grep(/opacity/), "ButtonComponent gives aria-disabled its look, with no fade"
     CODES.each { |code| assert_empty attribute_values.grep(/#{Regexp.escape(code)}/) }
   end
 

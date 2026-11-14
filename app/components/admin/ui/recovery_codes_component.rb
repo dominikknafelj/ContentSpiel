@@ -62,7 +62,7 @@ module Admin
 
       def dialog? = @frame == :dialog
 
-      DONE_CLASSES = "aria-disabled:pointer-events-none aria-disabled:opacity-50".freeze
+      DONE_CLASSES = "aria-disabled:pointer-events-none".freeze
 
       def done_link_classes = "#{Admin::Ui::ButtonComponent.classes(:primary)} #{DONE_CLASSES}"
     end
