@@ -74,3 +74,10 @@ en:
           default: Default
           no_icon: No icon
           not_in_theme: "%{name} (not in this theme)"
+        # The Search block's card (EditorSearchBlock): the Label field's help,
+        # `%{placeholder}` the visitor's word in the language being edited
+        # (`Admin::Ui::FieldComponent#help_text`), and the card's note
+        # (`BlockTypes::Search`, `t.editor_note`).
+        search:
+          label_help: "What the field is called on the page. Leave it blank for “%{placeholder}” in each visitor's language."
+          note: "Visitors search the live pages and posts in their language. In the preview, results come from the live site too."

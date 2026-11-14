@@ -31,12 +31,15 @@
         <% end %>
         <% if preview.heading.present? %>
           <%# `text-base`: the nearest size token to the drawing's 17px. %>
-          <span id="<%= name_id %>" class="admin-block-tile__title block truncate text-base font-semibold text-ink"><%= preview.heading %></span>
+          <span id="<%= name_id %>" class="<%= heading_class %>"><%= preview.heading %></span>
         <% end %>
       </span>
     <% end %>
     <% if preview.text.present? %>
       <span id="<%= text_id %>" class="<%= preview_text_class %>"><%= preview.text %></span>
+    <% elsif preview.line && line_parts.any? %>
+      <%# The type's line in place of a text (`Preview#line`); its parts stand against each other, as on the plain line. %>
+      <span id="<%= text_id %>" class="admin-block-tile__line truncate text-xs text-meta"><% line_parts.each do |text, look| %><%= look ? tag.span(text, class: look) : text %><% end %></span>
     <% end %>
     <% if invalid %>
       <span id="<%= status_id %>" class="text-sm text-dim"><%= needs_fixing %></span>

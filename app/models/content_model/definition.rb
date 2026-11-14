@@ -35,11 +35,19 @@ module ContentModel
     #
     # `help:` is a line under a string or a text field in CS Studio (the Note
     # block's title: what an empty one does; the Diagram block's
-    # description), and `placeholder_from:` names a select declared BEFORE
-    # the string whose chosen label is the string's placeholder (the Note
-    # block's title shows the kind's word, design answer B3). Both are
-    # literals of the type's definition, as `label:` is. `max:` on a string
-    # counts characters, as on a code field.
+    # description): a literal of the type's definition, as `label:` is, or a
+    # Symbol naming a key under `admin.components.fields`, read in CS
+    # Studio's language with `%{placeholder}` the input's placeholder (the
+    # Search block's label names the visitor's word it falls back to).
+    # `placeholder_from:` names a select declared BEFORE the string whose
+    # chosen label is the string's placeholder (the Note block's title shows
+    # the kind's word, design answer B3); `placeholder_public:` names a key
+    # under `public.` whose word, in the language being edited, is the
+    # string's placeholder (the Search block's label shows the visitor's
+    # default, `public.blocks.search.label`). A string has one placeholder,
+    # so the two are never given together. Only the block card hands a
+    # placeholder over (`BlockCardComponent#placeholder_for`). `max:` on a
+    # string counts characters, as on a code field.
     #
     # `format:` is the shape a string must have (a Regexp, tested against the whole
     # cast value; a blank value has none to test) and `format_message:` the I18n
@@ -58,7 +66,7 @@ module ContentModel
     # field is declared), and `description:` the text field whose words
     # describe that drawing, which the source's card asks for while it is
     # blank.
-    OPTIONS = %i[required default min max translated translation_required options of blank label control help placeholder_from format format_message drawing description].freeze
+    OPTIONS = %i[required default min max translated translation_required options of blank label control help placeholder_from placeholder_public format format_message drawing description].freeze
     CONTROLS = %i[segmented].freeze
 
     # One field in the schema: `options` carries everything but name/type
@@ -75,7 +83,9 @@ module ContentModel
       # Of a type only a built-in block type may declare (`FieldTypes::BLOCK_ONLY`).
       def block_only? = FieldTypes::BLOCK_ONLY.key?(type)
       def label = options[:label].presence || name.humanize
-      # The line under the field in CS Studio, or nil.
+      # The line under the field in CS Studio: a String, a Symbol naming its
+      # key under `admin.components.fields` (`Admin::Ui::FieldComponent
+      # #help_text` reads it), or nil.
       def help = options[:help].presence
       # Drawn as a row of buttons (`control: :segmented`), not a <select>;
       # the option is refused on any type but a select (`FieldTypes`).

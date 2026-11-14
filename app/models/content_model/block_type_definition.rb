@@ -239,6 +239,19 @@ module ContentModel
       @preview = callable
     end
 
+    # A note the type's block card draws under its fields, on every tab, as
+    # a neutral `Admin::Ui::NoticeComponent` (`role="note"`): a Symbol naming
+    # its key under `admin.components.fields`, in CS Studio's language (the
+    # Search block's: only the live site is searched). Read by
+    # `Admin::EditorScreen::BlockCardComponent` alone; nil for a type with
+    # none. An outside type may declare one, its key in its own locale file.
+    def editor_note(key = nil)
+      return @editor_note if key.nil?
+      refuse "`editor_note` is a Symbol naming a key under admin.components.fields" unless key.is_a?(Symbol) && key != :""
+
+      @editor_note = key
+    end
+
     # The small picture a closed block's tile draws beside its line, as
     # markup: a callable taking the block and `locale:` and answering an
     # `ActiveSupport::SafeBuffer` or nil (nothing to draw). The tile prints

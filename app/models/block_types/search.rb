@@ -21,11 +21,42 @@ module BlockTypes
     # The label is one line above a field.
     LABEL_LENGTH = 80
 
+    # The tile's line: "Searches the live site", after "Default label · "
+    # where the label is blank. A blank label is a finished block, so the
+    # line never says Empty.
+    def self.summary(block, locale:)
+      live = [ :hint, :searches_live ]
+      label(block, locale: locale) ? [ live ] : [ [ :hint, :default_label ], [ :text, " · " ], live ]
+    end
+
+    # The tile's heading: the label in the language shown, or, blank, the
+    # visitor's word in that language standing quiet; the line under it. So
+    # there is always a preview.
+    def self.preview(block, locale:)
+      label = label(block, locale: locale)
+      ContentModel::Preview.new(heading: label || PublicStrings.read("public.blocks.search.label", locale: locale),
+                                quiet_heading: label.nil?, line: true)
+    end
+
+    # The label a visitor of `locale` reads: the language's own, else along
+    # the site's fallback, as the public component reads it, so a tile says
+    # "Default label" only where the page draws the CMS's word.
+    def self.label(block, locale:) = block.settings_object(locale: locale, fallback: true)&.label.presence
+
     def self.register
       BlockTypes.register :search do |t|
         t.label "Search"
         t.icon "search", family: :form
-        t.field :label, :string, translated: true, max: LABEL_LENGTH
+        # A blank label draws the visitor's word, so the card shows that
+        # word as the placeholder in the language being edited and the help
+        # line names it (the Design System's EditorSearchBlock).
+        t.field :label, :string, translated: true, max: LABEL_LENGTH,
+                placeholder_public: "blocks.search.label", help: :"search.label_help"
+        # Only the live site is searched, and in the preview too: a person
+        # placing the block on a draft learns here that drafts are never found.
+        t.editor_note :"search.note"
+        t.summary ->(block, locale:) { Search.summary(block, locale: locale) }
+        t.preview ->(block, locale:) { Search.preview(block, locale: locale) }
         t.capability :search
         t.component Blocks::SearchComponent
         # `label` the field's label (the editor's, else the CMS's word);

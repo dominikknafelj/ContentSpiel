@@ -731,6 +731,80 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     end
   end
 
+  # The Search block's card (the Design System's EditorSearchBlock): one
+  # Label field whose placeholder is the visitor's word in the editing
+  # language, a help line that names that word, and a neutral note.
+  def search_block(page, label: nil)
+    block = page.content_blocks.new(block_type: "search", position: 0)
+    block.assign_settings({ "label" => label }, locale: "en") if label
+    block.save!
+    block
+  end
+
+  def with_german_search_word
+    I18n.backend.store_translations(:de, public: { blocks: { search: { label: "Diese Website durchsuchen" } } })
+    yield
+  ensure
+    I18n.reload!
+  end
+
+  test "the Search card's label shows the visitor's default as its placeholder in the editing language" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "Find")
+      block = search_block(page)
+
+      render_card(block, page: page)
+      assert_selector "input#block-#{block.id}-label[name='block[settings][label]'][placeholder='Search this site']"
+      assert_selector "input#block-#{block.id}-label:not([value])"
+
+      with_german_search_word do
+        render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")
+        assert_selector "input#block-#{block.id}-label[placeholder='Diese Website durchsuchen']"
+
+        render_card(block, page: page)
+        assert_selector "input#block-#{block.id}-label[placeholder='Search this site']", count: 1
+      end
+    end
+  end
+
+  test "the Search card's help line names the default" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "Find")
+      block = search_block(page, label: "Search the guide")
+
+      render_card(block, page: page)
+      input = self.page.find("input#block-#{block.id}-label")
+      assert_equal "Search the guide", input.value
+      assert_equal "block-#{block.id}-label-help", input["aria-describedby"]
+      assert_selector "p#block-#{block.id}-label-help", exact_text: "What the field is called on the page. Leave it blank for “Search this site” in each visitor's language."
+
+      with_german_search_word do
+        render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")
+        assert_selector "p#block-#{block.id}-label-help", exact_text: "What the field is called on the page. Leave it blank for “Diese Website durchsuchen” in each visitor's language."
+      end
+    end
+  end
+
+  test "the Search card draws its neutral note" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "Find")
+      block = search_block(page)
+      note = "Visitors search the live pages and posts in their language. In the preview, results come from the live site too."
+
+      render_card(block, page: page)
+      assert_selector "[data-block-body] [role=note].bg-sunken.text-dim", exact_text: note, count: 1
+      assert_no_selector "form [role=note]", text: note
+      assert_operator rendered_content.index("block-#{block.id}-label-help"), :<, rendered_content.index(note), "the note stands under the field"
+
+      render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")
+      assert_selector "[data-block-body] [role=note]", exact_text: note, count: 1
+
+      other = create_page(title: "Other")
+      render_card(note_block(other), page: other)
+      assert_no_selector "[role=note]", text: "Visitors search"
+    end
+  end
+
   def note_block(page, kind: "tip", title: "Before you publish")
     block = page.content_blocks.new(block_type: "note", position: 0, settings: { "kind" => kind })
     block.assign_settings({ "title" => title }, locale: "en")

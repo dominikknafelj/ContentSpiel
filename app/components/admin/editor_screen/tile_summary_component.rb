@@ -39,6 +39,14 @@ module Admin
     # (`truncate` on the element around the parts), after the count that
     # every tile's text is cut at (`LENGTH`).
     #
+    # A PREVIEW MAY ASK FOR THE LINE (`Preview#line`): the type's summary
+    # line is then drawn under the heading, in place of a text, smaller and
+    # in the meta colour, and it is what describes the face (`text_id`); the
+    # Search block's "Searches the live site". A QUIET HEADING (`Preview
+    # #quiet_heading`) is a word the CMS supplies where the editor wrote none
+    # (the Search block's visitor word under a blank label), drawn in the
+    # meta colour at weight 500 so it does not read as typed words.
+    #
     # A TYPE WITH A PICTURE (`tile_picture`, the Diagram block's drawing)
     # has a layout of its own: the picture small in a 112×72 box, hidden from
     # a screen reader, and beside it the summary line, its hints with it,
@@ -108,11 +116,25 @@ module Admin
 
       # `[text, class or nil]` in reading order; "Needs fixing" is the last.
       def parts
-        found = content
-        drawn = (found.is_a?(Array) ? found : [ [ found, nil ] ]).reject { |text, _| text.blank? }
+        drawn = line_parts
         return drawn unless invalid
 
         drawn + [ [ [ (SEPARATOR if drawn.any?), t(".needs_fixing") ].join, nil ] ]
+      end
+
+      # The line's own parts, without "Needs fixing": what a preview that
+      # asks for the line (`Preview#line`) draws under its heading, where
+      # "Needs fixing" stands on a line of its own.
+      def line_parts
+        found = content
+        (found.is_a?(Array) ? found : [ [ found, nil ] ]).reject { |text, _| text.blank? }
+      end
+
+      # The preview's heading: bold in the ink, or, quiet (`Preview
+      # #quiet_heading`, a word the CMS supplies), the meta colour at 500.
+      def heading_class
+        look = preview.quiet_heading ? "font-medium text-meta" : "font-semibold text-ink"
+        "admin-block-tile__title block truncate text-base #{look}"
       end
 
       def attention? = invalid || definition.nil? || missing_image?

@@ -75,6 +75,11 @@ en:
             post_list:
               any_type: "All posts"
               tag: "tag %{name}"
+            # A Search block's tile (`BlockTypes::Search.summary`): a blank
+            # label draws the visitor's word, so the tile never says Empty.
+            search:
+              default_label: "Default label"
+              searches_live: "Searches the live site"
         # A tile's "⋯" menu: every move a drag makes,
         # by name. `actions` names the button, whose label is the glyph.
         block_tile:

@@ -383,6 +383,36 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_equal (("a" * (length - 1)) + "…"), cut
   end
 
+  # A preview's heading may stand quiet (the meta colour, weight 500: a
+  # word the CMS supplies, not one the editor typed), and a preview may ask
+  # for the type's summary line under its heading in place of a text.
+  test "a preview's heading is quiet and its line drawn only when asked, and a line stands in place of a text" do
+    plain = ContentModel::Preview.new(heading: "Search")
+    assert_not plain.quiet_heading
+    assert_not plain.line
+
+    quiet = ContentModel::Preview.new(heading: "Search this site", quiet_heading: "yes", line: 1)
+    assert_equal true, quiet.quiet_heading
+    assert_equal true, quiet.line
+    assert_not quiet.blank?
+
+    error = assert_raises(ArgumentError) { ContentModel::Preview.new(heading: "A", text: "Some words", line: true) }
+    assert_includes error.message, "in place of its text"
+    assert ContentModel::Preview.new(heading: "A", text: "  ", line: true).line, "a blank text is no text"
+  end
+
+  test "editor_note names a key of the card's own note, and anything else is refused, the type's name first" do
+    d = definition
+    assert_nil d.editor_note
+    d.editor_note :"search.note"
+    assert_equal :"search.note", d.editor_note
+
+    [ "search.note", :"", 3 ].each do |bad|
+      error = assert_raises(ArgumentError, bad.inspect) { definition.editor_note bad }
+      assert_match(/\Atest_shape: `editor_note` is a Symbol naming a key under admin\.components\.fields/, error.message)
+    end
+  end
+
   test "preview is a callable taking the block and locale:, and anything else is refused, the type's name first" do
     d = definition
     assert_nil d.preview

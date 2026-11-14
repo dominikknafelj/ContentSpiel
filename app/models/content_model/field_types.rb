@@ -178,6 +178,13 @@ module ContentModel
               source = earlier.find { |candidate| candidate.name == options[:placeholder_from].to_s }
               raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" unless source&.type == :select
             end
+            # `placeholder_public:` names a key under `public.`, whose word in
+            # the language being edited is the string's placeholder.
+            if options.key?(:placeholder_public)
+              key = options[:placeholder_public]
+              raise ArgumentError, PLACEHOLDER_PUBLIC_REFUSAL unless key.is_a?(String) && key.strip != ""
+              raise ArgumentError, "a string field has one placeholder: `placeholder_from:` or `placeholder_public:`, not both" if options.key?(:placeholder_from)
+            end
             raise ArgumentError, "`max:` on a string field is a number of characters, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
             raise ArgumentError, "`format:` on a string field is a Regexp, with `format_message:` the I18n key of the sentence that refuses a value" if options.key?(:format) && !(options[:format].is_a?(Regexp) && options[:format_message].is_a?(String))
             raise ArgumentError, "`format_message:` belongs to a `format:`" if options.key?(:format_message) && !options.key?(:format)
@@ -588,15 +595,20 @@ module ContentModel
         raise ArgumentError, "`control: :segmented` draws a select's choices as buttons: it is for a select"
       end
 
-      HELP_REFUSAL = "`help:` is a line under a string or a text field, written as a String".freeze
+      HELP_REFUSAL = "`help:` is a line under a string or a text field, written as a String or as a Symbol naming its key under admin.components.fields".freeze
+      PLACEHOLDER_PUBLIC_REFUSAL = "`placeholder_public:` is for a string field and names a key under public. as a String (\"blocks.search.label\")".freeze
 
       def check_help(options)
-        raise ArgumentError, HELP_REFUSAL if options.key?(:help) && !(options[:help].is_a?(String) && options[:help].strip != "")
+        return unless options.key?(:help)
+
+        help = options[:help]
+        raise ArgumentError, HELP_REFUSAL unless (help.is_a?(String) || help.is_a?(Symbol)) && help.to_s.strip != ""
       end
 
       def refuse_string_options(options)
         raise ArgumentError, HELP_REFUSAL if options.key?(:help)
         raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" if options.key?(:placeholder_from)
+        raise ArgumentError, PLACEHOLDER_PUBLIC_REFUSAL if options.key?(:placeholder_public)
         raise ArgumentError, "`format:` is for a string field" if options.key?(:format) || options.key?(:format_message)
         raise ArgumentError, "`drawing:` is a mermaid field's, naming its diagram_drawing field" if options.key?(:drawing)
         raise ArgumentError, DESCRIPTION_REFUSAL if options.key?(:description)

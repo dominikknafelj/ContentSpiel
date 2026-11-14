@@ -158,6 +158,15 @@ module Admin
       # The help line under the input, named for its `aria-describedby`.
       def help_id = "#{input_id}-help"
 
+      # The help line's words: the type's literal, or, for a `help:` that is
+      # a Symbol, its key under `admin.components.fields` in CS Studio's
+      # language, `%{placeholder}` the input's placeholder text (empty where
+      # the caller handed none over: only the block card does).
+      def help_text
+        help = field.help
+        help.is_a?(Symbol) ? t("admin.components.fields.#{help}", placeholder: placeholder&.dig(:text).to_s) : help
+      end
+
       # True once the caller has handed over something to compare against --
       # see the class comment for why that's the caller's call, not this
       # component re-deriving "non-default locale and translated" itself --
