@@ -35,7 +35,7 @@ module Admin
       # The words the script shows, as `messages_data` serves them.
       MESSAGES = [
         *%w[draw_all stop stopping progress started insecure insecure_short
-            summary.drawn summary.failed summary.skipped summary.separator summary.end summary.none failed_generic]
+            summary.drawn summary.failed summary.skipped summary.separator summary.end failed_generic]
           .map { |key| "diagram_drawings.index.#{key}" },
         *%w[waiting drawing drawn failed skipped].map { |state| "components.diagram_drawings_screen.row.states.#{state}" },
         *%w[does_not_draw changed held stopped gone].map { |reason| "components.diagram_drawings_screen.row.reasons.#{reason}" },

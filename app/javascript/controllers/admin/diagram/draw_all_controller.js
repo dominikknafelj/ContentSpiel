@@ -62,7 +62,9 @@ import { headers } from "editing/requests"
 //
 // CAN'T DRAW HERE. Without `crypto.subtle` (plain HTTP to another host) no
 // frame is built: the `insecure` notice and reason are shown, the reason
-// made the button's description, and the button disabled.
+// made the button's description, and the button `aria-disabled` (not
+// `disabled`), so it keeps the focus and its reason is heard; `#toggle`
+// does nothing while it is.
 //
 // TAKE-BACK. `disconnect` and `turbo:before-cache` end the run (nothing is
 // sent after it), remove the frame and its slot, and put back every chip,
@@ -109,7 +111,7 @@ export default class extends Controller {
       this.insecureTargets.forEach((element) => { element.hidden = false })
       const reason = this.insecureTargets.find((element) => element.id)
       if (reason) this.startTarget.setAttribute("aria-describedby", reason.id)
-      this.startTarget.disabled = true
+      this.startTarget.setAttribute("aria-disabled", "true")
       return
     }
     this.openFrame()
@@ -133,7 +135,7 @@ export default class extends Controller {
   }
 
   toggle() {
-    if (!this.frame) return
+    if (!this.frame || this.startTarget.getAttribute("aria-disabled") === "true") return
     if (this.run) this.stop()
     else this.start()
   }
@@ -189,7 +191,6 @@ export default class extends Controller {
     row.setAttribute("aria-busy", "true")
     const source = row.querySelector("template[data-part='source']").content.textContent
     const answer = await this.draw(source)
-    if (this.run !== run) return GENERIC
     if (!answer) return this.outcome(GENERIC)
     if (answer.error) {
       if (answer.error.kind === "too_large") return this.outcome({ state: "failed", key: "components.fields.mermaid_field.too_large" })
@@ -197,11 +198,18 @@ export default class extends Controller {
     }
     if (typeof answer.svg !== "string" || answer.svg === "") return this.outcome(GENERIC)
     const from = await digest(source)
-    if (this.run !== run || run.leaving) return GENERIC
+    if (this.run !== run || run.leaving) return this.unsent(run)
     const sends = (isCurrent) => this.run === run && !run.leaving && isCurrent()
     const saved = await enqueue((isCurrent) => sends(isCurrent) ? this.save(row, answer.svg, from) : null, { generation: this.generation })
-    if (this.run !== run || !saved) return GENERIC
+    if (this.run !== run || !saved) return this.unsent(run)
     return this.saved(row, saved)
+  }
+
+  // A row whose drawing was not sent: stopped by leaving, or the generic
+  // failure. A run that was taken back writes no row, whatever this says.
+  unsent(run) {
+    if (run.leaving) return { state: "skipped", reason: this.text("components.diagram_drawings_screen.row.reasons.stopped") }
+    return this.outcome(GENERIC)
   }
 
   // The frame's answer to `source`, or null when none came in time.
@@ -272,10 +280,10 @@ export default class extends Controller {
     this.startTarget.hidden = this.rowTargets.every((row) => this.drawn.has(row))
   }
 
+  // Every run ends at least one row, so at least one part is not nought.
   summaryText(counts) {
     const parts = [ "drawn", "failed", "skipped" ].filter((part) => counts[part] > 0)
       .map((part) => this.text(`diagram_drawings.index.summary.${part}`, { count: counts[part] }))
-    if (parts.length === 0) return this.text("diagram_drawings.index.summary.none")
     return parts.join(this.text("diagram_drawings.index.summary.separator")) + this.text("diagram_drawings.index.summary.end")
   }
 
@@ -385,6 +393,7 @@ export default class extends Controller {
       this.startTarget.hidden = false
       this.startTarget.disabled = false
       this.startTarget.removeAttribute("aria-describedby")
+      this.startTarget.removeAttribute("aria-disabled")
     }
   }
 

@@ -24,7 +24,7 @@ en:
           one: "Drawing %{count} diagram…"
           other: "Drawing %{count} diagrams…"
         # The end of a run: the parts that are not nought, joined with " · "
-        # (`separator`) and ended with "." (`end`); `none` when nothing was drawn.
+        # (`separator`) and ended with "." (`end`). A run always ends a row, so one part at least is not nought.
         summary:
           drawn:
             one: "%{count} drawn"
@@ -37,7 +37,6 @@ en:
             other: "%{count} skipped"
           separator: " · "
           end: "."
-          none: "Nothing was drawn."
         # A row's reason when the save's answer is not JSON or names no reason.
         failed_generic: "This drawing wasn't saved. Try again."
         empty: "Every diagram is drawn. A diagram written outside CS Studio waits here until it is drawn."

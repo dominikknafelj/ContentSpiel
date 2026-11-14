@@ -2217,11 +2217,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "var(--cs-accent)" ], lit.map(&:last).uniq, "the verb under the pointer or the focus"
     selectors = lit.flat_map(&:first)
     assert selectors.all? { |selector| selector.match?(/:(hover|focus-within|focus-visible)/) }, selectors.inspect
-    # The Waiting for you row, the draft tile, a Translations row and a table
-    # row of one link (`.admin-row-link`) around their stretched links, and
-    # the Notes for you row that is the link, each on hover and focus.
+    # The Waiting for you row, the draft tile, a Translations row, a Draw
+    # diagrams row and a table row of one link (`.admin-row-link`) around
+    # their stretched links, and the Notes for you row that is the link, each
+    # on hover and focus.
     assert_equal [ ".admin-waiting-row:hover .admin-row-verb", ".admin-waiting-row:focus-within .admin-row-verb",
                    ".admin-translation-row:hover .admin-row-verb", ".admin-translation-row:focus-within .admin-row-verb",
+                   ".admin-draw-row:hover .admin-row-verb", ".admin-draw-row:focus-within .admin-row-verb",
                    "tr:has(.admin-row-link):hover .admin-row-verb", "tr:has(.admin-row-link):focus-within .admin-row-verb",
                    ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
                    "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort
