@@ -1,4 +1,4 @@
-// @tiptap/pm/view@3.31.3 downloaded from https://ga.jspm.io/npm:@tiptap/pm@3.31.3/dist/view/index.js
+// @tiptap/pm/view@3.34.0 downloaded from https://ga.jspm.io/npm:@tiptap/pm@3.34.0/dist/view/index.js
 
 export*from"prosemirror-view";
 

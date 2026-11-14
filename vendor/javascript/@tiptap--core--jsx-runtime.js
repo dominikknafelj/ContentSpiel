@@ -1,4 +1,4 @@
-// @tiptap/core/jsx-runtime@3.31.3 downloaded from https://cdn.jsdelivr.net/npm/@tiptap/core@3.31.3/dist/jsx-runtime/jsx-runtime.js
+// @tiptap/core/jsx-runtime@3.34.0 downloaded from https://cdn.jsdelivr.net/npm/@tiptap/core@3.34.0/dist/jsx-runtime/jsx-runtime.js
 // (not jspm's jsx-runtime/index.js: that one re-exports from a shared chunk, ../_/CUaCpXev.js, which bin/importmap pin does not download -- see config/importmap.rb)
 
 //#region src/jsx-runtime.ts
@@ -64,3 +64,4 @@ const jsxDEV = (tag, attributes, _key, _isStaticChildren) => {
 //#endregion
 export { Fragment, h as createElement, h, h as jsx, jsxDEV, jsxs };
 
+//# sourceMappingURL=jsx-runtime.js.map

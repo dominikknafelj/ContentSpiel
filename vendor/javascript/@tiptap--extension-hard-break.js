@@ -1,4 +1,4 @@
-// @tiptap/extension-hard-break@3.31.3 downloaded from https://ga.jspm.io/npm:@tiptap/extension-hard-break@3.31.3/dist/index.js
+// @tiptap/extension-hard-break@3.34.0 downloaded from https://ga.jspm.io/npm:@tiptap/extension-hard-break@3.34.0/dist/index.js
 
 import{Node as e,mergeAttributes as t}from"@tiptap/core";const n=e.create({name:`hardBreak`,markdownTokenName:`br`,addOptions(){return{keepMarks:!0,HTMLAttributes:{}}},inline:!0,group:`inline`,selectable:!1,linebreakReplacement:!0,parseHTML(){return[{tag:`br`}]},renderHTML({HTMLAttributes:e}){return[`br`,t(this.options.HTMLAttributes,e)]},renderText(){return`
 `},renderMarkdown:()=>`  
