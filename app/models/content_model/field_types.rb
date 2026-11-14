@@ -22,10 +22,18 @@ module ContentModel
     THEME_CHOICE = :theme_choice
     THEME_CHOICE_LISTS = %i[section_styles icons].freeze
 
-    # Types only a built-in block type may declare: choices for posts are not
-    # built, and an outside type's list would need a key of theme.yml, which
-    # the CMS owns.
-    BLOCK_ONLY = [ THEME_CHOICE ].freeze
+    # Types only a built-in block type may declare, each with why a post
+    # type (or a field group) and an outside block type may not: choices for
+    # posts are not built, and an outside type's list would need a key of
+    # theme.yml, which the CMS owns; a Mermaid source and its drawing are
+    # the Diagram block's, whose card makes the drawing (the renderer frame)
+    # and whose component prints it, and no other record has either.
+    DIAGRAM_ONLY = "a drawing is made by the Diagram block's card and printed by its component, and nothing else draws or shows one".freeze
+    BLOCK_ONLY = {
+      THEME_CHOICE => { posts: "choices for posts are not built", outside: "its list would need a key of theme.yml, which the CMS owns" },
+      mermaid: { posts: DIAGRAM_ONLY, outside: DIAGRAM_ONLY },
+      diagram_drawing: { posts: DIAGRAM_ONLY, outside: DIAGRAM_ONLY }
+    }.freeze
 
     # A link longer than this is refused, never cut.
     LINK_MAX = 2048
@@ -68,6 +76,12 @@ module ContentModel
     # `FieldSet#assign` would drop without a word. It is never stored, since
     # the save it is in is refused.
     DRAWING_REFUSED = "refused".freeze
+
+    # A drawing's `from`: the SHA-256 of its source in hex, which is all it
+    # is ever compared with (`Diagrams::Drawing#current?`). Anything else,
+    # a hand-posted string of any length among them, is refused as the
+    # drawing's shape, so it never rides along with every later save.
+    DRAWING_FROM = /\A\h{64}\z/
 
     class << self
       def register(type)
@@ -349,8 +363,9 @@ module ContentModel
       # sent by the editor's script as JSON, read back from jsonb as a Hash.
       # The cast cleans the SVG (`Diagrams::Drawing.clean`, the security
       # boundary) and keeps `from`, the digest of the source the frame drew,
-      # as it was given: it cannot see the source. A value that is no such
-      # pair or does not clean casts to the `DRAWING_REFUSED` mark, and only
+      # as it was given when it is a digest (`DRAWING_FROM`): it cannot see
+      # the source. A value that is no such pair, holds another `from` or
+      # does not clean casts to the `DRAWING_REFUSED` mark, and only
       # a mark this save was handed is refused (`raw`, and every language of
       # `translations`): a stored drawing that today's rules refuse reads back
       # as the mark (no drawing) and stops no save. Translated with its
@@ -540,7 +555,7 @@ module ContentModel
         pair = value.is_a?(String) ? parse_json(value) : value
         pair = pair.to_h.stringify_keys if pair.is_a?(Hash)
         return pair.slice(DRAWING_REFUSED) if pair.is_a?(Hash) && pair.key?(DRAWING_REFUSED)
-        return { DRAWING_REFUSED => "shape" } unless pair.is_a?(Hash) && pair["svg"].is_a?(String) && pair["from"].is_a?(String)
+        return { DRAWING_REFUSED => "shape" } unless pair.is_a?(Hash) && pair["svg"].is_a?(String) && pair["from"].is_a?(String) && pair["from"].match?(DRAWING_FROM)
 
         result = Diagrams::Drawing.clean(pair["svg"])
         result.svg ? { "svg" => result.svg, "from" => pair["from"] } : { DRAWING_REFUSED => result.reason.to_s }

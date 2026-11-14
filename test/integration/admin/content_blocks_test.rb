@@ -1797,7 +1797,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   # style's url(), a handler) is refused whole with a 422, the save writes
   # and audits nothing, the source sent with it neither, and the refusal's
   # sentence stands in the drawing field's slot.
-  test "a hand-posted drawing with an entity, a DOCTYPE, an a href, a use href, a style url or an onload is refused" do
+  test "a hand-posted drawing with an entity, a DOCTYPE, an a href, a use href, a style url or an onload is refused, and so is one whose from is no digest" do
     block = diagram_block(translated_settings: { "en" => { "source" => DIAGRAM_SOURCE, "drawing" => { "svg" => BlockTypes::Diagram.sample_drawing("en")["svg"], "from" => Diagrams::Drawing.digest(DIAGRAM_SOURCE) } } })
     stored = block.reload.translated_settings
     stamp = block.updated_at
@@ -1819,6 +1819,15 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       assert_equal stored, block.reload.translated_settings, "#{name}: nothing is written, the source neither"
       assert_equal stamp, block.updated_at
     end
+
+    # A clean drawing whose `from` is no digest: a hand-made string of any
+    # length would otherwise ride along with every later save.
+    assert_no_difference -> { Audit::Event.count } do
+      save_diagram(block, { source: DIAGRAM_SOURCE, drawing: JSON.generate(svg: BlockTypes::Diagram.sample_drawing("en")["svg"], from: "x" * 100_000) })
+    end
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='block-#{block.id}-drawing-errors'] template", text: /This drawing can't be shown on the site\./
+    assert_equal stored, block.reload.translated_settings, "a from that is no digest: nothing is written"
     assert_equal version, PublicSite.content_version
   end
 

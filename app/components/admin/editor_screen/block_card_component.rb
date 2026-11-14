@@ -325,7 +325,8 @@ module Admin
       def translation_tab? = locale.to_s != ::Locales.default
 
       # `[label, value]` for each untranslated schema field but a hidden one
-      # (`SharedFieldsComponent.listed?`), read from the primary language (where its one value lives); empty off a translation tab.
+      # (`SharedFieldsComponent.listed?`), read from the primary language
+      # (where its one value lives); empty off a translation tab.
       def shared_fields
         return [] unless translation_tab?
 

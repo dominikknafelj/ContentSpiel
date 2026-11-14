@@ -19,8 +19,9 @@ module ContentModel
     # `theme_methods` and `tokens` by `Theme::Contract`, `stylesheet` by the
     # public stylesheet's build (`BlockTypes.theme_css_blocks`), `summary`,
     # `preview` and `tile_picture` by the editor's tile, `read_only_actions`
-    # by the held form's allow-list, `sample` by the shared tests. A declaration nothing reads would be
-    # documentation in code; none of these is.
+    # by the held form's allow-list, `sample` by the shared tests. A
+    # declaration nothing reads would be documentation in code; none of
+    # these is.
 
     # The capabilities something in the CMS asks for (`capability?`): a type
     # claiming another is refused at registration, since nothing would read it.
@@ -428,8 +429,8 @@ module ContentModel
       # The table body is the CMS's own: its editor, its Markdown form and its
       # public markup are the Table block's, so an outside type has no way to
       # say what a table in its body would mean.
-      if fields.any?(&:block_only?)
-        refuse "a block type from outside may not declare a :theme_choice field: its list would need a key of theme.yml, which the CMS owns"
+      if (field = fields.find(&:block_only?))
+        refuse "a block type from outside may not declare a :#{field.type} field: #{ContentModel::FieldTypes::BLOCK_ONLY.dig(field.type, :outside)}"
       end
       refuse "a block type from outside holds rich text only: `body_content :table` is the CMS's own" unless body_content == :rich
       if tile_picture

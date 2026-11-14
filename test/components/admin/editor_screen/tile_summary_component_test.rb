@@ -713,6 +713,22 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_equal 1, parses
   end
 
+  # The read is kept for one render, never by the block's contents: a
+  # block changed in memory (a save's answer draws the object it saved) is
+  # read again by the next render, and nothing is kept outside one.
+  test "a block changed in memory between two renders is read again, and nothing is kept outside a render" do
+    drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes." })
+    render_summary drawn
+    assert_selector diagram_line(drawn), text: "A --> B"
+
+    drawn.translated_settings["en"]["source"] = "flowchart LR\n  X --> Y"
+    render_summary drawn
+    assert_selector diagram_line(drawn), text: "X --> Y"
+
+    first = BlockTypes::Diagram::Shown.for(drawn, locale: "en")
+    assert_not_same first, BlockTypes::Diagram::Shown.for(drawn, locale: "en"), "outside a render each call reads"
+  end
+
   test "the tile's picture is the stored drawing with tile ids, no title and no script" do
     drawn = diagram("en" => { "source" => DIAGRAM_SOURCE, "drawing" => diagram_drawing, "description" => "Boxes <b>in</b> a row." })
     render_summary drawn

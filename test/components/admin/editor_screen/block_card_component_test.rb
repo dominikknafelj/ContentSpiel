@@ -656,7 +656,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
   # row of Shared fields, while its source is.
   test "on a translation tab an untranslated drawing has no row in Shared fields" do
     saved = BlockTypes.all.dup
-    BlockTypes.register("test/shared_diagram") do |t|
+    BlockTypes.register("test_shared_diagram") do |t|
       TestTypes.declare(t)
       t.label "Shared diagram"
       t.field :source, :mermaid, drawing: :drawing
@@ -665,7 +665,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     end
     with_locales(%w[en de], default: "en") do
       page = create_page(title: "Diagram tab")
-      block = page.content_blocks.create!(block_type: "test/shared_diagram", position: 0,
+      block = page.content_blocks.create!(block_type: "test_shared_diagram", position: 0,
         settings: { "source" => "flowchart LR\n  A --> B", "drawing" => { "svg" => Diagrams::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg, "from" => "a" * 64 } })
 
       render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de")

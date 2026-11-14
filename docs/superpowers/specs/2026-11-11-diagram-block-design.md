@@ -133,7 +133,7 @@ These are the owner's decisions, in his words and mine:
 - A save that the source's own keystroke sends first carries the old drawing. The next save carries the new one.
 - On `connect` the script draws, but writes nothing. Opening a card never saves, which keeps live editing and the stale check as they are.
 
-**The server checks the digest.** It stores `from` as sent, and `Diagrams::Drawing#current?(source)` compares it with the saved source's digest. A drawing whose `from` is not the source's digest is *the last drawing that worked*: the card and the tile say so (§7), and the public page still draws it (§6).
+**The server checks the digest.** It stores `from` as sent when it is a SHA-256 in hex (anything else refuses the drawing), and `Diagrams::Drawing#current?(source)` compares it with the saved source's digest. A drawing whose `from` is not the source's digest is *the last drawing that worked*: the card and the tile say so (§7), and the public page still draws it (§6).
 
 **What the frame and the card take back.**
 - At `disconnect`, the card removes the frame and forgets its listener.
@@ -430,6 +430,8 @@ Where the build (plan `docs/superpowers/plans/2026-11-13-diagram-block.md`, 2026
 - **AI never sends a non-translatable type's field**: the bulk count and `AI::Translate` skipped only the source by name in the first build; they now follow the Translate button's rule for every type, so a gem's translated `:url`, `:select` or `:link` field is no longer sent either (CHANGELOG, "For a gem or an outside caller").
 - **The audit snapshot keeps the source and the drawing whole per language**, as `:code`'s keeps the code (the version basis); an event's changes are digests. An open question for the owner: drop the derived drawing from snapshots (about 30 KB a language for an ordinary drawing).
 - **The preview needs a secure context** (`crypto.subtle`), with no fallback, as passkeys do.
+- **A drawing's `from` must be a SHA-256 in hex**, or the drawing is refused as `:invalid_drawing` (§2 says the server stores it as sent): it is only ever compared with a digest, and a hand-posted string of any length would otherwise ride along with every later save and snapshot.
+- **`:mermaid` and `:diagram_drawing` are a built-in block type's alone** (`FieldTypes::BLOCK_ONLY`): nothing but the Diagram block's card makes a drawing and nothing but its component prints one, so a post type, a field group or a gem may not declare either until a second user exists.
 - **Thruster keeps the fonts' CORS header**: measured on a local production image, the fingerprinted `archivo-latin-400-normal-*.woff2` answered `Access-Control-Allow-Origin: *` with and without `Origin: null`, on Thruster's cache miss and hit and with gzip; a face of another family answered none.
 
 ## My calls (marked so the owner can check them)

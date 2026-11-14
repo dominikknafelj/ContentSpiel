@@ -22,7 +22,7 @@ module Admin
       WORDS = "admin.components.fields.mermaid_field".freeze
       # The file's name is put into the sentence as this mark, then cut out
       # as the empty place the script fills: no locale string holds it.
-      FILE = "".freeze
+      FILE = "\uE000".freeze
 
       def initialize(input_id:)
         @input_id = input_id

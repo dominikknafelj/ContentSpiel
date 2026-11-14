@@ -7,10 +7,11 @@ module ContentModel
   class FieldGroupDefinition < Definition
     dsl_attribute :component
 
-    # Choices for posts are not built: a block's theme choice is the only
-    # one (`FieldTypes::BLOCK_ONLY`).
+    # A type only a built-in block type may declare (`FieldTypes::BLOCK_ONLY`):
+    # a theme choice, a Mermaid source, a diagram's drawing.
     def refuse_type!(type)
-      raise ArgumentError, "a field group may not declare a #{type} field: choices for posts are not built" if FieldTypes::BLOCK_ONLY.include?(type)
+      reason = FieldTypes::BLOCK_ONLY.dig(type, :posts)
+      raise ArgumentError, "a field group may not declare a #{type} field: #{reason}" if reason
     end
     private :refuse_type!
 

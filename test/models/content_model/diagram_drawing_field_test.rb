@@ -27,9 +27,12 @@ class ContentModel::DiagramDrawingFieldTest < ActiveSupport::TestCase
     assert from_json.valid?, from_json.errors.full_messages.inspect
     assert_equal({ "svg" => clean, "from" => FROM }, from_json.drawing)
     assert_equal({ "svg" => clean, "from" => FROM }, fields("drawing" => { "svg" => RAW, "from" => FROM }).drawing, "a Hash, as jsonb reads back")
-    assert_equal "hand-made", fields("drawing" => { "svg" => RAW, "from" => "hand-made" }).drawing["from"], "from is kept as given"
+    other = Diagrams::Drawing.digest("another source")
+    assert_equal other, fields("drawing" => { "svg" => RAW, "from" => other }).drawing["from"], "a digest is kept as given: the cast cannot see the source"
 
-    [ JSON.generate(svg: SCRIPT, from: FROM), "not json", JSON.generate([ 1 ]), JSON.generate(svg: RAW), { "from" => FROM } ].each do |sent|
+    not_digests = [ "hand-made", "#{FROM}0", FROM[0..62], "#{FROM}\n", "x" * 100_000, 42 ]
+    hand_made = not_digests.map { |from| JSON.generate(svg: RAW, from: from) }
+    [ JSON.generate(svg: SCRIPT, from: FROM), "not json", JSON.generate([ 1 ]), JSON.generate(svg: RAW), { "from" => FROM }, *hand_made ].each do |sent|
       refused = fields("drawing" => sent)
 
       assert_not refused.valid?, sent.inspect
@@ -56,7 +59,7 @@ class ContentModel::DiagramDrawingFieldTest < ActiveSupport::TestCase
 
   test "a block whose save sends a drawing that does not clean is refused, and its stored drawing stays" do
     saved = BlockTypes.all.dup
-    BlockTypes.register("test/diagram") do |t|
+    BlockTypes.register("test_diagram") do |t|
       TestTypes.declare(t)
       t.label "Diagram"
       t.field :source, :mermaid, translated: true, drawing: :drawing
@@ -64,7 +67,7 @@ class ContentModel::DiagramDrawingFieldTest < ActiveSupport::TestCase
       t.component TestQuoteComponent
     end
     Current.actor = users(:one)
-    block = ContentBlock.create!(owner: Page.create!(title: "Home", slug: ""), block_type: "test/diagram", position: 0,
+    block = ContentBlock.create!(owner: Page.create!(title: "Home", slug: ""), block_type: "test_diagram", position: 0,
       translated_settings: { "en" => { "source" => "flowchart LR\n  A --> B", "drawing" => { "svg" => Diagrams::Drawing.clean(RAW).svg, "from" => FROM } } })
 
     result = ContentBlocks::Save.call(block, attributes: { settings: { "drawing" => JSON.generate(svg: SCRIPT, from: FROM) } })

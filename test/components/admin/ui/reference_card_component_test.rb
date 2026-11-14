@@ -212,6 +212,24 @@ class Admin::Ui::ReferenceCardComponentTest < ViewComponent::TestCase
     block.reload
   end
 
+  test "an original's kind is read from its input's class, and no input's display is asked" do
+    link = ContentModel::Definition::Field.new(name: "target", type: :link, options: { translated: true })
+    code = ContentModel::Definition::Field.new(name: "snippet", type: :code, options: {})
+    mermaid = ContentModel::Definition::Field.new(name: "source", type: :mermaid, options: { translated: true, drawing: :drawing })
+    inputs = [ Admin::Fields::Base, Admin::Fields::LinkField, Admin::Fields::CodeField, Admin::Fields::MermaidField ]
+    own = inputs.select { |input| input.singleton_class.instance_methods(false).include?(:display) }
+    saved = own.to_h { |input| [ input, input.singleton_class.instance_method(:display) ] }
+    asked = []
+    own.each { |input| input.define_singleton_method(:display) { |*| asked << input } }
+
+    assert_equal :plain, Admin::Ui::ReferenceCardComponent.kind_for("/about", link)
+    assert_equal :code, Admin::Ui::ReferenceCardComponent.kind_for("puts 1", code)
+    assert_equal :code, Admin::Ui::ReferenceCardComponent.kind_for("flowchart LR", mermaid)
+    assert_empty asked
+  ensure
+    saved&.each { |input, method| input.singleton_class.define_method(:display, method) }
+  end
+
   test "a diagram's outdated source is a word diff in the code frame, its indentation kept" do
     block = outdated_diagram
     field = block.definition.fields.find { |candidate| candidate.name == "source" }

@@ -79,12 +79,12 @@ class ContentModel::MermaidFieldTest < ActiveSupport::TestCase
   end
 
   test "a mermaid field names its drawing, a diagram_drawing field translated as it is, and the registration refuses anything else" do
-    saved = FieldGroups.all.dup
+    saved = BlockTypes.all.dup
     register = lambda do |&block|
-      FieldGroups.register("test/diagram_pair", &block)
+      BlockTypes.register("test_diagram_pair") { |t| block.call(t); TestTypes.declare(t) }
     ensure
-      FieldGroups.reset!
-      saved.each { |definition| FieldGroups.registry_put(definition) }
+      BlockTypes.reset!
+      saved.each { |definition| BlockTypes.registry_put(definition) }
     end
 
     assert_raises(ArgumentError, "no drawing:") { ContentModel::BlockTypeDefinition.new("x").field(:source, :mermaid) }
@@ -102,12 +102,12 @@ class ContentModel::MermaidFieldTest < ActiveSupport::TestCase
   end
 
   test "a mermaid field may name its description, a string or text field translated as it is, and the registration refuses anything else" do
-    saved = FieldGroups.all.dup
+    saved = BlockTypes.all.dup
     register = lambda do |&block|
-      FieldGroups.register("test/diagram_described", &block)
+      BlockTypes.register("test_diagram_described") { |t| block.call(t); TestTypes.declare(t) }
     ensure
-      FieldGroups.reset!
-      saved.each { |definition| FieldGroups.registry_put(definition) }
+      BlockTypes.reset!
+      saved.each { |definition| BlockTypes.registry_put(definition) }
     end
 
     definition = register.call do |t|
@@ -126,5 +126,28 @@ class ContentModel::MermaidFieldTest < ActiveSupport::TestCase
     assert_raises(ArgumentError, "description: is a mermaid field's") { ContentModel::BlockTypeDefinition.new("x").field(:title, :string, description: :x) }
     assert_raises(ArgumentError, "description: is a mermaid field's") { ContentModel::BlockTypeDefinition.new("x").field(:body, :text, description: :x) }
     assert_equal :description, BlockTypes.fetch(:diagram).fields.first.options[:description]
+  end
+
+  test "only a built-in block type may declare a mermaid source or a drawing: a content type, a field group and an outside block type may not" do
+    [ ContentModel::ContentTypeDefinition, ContentModel::FieldGroupDefinition ].each do |kind|
+      %i[mermaid diagram_drawing].each do |type|
+        options = type == :mermaid ? { drawing: :drawing } : {}
+        error = assert_raises(ArgumentError, "#{kind} #{type}") { kind.new("sample").field :part, type, **options }
+        assert_match(/may not declare a #{type} field: a drawing is made by the Diagram block's card/, error.message)
+      end
+    end
+
+    saved = BlockTypes.all.dup
+    error = assert_raises(ArgumentError) do
+      BlockTypes.register("gallery/chart") do |t|
+        t.field :source, :mermaid, drawing: :drawing
+        t.field :drawing, :diagram_drawing
+        TestTypes.declare(t)
+      end
+    end
+    assert_match(/a block type from outside may not declare a :mermaid field/, error.message)
+  ensure
+    BlockTypes.reset!
+    saved&.each { |definition| BlockTypes.registry_put(definition) }
   end
 end

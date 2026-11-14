@@ -37,8 +37,9 @@ module ContentModel
     # block's title: what an empty one does; the Diagram block's
     # description), and `placeholder_from:` names a select declared BEFORE
     # the string whose chosen label is the string's placeholder (the Note
-    # block's title shows the kind's word, design answer B3). Both are literals of the type's definition, as `label:` is.
-    # `max:` on a string counts characters, as on a code field.
+    # block's title shows the kind's word, design answer B3). Both are
+    # literals of the type's definition, as `label:` is. `max:` on a string
+    # counts characters, as on a code field.
     #
     # `format:` is the shape a string must have (a Regexp, tested against the whole
     # cast value; a blank value has none to test) and `format_message:` the I18n
@@ -72,7 +73,7 @@ module ContentModel
       def translation_required? = options[:translation_required] == true
       def group? = GROUP_TYPES.include?(type)
       # Of a type only a built-in block type may declare (`FieldTypes::BLOCK_ONLY`).
-      def block_only? = FieldTypes::BLOCK_ONLY.include?(type)
+      def block_only? = FieldTypes::BLOCK_ONLY.key?(type)
       def label = options[:label].presence || name.humanize
       # The line under the field in CS Studio, or nil.
       def help = options[:help].presence

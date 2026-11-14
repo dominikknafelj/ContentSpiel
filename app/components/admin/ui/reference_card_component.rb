@@ -5,8 +5,9 @@ module Admin
     # the language's own name as an uppercase mono label, then the original --
     # a `<p>` for a plain value, the rendered (and scrubbed) HTML for a rich
     # one, and for code (`:code`, a Mermaid source) the code frame of
-    # `admin/shared/_code_display`, the one way CS Studio shows code it
-    # does not edit, so its indentation is kept (`kind_for`). It replaces the old sunken "original" panel `Admin::Columns::*` and
+    # `admin/shared/_code_display`, the one way CS Studio shows code it does
+    # not edit, so its indentation is kept (`kind_for`). It replaces the old
+    # sunken "original" panel `Admin::Columns::*` and
     # `Admin::Ui::FieldComponent` each rendered by hand.
     #
     # The root carries `data-original-for` (the field) and
@@ -149,14 +150,15 @@ module Admin
       KINDS = %i[plain rich code].freeze
 
       # The kind of an original: rich for a document, code where the field's
-      # input reads its value as code (`Admin::Fields::<Type>Field.display`, a
-      # `CodeDisplay`), plain otherwise. `field` is the schema field, or nil
-      # for a column.
+      # input is the Code field or one built on it (`:code`, `:mermaid`),
+      # plain otherwise. Decided by the input's class, never by its
+      # `display`, which for some types (a link, a form) runs a query.
+      # `field` is the schema field, or nil for a column.
       def self.kind_for(original, field)
         return :rich if original.is_a?(RichText::Document)
         return :plain if field.nil? || field.group?
 
-        Admin::Ui::FieldComponent.input_class_for(field).display(field, original).is_a?(Admin::Fields::CodeDisplay) ? :code : :plain
+        Admin::Ui::FieldComponent.input_class_for(field) <= Admin::Fields::CodeField ? :code : :plain
       end
 
       def rich? = kind == :rich

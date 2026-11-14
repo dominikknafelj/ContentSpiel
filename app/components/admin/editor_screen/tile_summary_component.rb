@@ -83,6 +83,11 @@ module Admin
 
       def dom_id = self.class.dom_id(block)
 
+      # One render asks the type for its line, its preview and its picture;
+      # a type whose three share a costly read keeps it for this render alone
+      # (`ContentModel::TileReads`).
+      def render_in(...) = ContentModel::TileReads.during { super }
+
       # The parts of the summary the tile's face is named and described by
       # (`BlockTileComponent`), in the order the name reads them: the
       # attention mark, the preview's heading (or the one line), then

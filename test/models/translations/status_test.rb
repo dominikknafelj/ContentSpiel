@@ -248,7 +248,7 @@ class Translations::StatusTest < ActiveSupport::TestCase
   # no language's state.
   test "changing only the default language's drawing leaves the other languages' states unchanged" do
     saved = BlockTypes.all.dup
-    BlockTypes.register("test/drawn") do |t|
+    BlockTypes.register("test_drawn") do |t|
       TestTypes.declare(t)
       t.label "Drawn"
       t.field :source, :mermaid, translated: true, drawing: :drawing
@@ -260,7 +260,7 @@ class Translations::StatusTest < ActiveSupport::TestCase
       source = "flowchart LR\n  A --> B"
       drawing = ->(from) { JSON.generate(svg: svg, from: from) }
       page = create_page(title: "About", translations: { "de" => { title: "Über uns" } })
-      result = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "test/drawn", settings: { source: source, drawing: drawing.(Diagrams::Drawing.digest(source)) } })
+      result = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "test_drawn", settings: { source: source, drawing: drawing.(Diagrams::Drawing.digest(source)) } })
       assert result.ok?, result.errors.to_sentence
       block = result.record
       assert ContentBlocks::Save.call(block, translations: { "de" => { settings: { source: "flowchart LR\n  A --> C", drawing: drawing.(Diagrams::Drawing.digest("flowchart LR\n  A --> C")) } } }).ok?
@@ -268,7 +268,7 @@ class Translations::StatusTest < ActiveSupport::TestCase
       assert_includes ContentBlock.translation_tracked_fields(block), "source"
       before = Translations::Status.for([ page ])[page]
 
-      assert ContentBlocks::Save.call(block.reload, attributes: { settings: { drawing: drawing.("a re-draw of the same source") } }).ok?
+      assert ContentBlocks::Save.call(block.reload, attributes: { settings: { drawing: drawing.(Diagrams::Drawing.digest("a re-draw of the same source")) } }).ok?
       assert_equal before, Translations::Status.for([ page.reload ])[page]
       assert_equal({ "de" => :complete }, before)
 

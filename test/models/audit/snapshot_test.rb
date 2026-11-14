@@ -359,7 +359,7 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
   # changes row, never the text or the SVG.
   test "a Diagram-shaped block's save audits its translated source and drawing as digests only" do
     saved_types = BlockTypes.all.dup
-    BlockTypes.register("test/diagram") do |t|
+    BlockTypes.register("test_diagram") do |t|
       TestTypes.declare(t)
       t.label "Diagram"
       t.field :source, :mermaid, translated: true, drawing: :drawing
@@ -371,7 +371,7 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       svg = Diagrams::Drawing.clean(Rails.root.join("test/fixtures/diagrams/flowchart.svg").read).svg
       drawing = ->(source) { JSON.generate(svg: svg, from: Diagrams::Drawing.digest(source)) }
       saved = ContentBlocks::Save.call(create_page(title: "With a diagram").content_blocks.new,
-        attributes: { block_type: "test/diagram", settings: { "source" => "flowchart LR\n  SOURCE-EN --> B", "drawing" => drawing.("flowchart LR\n  SOURCE-EN --> B"), "description" => "Words" } })
+        attributes: { block_type: "test_diagram", settings: { "source" => "flowchart LR\n  SOURCE-EN --> B", "drawing" => drawing.("flowchart LR\n  SOURCE-EN --> B"), "description" => "Words" } })
       assert saved.ok?, saved.errors.to_sentence
       block = saved.record
 

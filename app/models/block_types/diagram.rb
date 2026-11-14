@@ -98,10 +98,6 @@ module BlockTypes
 
     SUMMARY_LENGTH = ContentModel::BlockTypeDefinition::SUMMARY_LENGTH
 
-    # block object => { [locale, stored values] => Shown }, held no longer
-    # than the block object is.
-    MEMO = ObjectSpace::WeakMap.new
-
     # What a closed block's tile reads in a language, by the public
     # component's fallback (`Blocks::DiagramComponent`): the source and the
     # drawing of the first language on the fallback chain with a source of
@@ -109,19 +105,13 @@ module BlockTypes
     # language whose drawing it is. Read as stored, the drawing not cast.
     #
     # One tile asks it three times (its line, its preview and its picture),
-    # so it is kept per block object, language and stored values
-    # (`MEMO`): the three share one `Diagrams::Drawing`, which parses its
-    # drawing once and keeps its markup. A save hands the tile a block whose
-    # stored values changed, and so reads them again.
+    # so within one render of the tile it is read once
+    # (`ContentModel::TileReads`): the three share one `Diagrams::Drawing`,
+    # which parses its drawing once and keeps its markup. The next render,
+    # after a save or a change in memory, reads the block again.
     Shown = Data.define(:source, :drawing, :description) do
       def self.for(block, locale:)
-        stored = block.translated_settings.to_h
-        kept = (MEMO[block] ||= {})
-        key = [ locale.to_s, stored ]
-        return kept[key] if kept.key?(key)
-
-        kept.clear
-        kept[key] = read(block, stored, locale)
+        ContentModel::TileReads.fetch(block, [ :diagram_shown, locale.to_s ]) { read(block, block.translated_settings.to_h, locale) }
       end
 
       def self.read(block, stored, locale)
@@ -176,13 +166,13 @@ module BlockTypes
     end
 
     # The tile's small picture: the drawing the site would show, with no
-    # title (hidden from a screen reader, it needs no name, and a title would
-    # be a tooltip over the tile's face), its ids the tile's own (`diagram-tile-<block>-<locale>-`,
-    # never the card's frame's or the page's), in an element of the public
-    # block's class, so CS Studio's stylesheet paints it with the block's
-    # own rules on CS Studio's colours. The line beside it names the
-    # block. Nil when there is no drawing that
-    # passes on read.
+    # title (hidden from a screen reader, it needs no name, and a title
+    # would be a tooltip over the tile's face), its ids the tile's own
+    # (`diagram-tile-<block>-<locale>-`, never the card's frame's or the
+    # page's), in an element of the public block's class, so CS Studio's
+    # stylesheet paints it with the block's own rules on CS Studio's
+    # colours. The line beside it names the block. Nil when there is no
+    # drawing that passes on read.
     def self.tile_picture(block, locale:)
       shown = Shown.for(block, locale: locale)
       drawing = shown&.shown_drawing

@@ -38,8 +38,9 @@ module Admin
     # needs outside the form (`Fields::Base.outside_form`): the block card
     # alone. Only then does an input draw its import control (`label_end`);
     # it is false unless asked for.
+    #
     # The original is a code frame (`ReferenceCardComponent`'s `:code`) where
-    # the input reads its value as code (`display`, a `Fields::CodeDisplay`).
+    # the input is the Code field or one built on it (`kind_for`).
     class FieldComponent < AdminComponent
       include Admin::Ui::Contract
 

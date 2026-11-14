@@ -14,9 +14,9 @@ module Diagrams
   # passes that rule, text only inside `TEXT_HOLDERS` (and nothing but text
   # inside `TEXT_ONLY`), and every name written is this file's own string.
   # Comments, whitespace between elements and the input's quoting are not
-  # carried. So the HTML parser of the page that
-  # inlines it reads what the XML parser read: no prefix, no comment, no
-  # CDATA and no element that breaks out of an SVG into the page.
+  # carried. So the HTML parser of the page that inlines it reads what the
+  # XML parser read: no prefix, no comment, no CDATA and no element that
+  # breaks out of an SVG into the page.
   #
   # TWO OUTCOMES BESIDES A CLEAN DRAWING, as the spec divides them (Diagram
   # block spec, §3):
