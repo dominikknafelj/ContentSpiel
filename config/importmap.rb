@@ -125,7 +125,7 @@ pin "sortablejs", preload: false # @1.15.7
 # asset URL (an import map does not apply inside a worker). Nothing in a page
 # imports it, so it is not preloaded; the pin stays so `bin/importmap audit`
 # and `outdated` still see the package.
-pin "d3-force", preload: false # @3.0.0
+pin "d3-force", preload: false # @3.0.1
 # Vendored for the Diagram block's renderer frame (`Admin::DiagramRenderersController`),
 # which loads `dist/mermaid.min.js` (an IIFE that sets the global `mermaid`)
 # by its asset URL as a classic script: the frame has an opaque origin and
@@ -137,7 +137,7 @@ pin "mermaid", preload: false # @12.2.0
 # Tiptap 3 and its ProseMirror dependencies, vendored by
 # `bin/importmap pin @tiptap/core @tiptap/starter-kit @tiptap/extension-link`
 # and, for the Table block's grid (table spec decision 11), `bin/importmap pin
-# @tiptap/extension-table@3.31.3`, which brought `@tiptap/pm/tables` and
+# @tiptap/extension-table`, which brought `@tiptap/pm/tables` and
 # `prosemirror-tables` (and moved prosemirror-transform and -view up a patch
 # release) -- no npm, no CDN at runtime. `preload: "admin"` on every one of them (see
 # the top of this file); re-add it after a re-pin -- `bin/importmap pin`
@@ -154,49 +154,49 @@ pin "mermaid", preload: false # @12.2.0
 # from jsDelivr -- see the header comment in the file); same exports, no
 # imports. Re-pinning/`bin/importmap pristine` re-downloads the broken jspm
 # version, so re-apply this after either.
-pin "@tiptap/core", to: "@tiptap--core.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-link", to: "@tiptap--extension-link.js", preload: "admin" # @3.31.3
-pin "@tiptap/starter-kit", to: "@tiptap--starter-kit.js", preload: "admin" # @3.31.3
-pin "@tiptap/core/jsx-runtime", to: "@tiptap--core--jsx-runtime.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-blockquote", to: "@tiptap--extension-blockquote.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-bold", to: "@tiptap--extension-bold.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-code", to: "@tiptap--extension-code.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-code-block", to: "@tiptap--extension-code-block.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-document", to: "@tiptap--extension-document.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-hard-break", to: "@tiptap--extension-hard-break.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-heading", to: "@tiptap--extension-heading.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-horizontal-rule", to: "@tiptap--extension-horizontal-rule.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-italic", to: "@tiptap--extension-italic.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-list", to: "@tiptap--extension-list.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-paragraph", to: "@tiptap--extension-paragraph.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-strike", to: "@tiptap--extension-strike.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-text", to: "@tiptap--extension-text.js", preload: "admin" # @3.31.3
-pin "@tiptap/extension-underline", to: "@tiptap--extension-underline.js", preload: "admin" # @3.31.3
-pin "@tiptap/extensions", to: "@tiptap--extensions.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/commands", to: "@tiptap--pm--commands.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/dropcursor", to: "@tiptap--pm--dropcursor.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/gapcursor", to: "@tiptap--pm--gapcursor.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/history", to: "@tiptap--pm--history.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/keymap", to: "@tiptap--pm--keymap.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/model", to: "@tiptap--pm--model.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/schema-list", to: "@tiptap--pm--schema-list.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/state", to: "@tiptap--pm--state.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/transform", to: "@tiptap--pm--transform.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/view", to: "@tiptap--pm--view.js", preload: "admin" # @3.31.3
-pin "linkifyjs", preload: "admin" # @4.3.3
+pin "@tiptap/core", to: "@tiptap--core.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-link", to: "@tiptap--extension-link.js", preload: "admin" # @3.34.0
+pin "@tiptap/starter-kit", to: "@tiptap--starter-kit.js", preload: "admin" # @3.34.0
+pin "@tiptap/core/jsx-runtime", to: "@tiptap--core--jsx-runtime.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-blockquote", to: "@tiptap--extension-blockquote.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-bold", to: "@tiptap--extension-bold.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-code", to: "@tiptap--extension-code.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-code-block", to: "@tiptap--extension-code-block.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-document", to: "@tiptap--extension-document.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-hard-break", to: "@tiptap--extension-hard-break.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-heading", to: "@tiptap--extension-heading.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-horizontal-rule", to: "@tiptap--extension-horizontal-rule.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-italic", to: "@tiptap--extension-italic.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-list", to: "@tiptap--extension-list.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-paragraph", to: "@tiptap--extension-paragraph.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-strike", to: "@tiptap--extension-strike.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-text", to: "@tiptap--extension-text.js", preload: "admin" # @3.34.0
+pin "@tiptap/extension-underline", to: "@tiptap--extension-underline.js", preload: "admin" # @3.34.0
+pin "@tiptap/extensions", to: "@tiptap--extensions.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/commands", to: "@tiptap--pm--commands.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/dropcursor", to: "@tiptap--pm--dropcursor.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/gapcursor", to: "@tiptap--pm--gapcursor.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/history", to: "@tiptap--pm--history.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/keymap", to: "@tiptap--pm--keymap.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/model", to: "@tiptap--pm--model.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/schema-list", to: "@tiptap--pm--schema-list.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/state", to: "@tiptap--pm--state.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/transform", to: "@tiptap--pm--transform.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/view", to: "@tiptap--pm--view.js", preload: "admin" # @3.34.0
+pin "linkifyjs", preload: "admin" # @4.4.0
 pin "orderedmap", preload: "admin" # @2.1.1
 pin "prosemirror-commands", preload: "admin" # @1.7.2
 pin "prosemirror-dropcursor", preload: "admin" # @1.8.4
 pin "prosemirror-gapcursor", preload: "admin" # @1.4.1
-pin "prosemirror-history", preload: "admin" # @1.5.0
+pin "prosemirror-history", preload: "admin" # @1.5.1
 pin "prosemirror-keymap", preload: "admin" # @1.2.3
-pin "prosemirror-model", preload: "admin" # @1.25.12
-pin "prosemirror-schema-list", preload: "admin" # @1.5.1
+pin "prosemirror-model", preload: "admin" # @1.25.13
+pin "prosemirror-schema-list", preload: "admin" # @1.6.0
 pin "prosemirror-state", preload: "admin" # @1.4.4
-pin "prosemirror-transform", preload: "admin" # @1.12.4
-pin "prosemirror-view", preload: "admin" # @1.42.8
+pin "prosemirror-transform", preload: "admin" # @1.12.5
+pin "prosemirror-view", preload: "admin" # @1.42.9
 pin "rope-sequence", preload: "admin" # @1.3.4
 pin "w3c-keyname", preload: "admin" # @2.2.8
-pin "@tiptap/extension-table", to: "@tiptap--extension-table.js", preload: "admin" # @3.31.3
-pin "@tiptap/pm/tables", to: "@tiptap--pm--tables.js", preload: "admin" # @3.31.3
+pin "@tiptap/extension-table", to: "@tiptap--extension-table.js", preload: "admin" # @3.34.0
+pin "@tiptap/pm/tables", to: "@tiptap--pm--tables.js", preload: "admin" # @3.34.0
 pin "prosemirror-tables", preload: "admin" # @1.8.5
