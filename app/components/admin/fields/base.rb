@@ -11,6 +11,9 @@ module Admin
     # whichever one it dispatches to without a type-by-type special case.
     # `placeholder:` is what the caller hands a field that shows one
     # (`Admin::Fields::StringField`); every other type ignores it.
+    # `editable:` false is a field that can't be changed now (held by
+    # someone else, or drawn for a reader): an input draws no control that
+    # only changes it (`label_end`).
     class Base < Admin::AdminComponent
       # How a value of this type reads where it cannot be edited (a
       # translation tab's "Shared fields", `EditorScreen::SharedFieldsComponent`):
@@ -45,11 +48,21 @@ module Admin
       # nil. Read after the input is rendered.
       def below_pair = nil
 
+      # What the input needs drawn after its form, as a component, or nil: a
+      # confirmation dialog, whose `<form method="dialog">` cannot stand
+      # inside the form (the Mermaid source's "Replace the source?"). The
+      # block card asks it only where its fields can be changed now.
+      def self.outside_form(_field, _input_id) = nil
+
+      # A control at the end of the label's row (the Mermaid source's Import
+      # file…), or nil. Read after the input is rendered.
+      def label_end = nil
+
       # `id_prefix:` mirrors `Ui::FieldComponent`'s own (see its comment) --
       # forwarded here unchanged so `input_id` agrees with the wrapping
       # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a
       # caller supplied.
-      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil, placeholder: nil)
+      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil, placeholder: nil, editable: true)
         @field = field
         @form_name = form_name
         @value = value
@@ -58,11 +71,14 @@ module Admin
         @errors = errors
         @id_prefix = id_prefix || Admin::Ui::FieldComponent.dom_id_prefix(form_name)
         @placeholder = placeholder
+        @editable = editable
       end
 
       private
 
       attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :placeholder
+
+      def editable? = @editable
 
       def input_name = "#{form_name}[#{field.name}]"
 

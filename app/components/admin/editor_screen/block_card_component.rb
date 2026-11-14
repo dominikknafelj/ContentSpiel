@@ -424,6 +424,20 @@ module Admin
       # the table can be changed now: not for a reader, not in a held form.
       def table_controls? = block.body_content_kind == :table && editable? && !read_only_hold?
 
+      # Whether the block's fields can be changed now: by someone who may
+      # edit it, in a form nobody else holds. A schema field draws a control
+      # that only changes it (a Diagram's Import file…) only then.
+      def changeable? = editable? && !read_only_hold?
+
+      # What the schema fields shown need drawn after the form (a Diagram
+      # source's "Replace the source?", `Fields::Base.outside_form`), where
+      # the fields can be changed now.
+      def outside_form_parts
+        return [] unless changeable?
+
+        other_schema_fields.filter_map { |field| Admin::Ui::FieldComponent.input_class_for(field).outside_form(field, field_id(field.name)) }
+      end
+
       # What the body's editor shows while its field is empty: a Table's
       # starting grid, where its controls are drawn (a held or read-only grid
       # with no table shows none: there is nothing it could start).

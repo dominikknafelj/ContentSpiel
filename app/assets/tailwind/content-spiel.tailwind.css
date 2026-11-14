@@ -869,6 +869,10 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-mermaid-field__well { position: relative; }
 .admin-mermaid-field__line { position: absolute; pointer-events: none; background: var(--cs-warn-tint); mix-blend-mode: darken; }
 [data-theme="dark"] .admin-mermaid-field__line { mix-blend-mode: lighten; }
+/* Import file… only changes the source: a form turned read-only in place
+   (`editing/freeze`, which marks its fieldsets `admin-held`) shows none, as
+   the server draws none in a held form. */
+.admin-held .admin-mermaid-field__import { display: none; }
 /* A hidden field input (`Admin::Ui::FieldComponent#hidden?`, a Diagram
    block's drawing): no box and no gap in its form's column, until its error
    slot holds a message (a `p`, `admin/shared/_field_errors`). */

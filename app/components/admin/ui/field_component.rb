@@ -26,11 +26,17 @@ module Admin
     # has the last word (`Fields::Base.reference?`): one nobody types in (a
     # Diagram block's drawing) is never shown beside an original.
     #
-    # Three more answers of the input shape what is drawn around it:
+    # Four more answers of the input shape what is drawn around it:
     # `hidden?`, a hidden input nobody types in, drawn with its error slot
     # alone in `.admin-field--hidden`, which takes no room in the form until
-    # the slot holds an error; `field_data`, data on the field's wrapper; and
+    # the slot holds an error; `field_data`, data on the field's wrapper;
+    # `label_end`, a control at the end of the label's row; and
     # `below_pair`, what it draws under a translation pair, the pair's width.
+    #
+    # `editable:` false is a field that can't be changed now: the form is
+    # held by someone else or drawn for a reader. The input is still drawn
+    # (`HeldFields` and the disabled fieldset make it read-only), but a
+    # control that only changes it, such as `label_end`'s, is left out.
     # The original is a code frame (`ReferenceCardComponent`'s `:code`) where
     # the input reads its value as code (`display`, a `Fields::CodeDisplay`).
     class FieldComponent < AdminComponent
@@ -41,12 +47,13 @@ module Admin
         motion: :reduced,
         content_edges: %i[none short long],
         widths: :from_container,
-        interface: %i[field form_name value original locale errors id_prefix translation_state translation_confirm translation_record placeholder],
+        interface: %i[field form_name value original locale errors id_prefix translation_state translation_confirm translation_record placeholder editable],
         limits: [
           "It draws the chrome around a field; the input is the Admin::Fields class of the field's type.",
           "Whether the original is shown is the caller's and the input's: it is shown only when an original is handed over and the input answers reference? (a drawing nobody types in does not).",
           "A hidden input (hidden?) is drawn with its error slot alone: no label, help, original or Translate button, and no room in the form until the slot holds an error.",
-          "An input may put data on the field's wrapper (field_data) and draw under the translation pair (below_pair), the Mermaid source's preview."
+          "An input may put data on the field's wrapper (field_data) and draw under the translation pair (below_pair), the Mermaid source's preview.",
+          "An input may draw a control at the end of its label's row (label_end), the Mermaid source's Import file…; editable: false says the field can't be changed now (held by someone else, or for a reader), and such a control is not drawn."
         ],
         states: %i[rest invalid translated outdated hover focus],
         keys: [],
@@ -86,7 +93,7 @@ module Admin
       # changed" note beside the original -- the same contract
       # `Admin::Columns::Base` gives every column field.
       def initialize(field:, form_name:, value:, original: nil, locale:, errors: [], id_prefix: nil,
-        translation_state: nil, translation_confirm: nil, translation_record: nil, placeholder: nil)
+        translation_state: nil, translation_confirm: nil, translation_record: nil, placeholder: nil, editable: true)
         @field = field
         @form_name = form_name
         @value = value
@@ -98,6 +105,7 @@ module Admin
         @translation_confirm = translation_confirm
         @translation_record = translation_record
         @placeholder = placeholder
+        @editable = editable
       end
 
       # The field's own label where its type gives one (`label: "File name"`),
@@ -119,7 +127,8 @@ module Admin
       # for its wrapper's data and what it draws under the pair.
       def input_component
         @input_component ||= input_class.new(
-          field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix, placeholder: placeholder
+          field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix, placeholder: placeholder,
+          editable: editable
         )
       end
 
@@ -190,7 +199,7 @@ module Admin
 
       def translatable? = field.field_type&.translatable == true
 
-      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record, :placeholder
+      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record, :placeholder, :editable
     end
   end
 end

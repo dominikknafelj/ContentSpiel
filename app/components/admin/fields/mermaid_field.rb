@@ -45,6 +45,20 @@ module Admin
     # translation tab the source and the original take the pair, so the
     # preview stands under the whole pair (`below_pair`).
     #
+    # IMPORT FILE… (EditorDiagramBlock, "Importing") stands at the end of
+    # the label's row (`label_end`) wherever the source can be changed now,
+    # never in a held form or for a reader (`editable?`): a small tertiary
+    # button that opens a hidden file input with no `name`, so no form ever
+    # sends the file; the script reads it in the browser and puts its text
+    # into the source as if typed. What an import says goes into
+    # `importStatus`, a polite region under the source, as clones of the
+    # server's templates (a warn and a neutral notice with no role of their
+    # own, and the "Imported from" line). A source that isn't empty asks
+    # first, in the replace confirmation (`MermaidReplaceDialogComponent`,
+    # `replace_dialog_id`), which the block card draws after its form
+    # (`outside_form`): a dialog's `<form method="dialog">` cannot stand
+    # inside the block's form. Its confirm closes it with `REPLACE_VALUE`.
+    #
     # THE SENTENCES of a refused line, of a type off the list and of a first
     # line that names none are written once, in `errors.messages.diagram_*`
     # (`SENTENCES`), and handed to the script under this field's keys. No
@@ -54,7 +68,8 @@ module Admin
       CONTROLLER = "admin--diagram--preview".freeze
 
       # The card's words the script shows, under `admin.components.fields.mermaid_field`.
-      MESSAGES = %w[frame_title empty error_lead kept nothing_yet kept_badge too_long too_large]
+      MESSAGES = %w[frame_title empty error_lead kept nothing_yet kept_badge too_long too_large
+                    imported import_first_only import_no_mermaid import_too_long import_unreadable]
         .map { |key| "components.fields.mermaid_field.#{key}" }.freeze
 
       # The server's sentences the script shows: its key => the I18n key
@@ -69,6 +84,14 @@ module Admin
         "unsupported" => "diagram_unsupported",
         "no_type" => "diagram_no_type"
       }.to_h { |key, error| [ "components.fields.mermaid_field.#{key}", "errors.messages.#{error}" ] }.freeze
+
+      # What the replace confirmation's confirm closes it with (`returnValue`).
+      REPLACE_VALUE = "replace".freeze
+
+      # The replace confirmation of the source whose input is `input_id`.
+      def self.replace_dialog_id(input_id) = "#{input_id}-replace"
+
+      def self.outside_form(_field, input_id) = MermaidReplaceDialogComponent.new(input_id: input_id)
 
       # The `--th-diagram-*` tokens the script reads off the colour probe and
       # posts to the frame: the Diagram block's themed tokens, which CS
@@ -111,8 +134,42 @@ module Admin
           "#{CONTROLLER}-starting-value": starting?,
           "#{CONTROLLER}-colours-value": self.class.colour_names.to_json,
           "#{CONTROLLER}-description-field-value": description_id,
+          "#{CONTROLLER}-replace-dialog-value": (self.class.replace_dialog_id(input_id) if editable?),
           messages: messages
-        }
+        }.compact
+      end
+
+      # Import file… and the hidden file input it opens, for a source that
+      # can be changed now. The input takes no Tab stop: the button is the
+      # way in.
+      def label_end
+        return unless editable?
+
+        tag.span(class: "admin-mermaid-field__import") do
+          safe_join([
+            render(Admin::Ui::ButtonComponent.new(label: t(".import"), variant: :tertiary, size: :small, data: { action: "#{CONTROLLER}#import" })),
+            tag.input(type: "file", id: "#{input_id}-import", accept: ".mmd,.md,text/markdown,text/plain", hidden: true, tabindex: -1,
+              data: { **target("file"), action: "change->#{CONTROLLER}#read" })
+          ])
+        end
+      end
+
+      # A compact notice's box with no words yet, for the script to fill:
+      # `NoticeComponent` draws nothing without words, so the box takes its
+      # classes, and no role, since the region it is put in speaks.
+      def empty_notice(tone) = tag.div(class: "#{Admin::Ui::NoticeComponent.classes(tone, size: :compact)} mt-2")
+
+      # The polite region an import speaks in, and the three boxes the
+      # script clones into it.
+      def import_status
+        return unless editable?
+
+        safe_join([
+          tag.div(aria: { live: "polite" }, data: target("importStatus")),
+          tag.template(empty_notice(:warn), data: target("importWarning")),
+          tag.template(empty_notice(:neutral), data: target("importNote")),
+          tag.template(tag.p(class: "mt-1 text-small text-meta"), data: target("imported"))
+        ])
       end
 
       # The source target, the Code field's counter (`admin--editor--code-limit`,

@@ -160,7 +160,7 @@
           <%= render Admin::Ui::FieldComponent.new(
                 field: field, form_name: "block[settings]",
                 value: value_for(field), original: original_for(field), locale: locale,
-                errors: field_errors(field), id_prefix: error_prefix, placeholder: placeholder_for(field), **translation(field.name)
+                errors: field_errors(field), id_prefix: error_prefix, placeholder: placeholder_for(field), editable: changeable?, **translation(field.name)
               ) %>
         <% end %>
 
@@ -201,6 +201,9 @@
       <% end %>
       <%# Outside the form: see the component. %>
       <%= render Admin::EditorScreen::TableDeleteDialogsComponent.new(block: block) if table_controls? %>
+      <% outside_form_parts.each do |part| %>
+        <%= render part %>
+      <% end %>
     </div>
   <% end %>
 

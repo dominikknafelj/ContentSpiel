@@ -392,4 +392,137 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
     assert_no_selector "iframe", visible: :all
     assert_equal 0, page.evaluate_script("performance.getEntriesByType('resource').filter((entry) => entry.name.includes('diagram-renderer')).length")
   end
+
+  # ----- Import file… -----
+
+  IMPORTS = Rails.root.join("test/fixtures/files/diagrams_import")
+
+  def import_id(block) = "#{source_id(block)}-import"
+
+  def replace_dialog(block) = "##{Admin::Fields::MermaidField.replace_dialog_id(source_id(block))}"
+
+  # Chooses a file in the hidden input, as the picker that Import file… opens would.
+  def import_file(block, name)
+    attach_file(import_id(block), IMPORTS.join(name).to_s, make_visible: true)
+  end
+
+  def import_status(block) = find("#{field_selector(block)} [data-admin--diagram--preview-target='importStatus']", visible: :all)
+
+  def source_value(block) = find("##{source_id(block)}").value
+
+  test "importing a .mmd file fills the source and draws it" do
+    block = diagram_of
+    visit_editor(@page)
+    assert_selector "#content_block_#{block.id} .admin-field__label-row button", exact_text: "Import file…"
+
+    import_file(block, "release-flow.mmd")
+    flow = IMPORTS.join("release-flow.mmd").read
+    assert_no_selector "#{replace_dialog(block)}[open]", visible: :all
+    assert_eventually(message: "the file's text is the source") { source_value(block) == flow }
+    await_frame_text(block, "Live")
+    await_stored_drawing(block, flow.chomp)
+    within(import_status(block)) { assert_selector "p.text-small.text-meta", exact_text: "Imported from release-flow.mmd." }
+
+    find("##{source_id(block)}").send_keys(:end, " ")
+    within(import_status(block)) { assert_no_selector "p" }
+    assert_empty import_status(block).text(:all), "the next keystroke takes the line away"
+  end
+
+  test "a .md file's first mermaid fence is taken" do
+    block = diagram_of
+    visit_editor(@page)
+
+    import_file(block, "guide.md")
+    taken = "flowchart LR\n  Written --> Checked\n  Checked --> Published"
+    assert_eventually(message: "the first mermaid fence outside another fence is the source") { source_value(block) == taken }
+    await_stored_drawing(block, taken)
+    within(import_status(block)) do
+      assert_selector "p", exact_text: "Imported from guide.md."
+      assert_selector "div.bg-sunken", exact_text: "Only the first diagram in guide.md was imported."
+    end
+    assert_no_selector "#{field_selector(block)} [data-admin--diagram--preview-target='importStatus'] [role]"
+  end
+
+  test "a file with no Mermaid says so and changes nothing" do
+    block = diagram_of("en" => { "source" => FLOW })
+    visit_editor(@page)
+    await_frame_text(block, "Review")
+    updated_at = block.reload.updated_at
+
+    import_file(block, "notes.md")
+    within(import_status(block)) { assert_selector ".border-warn", exact_text: "notes.md holds no Mermaid diagram. A .md file needs a ```mermaid fence." }
+    assert_no_selector "#{replace_dialog(block)}[open]", visible: :all
+    assert_equal FLOW, source_value(block)
+    await_frames
+    assert_writes_settled
+    assert_equal updated_at, block.reload.updated_at, "nothing was saved"
+  end
+
+  test "a file too long or not UTF-8 says so and changes nothing" do
+    block = diagram_of("en" => { "source" => FLOW })
+    visit_editor(@page)
+    await_frame_text(block, "Review")
+
+    import_file(block, "big-flow.mmd")
+    count = ActiveSupport::NumberHelper.number_to_delimited(IMPORTS.join("big-flow.mmd").read.length)
+    within(import_status(block)) { assert_selector ".border-warn", exact_text: "big-flow.mmd is too long: its diagram has #{count} characters, and the limit is 10,000." }
+    assert_equal FLOW, source_value(block)
+
+    import_file(block, "latin1.mmd")
+    within(import_status(block)) { assert_selector ".border-warn", exact_text: "latin1.mmd couldn't be read. Use a .mmd or .md text file." }
+    assert_selector "#{field_selector(block)} [data-admin--diagram--preview-target='importStatus'] .border-warn", count: 1, visible: :all
+    assert_equal FLOW, source_value(block)
+    assert_no_selector "#{replace_dialog(block)}[open]", visible: :all
+    assert_writes_settled
+    assert_equal FLOW, stored(block)["source"]
+  end
+
+  test "replacing a typed source asks first, and Cancel keeps it" do
+    block = diagram_of
+    visit_editor(@page)
+    find("##{source_id(block)}").set(FLOW)
+    await_stored_drawing(block, FLOW)
+
+    import_file(block, "release-flow.mmd")
+    dialog = find("#{replace_dialog(block)}[open]")
+    assert_equal "Replace the source?", dialog.find("h2, h3").text
+    assert_text "The diagram in Source is replaced by the one in release-flow.mmd. The site keeps the last drawing that worked until the new one draws."
+    assert_equal "Cancel", page.evaluate_script("document.activeElement.textContent").strip, "destructive: Cancel takes the focus"
+    dialog.click_button("Cancel")
+    assert_no_selector "#{replace_dialog(block)}[open]", visible: :all
+    assert_equal FLOW, source_value(block)
+    assert_empty import_status(block).text(:all)
+    assert_writes_settled
+    assert_equal FLOW, stored(block)["source"]
+
+    import_file(block, "release-flow.mmd")
+    find("#{replace_dialog(block)}[open]").click_button("Replace source")
+    flow = IMPORTS.join("release-flow.mmd").read
+    assert_eventually(message: "confirmed, the file's text is the source") { source_value(block) == flow }
+    await_stored_drawing(block, flow.chomp)
+    within(import_status(block)) { assert_selector "p", exact_text: "Imported from release-flow.mmd." }
+  end
+
+  test "an import on the translation tab becomes that language's own source" do
+    block = diagram_of("en" => { "source" => FLOW })
+    visit_editor(@page, locale: "de")
+    await_frame_text(block, "Review")
+
+    import_file(block, "release-flow.mmd")
+    find("#{replace_dialog(block)}[open]").click_button("Replace source")
+    flow = IMPORTS.join("release-flow.mmd").read
+    assert_selector "textarea##{source_id(block)}[name='block[settings][source]']"
+    await_stored_drawing(block, flow.chomp, locale: "de")
+    assert_equal FLOW, stored(block)["source"], "the default's source is its own"
+  end
+
+  test "a held card draws no Import control" do
+    block = diagram_of("en" => { "source" => FLOW })
+    reserve(block, @page, users(:two), "tab-dana-0001")
+    visit_editor(@page)
+
+    assert_selector "##{source_id(block)}[readonly]"
+    assert_no_button "Import file…", visible: :all
+    assert_no_selector "#content_block_#{block.id} input[type=file], #{replace_dialog(block)}", visible: :all
+  end
 end

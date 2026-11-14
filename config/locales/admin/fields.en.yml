@@ -40,6 +40,18 @@ en:
           # over its limit, and a drawing over the size the site keeps.
           too_long: "This diagram is too long to draw. Shorten it to %{limit} characters or fewer."
           too_large: This diagram is too large to keep. Shorten it or split it in two.
+          # Import file…: a .mmd file, or a .md file's first mermaid fence,
+          # read in the browser into the source. `replace_*` is the
+          # confirmation a source that isn't empty asks first.
+          import: Import file…
+          imported: Imported from %{file}.
+          import_first_only: Only the first diagram in %{file} was imported.
+          import_no_mermaid: "%{file} holds no Mermaid diagram. A .md file needs a ```mermaid fence."
+          import_too_long: "%{file} is too long: its diagram has %{count} characters, and the limit is %{limit}."
+          import_unreadable: "%{file} couldn't be read. Use a .mmd or .md text file."
+          replace_title: Replace the source?
+          replace_body: The diagram in Source is replaced by the one in %{file}. The site keeps the last drawing that worked until the new one draws.
+          replace_confirm: Replace source
         # A link field's other half: a page or a post chosen by its title
         # (`Admin::Fields::LinkField`). `unavailable` is one answer for a target
         # outside the viewer's scope, in the trash or gone: it must tell none.

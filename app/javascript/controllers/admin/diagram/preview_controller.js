@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 import { openFrame } from "diagram/frame"
 import { digest } from "diagram/digest"
+import { firstMermaidFence } from "diagram/fence"
 
 // A Diagram block's source and its preview (`Admin::Fields::MermaidField`,
 // Diagram block spec §2 and §7, the Design System's EditorDiagramBlock and
@@ -56,6 +57,22 @@ import { digest } from "diagram/digest"
 // names): while it is blank, the neutral note the server drew hidden under
 // the preview says the site shows the diagram only once it has one.
 //
+// IMPORT FILE… (`import`, then `read` at the file input's `change`): the
+// chosen file is read here, in the browser, and never sent or stored (its
+// input has no `name`). Its bytes must be UTF-8 text (`TextDecoder`, fatal,
+// and no NUL); a `.md` file gives its first mermaid fence (`diagram/fence`),
+// any other file its whole text. The text is held to the rules'
+// `max_characters` in code points, as the server counts. A file that can't
+// be imported changes nothing and says why in a clone of the warn notice in
+// `importStatus`, the polite region under the source. A source that isn't
+// empty (a starting source too: it is what the person sees) asks first, in
+// the replace confirmation the card draws after its form (`replaceDialog`),
+// and only its confirm, which closes it with "replace", replaces. Replacing
+// sets the source and dispatches `input` on it, so it is drawn, counted,
+// named and autosaved as typing is. "Imported from …" (and, for a `.md`
+// file with another diagram, the neutral note that only the first was
+// taken) stays in the region until the next change of the source.
+//
 // TAKE-BACK. `disconnect` and `turbo:before-cache` remove the frame, its
 // listener, the timers and everything this script showed, so a copy Turbo
 // keeps holds the server's markup as drawn, and a page shown again from it
@@ -77,9 +94,14 @@ const FRAME_MAX = 640
 const CODED = "\uE000"
 // The line rules whose sentence is the server's, by name.
 const REFUSED = [ "colours", "links", "directive", "front_matter", "maths" ]
+// What the replace confirmation's confirm closes it with (`MermaidField::REPLACE_VALUE`).
+const REPLACE = "replace"
+// A file read for its first mermaid fence rather than whole.
+const MARKDOWN = /\.(md|markdown)$/i
 
 export default class extends Controller {
-  static targets = [ "source", "frameSlot", "status", "colourProbe", "blank", "kept", "busy", "line", "notice", "undescribed" ]
+  static targets = [ "source", "frameSlot", "status", "colourProbe", "blank", "kept", "busy", "line", "notice", "undescribed",
+    "file", "importStatus", "importWarning", "importNote", "imported" ]
 
   static values = {
     rendererUrl: String,
@@ -89,7 +111,8 @@ export default class extends Controller {
     sourceName: String,
     starting: Boolean,
     colours: Array,
-    descriptionField: String
+    descriptionField: String,
+    replaceDialog: String
   }
 
   connect() {
@@ -141,6 +164,7 @@ export default class extends Controller {
 
   // The source changed: a person's edit, so the drawing it leads to is written.
   input() {
+    if (!this.importing) this.clearImport()
     if (!this.edited && this.startingValue) {
       this.sourceTarget.name = this.sourceNameValue
       this.drawingInput.name = this.drawingNameValue
@@ -339,6 +363,100 @@ export default class extends Controller {
     return Object.fromEntries(this.coloursValue.map((name) => [ name, style.getPropertyValue(name).trim() ]).filter(([ , value ]) => value))
   }
 
+  // --- Import file… ----------------------------------------------------------
+
+  import() {
+    this.fileTarget.click()
+  }
+
+  async read() {
+    const file = this.fileTarget.files?.[0]
+    // Emptied at once, so choosing the same file again is a change again.
+    this.fileTarget.value = ""
+    if (!file) return
+    this.clearImport()
+    const taken = await this.taken(file)
+    if (!this.frame || this.sourceTarget.readOnly) return
+    if (taken.error) {
+      this.sayImport([ this.importBox("importWarning", taken.error) ])
+      return
+    }
+    if (this.sourceTarget.value.trim() === "") this.replaceWith(taken, file.name)
+    else this.ask(file.name, () => this.replaceWith(taken, file.name))
+  }
+
+  // `{ text, more }` of the file, or `{ error }` with what to say.
+  async taken(file) {
+    const name = file.name
+    const said = (key, vars = {}) => ({ error: this.text(key, { file: name, ...vars }) })
+    let text
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer())
+    } catch {
+      return said("components.fields.mermaid_field.import_unreadable")
+    }
+    if (text.includes("\u0000")) return said("components.fields.mermaid_field.import_unreadable")
+    text = text.replace(/\r\n?/g, "\n")
+    const found = MARKDOWN.test(name) || file.type === "text/markdown" ? firstMermaidFence(text) : { text, more: false }
+    if (!found || found.text.trim() === "") return said("components.fields.mermaid_field.import_no_mermaid")
+    const count = Array.from(found.text).length
+    const limit = this.rulesValue.max_characters
+    if (count > limit) return said("components.fields.mermaid_field.import_too_long", { count: this.number(count), limit: this.number(limit) })
+    return found
+  }
+
+  // Opens the replace confirmation by id, with the file's name in its
+  // sentence, and replaces only when it closes with REPLACE.
+  ask(name, replace) {
+    const dialog = this.replaceDialogValue ? document.getElementById(this.replaceDialogValue) : null
+    if (!dialog || dialog.open) return
+    this.withdrawDialog()
+    dialog.querySelector("[data-import-file]").textContent = name
+    dialog.returnValue = ""
+    const closed = () => {
+      this.withdrawDialog()
+      if (dialog.returnValue === REPLACE && this.frame && !this.sourceTarget.readOnly) replace()
+    }
+    dialog.addEventListener("close", closed)
+    this.dialogListener = { dialog, closed }
+    dialog.showModal()
+  }
+
+  withdrawDialog() {
+    if (!this.dialogListener) return
+    const { dialog, closed } = this.dialogListener
+    dialog.removeEventListener("close", closed)
+    dialog.querySelector("[data-import-file]").textContent = ""
+    this.dialogListener = null
+    if (dialog.open) dialog.close()
+  }
+
+  replaceWith({ text, more }, name) {
+    const source = this.sourceTarget
+    this.importing = true
+    source.value = text
+    source.dispatchEvent(new Event("input", { bubbles: true }))
+    this.importing = false
+    const boxes = [ this.importBox("imported", this.text("components.fields.mermaid_field.imported", { file: name })) ]
+    if (more) boxes.push(this.importBox("importNote", this.text("components.fields.mermaid_field.import_first_only", { file: name })))
+    this.sayImport(boxes)
+  }
+
+  // A clone of the server's box in the template `name`, holding `words`.
+  importBox(name, words) {
+    const box = this.targets.find(name).content.firstElementChild.cloneNode(true)
+    box.textContent = words
+    return box
+  }
+
+  sayImport(boxes) {
+    this.importStatusTarget.replaceChildren(...boxes)
+  }
+
+  clearImport() {
+    if (this.hasImportStatusTarget) this.importStatusTarget.replaceChildren()
+  }
+
   close() {
     clearTimeout(this.drawTimer)
     clearTimeout(this.busyTimer)
@@ -357,6 +475,8 @@ export default class extends Controller {
     this.busyTarget.hidden = true
     this.lineTarget.hidden = true
     this.lineTarget.removeAttribute("style")
+    this.withdrawDialog()
+    this.clearImport()
   }
 
   get kept() {

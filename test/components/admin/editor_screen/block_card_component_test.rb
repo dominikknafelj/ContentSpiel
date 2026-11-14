@@ -864,4 +864,44 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "##{prefix}-alt"
     assert_text "English words"
   end
+
+  # ----- A Diagram's Import file… -----
+
+  # The replace confirmation is drawn after the form, not inside it: its
+  # buttons are a `<form method="dialog">`, which the block's form would
+  # swallow. The script opens it by id and fills in the file's name.
+  test "a Diagram card draws Import file… and, after its form, the destructive replace confirmation" do
+    page = create_page(title: "Import")
+    block = page.content_blocks.create!(block_type: "diagram", position: 0, translated_settings: { "en" => { "source" => "flowchart LR\n  A --> B" } })
+    render_card(block, page: page)
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
+    id = Admin::Fields::MermaidField.replace_dialog_id("#{prefix}-source")
+
+    assert_selector "form .admin-mermaid-field__import button", exact_text: "Import file…"
+    assert_selector "form [data-admin--diagram--preview-replace-dialog-value='#{id}']"
+    assert_selector "[data-block-body] > dialog##{id}", visible: :all
+    assert_no_selector "form dialog", visible: :all
+    dialog = Nokogiri::HTML5.fragment(rendered_content).at_css("dialog##{id}")
+    assert_equal "Replace the source?", dialog.at_css("h2, h3").text.strip
+    assert_equal "The diagram in Source is replaced by the one in . The site keeps the last drawing that worked until the new one draws.", dialog.at_css(".admin-dialog__body p").text.squish
+    assert dialog.at_css(".admin-dialog__body p span[data-import-file]:empty"), "the script names the file"
+    assert dialog.at_css("form[method=dialog] button[autofocus]", text: "Cancel"), "destructive: Cancel takes the focus"
+    confirm = dialog.css("form[method=dialog] button[type=submit]").find { |button| button.text.strip == "Replace source" }
+    assert_equal Admin::Fields::MermaidField::REPLACE_VALUE, confirm["value"]
+    assert_includes confirm["class"].split, "bg-danger"
+  end
+
+  test "a Diagram card held by someone else, or a reader's, draws no Import file… and no replace confirmation" do
+    @held_page = create_page(title: "Held diagram")
+    @held_block = @held_page.content_blocks.create!(block_type: "diagram", position: 0, translated_settings: { "en" => { "source" => "flowchart LR\n  A --> B" } })
+    @dana = users(:two)
+    reserve(@held_block, @held_page, @dana, B)
+    render_for(users(:one), A)
+    assert_selector "fieldset.admin-held textarea[readonly]"
+    assert_no_selector ".admin-mermaid-field__import, input[type=file], dialog[id$='-source-replace']", visible: :all
+    assert_no_selector "[data-admin--diagram--preview-replace-dialog-value]", visible: :all
+
+    render_for(users(:one), A, editable: false)
+    assert_no_selector ".admin-mermaid-field__import, input[type=file], dialog[id$='-source-replace']", visible: :all
+  end
 end

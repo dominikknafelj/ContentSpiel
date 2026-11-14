@@ -13,12 +13,20 @@
     and the suggestion box. Drawn first, so the input has been rendered when the wrapper below
     asks it for its data (`Fields::Base#field_data`). The error slot stays a direct child of `.admin-field`. %>
 <% field_side = capture do %>
+  <%# The input is rendered before its label, so the label's row can ask it what stands at its end (`Fields::Base#label_end`). %>
+  <% input = render(input_component) %>
+  <% label_end = input_component.label_end %>
   <%# A switch carries its own label beside it (`Admin::Fields::BooleanField`), and a segmented
       control its legend (`Admin::Fields::SelectField`); a second one above either would say it twice. %>
-  <% unless own_label? %>
+  <% if label_end && !own_label? %>
+    <div class="admin-field__label-row mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <label class="<%= setup_label_class %>" for="<%= input_id %>"><%= label_text %></label>
+      <%= label_end %>
+    </div>
+  <% elsif !own_label? %>
     <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
   <% end %>
-  <%= render input_component %>
+  <%= input %>
   <% if field.help %>
     <p id="<%= help_id %>" class="mt-1 text-sm text-meta"><%= field.help %></p>
   <% end %>

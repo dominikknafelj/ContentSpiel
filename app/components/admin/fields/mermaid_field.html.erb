@@ -14,6 +14,7 @@
       <% if starting? %>
         <%= tag.p starting_text, id: starting_id, class: "mt-1 text-sm text-meta" %>
       <% end %>
+      <%= import_status %>
     <% end %>
     <%# The script builds the renderer frame in the preview's slot; on a translation tab it stands under the pair (`#below_pair`). %>
     <%= preview unless paired? %>

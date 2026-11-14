@@ -12,8 +12,8 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
 
   def field(**options) = Field.new(name: "source", type: :mermaid, options: { translated: true, drawing: :drawing, max: 10_000 }.merge(options))
 
-  def render_field(value, original: nil, locale: "en", **options)
-    render_inline Admin::Ui::FieldComponent.new(field: field(**options), form_name: "block[settings]", value: value, original: original, locale: locale, id_prefix: "block-7")
+  def render_field(value, original: nil, locale: "en", editable: true, **options)
+    render_inline Admin::Ui::FieldComponent.new(field: field(**options), form_name: "block[settings]", value: value, original: original, locale: locale, id_prefix: "block-7", editable: editable)
   end
 
   def target(name) = "[data-#{CONTROLLER}-target='#{name}']"
@@ -30,7 +30,8 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert_includes page.find("textarea")[:class].split, "[field-sizing:content]"
     assert_no_selector "textarea[maxlength]"
     assert_equal "input->admin--editor--code-limit#update input->#{CONTROLLER}#input", page.find("textarea")["data-action"]
-    assert_equal 1, page.all("[data-action]", visible: :all).size, "the textarea's are the field's only actions"
+    assert_equal [ "admin--diagram--preview#import", "change->admin--diagram--preview#read", page.find("textarea")["data-action"] ],
+      page.all("[data-action]", visible: :all).map { |node| node["data-action"] }, "the import's, in the label's row, then the textarea's"
     assert_equal SOURCE, textarea_text
   end
 
@@ -204,5 +205,66 @@ class Admin::Fields::MermaidFieldTest < ViewComponent::TestCase
     assert below.at_css(target("frameSlot"))
     assert below.at_css("#{target("status")}[aria-live='polite']")
     assert_equal 1, fragment.css(target("frameSlot")).size
+  end
+
+  # Import file… (EditorDiagramBlock, "Importing"): a small tertiary button
+  # at the end of the Source label's row, opening a hidden file input the
+  # script reads in the browser. The input has no name, so no form sends it.
+  test "Import file… is a small tertiary button at the end of the label's row, opening a hidden file input with no name" do
+    render_field(SOURCE)
+
+    row = page.find(".admin-field > .admin-field__label-row", visible: :all)
+    assert_equal [ "label", "span" ], row.all(:xpath, "./*", visible: :all).map(&:tag_name)
+    assert_equal "block-7-source", row.find("label")["for"]
+    button = row.find("span.admin-mermaid-field__import > button[type='button']", exact_text: "Import file…")
+    assert_equal Admin::Ui::ButtonComponent.classes(:tertiary, size: :small).split.sort, button[:class].split.sort
+    assert_equal "#{CONTROLLER}#import", button["data-action"]
+
+    file = row.find("span.admin-mermaid-field__import > input[type='file']#block-7-source-import[hidden]", visible: :all)
+    assert_equal ".mmd,.md,text/markdown,text/plain", file["accept"]
+    assert_nil file["name"], "the file is never sent"
+    assert_equal "file", file["data-#{CONTROLLER}-target"]
+    assert_equal "change->#{CONTROLLER}#read", file["data-action"]
+    assert_equal "-1", file["tabindex"], "the button is the one stop"
+  end
+
+  test "a source that cannot be edited draws no Import control and no file input" do
+    render_field(SOURCE, editable: false)
+
+    assert_no_selector ".admin-mermaid-field__import, input[type='file'], .admin-field__label-row", visible: :all
+    assert_no_text "Import file…"
+    assert_selector "label[for='block-7-source']", exact_text: "Source"
+    assert_nil wrapper["data-#{CONTROLLER}-replace-dialog-value"]
+  end
+
+  # What an import says comes from server markup the script clones: a
+  # polite region under the source, the warn and neutral notices with no
+  # role of their own inside it, and the "Imported from" line.
+  test "an import's words stand in a polite region under the source, cloned from templates" do
+    render_field(SOURCE)
+
+    region = page.find(".admin-mermaid-field__pair > :first-child > #{target("importStatus")}[aria-live='polite']", visible: :all)
+    assert_empty region.text(:all)
+    fragment = Nokogiri::HTML5.fragment(rendered_content)
+    box = ->(name) { fragment.at_css("template#{target(name)}").children.find(&:element?) }
+
+    assert_equal (Admin::Ui::NoticeComponent.classes(:warn, size: :compact).split + [ "mt-2" ]).sort, box.call("importWarning")["class"].split.sort
+    assert_equal (Admin::Ui::NoticeComponent.classes(:neutral, size: :compact).split + [ "mt-2" ]).sort, box.call("importNote")["class"].split.sort
+    assert_nil box.call("importWarning")["role"]
+    assert_nil box.call("importNote")["role"]
+    line = box.call("imported")
+    assert_equal "p", line.name
+    assert_equal %w[mt-1 text-meta text-small], line["class"].split.sort
+    assert_empty line.text
+
+    assert_equal "block-7-source-replace", wrapper["data-#{CONTROLLER}-replace-dialog-value"]
+    served = JSON.parse(wrapper["data-messages"])
+    {
+      "imported" => "Imported from %{file}.",
+      "import_first_only" => "Only the first diagram in %{file} was imported.",
+      "import_no_mermaid" => "%{file} holds no Mermaid diagram. A .md file needs a ```mermaid fence.",
+      "import_too_long" => "%{file} is too long: its diagram has %{count} characters, and the limit is %{limit}.",
+      "import_unreadable" => "%{file} couldn't be read. Use a .mmd or .md text file."
+    }.each { |key, words| assert_equal words, served.fetch("components.fields.mermaid_field.#{key}"), key }
   end
 end
