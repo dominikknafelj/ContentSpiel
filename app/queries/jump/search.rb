@@ -30,10 +30,17 @@ module Jump
     # dialogs) instead of navigating: its row is still a link, to `path`, which
     # is what a viewer without JavaScript (or a dialog that isn't on the page)
     # gets. See `admin/jump/show`.
+    #
+    # An action with a `when:` is offered only while that callable, handed the
+    # actor, answers true; it is asked AFTER the permission holds, never before,
+    # so a viewer without the permission costs the question nothing. "Draw
+    # diagrams" is listed only while there is a diagram to draw.
     ACTIONS = [
       { title: "New page", path: :new_admin_page_path, permission: "pages.create", dialog: "new-page-dialog" },
       { title: "New post", path: :new_admin_post_path, permission: "posts.create", dialog: "new-post-dialog" },
       { title: "Upload image", path: :admin_media_path, permission: "media.upload" },
+      { title: "Draw diagrams", path: :admin_diagram_drawings_path, permission: "pages.edit",
+        when: ->(actor) { Diagrams::ToDraw.new(actor: actor).count.positive? } },
       { title: "Your account", path: :admin_account_path, permission: nil }
     ].freeze
 
@@ -122,6 +129,7 @@ module Jump
 
     def action_rows
       ACTIONS.select { |action| action[:permission].nil? || AccessControl.holds?(actor, action[:permission], channel: :admin) }
+        .select { |action| action[:when].nil? || action[:when].call(actor) }
         .select { |action| blank? || matches?(action[:title]) }
         .map { |action| { title: action[:title], route: [ action[:path], [], {} ], dialog: action[:dialog] }.compact }
     end

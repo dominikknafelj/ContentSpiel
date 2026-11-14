@@ -17,6 +17,9 @@
     <% if forms_link? %>
       <p class="mt-2"><%= link_to t(".open_forms"), @forms_href, class: LINK_CLASS %></p>
     <% end %>
+    <% if diagram_drawings_link? %>
+      <p class="mt-2"><%= link_to t(".draw_diagrams"), @diagram_drawings_href, class: LINK_CLASS %></p>
+    <% end %>
     <% if result.docs.present? %>
       <p class="mt-2"><%= link_to t(".learn_more"), result.docs, class: LINK_CLASS %></p>
     <% end %>

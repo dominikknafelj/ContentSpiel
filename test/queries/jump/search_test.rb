@@ -156,4 +156,42 @@ class Jump::SearchTest < ActiveSupport::TestCase
     assert_nothing_raised { search("\\") }
     assert_equal [ 'C:\\temp' ], rows_of(content_groups(search("\\"))).map { |row| row[:title] }
   end
+
+  # A diagram with a source and no drawing, which `Diagrams::ToDraw` lists.
+  def create_undrawn_diagram
+    page = create_page(title: "Flows", published: false)
+    source = BlockTypes::Diagram::SAMPLE_SOURCES.fetch("en")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "diagram" },
+      translations: { "en" => { settings: { "source" => source } } }, actor: @owner)
+    assert result.ok?, result.errors.to_sentence
+  end
+
+  def action_titles(actor: @owner) = rows_of(search("", actor: actor).select { |group| group[:label] == "Actions" }).map { |row| row[:title] }
+
+  test "draw diagrams is offered while there is something to draw" do
+    create_undrawn_diagram
+    groups = search("draw diag")
+    row = rows_of(groups).find { |candidate| candidate[:title] == "Draw diagrams" }
+    assert_equal [ :admin_diagram_drawings_path, [], {} ], row[:route]
+    assert_includes action_titles, "Draw diagrams"
+  end
+
+  test "draw diagrams is not offered when nothing is to draw" do
+    assert_not_includes action_titles, "Draw diagrams"
+    assert_empty rows_of(search("draw diag"))
+  end
+
+  test "draw diagrams needs pages.edit, and the count is not asked without it" do
+    create_undrawn_diagram
+    nobody = User.create!(email_address: "nobody3@example.com", password: "a long enough password")
+    asked = false
+    original = Diagrams::ToDraw.method(:new)
+    Diagrams::ToDraw.define_singleton_method(:new) { |**args| asked = true; original.call(**args) }
+    begin
+      assert_not_includes action_titles(actor: nobody), "Draw diagrams"
+    ensure
+      Diagrams::ToDraw.singleton_class.send(:remove_method, :new)
+    end
+    assert_not asked
+  end
 end

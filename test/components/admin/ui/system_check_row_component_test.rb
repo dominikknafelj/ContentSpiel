@@ -96,4 +96,13 @@ class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
     render_inline(Admin::Ui::SystemCheckRowComponent.new(index: 0, result: result(command: nil), mail_settings_href: "/cs-studio/settings#mail"))
     assert_no_selector "a"
   end
+
+  test "a diagram-drawings link is Draw diagrams at the address the screen hands over, and nowhere without one" do
+    row = result(command: nil, link: :diagram_drawings)
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(index: 0, result: row, diagram_drawings_href: "/cs-studio/diagram-drawings"))
+    assert_selector "li a[href='/cs-studio/diagram-drawings']", text: "Draw diagrams →"
+
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(index: 0, result: row))
+    assert_no_selector "a"
+  end
 end

@@ -13,7 +13,7 @@ module Admin
   module JumpHelper
     JUMP_ROUTES = %i[
       admin_page_path admin_post_path admin_media_path admin_settings_path
-      new_admin_page_path new_admin_post_path admin_account_path
+      new_admin_page_path new_admin_post_path admin_account_path admin_diagram_drawings_path
     ].freeze
 
     # Every route a row may carry: the fixed destinations and the modules'
