@@ -579,4 +579,62 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
     ContentSpiel::Plugins.remove(bad) if bad
     Rails.application.reloader.prepare!
   end
+
+  test "a gem registers a search backend through the hook, owner rules applied" do
+    assert_raises(ArgumentError) { ContentSpiel::Plugins.search_backends }
+
+    hook = ContentSpiel::Plugins.search_backends do |backends|
+      backends.register "acme/solr", label: "Solr", backend: -> { SiteSearch::Fake.new }
+    end
+    Rails.application.reloader.prepare!
+    assert_equal %w[postgres acme/solr], SiteSearch::Backends.names, "the built-in first, then the gem's"
+    Rails.application.reloader.prepare!
+    assert_equal %w[postgres acme/solr], SiteSearch::Backends.names, "a reload resets the registry and replays the hook"
+    assert_equal "Solr", SiteSearch::Backends.label("acme/solr")
+    ContentSpiel::Plugins.remove(hook)
+    Rails.application.reloader.prepare!
+
+    seen = nil
+    handed = ContentSpiel::Plugins.search_backends { |backends| seen = backends }
+    ContentSpiel::Plugins.register_search_backends(SiteSearch::Backends)
+    assert_respond_to seen, :register
+    assert_not_respond_to seen, :reset!
+    assert_not_respond_to seen, :current
+    ContentSpiel::Plugins.remove(handed)
+
+    line = __LINE__ + 1
+    bare = ContentSpiel::Plugins.search_backends { |backends| backends.register "solr", label: "Solr", backend: -> { } }
+    error = assert_raises(ArgumentError) { ContentSpiel::Plugins.register_search_backends(SiteSearch::Backends) }
+    assert_includes error.message, "a search backend from outside is named owner/name"
+    assert_includes error.message, "#{ContentSpiel::Plugins::REPLAYED_SEARCH_BACKENDS} #{__FILE__}:#{line}"
+    ContentSpiel::Plugins.remove(bare)
+
+    owned = ContentSpiel::Plugins.search_backends { |backends| backends.register "site_search/solr", label: "Solr", backend: -> { } }
+    assert_equal "SiteSearch", TopLevelNames.matching("site_search")
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_search_backends(SiteSearch::Backends) }.message, "the CMS's own SiteSearch"
+    ContentSpiel::Plugins.remove(owned)
+
+    blocked = ContentSpiel::Plugins.search_backends { |backends| backends.register("acme/solr", label: "Solr", backend: -> { }) { } }
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_search_backends(SiteSearch::Backends) }.message, "takes no block"
+  ensure
+    [ hook, handed, bare, owned, blocked ].compact.each { |each| ContentSpiel::Plugins.remove(each) }
+    Rails.application.reloader.prepare!
+  end
+
+  test "a raising search backends hook names its place" do
+    line = __LINE__ + 1
+    bad = ContentSpiel::Plugins.search_backends { |backends| raise ArgumentError, "the engine's address is missing" }
+    error = assert_raises(ArgumentError) { ContentSpiel::Plugins.register_search_backends(SiteSearch::Backends) }
+    assert_includes error.message, "the engine's address is missing (#{ContentSpiel::Plugins::REPLAYED_SEARCH_BACKENDS} #{__FILE__}:#{line})"
+
+    logged = capture_log { Rails.application.reloader.prepare! }
+    assert_includes logged, "#{__FILE__}:#{line}"
+    assert_includes logged, "restart the server"
+    assert_equal %w[postgres], SiteSearch::Backends.names, "the built-in is registered before the hooks"
+    assert_equal BUILT_IN_MODULES, module_names
+    assert_equal BUILT_INS, BlockTypes.names
+  ensure
+    ContentSpiel::Plugins.remove(bad) if bad
+    Rails.application.reloader.prepare!
+  end
 end
