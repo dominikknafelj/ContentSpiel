@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.0 (2026-11-14)
+
 ### Added
 
 - The Diagram block, an eighth block type: a diagram written as Mermaid text (flowchart, sequence, class, state, ER, gantt and pie), drawn in CS Studio as the editor types and shown on the site as a cleaned SVG printed inline with no script, in the theme's colours in both schemes and on every band. Each language may have its own source, drawing and description; a diagram shows on the site only once it has a description, which is its accessible name. A wide diagram scales down to its column to three fifths of its size, then scrolls sideways in its own box. On the card the preview says why a source does not draw (a construct the site does not use, a type not supported yet, Mermaid's own message) and keeps the last drawing that worked; Import file… reads a `.mmd` file, or a `.md` file's first mermaid fence, into the source. The tile shows the drawing's shape in small, with "No description", "Last drawing kept" or "Not drawn yet". AI translation sends the description and the caption, never the source (`docs/reference/content-blocks-and-types.md`, "The Diagram block").
