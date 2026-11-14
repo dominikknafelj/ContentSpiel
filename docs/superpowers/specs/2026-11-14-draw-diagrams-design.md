@@ -85,9 +85,8 @@ The action, in order:
    changed since the list was drawn; the row says so and is skipped.
 3. Refuses when someone else holds the block (`Admin::EditingClaims`): the
    row says "Being edited by ‹name›" and is skipped. The task takes no claim
-   that outlives its own request: it claims for the save and gives the claim
-   back in the same request, so a person opening the card a second later is
-   not held off.
+   at all (it asks `held_elsewhere?`, as an instant action does), so a
+   person opening the card a second later is not held off.
 4. Refuses when `from` is not the digest of the language's stored source
    (`Diagrams::Drawing.digest`): the source changed in between.
 5. Saves through `ContentBlocks::Save` with the language's translations
