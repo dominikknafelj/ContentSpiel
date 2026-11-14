@@ -142,6 +142,11 @@
     for (const element of Array.from(root.getElementsByTagName("*"))) {
       if (DROPPED_ELEMENTS.has(element.localName)) element.remove()
     }
+    // A `desc` holds text alone: the server refuses an element in one (the
+    // page's HTML parser reads a desc's content as HTML), so none is handed back.
+    for (const desc of Array.from(root.getElementsByTagName("desc"))) {
+      for (const child of Array.from(desc.children)) child.remove()
+    }
     for (const element of [ root, ...root.getElementsByTagName("*") ]) {
       for (const { name } of Array.from(element.attributes)) {
         const dropped = DROPPED_ATTRIBUTES.has(name) || name.startsWith("data-") ||

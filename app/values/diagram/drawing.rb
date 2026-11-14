@@ -11,9 +11,10 @@ module Diagram
   # THE OUTPUT IS WRITTEN FROM THE PARSE TREE, never passed through from the
   # input string: an element is written only when its name is on `ELEMENTS`,
   # an attribute only when its name has a rule in `ATTRIBUTES` and its value
-  # passes that rule, text only inside `TEXT_HOLDERS`, and every name written
-  # is this file's own string. Comments, whitespace between elements and the
-  # input's quoting are not carried. So the HTML parser of the page that
+  # passes that rule, text only inside `TEXT_HOLDERS` (and nothing but text
+  # inside `TEXT_ONLY`), and every name written is this file's own string.
+  # Comments, whitespace between elements and the input's quoting are not
+  # carried. So the HTML parser of the page that
   # inlines it reads what the XML parser read: no prefix, no comment, no
   # CDATA and no element that breaks out of an SVG into the page.
   #
@@ -77,6 +78,13 @@ module Diagram
     # between elements, or nothing an SVG draws.
     TEXT_HOLDERS = %w[text tspan desc].to_set.freeze
 
+    # Elements that hold text and nothing else. An SVG `desc` (as `title`)
+    # is an HTML integration point: the page's HTML parser reads what is in
+    # it as HTML, where `<path/>` is no empty element, so an element inside
+    # one would be a tree the page builds differently from the one written
+    # here. Mermaid writes only text there.
+    TEXT_ONLY = %w[desc].to_set.freeze
+
     # Mermaid's presentation, dropped from any element. `filter` points a
     # sequence diagram's boxes at the dropped `<filter>`'s drop shadow.
     DROPPED_ATTRIBUTES = %w[
@@ -91,14 +99,25 @@ module Diagram
 
     CLASS_TOKEN = /\A[A-Za-z][\w-]*\z/
 
-    # A coordinate, a length, path data, a point list or a transform:
-    # numbers, their units and the letters of path commands and transform
-    # functions. No quote, colon, slash, backslash or semicolon, so a value
-    # here can say nothing but where to draw.
-    GEOMETRY = /\A[A-Za-z0-9.,+\-%() \t\r\n]*\z/
+    # The values that say where to draw, each said with nothing but what its
+    # attribute takes, so none can hold a quote, a colon, a slash or a word.
+    NUMBER = /[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/
+    SEPARATOR = /(?:\s*,\s*|\s+)/
+    # A coordinate, a length or a list of them (`points`, `viewBox`): numbers
+    # with an optional unit, apart by a comma or whitespace.
+    LENGTHS = /\A\s*(?:#{NUMBER}(?:px|em|ex|rem|pt|pc|cm|mm|in|%)?(?:#{SEPARATOR}#{NUMBER}(?:px|em|ex|rem|pt|pc|cm|mm|in|%)?)*)?\s*\z/
+    # Path data: the path commands' letters, numbers and their separators.
+    PATH_DATA = /\A[MmLlHhVvCcSsQqTtAaZzEe0-9.,+\-\s]*\z/
+    # A transform list: SVG's six functions, each with numbers alone.
+    TRANSFORM_FUNCTION = /(?:matrix|translate|scale|rotate|skewX|skewY)\s*\(\s*#{NUMBER}(?:#{SEPARATOR}#{NUMBER})*\s*\)/
+    TRANSFORM = /\A\s*(?:#{TRANSFORM_FUNCTION}(?:#{SEPARATOR}?#{TRANSFORM_FUNCTION})*)?\s*\z/
 
     # A marker reference: the one `url(` a drawing may hold, to an id in it.
     REFERENCE = /\Aurl\(#([^()\s'"\\]+)\)\z/
+
+    # The attributes that place a marker, each only as a REFERENCE to a
+    # `marker` of this drawing. Mermaid writes the start and the end.
+    MARKER_REFERENCES = %w[marker-start marker-mid marker-end].freeze
 
     # A value holding any of these is refused, whatever its attribute.
     UNSAFE = %r{javascript:|data:|//}i
@@ -108,28 +127,31 @@ module Diagram
     # are SVG's own keywords for each, which only place text or a marker,
     # wider than the values Mermaid was seen writing.
     ATTRIBUTES = {
-      **%w[x y x1 y1 x2 y2 cx cy r rx ry width height d points transform viewBox dy].index_with { { hosts: nil, values: GEOMETRY } },
+      **%w[x y x1 y1 x2 y2 cx cy r rx ry width height points viewBox dy].index_with { { hosts: nil, values: LENGTHS } },
+      "d" => { hosts: nil, values: PATH_DATA },
+      "transform" => { hosts: nil, values: TRANSFORM },
       "text-anchor" => { hosts: nil, values: %w[start middle end] },
       "dominant-baseline" => { hosts: nil, values: %w[auto middle central hanging alphabetic] },
       "alignment-baseline" => { hosts: nil, values: %w[auto baseline middle central hanging alphabetic] },
       "font-size" => { hosts: nil, values: /\A\d+(?:\.\d+)?(?:px)?\z/ },
       "font-weight" => { hosts: nil, values: [ "", "normal", "bold" ] },
       "font-style" => { hosts: nil, values: %w[normal italic] },
-      "marker-start" => { hosts: %w[path line], values: REFERENCE },
-      "marker-end" => { hosts: %w[path line], values: REFERENCE },
-      **%w[markerWidth markerHeight refX refY].index_with { { hosts: %w[marker], values: GEOMETRY } },
+      **MARKER_REFERENCES.index_with { { hosts: %w[path line], values: REFERENCE } },
+      **%w[markerWidth markerHeight refX refY].index_with { { hosts: %w[marker], values: LENGTHS } },
       # `strokeWidth`: the state diagram's `barbEnd` marker.
       "markerUnits" => { hosts: %w[marker], values: %w[userSpaceOnUse strokeWidth] },
       "orient" => { hosts: %w[marker], values: /\A(?:auto|auto-start-reverse|-?\d+(?:\.\d+)?)\z/ },
       "id" => { hosts: nil, values: /\A\S+\z/ },
-      "class" => { hosts: nil, values: /./m }
+      # Any value: the tokens that fail CLASS_TOKEN are dropped, and a class
+      # left with none (`class=""` too) with them, as the frame drops it.
+      "class" => { hosts: nil, values: /\A.*\z/m }
     }.freeze
 
     # On the root alone. Every type writes `aria-roledescription` (`flowchart-v2`, `er`, `pie`…).
     ROOT_ATTRIBUTES = { KEPT_ROOT_ARIA => { hosts: nil, values: CLASS_TOKEN } }.freeze
 
     # An id `#markup` is handed: the shape of the ids it writes.
-    ID = /\A[A-Za-z][\w-]*\z/
+    ID = /\A[A-Za-z][A-Za-z0-9_-]*\z/
 
     SAVE = Nokogiri::XML::Node::SaveOptions::NO_DECLARATION | Nokogiri::XML::Node::SaveOptions::AS_XML
 
@@ -183,6 +205,9 @@ module Diagram
     def markup(prefix:, title:, title_id:)
       raise ArgumentError, "prefix #{prefix.inspect} is not the start of an id" unless prefix.match?(ID)
       raise ArgumentError, "title id #{title_id.inspect} is not an id" unless title_id.match?(ID)
+      if title_id.start_with?("#{prefix}d-") || title_id == "#{prefix}desc"
+        raise ArgumentError, "title id #{title_id.inspect} can be the name of a prefixed id of the drawing"
+      end
 
       document, reason = self.class.read(@svg)
       return if reason
@@ -217,7 +242,7 @@ module Diagram
     def prefix_ids(root, prefix)
       [ root, *root.xpath(".//*") ].each do |element|
         element["id"] = "#{prefix}#{element["id"]}" if element["id"]
-        %w[marker-start marker-end].each do |name|
+        MARKER_REFERENCES.each do |name|
           element[name] = element[name].sub("url(#", "url(##{prefix}") if element[name]
         end
       end
@@ -241,6 +266,8 @@ module Diagram
 
       # libxml's XML_ERR_DOCUMENT_END, "Extra content at the end of the document".
       DOCUMENT_END = 5
+      # libxml's XML_ERR_UNDECLARED_ENTITY: `&name;` with no DTD to declare it.
+      UNDECLARED_ENTITY = 26
 
       attr_reader :document
 
@@ -274,6 +301,7 @@ module Diagram
       rescue Nokogiri::XML::SyntaxError => error
         # libxml says a second root and text after the root alike.
         refuse :roots if error.code == DOCUMENT_END && Nokogiri::XML.fragment(text).element_children.size > 1
+        refuse :entity if error.code == UNDECLARED_ENTITY
         refuse :not_xml
       end
 
@@ -310,6 +338,7 @@ module Diagram
       end
 
       def write_element(node, to)
+        refuse :element if TEXT_ONLY.include?(to.name)
         name = svg_name(node)
         if DROPPED_ELEMENTS.include?(name)
           refuse :element if name == "style" && node.parent != @root
@@ -382,7 +411,7 @@ module Diagram
           refuse :value if @ids.key?(value)
           @ids[value] = element
           element["id"] = value
-        when "marker-start", "marker-end"
+        when *MARKER_REFERENCES
           @references << [ element, name, value[REFERENCE, 1] ]
         when "class"
           tokens = value.split.grep(CLASS_TOKEN)
@@ -394,17 +423,20 @@ module Diagram
 
       # `d-1`, `d-2`… in the order of the clean tree, then every marker
       # reference to the new name. An id on a `g` dropped as empty is gone,
-      # and a reference to it, or to anything not drawn, is refused.
+      # and a reference to it, to anything not drawn or to anything but a
+      # `marker`, is refused.
       def name_ids(root)
         renamed = {}
         [ root, *root.xpath(".//*[@id]") ].each do |element|
           next unless (old = element["id"])
 
-          renamed[old] = element["id"] = "d-#{renamed.size + 1}"
+          element["id"] = "d-#{renamed.size + 1}"
+          renamed[old] = element
         end
         @references.each do |element, name, target|
-          refuse :url unless renamed.key?(target)
-          element[name] = "url(##{renamed[target]})"
+          marker = renamed[target]
+          refuse :url unless marker&.name == "marker"
+          element[name] = "url(##{marker["id"]})"
         end
       end
     end

@@ -96,7 +96,7 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
     {
       not_xml: [ "<svg", "", "not xml", %(<svg xmlns="#{SVG}"><a xlink:href="x"/></svg>), "<svg>\xFF</svg>".b ],
       doctype: [ %(<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">#{drawing("")}), %(<!DOCTYPE svg>#{drawing("")}) ],
-      entity: [ %(<!DOCTYPE svg [<!ENTITY x "y">]>#{drawing("<text>&x;</text>")}) ],
+      entity: [ %(<!DOCTYPE svg [<!ENTITY x "y">]>#{drawing("<text>&x;</text>")}), drawing("<text>&undeclared;</text>") ],
       processing_instruction: [ %(<?xml-stylesheet href="https://x.test/a.css"?>#{drawing("")}), drawing(%(<g><?php echo 1 ?></g>)) ],
       roots: [ drawing("") + drawing("") ],
       element: [
@@ -114,6 +114,8 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
         drawing(%(<g><style>x{}</style></g>)),
         drawing(%(<symbol><script>alert(1)</script></symbol>)),
         drawing(%(<x:script xmlns:x="http://x.test/ns"/>)),
+        drawing(%(<desc>hi<path d="M0 0"/><text>x</text></desc>)),
+        drawing(%(<desc><title>x</title></desc>)),
         %(<html xmlns="#{SVG}"/>),
         %(<svg viewBox="0 0 1 1"/>)
       ],
@@ -126,13 +128,16 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
         drawing(%(<path href="#a"/>)),
         drawing(%(<rect marker-end="url(#a)"/>)),
         drawing(%(<path aria-label="x"/>)),
-        drawing(%(<path dx="1"/>))
+        drawing(%(<path dx="1"/>)),
+        drawing(%(<rect marker-mid="url(#a)"/>))
       ],
       url: [
         drawing(%(<path marker-end="url(http://x)"/>)),
         drawing(%(<path marker-start="url(#nowhere)"/>)),
         drawing(%(<rect x="url(#a)"/>)),
-        drawing(%(<marker id="m"/><path marker-end="URL(#m) "/>))
+        drawing(%(<marker id="m"/><path marker-end="URL(#m) "/>)),
+        drawing(%(<path id="p" d="M0 0"/><path marker-end="url(#p)"/>)),
+        drawing(%(<g id="g"><path d="M0 0"/></g><line marker-mid="url(#g)"/>))
       ],
       value: [
         drawing(%(<rect class="javascript:alert(1)"/>)),
@@ -140,6 +145,12 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
         drawing(%(<rect class="a //x.test"/>)),
         drawing(%(<rect id="javascript:alert(1)"/>)),
         drawing(%(<rect x="1;y"/>)),
+        drawing(%(<rect x="auto"/>)),
+        drawing(%(<g transform="expression(alert(1))"/>)),
+        drawing(%(<g transform="translate(a, 1)"/>)),
+        drawing(%(<path d="M0 0 x"/>)),
+        drawing(%(<path d="M0 0 (1)"/>)),
+        drawing(%(<polygon points="1,2 three"/>)),
         drawing(%(<text text-anchor="inherit"/>)),
         drawing(%(<marker orient="sideways"/>)),
         drawing(%(<rect id="a"/><rect id="a"/>)),
@@ -163,6 +174,27 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
   test "a class token failing the pattern is dropped and the element kept" do
     rect = parsed(clean(drawing(%(<rect class="task width-27.4375" x="1"/>))).svg).at_xpath("//*[local-name()='rect']")
     assert_equal "task", rect["class"]
+  end
+
+  test "an empty class, or one whose every token fails, is dropped and the element kept" do
+    [ %(class=""), %(class="200 width-1.5"), %(class="  ") ].each do |attribute|
+      result = clean(drawing(%(<rect #{attribute} x="1"/>)))
+      assert_nil result.reason, attribute
+      assert_equal({ "x" => "1" }, parsed(result.svg).at_xpath("//*[local-name()='rect']").attributes.transform_values(&:value), attribute)
+    end
+  end
+
+  test "geometry takes numbers and units, path data its commands, a transform SVG's functions" do
+    result = clean(drawing(%(<g transform="translate(10, 20) rotate(-45)scale(1.5e-1)"><rect x="1px" y="-.5em" width="100%" height="2"/><path d="M1e-3,0 L 10 -2 C1 2 3 4 5 6 A 1 1 0 0 1 2 2 Z"/><polygon points="1,2 3,4 5.5,-6"/><text dy="0.35em">x</text></g>)))
+    assert_nil result.reason
+    assert_includes result.svg, %(transform="translate(10, 20) rotate(-45)scale(1.5e-1)")
+  end
+
+  test "a marker reference names a marker, at the start, the middle or the end" do
+    result = clean(drawing(%(<marker id="m"><path d="M0 0"/></marker><path d="M0 0" marker-start="url(#m)" marker-mid="url(#m)" marker-end="url(#m)"/>)))
+    assert_nil result.reason
+    path = parsed(result.svg).xpath("//*[local-name()='path']").last
+    assert_equal [ "url(#d-2)" ] * 3, [ path["marker-start"], path["marker-mid"], path["marker-end"] ]
   end
 
   test "the empty g is dropped, innermost first" do
@@ -266,6 +298,13 @@ class Diagram::DrawingTest < ActiveSupport::TestCase
     drawing = Diagram::Drawing.new("svg" => clean(fixture("pie")).svg, "from" => "x")
     assert_raises(ArgumentError) { drawing.markup(prefix: %(x" onload="), title: "t", title_id: "p-title") }
     assert_raises(ArgumentError) { drawing.markup(prefix: "p-", title: "t", title_id: "a b") }
+    assert_raises(ArgumentError) { drawing.markup(prefix: "p-", title: "t", title_id: "a.b") }
+    assert_raises(ArgumentError) { drawing.markup(prefix: "pä-", title: "t", title_id: "p-title") }
+    assert_raises(ArgumentError) { drawing.markup(prefix: "p-", title: "t", title_id: "p-tïtle") }
+    # A title id that one of the drawing's own prefixed ids could be.
+    assert_raises(ArgumentError) { drawing.markup(prefix: "p-", title: "t", title_id: "p-d-1") }
+    assert_raises(ArgumentError) { drawing.markup(prefix: "p-", title: "t", title_id: "p-desc") }
+    assert drawing.markup(prefix: "p-", title: "t", title_id: "p-title")
   end
 
   test "current? is true only for the source the drawing was made from" do
