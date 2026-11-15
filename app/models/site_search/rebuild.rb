@@ -42,7 +42,10 @@ module SiteSearch
   # Then the row is marked `ready` with the fingerprint read at the start
   # and the languages indexed: a change of the languages made during the
   # build leaves the row stale, and the job that ran it sees it
-  # (`ReindexJob`).
+  # (`ReindexJob`). Before that the built-in's vocabulary is pruned
+  # (`Postgres::Vocabulary.prune`), so a build ends with no word that no
+  # entry holds: the words of records gone, of copies superseded and of the
+  # languages just dropped.
   #
   # Every call to the backend is scrubbed (`Unavailable.scrubbing`): a
   # failure comes out as `SiteSearch::Unavailable`, the row left `building`.
@@ -93,6 +96,7 @@ module SiteSearch
 
       prune_unkept
       drop_languages(Array(indexed_before || SUPPORTED_LOCALES.keys) - Locales.enabled)
+      Unavailable.scrubbing(backend: @name) { Postgres::Vocabulary.prune } if @inline
       state.ready!(fingerprint, languages: Locales.enabled.sort, done: done)
       done
     end

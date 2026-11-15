@@ -23,7 +23,9 @@ module SiteSearch
   # the copies: its query reads each record's state, address and clock as it
   # searches (spec §6.3), and its foreign key's cascade takes a withdrawn or
   # purged copy's entries with the copy. So it is asked something for a copy
-  # taken and a copy rewritten, and nothing for the other events.
+  # taken and a copy rewritten, and nothing for the other events; a withdrawn
+  # copy and a purge enqueue `SiteSearch::PruneWordsJob` after the commit,
+  # for the words of the entries the cascade took (`Postgres::Vocabulary`).
   #
   # AN OUTSIDE BACKEND is never called inside a write, which would hold the
   # write open on the network: every event becomes a `SiteSearch::SyncJob`
@@ -65,11 +67,16 @@ module SiteSearch
       nil
     end
 
-    # The built-in's entries went with the copies (the cascade).
+    # The built-in's entries went with the copies (the cascade); their words
+    # go with the prune after the commit.
     def copies_withdrawn(record, copy_ids:)
-      return nil if inline? || copy_ids.empty?
+      return nil if copy_ids.empty?
 
-      enqueue_sync(record.class.polymorphic_name, record.id) { !Publishing::Version.exists?(id: copy_ids) }
+      if inline?
+        enqueue_prune
+      else
+        enqueue_sync(record.class.polymorphic_name, record.id) { !Publishing::Version.exists?(id: copy_ids) }
+      end
       nil
     end
 
@@ -116,10 +123,14 @@ module SiteSearch
       nil
     end
 
+    # As a withdrawn copy: the cascade took the built-in's entries, the
+    # prune takes their words.
     def record_purged(record_type, record_id)
-      return nil if inline?
-
-      enqueue_sync(record_type, record_id) { true }
+      if inline?
+        enqueue_prune
+      else
+        enqueue_sync(record_type, record_id) { true }
+      end
       nil
     end
 
@@ -152,6 +163,17 @@ module SiteSearch
       end
     end
     private_class_method :enqueue_sync
+
+    # After the outermost commit, as `enqueue_sync`: a rolled-back purge
+    # prunes nothing, and an enqueue that raises is reported, never raised.
+    def enqueue_prune
+      ActiveRecord.after_all_transactions_commit do
+        PruneWordsJob.perform_later
+      rescue StandardError => error
+        Reports.report(backend: Backends.current_name, error: error)
+      end
+    end
+    private_class_method :enqueue_prune
 
     def stands?(record_type, record_id) = RECORDS.include?(record_type) && record_type.constantize.exists?(record_id)
     # The built-in's documents of what `record` shows now and is scheduled

@@ -50,7 +50,9 @@ module SiteSearch
     # `Documents::REVISION` does for the documents themselves.
     REVISION = 1
 
-    COLUMNS = %i[published_version_id record_type record_id locale config live_at document text created_at].freeze
+    # `title` is the title field's plain text, which the suggestions read
+    # by its `simple` words (`index_search_entries_on_title_words`).
+    COLUMNS = %i[published_version_id record_type record_id locale config live_at document text created_at title].freeze
 
     def self.config_for(code) = CONFIGS.fetch(code.to_s, "simple")
 
@@ -73,13 +75,17 @@ module SiteSearch
     end
 
     # Each document's entry replaced: the rows of its copy and language
-    # deleted, the new ones inserted, in one transaction.
+    # deleted, the new ones inserted, and their words added to the
+    # vocabulary (`Vocabulary`), in one transaction. Every writer of the
+    # entries comes through here, so the vocabulary holds every word of every
+    # entry that is no stopword; a word of an entry gone stays until a prune.
     def index(documents)
       return nil if documents.empty?
 
       Entry.transaction do
         Entry.where([ :published_version_id, :locale ] => documents.map { |document| [ document.copy_id, document.language ] }).delete_all # version: none (the search index is no part of a page: results are never cached, §8.1)
         Entry.connection.insert(insert_of(documents)) # version: none (the search index is no part of a page: results are never cached, §8.1)
+        Vocabulary.write(documents)
       end
       nil
     end
@@ -99,6 +105,7 @@ module SiteSearch
 
     def clear
       Entry.delete_all # version: none (the search index is no part of a page: results are never cached, §8.1)
+      Word.delete_all # version: none (the vocabulary is no part of a page)
       nil
     end
 
@@ -130,9 +137,11 @@ module SiteSearch
     def row_of(document, now)
       config = self.class.config_for(document.language)
       [ document.copy_id, document.record_type, document.record_id, document.language, config,
-        SqlNodes.cast(document.live_at, "timestamp"), vector_of(document, config), document.text, SqlNodes.cast(now, "timestamp") ]
+        SqlNodes.cast(document.live_at, "timestamp"), vector_of(document, config), document.text, SqlNodes.cast(now, "timestamp"), title_of(document) ]
         .map { |value| SqlNodes.quoted(value) }
     end
+
+    def title_of(document) = document.fields.find { |field| field.name == "title" }&.text.to_s
 
     # `setweight(to_tsvector(config, title), 'A') || setweight(…, 'B') || …`:
     # every field with the document's configuration and its own weight. A

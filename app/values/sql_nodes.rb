@@ -21,6 +21,12 @@ module SqlNodes
   # `q`).
   def bound(value, name:) = Arel::Nodes::BindParam.new(ActiveRecord::Relation::QueryAttribute.new(name.to_s, value, ActiveModel::Type::Value.new))
 
+  # `CAST($1 AS text[])`: a list of strings sent as one bind named `name`,
+  # Postgres's array literal of them, so no element is ever statement text.
+  def bound_text_array(values, name:)
+    Arel::Nodes::NamedFunction.new("CAST", [ Arel::Nodes::As.new(bound(PG::TextEncoder::Array.new.encode(values.map(&:to_s)), name: name), Arel::Nodes::SqlLiteral.new("text[]")) ])
+  end
+
   # `NAME(a, b)`: a SQL function over nodes and values.
   def function(name, *arguments) = Arel::Nodes::NamedFunction.new(name, arguments.map { |argument| quoted(argument) })
 

@@ -1423,4 +1423,19 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes indexed, [ "Page", @gone_page.id ]
     assert_not_includes indexed, [ "Post", @gone_post.id ]
   end
+
+  # The vocabulary is a list the close matches read: a purge's words go
+  # with the prune job enqueued after its commit (`SiteSearch::PruneWordsJob`).
+  test "the vocabulary forgets a purged record's words after the prune job" do
+    post = create_post(title: "Purgeableword")
+    assert SiteSearch::Word.exists?(locale: "en", word: "purgeableword")
+
+    perform_enqueued_jobs do
+      assert Trash::Move.call(post.reload).ok?
+      assert Trash::Purge.call(post.reload).ok?
+    end
+
+    assert_not SiteSearch::Word.exists?(word: "purgeableword")
+    assert SiteSearch::Word.exists?(locale: "en", word: "kept"), "a kept post's words stay"
+  end
 end

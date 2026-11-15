@@ -54,11 +54,36 @@ class SiteSearch::PostgresParityTest < ActiveSupport::TestCase
     end
     assert kept.values.any?(&:present?), step
     assert_equal fresh, kept, "after #{step}, a search over the kept entries finds what it finds over a re-index"
+    assert_vocabulary(step)
   end
 
   def assert_parity(step)
     assert_not_empty rows, step
     assert_equal reindexed, rows, "after #{step}, search_entries is what search:reindex would write"
+    assert_vocabulary(step)
+  end
+
+  # The documents of every entry's copy and language, built again.
+  def current_documents
+    now = Time.current
+    SiteSearch::Entry.distinct.pluck(:published_version_id, :locale).group_by(&:first).flat_map do |copy_id, pairs|
+      languages = pairs.map(&:last)
+      SiteSearch::Documents.for(Publishing::Version.find(copy_id), now: now).select { |doc| languages.include?(doc.language) }
+    end
+  end
+
+  # The words that are no stopword of `language`, asked of Postgres one by
+  # one, as the writer's filter is not.
+  def non_stopwords(language, words)
+    config = SiteSearch::Postgres.config_for(language)
+    words.select { |word| SiteSearch::Entry.connection.select_value(SiteSearch::Entry.sanitize_sql_array([ "SELECT to_tsvector(CAST(? AS regconfig), ?) <> ''::tsvector", config, word ])) }
+  end
+
+  # A superset: the words of entries that are gone may stay until a prune.
+  def assert_vocabulary(step)
+    expected = current_documents.flat_map { |doc| non_stopwords(doc.language, SiteSearch::Postgres::Vocabulary.words_of(doc)).map { [ doc.language, it ] } }
+    assert_not_empty expected, step
+    assert_empty expected - SiteSearch::Word.pluck(:locale, :word), "after #{step}, every non-stopword of every entry is in search_words"
   end
 
   def ok(result)

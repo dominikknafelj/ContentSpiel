@@ -4,7 +4,8 @@ require "test_helper"
 # `SiteSearch::Indexing` is the one caller of a backend's `index` and
 # `remove`, so every event that moves a copy reaches the backend in use the
 # same way, inline or after the commit; and `SiteSearch::Postgres` is the
-# one writer of `search_entries`, a derived table nobody writes by hand.
+# one writer of `search_entries` and `search_words`, derived tables nobody
+# writes by hand.
 # Read in `app/` and `lib/`, comment lines skipped.
 class SiteSearchGuardsTest < ActiveSupport::TestCase
   # path => why it may ask a backend to index, remove or prune.
@@ -20,7 +21,17 @@ class SiteSearchGuardsTest < ActiveSupport::TestCase
 
   WRITES = /\.(?:update_all|update_columns|update_column|update!?|upsert|upsert_all|insert_all!?|insert!?|create!?|delete_all|delete_by|delete|destroy_all|destroy_by|destroy!?|touch_all|touch)\b/
 
-  WRITERS = { "app/models/site_search/postgres.rb" => "the built-in backend, the table's one writer" }.freeze
+  WRITERS = {
+    "app/models/site_search/postgres.rb" => "the built-in backend, the entries' one writer",
+    "app/models/site_search/postgres/vocabulary.rb" => "the built-in's vocabulary, which its index writes and its build prunes"
+  }.freeze
+
+  # A write's line names the table or its model; inside the search folders
+  # the bare model too.
+  def writes_search_table?(line, own:)
+    line.match?(/(?:\bSiteSearch::(?:Entry|Word)\b|\bsearch_(?:entries|words)\b)[^\n]*#{WRITES}/) ||
+      (own && line.match?(/(?<![:\w])(?:Entry|Word)\b[^\n]*#{WRITES}/))
+  end
 
   def sources = %w[app lib].flat_map { |root| Rails.root.glob("#{root}/**/*.{rb,rake,erb}") }.to_h { |path| [ path.to_s.delete_prefix("#{Rails.root}/"), path.read ] }
 
@@ -39,14 +50,19 @@ class SiteSearchGuardsTest < ActiveSupport::TestCase
     [ "text.index(\"a\")", "list.remove(1)", "Entry.where(id: 1)", "Backends.current_name" ].each { |line| assert_no_match ASKS, line }
   end
 
-  test "only SiteSearch::Postgres writes search_entries" do
+  test "only SiteSearch::Postgres writes search_entries and search_words" do
     writers = sources.select do |path, source|
       own = path.start_with?("app/models/site_search/", "app/queries/site_search/", "app/jobs/site_search/")
-      code_lines(source).any? do |line|
-        line.match?(/(?:\bSiteSearch::Entry\b|\bsearch_entries\b)[^\n]*#{WRITES}/) || (own && line.match?(/(?<![:\w])Entry\b[^\n]*#{WRITES}/))
-      end
+      code_lines(source).any? { |line| writes_search_table?(line, own: own) }
     end.keys
 
-    assert_equal WRITERS.keys, writers, "search_entries is derived: written by SiteSearch::Postgres alone (spec §6.1)"
+    assert_equal WRITERS.keys.sort, writers.sort, "search_entries and search_words are derived: written by SiteSearch::Postgres alone (spec §6.1, search 2 §3.2)"
+  end
+
+  test "the writing pattern catches a write of either table and lets a read through" do
+    [ "Word.insert_all(rows, unique_by: %i[locale word])", "SiteSearch::Word.where(locale: \"en\").delete_all", "Entry.delete_all" ].each { |line| assert writes_search_table?(line, own: true), line }
+    assert writes_search_table?("SiteSearch::Word.delete_all", own: false)
+    [ "Word.where(locale: \"en\").pluck(:word)", "Word.exists?(word: \"x\")" ].each { |line| assert_not writes_search_table?(line, own: true), line }
+    assert_not writes_search_table?("Word.delete_all", own: false), "a bare Word outside the search folders is another model's"
   end
 end

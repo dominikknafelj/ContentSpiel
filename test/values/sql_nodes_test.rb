@@ -96,6 +96,16 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_equal [ "q" ], binds.map(&:name)
   end
 
+  test "bound_text_array sends a list of strings as one text[] bind, never as statement text" do
+    words = [ "it's", "a,b", %(x"y), "back\\slash", "{brace}" ]
+    statement = Arel::SelectManager.new.project(SqlNodes.function("unnest", SqlNodes.bound_text_array(words, name: "words")))
+    sql, binds = ActiveRecord::Base.connection.send(:to_sql_and_binds, statement)
+
+    assert_equal "SELECT unnest(CAST($1 AS text[]))", sql
+    assert_equal [ "words" ], binds.map(&:name)
+    assert_equal words, ActiveRecord::Base.connection.select_values(statement)
+  end
+
   private
 
   # An attribute has no `to_sql` of its own; the connection's visitor renders any node.
