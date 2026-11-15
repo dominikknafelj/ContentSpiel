@@ -10,6 +10,12 @@ module SiteSearch
   # waits for it (Solid Queue's default, `:block`) rather than being
   # discarded, since the running one may have read a word before the purge
   # behind the waiting one committed.
+  #
+  # A prune longer than Solid Queue's semaphore (three minutes) may overlap
+  # a second one, which is harmless: a prune is idempotent, and the two
+  # take the vocabulary's lock in turn (`Postgres::Vocabulary::LOCK`).
+  # `SiteSearch::Indexing` enqueues one per transaction, so a branch purged
+  # together prunes once.
   class PruneWordsJob < ApplicationJob
     queue_as :default
 

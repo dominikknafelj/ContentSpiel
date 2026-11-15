@@ -46,6 +46,7 @@ module SiteSearch
   # `public_paths`, which keeps the results honest.
   module Indexing
     RECORDS = %w[Page Post].freeze
+    PRUNE_ASKED = :site_search_prune_asked
 
     module_function
 
@@ -166,8 +167,17 @@ module SiteSearch
 
     # After the outermost commit, as `enqueue_sync`: a rolled-back purge
     # prunes nothing, and an enqueue that raises is reported, never raised.
+    # One per transaction, however many records it purged (a page's
+    # branch, `Trash::Empty`): the transaction that asked is remembered
+    # until the callback runs, and one finished without it (rolled back) is
+    # open no more, so the next asks again.
     def enqueue_prune
+      transaction = ActiveRecord::Base.current_transaction
+      return if transaction.open? && ActiveSupport::IsolatedExecutionState[PRUNE_ASKED].equal?(transaction)
+
+      ActiveSupport::IsolatedExecutionState[PRUNE_ASKED] = transaction
       ActiveRecord.after_all_transactions_commit do
+        ActiveSupport::IsolatedExecutionState[PRUNE_ASKED] = nil
         PruneWordsJob.perform_later
       rescue StandardError => error
         Reports.report(backend: Backends.current_name, error: error)

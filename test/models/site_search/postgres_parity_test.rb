@@ -72,18 +72,21 @@ class SiteSearch::PostgresParityTest < ActiveSupport::TestCase
     end
   end
 
-  # The words that are no stopword of `language`, asked of Postgres one by
-  # one, as the writer's filter is not.
-  def non_stopwords(language, words)
+  # The words an entry of `language` holds by the vocabulary's one rule
+  # (`document @@ plainto_tsquery(config, word)`), asked one by one.
+  def held_words(language, words)
     config = SiteSearch::Postgres.config_for(language)
-    words.select { |word| SiteSearch::Entry.connection.select_value(SiteSearch::Entry.sanitize_sql_array([ "SELECT to_tsvector(CAST(? AS regconfig), ?) <> ''::tsvector", config, word ])) }
+    words.select do |word|
+      SiteSearch::Entry.where(locale: language)
+        .where(SiteSearch::Entry.sanitize_sql_array([ "document @@ plainto_tsquery(CAST(? AS regconfig), ?)", config, word ])).exists?
+    end
   end
 
   # A superset: the words of entries that are gone may stay until a prune.
   def assert_vocabulary(step)
-    expected = current_documents.flat_map { |doc| non_stopwords(doc.language, SiteSearch::Postgres::Vocabulary.words_of(doc)).map { [ doc.language, it ] } }
+    expected = current_documents.flat_map { |doc| held_words(doc.language, SiteSearch::Postgres::Vocabulary.words_of(doc)).map { [ doc.language, it ] } }
     assert_not_empty expected, step
-    assert_empty expected - SiteSearch::Word.pluck(:locale, :word), "after #{step}, every non-stopword of every entry is in search_words"
+    assert_empty expected - SiteSearch::Word.pluck(:locale, :word), "after #{step}, every word an entry holds is in search_words"
   end
 
   def ok(result)

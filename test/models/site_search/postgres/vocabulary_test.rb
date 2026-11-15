@@ -60,6 +60,34 @@ class SiteSearch::Postgres::VocabularyTest < ActiveSupport::TestCase
     assert_equal %w[albatross these], words("de")
   end
 
+  # Postgres keeps `example.com` and `info@example.org` as one lexeme each,
+  # so no entry holds `example` by the prune's test, and the writer keeps
+  # it out by the same test.
+  test "a word inside a host name or e-mail address never enters" do
+    index(doc(title: "visit example.com", body: "mail info@example.org"))
+    assert_equal %w[mail visit], words
+    assert_equal 0, SiteSearch::Postgres::Vocabulary.prune, "the prune finds nothing the writer kept that no entry holds"
+  end
+
+  # The advisory locks the current connection holds, by mode.
+  def vocabulary_locks
+    classid, objid = SiteSearch::Postgres::Vocabulary::LOCK
+    SiteSearch::Word.connection.select_values(SiteSearch::Word.sanitize_sql_array([
+      "SELECT mode FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND classid = ? AND objid = ? AND objsubid = 2", classid, objid
+    ])).sort
+  end
+
+  test "a write takes the vocabulary's lock shared and a prune takes it exclusive, each to the transaction's end" do
+    SiteSearch::Entry.transaction(requires_new: true) do
+      index(doc(title: "albatross"))
+      assert_equal %w[ShareLock], vocabulary_locks, "a write in flight lets other writes through and holds a prune"
+    end
+    SiteSearch::Entry.transaction(requires_new: true) do
+      SiteSearch::Postgres::Vocabulary.prune
+      assert_includes vocabulary_locks, "ExclusiveLock", "a prune holds every write"
+    end
+  end
+
   test "the four limited languages get no vocabulary" do
     index(doc(title: "検索エンジンの使い方 searching", language: "ja"))
     assert_empty SiteSearch::Word.where(locale: "ja")

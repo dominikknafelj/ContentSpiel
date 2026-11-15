@@ -77,8 +77,9 @@ module SiteSearch
     # Each document's entry replaced: the rows of its copy and language
     # deleted, the new ones inserted, and their words added to the
     # vocabulary (`Vocabulary`), in one transaction. Every writer of the
-    # entries comes through here, so the vocabulary holds every word of every
-    # entry that is no stopword; a word of an entry gone stays until a prune.
+    # entries comes through here, so the vocabulary holds every word some
+    # entry holds by `document @@ plainto_tsquery(config, word)` (no stopword
+    # does); a word of an entry gone stays until a prune.
     def index(documents)
       return nil if documents.empty?
 

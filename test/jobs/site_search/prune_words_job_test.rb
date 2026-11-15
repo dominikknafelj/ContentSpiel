@@ -36,6 +36,37 @@ class SiteSearch::PruneWordsJobTest < ActiveSupport::TestCase
     assert SiteSearch::Word.exists?(locale: "en", word: "harbourmaster"), "a word another entry holds stays"
   end
 
+  test "a branch purged together enqueues one prune" do
+    root = create_page(title: "Branchroot")
+    child = create_page(title: "Branchchild", parent: root)
+    create_page(title: "Branchgrandchild", parent: child)
+    ok Trash::Move.call(root.reload)
+    clear_enqueued_jobs
+
+    ok Trash::Purge.call(root.reload)
+    assert_enqueued_jobs 1, only: SiteSearch::PruneWordsJob
+    perform_enqueued_jobs
+    assert_empty SiteSearch::Word.where(word: %w[branchroot branchchild branchgrandchild])
+
+    other = create_page(title: "Lighthouse")
+    ok Trash::Move.call(other.reload)
+    clear_enqueued_jobs
+    ok Trash::Purge.call(other.reload)
+    assert_enqueued_jobs 1, only: SiteSearch::PruneWordsJob # the next transaction asks again
+  end
+
+  test "a purge rolled back leaves the next one free to enqueue its prune" do
+    page = create_page(title: "Uniqueword")
+    ok Trash::Move.call(page.reload)
+    clear_enqueued_jobs
+    ActiveRecord::Base.transaction(requires_new: true) do
+      ok Trash::Purge.call(page.reload)
+      raise ActiveRecord::Rollback
+    end
+    ok Trash::Purge.call(page.reload)
+    assert_enqueued_jobs 1, only: SiteSearch::PruneWordsJob
+  end
+
   test "a withdrawn scheduled change's words are pruned by the job" do
     page = create_page(title: "Lighthouse")
     ok Pages::Save.call(page.reload, translations: { "en" => { title: "Scheduledword" } })
