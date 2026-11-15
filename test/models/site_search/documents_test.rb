@@ -55,9 +55,6 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
     assert_includes summary.text, "zero downtime deploys"
     assert_not_includes summary.text, "zero-downtime"
 
-    blog = create_page(title: "Blog")
-    assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
-    publish_changes(blog)
     created = Posts::Save.call(attributes: { content_type: "blog", published: true, tag_names: [ "deployment" ] },
       translations: { "en" => { title: "P", excerpt: "Ex", slug: "my-post" } })
     assert created.ok?, created.errors.to_sentence
@@ -66,9 +63,9 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
     assert_equal "Ex my post", field(post_doc, "summary").text
   end
 
-  # A page's slug is read in the document's language: the Spanish document
-  # holds the Spanish slug, with no language prefix.
-  test "the slug is the address's last segment in the document's language" do
+  # A record's slug is read in the document's language, as stored: the
+  # Spanish document holds the Spanish slug.
+  test "the slug words are the record's own slug in the document's language" do
     page = create_page(title: "Harbour", translations: { "es" => { title: "Puerto", slug: "puerto-viejo" } })
     assert_equal "harbour", field(document_of(page, "en"), "summary").text
     assert_equal "puerto viejo", field(document_of(page, "es"), "summary").text
@@ -98,7 +95,7 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
     doc = SiteSearch::Documents.for(Publishing.current(post), now: Time.current).find { |each| each.language == "en" }
 
     assert_equal [ [ "title", :a ], [ "summary", :b ], [ "tags", :a ], [ "body", :c ], [ "code", :d ] ], doc.fields.map { [ _1.name, _1.weight ] }
-    assert_equal "A short look back", field(doc, "summary").text, "a post no list shows has no address, so no slug words"
+    assert_equal "A short look back spring report", field(doc, "summary").text, "a post no list shows has its slug words all the same"
     assert_equal "tides weather", field(doc, "tags").text.split.sort.join(" ")
     assert_equal "The rain was heavy. Rain came early", field(doc, "body").text
     assert_not_includes doc.fields.map(&:text).join(" "), "Untranslated hall"

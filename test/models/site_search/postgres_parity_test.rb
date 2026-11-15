@@ -124,6 +124,13 @@ class SiteSearch::PostgresParityTest < ActiveSupport::TestCase
     assert_parity "a page unpublished and published again"
     assert_view_parity "a page unpublished and published again"
 
+    update = create_post(title: "Tide table", content_type: "now_update")
+    news = create_page(title: "News")
+    ok ContentBlocks::Save.call(ContentBlock.new(owner: news), attributes: { block_type: "post_list", settings: { "content_type" => "now_update" } })
+    publish_changes(news)
+    assert PublicSite::Urls.new.path_for(update.reload, "en"), "the listing gave the post an address"
+    assert_parity "a listing published after its posts"
+
     ok Tags::Merge.call(Tag.find_by!(name: "seafaring"), into: Tag.find_by!(name: "maritime"))
     assert_parity "a tag merged"
     SiteSearch::Entry.where(record_type: "Post", record_id: post.id, locale: "en").pluck(:document).sole.then { |vector| assert_includes vector, "'maritim'" }

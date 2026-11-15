@@ -102,11 +102,11 @@ module SiteSearch
     # words are in the record's documents (`Documents`, the summary): the
     # built-in rebuilds the record's own documents from the copies it shows
     # now or is scheduled to show, in the caller's transaction and after the
-    # address was refreshed. A subpage's documents keep their words, since
-    # its own slug is its address's last segment wherever its parent is.
+    # address was refreshed. A subpage's documents keep their words: they
+    # are its own slug's, wherever its parent is.
     def record_changed(record, slug: false)
       if inline?
-        copies_rewritten([ Publishing.current(record), Publishing.pending(record) ].compact.map(&:id)) if slug
+        reindex_shown(record) if slug
         return nil
       end
 
@@ -154,6 +154,12 @@ module SiteSearch
     private_class_method :enqueue_sync
 
     def stands?(record_type, record_id) = RECORDS.include?(record_type) && record_type.constantize.exists?(record_id)
-    private_class_method :backend, :inline?, :stands?
+    # The built-in's documents of what `record` shows now and is scheduled
+    # to show, indexed again in one pass.
+    def reindex_shown(record)
+      backend.index(Documents.for_record(record, now: Time.current))
+    end
+
+    private_class_method :backend, :inline?, :stands?, :reindex_shown
   end
 end

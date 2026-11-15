@@ -29,13 +29,12 @@ module SiteSearch
       record = version.record
       pending = Publishing.pending(record, now: now) if pending == :unknown
       view = Publishing::Snapshot.rebuild(version, record)
-      urls = PublicSite::Urls.new
-      paths = urls.paths_by_language(record)
+      paths = PublicSite::Urls.new.paths_by_language(record)
       shown_from = [ version.live_at, record.published_at ].compact.max
       shown_until = pending.live_at if pending && pending.id != version.id && pending.live_at > version.live_at
 
       Locales.enabled.map do |locale|
-        fields = fields_of(view, locale, slug_words(paths[locale], urls.prefix(locale)))
+        fields = fields_of(view, locale)
         Document.new(
           key: [ record.class.polymorphic_name, record.id, version.id, locale ].join(":"),
           record_type: record.class.polymorphic_name, record_id: record.id, copy_id: version.id, language: locale,
@@ -66,11 +65,11 @@ module SiteSearch
       text.gsub(MARKERS, "").gsub(CONTROL, " ").squish
     end
 
-    def fields_of(view, locale, slug)
+    def fields_of(view, locale)
       blocks = view.is_a?(Page) ? view.content_blocks.to_a : []
       fields = [
         Field.new(name: "title", weight: :a, text: plain(Locales.read(view, :title, locale: locale))),
-        Field.new(name: "summary", weight: :b, text: joined(summary_of(view, locale) << slug))
+        Field.new(name: "summary", weight: :b, text: joined(summary_of(view, locale) << slug_words(view, locale)))
       ]
       fields << Field.new(name: "tags", weight: :a, text: joined(view.tags.map(&:name))) if view.is_a?(Post)
       fields << Field.new(name: "body", weight: :c, text: joined(post_text(view, locale) + block_texts(blocks, :body, locale)))
@@ -84,15 +83,16 @@ module SiteSearch
     end
     private_class_method :summary_of
 
-    # The last segment of the record's address in a language, `path` with
-    # that language's `prefix` taken off, its hyphens as spaces: the words a
-    # visitor reads in the URL, as parts, where Postgres's parser would read
-    # `zero-downtime-deploys` as one hyphenated compound. The homepage, and a
-    # record with no address in the language, give "".
-    def slug_words(path, prefix)
-      return "" if path.nil?
-
-      path.delete_prefix(prefix).split("/").last.to_s.tr("-", " ")
+    # The record's own slug in `locale`, as stored and with no fallback,
+    # its hyphens as spaces: the parts of `zero-downtime-deploys`, which
+    # Postgres's parser would read as one hyphenated compound. Never the
+    # address's last segment: an address also moves with writes that are no
+    # slug's (a list published after its posts gives them one), and those
+    # re-index nothing, while every write of a slug re-indexes its record
+    # (`Indexing.record_changed(record, slug: true)`). The homepage's slug
+    # is "" and gives nothing.
+    def slug_words(view, locale)
+      view.read_attribute(:slug).to_h[locale.to_s].to_s.tr("-", " ")
     end
     private_class_method :slug_words
 
