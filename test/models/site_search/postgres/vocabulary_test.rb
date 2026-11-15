@@ -5,6 +5,7 @@ require "test_helper"
 # its transaction, never a stopword of its language, and pruned to the words
 # some entry of their language still holds.
 class SiteSearch::Postgres::VocabularyTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
   setup do
     @copy = Publishing.current(create_page(title: "Vocabulary host"))
     SiteSearch::Word.delete_all # version: none (each test reads a vocabulary of its own documents)
@@ -134,6 +135,17 @@ class SiteSearch::Postgres::VocabularyTest < ActiveSupport::TestCase
     SiteSearch::Rebuild.new(name: "postgres", backend: backend).call
     assert_not SiteSearch::Word.exists?(word: "orphanword")
     assert_includes words, "vocabulary", "the build wrote the words of the entries it indexed"
+  end
+
+  # The build's entries stand without the prune, so a prune that waited
+  # too long for the writes in flight is the job's, never a reason to
+  # build everything again.
+  test "a build whose prune waits too long ends ready and leaves the prune to its job" do
+    timing_out = ->(*) { raise ActiveRecord::LockWaitTimeout, "canceling statement due to lock timeout" }
+    with_singleton_override(SiteSearch::Postgres::Vocabulary, :prune, timing_out) do
+      assert_enqueued_with(job: SiteSearch::PruneWordsJob) { SiteSearch::Rebuild.new(name: "postgres", backend: backend).call }
+    end
+    assert_predicate SiteSearch::IndexState.for("postgres"), :ready?
   end
 
   test "clearing the built-in clears its vocabulary" do

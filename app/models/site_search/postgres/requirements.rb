@@ -14,6 +14,10 @@ module SiteSearch
     #
     # The probe tests what matters, `pg_trgm` on a letter outside ASCII,
     # rather than the name in `datctype`: ICU locales and `C.UTF-8` pass.
+    #
+    # `enable!` is called by the migration 20261115120000_search_two, which
+    # a site upgrading from before 0.8 still runs: its name and this
+    # module's stay, or that upgrade stops at a NameError.
     module Requirements
       module_function
 
@@ -21,16 +25,20 @@ module SiteSearch
       EXTENSIONS = %w[plpgsql pg_trgm].freeze
 
       # The driver's errors that mean the extension cannot be had in this
-      # database: a role that may not create it, a server without the
-      # contrib package (`UndefinedFile` before Postgres 15's "is not
-      # available", `FeatureNotSupported`, which a managed host's allow-list
-      # answers too). Anything else (a cancelled statement, a lock wait) is
+      # database: a role that may not create it (`InsufficientPrivilege`), a
+      # server without the contrib package (`UndefinedFile`, SQLSTATE
+      # 58P01, whose message reads "is not available"), and
+      # `FeatureNotSupported`, which some managed hosts' allow-lists answer. Anything else (a cancelled statement, a lock wait) is
       # raised as itself.
       UNAVAILABLE = [ PG::InsufficientPrivilege, PG::UndefinedFile, PG::FeatureNotSupported ].freeze
 
       NOT_INSTALLED = "it is not installed in this database".freeze
       NOT_IN_SCHEMA = "db/schema.rb did not enable it (run bin/rails db:migrate)".freeze
       CHARACTER_TYPE = "pg_trgm cannot read letters outside ASCII in this database's character type".freeze
+
+      # What a host does about each, the last clause of the message.
+      EXTENSION_REMEDY = "where the app's database user may not create extensions, a superuser runs CREATE EXTENSION pg_trgm first".freeze
+      CHARACTER_TYPE_REMEDY = "a database's character type cannot be changed: create the database with a UTF-8 LC_CTYPE (or an ICU locale) and restore into it".freeze
 
       def enable!(connection)
         begin
@@ -84,14 +92,13 @@ module SiteSearch
         connection.select_value(Arel::SelectManager.new.project(trigrams.not_eq(SqlNodes.quoted("{}"))))
       end
 
-      def message_for(missing:, cause:)
+      def message_for(missing:, cause:, remedy: EXTENSION_REMEDY)
         "#{missing} is missing: #{cause}. ContentSpiel requires the Postgres extension pg_trgm and a UTF-8 character type " \
-          "(docs/reference/hosting.md, \"#{DOCS_HEADING}\"; the guide's \"What ContentSpiel asks of its host\"); " \
-          "where the app's database user may not create extensions, a superuser runs CREATE EXTENSION pg_trgm first."
+          "(docs/reference/hosting.md, \"#{DOCS_HEADING}\"; the guide's \"What ContentSpiel asks of its host\"); #{remedy}."
       end
 
       def check_character_type!(connection)
-        raise DatabaseRequirementMissing, message_for(missing: "a UTF-8 character type", cause: CHARACTER_TYPE) unless probe(connection)
+        raise DatabaseRequirementMissing, message_for(missing: "a UTF-8 character type", cause: CHARACTER_TYPE, remedy: CHARACTER_TYPE_REMEDY) unless probe(connection)
 
         nil
       end

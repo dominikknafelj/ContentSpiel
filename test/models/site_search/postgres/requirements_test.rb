@@ -87,6 +87,8 @@ class SiteSearch::Postgres::RequirementsTest < ActiveSupport::TestCase
       assert_includes error.message, "pg_trgm cannot read letters outside ASCII in this database's character type"
       error = assert_raises(SiteSearch::Postgres::DatabaseRequirementMissing) { boot_check(serving: true) }
       assert_includes error.message, "pg_trgm cannot read letters outside ASCII in this database's character type"
+      assert_includes error.message, "create the database with a UTF-8 LC_CTYPE (or an ICU locale) and restore into it"
+      refute_includes error.message, "CREATE EXTENSION", "no extension gives a database a character type"
     end
   end
 

@@ -16,6 +16,7 @@ module SiteSearch
   class FirstHolder
     # The pages' copies in force at `now` whose `blocks` meet `condition`
     # (an Arel node over `Publishing::Version.arel_table[:blocks]`).
+    # Taking a copy deletes the pending one (`Publishing::Version`), so `max(id)` in force is the greatest `(live_at, id)`, as `Version.current_for`.
     def self.copies_holding(condition, now:)
       newest = Publishing::Version.unscoped.where(record_type: "Page").in_force(now).group(:record_id).select(Publishing::Version.arel_table[:id].maximum)
       Publishing::Version.unscoped.where(id: newest).where(condition)

@@ -96,12 +96,24 @@ module SiteSearch
 
       prune_unkept
       drop_languages(Array(indexed_before || SUPPORTED_LOCALES.keys) - Locales.enabled)
-      Unavailable.scrubbing(backend: @name) { Postgres::Vocabulary.prune } if @inline
+      prune_words if @inline
       state.ready!(fingerprint, languages: Locales.enabled.sort, done: done)
       done
     end
 
     def kept(model) = model.kept.where.not(published_at: nil)
+
+    # The built-in's vocabulary pruned at the build's end. The entries stand
+    # without it, so a prune that waited `Vocabulary::LOCK_TIMEOUT` for the
+    # writes in flight is left to `PruneWordsJob`, which retries, and never
+    # makes the whole build fail and run again.
+    def prune_words
+      Unavailable.scrubbing(backend: @name) do
+        Postgres::Vocabulary.prune
+      rescue ActiveRecord::LockWaitTimeout
+        PruneWordsJob.perform_later
+      end
+    end
 
     def send_batch(model, ids)
       Telemetry.in_span("search.index", attributes: { "search.backend" => @name }) do |span|

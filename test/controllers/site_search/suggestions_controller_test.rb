@@ -248,13 +248,10 @@ class SiteSearch::SuggestionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "a suggestion that raises gives its slot back" do
-    # The suite has no minitest/mock: the module's own method is put back.
-    original = SiteSearch.method(:suggest)
-    SiteSearch.define_singleton_method(:suggest) { |**| raise ActiveRecord::ConnectionNotEstablished, "down" }
-    assert_raises(ActiveRecord::ConnectionNotEstablished) { suggest } # raised through: the test environment renders only rescuable errors
+    with_singleton_override(SiteSearch, :suggest, ->(**) { raise ActiveRecord::ConnectionNotEstablished, "down" }) do
+      assert_raises(ActiveRecord::ConnectionNotEstablished) { suggest } # raised through: the test environment renders only rescuable errors
+    end
     assert_equal SiteSearch::SuggestLimit::IN_FLIGHT, SiteSearch::SuggestLimit::SLOTS.available_permits
-  ensure
-    SiteSearch.define_singleton_method(:suggest, original)
   end
 
   test "the site limit refuses the 3,001st" do
