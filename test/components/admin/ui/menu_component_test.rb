@@ -29,6 +29,18 @@ class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
     assert_selector "[role=menu][data-action~='click->admin--ui--menu#select']", visible: :all
   end
 
+  test "chips: lays each one-column button out as a chip and a name side by side, never as a block" do
+    render_inline(Admin::Ui::MenuComponent.new(label: "Add", chips: true)) { |menu| menu.with_item { "x" } }
+    panel = page.find("[role=menu]", visible: :all)[:class]
+
+    assert_includes panel, "[&_button]:flex"
+    assert_includes panel, "[&_button]:gap-2"
+    refute_includes panel, "[&_button]:block"
+
+    render_inline(Admin::Ui::MenuComponent.new(label: "More")) { |menu| menu.with_item { "x" } }
+    assert_includes page.find("[role=menu]", visible: :all)[:class], "[&_button]:block"
+  end
+
   test "columns: lays the items out in a grid, and a count it does not know is refused" do
     render_inline(Admin::Ui::MenuComponent.new(label: "Add", columns: 3)) { |menu| menu.with_item { "x" } }
     classes = page.find("[role=menu]", visible: :all)[:class].split
