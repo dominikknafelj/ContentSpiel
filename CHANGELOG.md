@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Draw diagrams reached by a link inside CS Studio (System status's "Draw diagrams →") did nothing when Draw all was pressed: Turbo's copy of the page it had just drawn took its renderer frame back and nothing built it again. The screen, and the Diagram card in the same case, build their frame again once the copy is made.
+
 ## 0.7.0 (2026-11-15)
 
 ### Added

@@ -4,6 +4,7 @@ import { openFrame } from "diagram/frame"
 import { digest } from "diagram/digest"
 import { enqueue, currentGeneration } from "saving/queue"
 import { headers } from "editing/requests"
+import { afterSnapshot } from "diagram/snapshot"
 
 // The Draw diagrams screen's run (`Admin::DiagramDrawingsScreen::ListComponent`,
 // draw-diagrams spec §5, the Design System's StudioDrawDiagrams): "Draw all"
@@ -77,7 +78,11 @@ import { headers } from "editing/requests"
 // sent after it), remove the frame and its slot, and put back every chip,
 // reason, mark, the count, the progress, the live region, the summary, the
 // card and the button as the server drew them, so a copy Turbo keeps is the
-// server's. A row's base taken from a save stays: it is the block's as
+// server's. At `turbo:before-cache` the screen may be the one still showing
+// (a link inside `#content` caches the page it has just drawn), so once the
+// copy is made a controller still in the document connects again
+// (`diagram/snapshot`): without it, Draw all would find no frame and do
+// nothing. A row's base taken from a save stays: it is the block's as
 // stored, and a run from a restored copy would otherwise be refused.
 const REASONS = {
   stale: { state: "skipped", key: "components.diagram_drawings_screen.row.reasons.changed" },
@@ -109,7 +114,10 @@ export default class extends Controller {
     this.publishedPages = new Map()
     this.servedCount = this.hasCountTarget ? this.countTarget.textContent : null
     this.served = new Map(this.rowTargets.map((row) => [ row, [ ...this.slot(row).childNodes ].map((node) => node.cloneNode(true)) ]))
-    this.takeBack = () => this.close()
+    this.takeBack = () => {
+      this.close()
+      afterSnapshot(() => { if (this.element.isConnected && !this.frame) this.connect() })
+    }
     this.leaving = (event) => this.leave(event)
     document.addEventListener("turbo:before-cache", this.takeBack)
     document.addEventListener("turbo:before-visit", this.leaving)
