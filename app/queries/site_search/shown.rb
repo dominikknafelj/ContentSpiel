@@ -10,7 +10,7 @@ module SiteSearch
   #
   # A hit dropped here is not replaced: the page shows fewer than ten and the
   # total stays the engine's. With the built-in nothing is dropped, since its
-  # query asks the same (`test/models/site_search/shown_test.rb` holds the
+  # query asks the same (`test/queries/site_search/shown_test.rb` holds the
   # two to agree).
   #
   # THE STATEMENTS, whatever the number of hits: the records, one per kind;

@@ -86,7 +86,7 @@ class SiteSearch::PostgresTest < ActiveSupport::TestCase
 
   test "health is ok and the backend writes in the caller's transaction" do
     assert_equal SiteSearch::Health.new(status: :ok, detail: nil), backend.health(deadline: contract_deadline)
-    assert backend.inline?
+    assert SiteSearch::Backends.inline?(SiteSearch::Backends::BUILT_IN), "its registration says so"
   end
 
   test "entry_count counts the records with an entry, not the entries" do
