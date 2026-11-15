@@ -15,6 +15,7 @@
 
 ### Fixed
 
+- Puma 8.1.1, from 8.0.2: seven advisories published 2026-11-15 (GHSA-x646-wp7c-h9mg, GHSA-xw3h-pgr9-3vg7 among them), each a client that stalls or floods a worker.
 - A page's address under the default language's own prefix (`/en/…`) whose slug holds a space, a quote, a brace or a letter outside ASCII (`/en/caf%C3%A9`) answered 500; it redirects to the unprefixed address again, the slug percent-encoded. A path that decodes to begin with a slash (`/en/%2Fevil.com`) redirects on the site's own host and never to another.
 
 ### Breaking
