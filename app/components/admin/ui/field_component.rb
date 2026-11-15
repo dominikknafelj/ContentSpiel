@@ -161,10 +161,24 @@ module Admin
       # The help line's words: the type's literal, or, for a `help:` that is
       # a Symbol, its key under `admin.components.fields` in CS Studio's
       # language, `%{placeholder}` the input's placeholder text (empty where
-      # the caller handed none over: only the block card does).
+      # the caller handed none over: only the block card does). A key is a
+      # gem's as often as ours, and read only here: one that is missing,
+      # names a subtree or interpolates a name this hands none of answers
+      # nil, so the line is left out and the editor drawn, and the mistake
+      # is reported with the key (`HelpKeyUnreadable`), as a block type's
+      # raising summary is logged (`EditorScreen::TileSummaryComponent`).
       def help_text
+        return @help_text if defined?(@help_text)
+
         help = field.help
-        help.is_a?(Symbol) ? t("admin.components.fields.#{help}", placeholder: placeholder&.dig(:text).to_s) : help
+        @help_text = help.is_a?(Symbol) ? help_from_key(help) : help
+      end
+
+      # A `help:` key that could not be read as one line of words.
+      class HelpKeyUnreadable < StandardError
+        def initialize(key, error_class)
+          super("the help: key admin.components.fields.#{key} could not be drawn (#{error_class}); the field is drawn without its help line") # i18n-ok: an error report for whoever runs the site, not a word of CS Studio
+        end
       end
 
       # True once the caller has handed over something to compare against --
@@ -207,6 +221,16 @@ module Admin
       end
 
       private
+
+      def help_from_key(key)
+        text = t("admin.components.fields.#{key}", placeholder: placeholder&.dig(:text).to_s)
+        raise TypeError, "a help key names one string" unless text.is_a?(String)
+
+        text
+      rescue StandardError => error
+        Rails.error.report(HelpKeyUnreadable.new(key, error.class.name), handled: true, source: "content_spiel.fields")
+        nil
+      end
 
       def translatable? = field.field_type&.translatable == true
 

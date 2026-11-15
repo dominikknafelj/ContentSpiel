@@ -793,6 +793,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
 
       render_card(block, page: page)
       assert_selector "[data-block-body] [role=note].bg-sunken.text-dim", exact_text: note, count: 1
+      assert_selector "[data-block-body] [role=note].mt-2\\.5", exact_text: note, count: 1
       assert_no_selector "form [role=note]", text: note
       assert_operator rendered_content.index("block-#{block.id}-label-help"), :<, rendered_content.index(note), "the note stands under the field"
 

@@ -117,6 +117,26 @@ class Admin::Ui::FieldComponentTranslationTest < ViewComponent::TestCase
     assert_selector "p#block-7-title-help.text-meta", exact_text: "Empty: the kind's word."
   end
 
+  # A gem's `help:` key is read only when its field is drawn: a string that
+  # interpolates a name the field never hands over, a key that names a
+  # subtree, or one that is missing must not take the editor down with a
+  # 500. The line is left out and the mistake reported.
+  test "a help key that cannot be read draws no help line and is reported" do
+    I18n.backend.store_translations(:en, admin: { components: { fields: { acme_help_probe: {
+      counted: "Shows %{count} images", tree: { first: "One", second: "Two" }
+    } } } })
+
+    %i[acme_help_probe.counted acme_help_probe.tree acme_help_probe.missing].each do |key|
+      field = Field.new(name: "title", type: :string, options: { help: key })
+      report = assert_error_reported do
+        render_inline Admin::Ui::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "en", id_prefix: "block-7")
+      end
+      assert_selector "input#block-7-title", count: 1
+      assert_no_selector "#block-7-title-help"
+      assert_includes report.error.message, key.to_s, key
+    end
+  end
+
   test "a placeholder handed to the field reaches its input" do
     field = Field.new(name: "title", type: :string, options: {})
     render_inline Admin::Ui::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "en", placeholder: { text: "Note" })

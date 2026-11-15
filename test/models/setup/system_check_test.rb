@@ -71,7 +71,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
     old = result("Search", run_check(search: search_status(state: :out_of_date, count: nil)))
     assert_equal :warning, old.status
-    assert_equal "The search index is out of date: the site's languages changed since it was built. Run this to rebuild it:", old.message
+    assert_equal "The search index is out of date. Run this to rebuild it:", old.message
     assert_equal "bin/rails search:reindex", old.command
   end
 
