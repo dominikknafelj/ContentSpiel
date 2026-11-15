@@ -2,13 +2,13 @@ require "test_helper"
 require_relative "../support/source_code"
 
 # With ADMIN_HOST set, the backend (every route under /<ADMIN_PATH>/) answers
-# on the admin host alone and the public site's pages and form sends on every
-# other host; on the wrong host either is the public 404, never a redirect
-# that would name the other host. `/up` and Active Storage answer on both.
+# on the admin host alone and the public site's pages, form sends and
+# suggestions on every other host; on the wrong host either is the public
+# 404, never a redirect that would name the other host. `/up` and Active Storage answer on both.
 class AdminHostTest < ActionDispatch::IntegrationTest
   PUBLIC_ADDRESS = "https://docs.example.org".freeze
   ADMIN_ADDRESS = "https://studio.example.internal".freeze
-  SITE_ROUTES = [ "GET /", "GET /:locale(/*path)", "GET /*path", "POST /forms/:form_id" ].freeze
+  SITE_ROUTES = [ "GET /", "GET /:locale(/*path)", "GET /*path", "POST /forms/:form_id", "POST /search/suggestions" ].freeze
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)

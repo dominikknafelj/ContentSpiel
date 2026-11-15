@@ -25,7 +25,10 @@ Rails.application.config.filter_parameters += [
   # database as the bind named `q` too, which Active Record's debug line prints through this list. The whole name: a
   # bare :q matches by substring, so it would mask every parameter with a "q" in it (`quote`, `note_quote`), and
   # `Audit::Snapshot.scrub` drops every snapshot key this list matches.
-  /\Aq\z/
+  /\Aq\z/,
+  # What a visitor has typed so far, sent for suggestions (search 2 spec §4.2) as the JSON body's `suggest`, which
+  # the "Parameters:" line logs by its key: personal data as `q` is, and the whole name for the same reasons.
+  /\Asuggest\z/
 ]
 
 # The single sign-on's one-time secrets in a request: the callback's query (`code`, an authorization code, and

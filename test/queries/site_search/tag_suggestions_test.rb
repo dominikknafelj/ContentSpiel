@@ -56,6 +56,25 @@ class SiteSearch::TagSuggestionsTest < ActiveSupport::TestCase
     assert_empty tags_for("")
   end
 
+  # The publishing services never leave two copies of a record in force
+  # whose `live_at` and ids run in opposite orders (`Publishing::Version`,
+  # "THE ORDER OF COPIES": a copy taken removes the pending one), so the
+  # later copy with the earlier time is written here around them. The copy
+  # in force is still the one `Postgres::Visible` reads: the greatest
+  # `(live_at, id)`, never the greatest id alone.
+  test "the copy in force is the one with the latest time, as a search reads it, not the newest id" do
+    post = publish(create_post(title: "P", tags: %w[deployment]))
+    assert Posts::Save.call(post.reload, attributes: { tag_names: %w[release] }).ok?
+    publish_changes(post, at: 2.hours.from_now)
+    scheduled = Publishing::Version.of(post).order(:id).last
+    deployment = Tag.find_by!(name: "deployment")
+    Publishing::Version.create!(scheduled.attributes.except("id").merge("number" => scheduled.number + 1, "live_at" => 1.hour.from_now, "tag_ids" => [ deployment.id ])) # version: none (a test writes a copy the services never write)
+
+    later = 3.hours.from_now
+    assert_equal %w[release], tags_for("", now: later).map(&:name), "the scheduled copy's time is the latest"
+    assert_equal %w[deployment], tags_for("", now: 90.minutes.from_now).map(&:name), "before it, the later copy is the one in force"
+  end
+
   test "ordered by name, case aside, cut to the limit, and matched by the start of the name" do
     publish(create_post(title: "P", tags: %w[delta deploy dev]))
     assert_equal %w[delta deploy], tags_for("de", limit: 2).map(&:name)

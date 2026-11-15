@@ -27,13 +27,11 @@ class SiteSearch::TagPageTest < ActiveSupport::TestCase
     assert_predicate tag_pages([ tag.id ])[tag.id], :readonly?, "the page as published"
   end
 
-  test "a draft or trashed listing page is not the tag's page" do
+  # A trashed listing page is the request's test, where the suggestion then
+  # searches for the tag (test/controllers/site_search/suggestions_controller_test.rb).
+  test "a draft listing page is not the tag's page" do
     tag = Tag.create!(name: "deployment")
     page_with_post_list(tag: tag, published: false)
-    assert_empty tag_pages([ tag.id ])
-
-    trashed = page_with_post_list(tag: tag)
-    assert Trash::Move.call(trashed).ok?
     assert_empty tag_pages([ tag.id ])
   end
 

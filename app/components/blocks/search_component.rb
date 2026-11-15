@@ -131,8 +131,10 @@ module Blocks
     def correction_path = correction && "#{action}?#{{ q: correction }.to_query}"
 
     # The suggestions endpoint the script posts to, or nil, which offers no
-    # suggestions: the site has no such endpoint.
-    def suggest_url = nil
+    # suggestions: in the preview (where `live_note?` is true) and on a site
+    # with no search page. One rule with a theme's header box
+    # (`ThemeHelper#search_suggest_url`).
+    def suggest_url = helpers.search_suggest_url
 
     # The words a tag is matched by: the query's, and on close matches the
     # correction's too, in lower case.

@@ -325,4 +325,19 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
       assert_no_match(/\braw\b|html_safe|<%==/, source)
     end
   end
+
+  test "suggest_url is the suggestions' path on a site with a search page, and nil in the preview" do
+    block = search_block
+    publish_changes(@shown)
+    vc_test_controller.search_answer = answer(:empty, query: nil)
+    component = Blocks::SearchComponent.new(block: block, page: @shown)
+    render_inline(component)
+    assert_equal "/search/suggestions", component.send(:suggest_url)
+
+    vc_test_controller.instance_variable_set(:@public_urls, PublicSite::Urls.new(preview: true))
+    preview = Blocks::SearchComponent.new(block: block, page: @shown)
+    vc_test_controller.search_answer = answer(:empty, query: nil, live_note: true)
+    render_inline(preview)
+    assert_nil preview.send(:suggest_url)
+  end
 end

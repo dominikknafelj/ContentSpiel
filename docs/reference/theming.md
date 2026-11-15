@@ -541,6 +541,7 @@ What a page or layout template may call (`ThemeHelper`, `PagesHelper`). `public_
 | `neighbouring_pages(tree)` | the shown page's previous and next |
 | `with_heading_ids(html)` | rendered blocks with an id on each heading, and the headings |
 | `search_page` | the page that holds the site's first Search block, as published (a page, `page_url_path` gives its address), or nil: with nil a theme draws no header form |
+| `search_suggest_url` | where the suggestions while typing are asked (`/search/suggestions`), or nil in the preview and on a site with no search page: a header box offers suggestions only with it (`docs/reference/search.md`, "Suggestions") |
 
 ### Rich text selectors
 

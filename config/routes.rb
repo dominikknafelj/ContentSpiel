@@ -584,9 +584,10 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  # The public site, its pages and a visitor's form sends: on every host but
-  # the admin one (`HostRouteConstraint::Site`). Active Storage's routes,
-  # drawn after this file, carry no host constraint: both hosts embed its files.
+  # The public site, its pages, a visitor's form sends and suggestions: on
+  # every host but the admin one (`HostRouteConstraint::Site`). Active
+  # Storage's routes, drawn after this file, carry no host constraint: both
+  # hosts embed its files.
   constraints(HostRouteConstraint::Site) do
     # A visitor's send of a form: the form
     # posts to its own endpoint, never to the page, so a public page stays a
@@ -597,6 +598,16 @@ Rails.application.routes.draw do
     # the public routes have it: JSON or a plain page is chosen by the
     # `Accept` header (`FormSendsController#json?`), never by a suffix.
     post "forms/:form_id", to: "form_sends#create", as: :form_send, constraints: { form_id: /\d+/ }, format: false
+
+    # The suggestions while typing (search 2 spec §4.1): a JSON body,
+    # capped and parsed before Rails reads it (`ContentSpiel::SuggestGate`).
+    # POST only: a GET of this address is the public catch-all's below, a
+    # page path like any other (a page called "search" keeps its address,
+    # and its child "suggestions" too). Declared before the catch-alls.
+    # `format: false`, as the public routes have it, and the format JSON by
+    # default: the answer is JSON whatever the suffix or `Accept`, so it
+    # names nothing in `Vary`.
+    post "search/suggestions", to: "site_search/suggestions#create", as: :search_suggestions, format: false, defaults: { format: "json" }
 
     # Every locale is reachable under its own prefix (e.g. /de/about), including
     # whichever one is currently the site's default -- but a default-locale

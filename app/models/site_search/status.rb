@@ -73,8 +73,11 @@ module SiteSearch
     end
 
     # Asks the object only whether it has the method, never the engine. A
-    # backend that cannot be built says nothing here: the row's own state
-    # says it failed.
+    # backend that cannot be built answers false here, and the row shows the
+    # failure only where the backend is asked: `:timeout` once its index row
+    # is ready. While the row reads `:building`, `:stopped`, `:not_built` or
+    # `:out_of_date` the backend is not asked, so nothing on the row says it
+    # cannot be built.
     def self.tags_only?(name)
       name != Backends::BUILT_IN && !Backends.current.respond_to?(:suggest)
     rescue StandardError

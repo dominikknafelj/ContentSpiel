@@ -188,4 +188,58 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
       assert_nil report.error.backtrace&.find { |line| line.include?(CANARY) }
     end
   end
+
+  def post_suggestion(suggest:, language: "en")
+    post "/search/suggestions", params: { suggest: suggest, language: language }.to_json,
+      headers: { "Content-Type" => "application/json", "Sec-Fetch-Site" => "same-origin" }
+  end
+
+  # The block run with the request loggers at debug, then every place the
+  # CMS writes to as one text: the log, the spans, the tables, the counters'
+  # store and the errors reported with their messages.
+  def capture_everything
+    log = capture_log(LogCapture::REQUEST_LOGGERS) do
+      Rails.logger.level = :debug
+      yield
+    end
+    [ log, spans_text, tables_text, store_text(CounterStore.current), @reports.all.inspect,
+      @reports.all.map { |error, _| error.message }.join ].join("\n")
+  end
+
+  test "a suggestion's prefix reaches no log, span, table, cache or error report" do
+    place_search_block(root_page)
+    create_page(title: "Albatross")
+    planted = "zqxprefix#{SecureRandom.hex(3)}"
+    everything = capture_everything do
+      post_suggestion(suggest: planted)
+      assert_response :ok
+      post_suggestion(suggest: "alba #{planted}")
+      post "/search/suggestions", params: "{\"suggest\": \"#{planted}", headers: { "Content-Type" => "application/json" }
+      assert_response :bad_request
+      SiteSearch::Fake.new(raise_with: RuntimeError.new("http://engine/suggest?q=#{planted}")).installed do
+        post_suggestion(suggest: planted)
+        assert_equal "unavailable", response.parsed_body["state"]
+      end
+    end
+
+    assert_match(/"suggest" => "\[FILTERED\]"/, everything, "the Parameters line names the key, filtered")
+    assert @exporter.finished_spans.any? { |span| span.name == "search.suggest" }, "the suggestion's span is recorded"
+    refute_includes everything, planted
+  end
+
+  test "an outside backend's suggest failure is reported without its message" do
+    SiteSearch::Fake.new(raise_with: RuntimeError.new("secret alba")).installed do
+      report = assert_error_reported(SiteSearch::Unavailable) { post_suggestion(suggest: "alba") }
+      assert_response :ok
+      assert_equal "#{SiteSearch::Fake::NAME}: RuntimeError", report.error.message
+      assert_nil report.error.cause
+    end
+    assert_equal [ "SiteSearch::Unavailable" ], @reports.all.map { |error, _| error.class.name }
+    refute @reports.all.any? { |error, _| error.message.include?("secret") }
+  end
+
+  test "suggest is filtered and suggested_at is not" do
+    filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
+    assert_equal({ "suggest" => "[FILTERED]", "suggested_at" => "x" }, filter.filter("suggest" => "a", "suggested_at" => "x"))
+  end
 end
