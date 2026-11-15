@@ -831,7 +831,7 @@ New words under `public.blocks.search`:
 The words are read through `PublicStrings.read`, with English as the explicit
 fallback. `STRINGS` and the contract's `words:` gain them, and so does the
 ledger. The component's `limits:` sentence "No filter, no sort and no
-suggestion as one types" becomes "No filter and no sort; suggestions as one
+suggestion as one types" becomes "No filter, and no sort; suggestions as one
 types with a script, none without".
 
 The default template draws: the tags line under a post result's title,

@@ -101,8 +101,10 @@ module SiteSearch
 
       # Held until the transaction ends.
       def take_lock(function)
+        # The lock functions return void, a type Active Record's type map does
+        # not know, so the value is cast to text and no void column reaches it.
         # sql: an advisory lock is a function no relation reads; the statement is Arel
-        Word.connection.select_value(Arel::SelectManager.new.project(SqlNodes.function(function, *LOCK)))
+        Word.connection.select_value(Arel::SelectManager.new.project(SqlNodes.cast(SqlNodes.function(function, *LOCK), "text")))
       end
 
       # `SELECT "words"."locale", "words"."word" FROM (SELECT 'en' AS locale,
