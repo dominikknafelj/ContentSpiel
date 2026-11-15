@@ -150,6 +150,13 @@ class Post < ApplicationRecord
   # must not be able to 500 (global constraints).
   def definition = ContentTypes.find(content_type)
 
+  # A post of a type the site has not switched on (or that is not declared)
+  # is dormant: kept whole, but it has no address, is listed nowhere and
+  # gives no search document.
+  def type_switched_on? = ContentTypes.switched_on?(content_type)
+
+  scope :of_switched_on_types, -> { where(content_type: ContentTypes.switched_on_names) }
+
   # The content type's `ContentModel::FieldSet` instance over this post's
   # `metadata`/`translated_metadata`, or nil when `content_type` isn't
   # registered (there is no schema to build one from).

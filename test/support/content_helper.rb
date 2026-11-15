@@ -99,6 +99,14 @@ module ContentHelper
     document.to_h
   end
 
+  # The post types the site has switched on, from here on (the column is
+  # `site_settings.content_types`); the addresses are rebuilt for them.
+  def switch_on_content_types(*names)
+    SiteSetting.instance.update!(content_types: names)
+    Current.site = nil
+    PublicSite::Paths.rebuild!
+  end
+
   def with_locales(codes, default:)
     site_settings(:default).update!(locales: codes.map { |code| { "code" => code } }, default_locale: default)
     PublicSite::Paths.rebuild!

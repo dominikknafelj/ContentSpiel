@@ -86,6 +86,19 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
   def resolve(path, scope: :published) = PublicSite::Resolver.new(scope: scope).call(locale: "en", path: path)
 
+  test "a post of a switched-off type gets no address, and an unhoused one is not housed" do
+    blog = listing(@root, "Everything", nil)
+    update = create_post(title: "Update", content_type: "now_update")
+    assert PublicPath.current.where(record: update).exists?
+
+    switch_on_content_types("blog")
+
+    assert_not PublicPath.current.where(record: update).exists?
+
+    PublicSite::Paths.refresh(pages: [ blog ])
+    assert_not PublicPath.current.where(record: update).exists?, "a page's refresh does not house a dormant post"
+  end
+
   test "a post lives under the first listing page in tree order" do
     blog = listing(@root, "Blog", "blog")
     listing(@root, "Archive", "blog")

@@ -326,7 +326,7 @@ module PublicSite
       addressed = PublicPath.current.where(record_type: Post.polymorphic_name)
       hosted = Post.where(id: addressed.where(listed_on_id: below).select(:record_id))
       listable = posts_listed_by(candidates.select { |block| below.include?(block.owner.id) })
-      unhoused = posts_listed_by(candidates).kept.where(content_type: ContentTypes.names).where.not(id: addressed.select(:record_id))
+      unhoused = posts_listed_by(candidates).kept.of_switched_on_types.where.not(id: addressed.select(:record_id))
       [ touched, hosted, listable, unhoused ].reduce(:or)
     end
 
@@ -399,9 +399,9 @@ module PublicSite
       case record
       when Page then page_path(record, locale, above)
       when Post
-        if record.definition.nil?
+        if !record.type_switched_on?
           Rails.logger.warn("[public_paths] Post##{record.id} gets no #{locale} URL: " \
-            "#{record.content_type.inspect} isn't a registered content type")
+            "#{record.content_type.inspect} isn't a switched-on content type")
           nil
         else
           post_path(record, locale, above)

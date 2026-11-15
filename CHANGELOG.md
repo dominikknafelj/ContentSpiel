@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The public site reads the post types a site has switched on (`ContentTypes.switched_on`): a post of a type that is not switched on has no address, is listed by no Post list block, gives no search document and is offered no starter section.
+
 ## 0.7.0 (2026-11-15)
 
 ### Added

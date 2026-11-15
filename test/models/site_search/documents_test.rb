@@ -34,6 +34,16 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
     assert_equal "/de#{PublicSite::Paths.current_path(page, "de")}", docs.find { |each| each.language == "de" }.url
   end
 
+  test "a dormant post's copy gives no document" do
+    post = create_post(title: "Gone dark", content_type: "now_update")
+    version = Publishing.current(post)
+    assert_not_empty SiteSearch::Documents.for(version, now: Time.current)
+
+    switch_on_content_types("blog")
+
+    assert_empty SiteSearch::Documents.for(version, now: Time.current)
+  end
+
   test "the title is A, subtitle and meta description B, the blocks C, code D" do
     doc = SiteSearch::Documents.for(Publishing.current(page_with_blocks), now: Time.current).find { |each| each.language == "en" }
 
@@ -56,6 +66,7 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
       t.field :standfirst, :text, translated: true
       t.field :venue, :string
     end
+    switch_on_content_types("blog", "test/report")
     post = create_post(title: "Spring report", content_type: "test/report", tags: %w[Weather Tides])
     assert Posts::Save.call(post, translations: { "en" => { excerpt: "A short look back", body: rich_doc("The rain was heavy.") } },
                                   attributes: { fields: { "standfirst" => "Rain came early", "venue" => "Untranslated hall" } }).ok?

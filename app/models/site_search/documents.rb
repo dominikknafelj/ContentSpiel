@@ -23,9 +23,12 @@ module SiteSearch
 
     module_function
 
-    # One document per enabled language for `version`, a copy of its record.
+    # One document per enabled language for `version`, a copy of its record;
+    # none for a post whose type is not switched on.
     def for(version, now:, pending: :unknown)
       record = version.record
+      return [] if record.is_a?(Post) && !record.type_switched_on?
+
       pending = Publishing.pending(record, now: now) if pending == :unknown
       view = Publishing::Snapshot.rebuild(version, record)
       paths = PublicSite::Urls.new.paths_by_language(record)

@@ -13,6 +13,24 @@ class BlockTypes::PostListTest < ActiveSupport::TestCase
     assert_not BlockTypes::PostList.matches?(Criteria.new(nil, nil), content_type: "gone/thing", tag_names: []), "a post of a type that is not registered is listed nowhere"
   end
 
+  test "a list with no filter lists only switched-on types' posts and one filtered to a switched-off type lists nothing" do
+    blog = create_post(title: "Blog post")
+    create_post(title: "Update", content_type: "now_update")
+    switch_on_content_types("blog")
+
+    assert_equal [ blog ], BlockTypes::PostList.listed_posts(Criteria.new(nil, nil)).to_a
+    assert_equal [ blog ], BlockTypes::PostList.listed_posts(Criteria.new("blog", nil)).to_a
+    assert_empty BlockTypes::PostList.listed_posts(Criteria.new("now_update", nil))
+  end
+
+  test "matches? is false for a switched-off type" do
+    switch_on_content_types("blog")
+
+    assert BlockTypes::PostList.matches?(Criteria.new(nil, nil), content_type: "blog", tag_names: [])
+    assert_not BlockTypes::PostList.matches?(Criteria.new(nil, nil), content_type: "now_update", tag_names: [])
+    assert_not BlockTypes::PostList.matches?(Criteria.new("now_update", nil), content_type: "now_update", tag_names: [])
+  end
+
   test "lists? and matches? are one answer" do
     post = create_post(title: "A", tags: [ "Rails" ])
     [ Criteria.new(nil, nil), Criteria.new("blog", "rails"), Criteria.new("resume_entry", nil), Criteria.new(nil, "ruby") ].each do |criteria|

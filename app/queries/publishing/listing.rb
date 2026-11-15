@@ -31,7 +31,7 @@ module Publishing
       # (`Publishing::DeferredBodies`).
       def posts(block, limit: nil, now: Time.current)
         settings = block.settings_object
-        scope = Post.without_body.where(published_at: ..now).kept.where(content_type: ContentTypes.names) # public: rows (which posts are live, kept and of a type is the rows'; their content is rebuilt from copies below)
+        scope = Post.without_body.where(published_at: ..now).kept.of_switched_on_types # public: rows (which posts are live, kept and of a type is the rows'; their content is rebuilt from copies below)
         scope = scope.where(content_type: settings.content_type) if settings.content_type.present?
         if settings.tag.to_s.strip.present?
           tag_id = block.listed_tag_id or return []

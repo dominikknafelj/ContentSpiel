@@ -101,6 +101,19 @@ class PostTest < ActiveSupport::TestCase
     assert_includes duplicate.errors[:slug_en], "has already been taken in EN"
   end
 
+  test "of_switched_on_types leaves out a dormant post, declared or not" do
+    on = create_post(title: "On")
+    off = create_post(title: "Off", content_type: "now_update")
+    gone = create_post(title: "Gone")
+    gone.update_columns(content_type: "gone/type") # version: none (a stored name no registry declares)
+    switch_on_content_types("blog")
+
+    assert_equal [ on ], Post.of_switched_on_types.to_a
+    assert on.type_switched_on?
+    assert_not off.type_switched_on?
+    assert_not gone.type_switched_on?
+  end
+
   test "the same slug is allowed across different content_types" do
     Post.create!(content_type: :blog, title: "Hello World")
     other = Post.new(content_type: :resume_entry, title: "Hello World")

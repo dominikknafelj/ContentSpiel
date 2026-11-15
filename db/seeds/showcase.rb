@@ -66,7 +66,7 @@ module DevelopmentShowcase
 
     lists = page(showcase, "every-list", "Every list")
     fill(lists) do
-      ContentTypes.names.each { |type| save(lists, block_type: "post_list", settings: { "content_type" => type.to_s }) }
+      ContentTypes.switched_on_names.each { |type| save(lists, block_type: "post_list", settings: { "content_type" => type.to_s }) }
       save(lists, block_type: "post_list", settings: { "tag" => "ruby", "limit" => 2 })
     end
 

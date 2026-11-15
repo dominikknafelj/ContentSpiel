@@ -57,7 +57,7 @@ module StarterContent
   # itself (a content type already knows its own name; nothing else reading
   # `starter_data` needs it repeated).
   def sections
-    ContentTypes.all.filter_map { |type| type.starter_data&.merge(content_type: type.name) }
+    ContentTypes.switched_on.filter_map { |type| type.starter_data&.merge(content_type: type.name) }
   end
 
   # Kept records only: a starter section or sample post in the trash is

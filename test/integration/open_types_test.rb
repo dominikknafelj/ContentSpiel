@@ -28,6 +28,7 @@ class OpenTypesTest < ActionDispatch::IntegrationTest
 
   test "a new content type gets canonical URLs, MCP schema entries and typed validation" do
     with_test_types do
+      switch_on_content_types("blog", "test/event")
       listing = create_page(title: "Events")
       block_result = ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "test/event" } })
       assert block_result.ok?, block_result.errors.to_sentence
