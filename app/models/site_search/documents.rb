@@ -7,8 +7,9 @@ module SiteSearch
   # shows. Never the rows: words typed and not published are in no document.
   #
   # The fields, always all of them for the record's kind, blank or not:
-  # `title` (A); `summary` (B), a page's subtitle and meta description, a
-  # post's excerpt; `tags` (B, a post's), the tag names its copy shows;
+  # `title` (A); `tags` (A, a post's), the tag names its copy shows;
+  # `summary` (B), a page's subtitle, meta title, meta description and slug
+  # words, a post's excerpt and slug words;
   # `body` (C), a post's rich text and its type's translated string and
   # text fields, then every block's text in the copy's reading order
   # (`BlockTypeDefinition#search_text`); `code` (D), the Code blocks' code.
@@ -16,7 +17,7 @@ module SiteSearch
     # Moves when what a document holds for the same copy changes (a field,
     # a reader, a block type's text), so a backend can tell an index made
     # by older rules (spec §6.6).
-    REVISION = 1
+    REVISION = 2
 
     MARKERS = /[\u{E000}\u{E001}]/
     CONTROL = /[[:cntrl:]]/
@@ -28,12 +29,13 @@ module SiteSearch
       record = version.record
       pending = Publishing.pending(record, now: now) if pending == :unknown
       view = Publishing::Snapshot.rebuild(version, record)
-      paths = PublicSite::Urls.new.paths_by_language(record)
+      urls = PublicSite::Urls.new
+      paths = urls.paths_by_language(record)
       shown_from = [ version.live_at, record.published_at ].compact.max
       shown_until = pending.live_at if pending && pending.id != version.id && pending.live_at > version.live_at
 
       Locales.enabled.map do |locale|
-        fields = fields_of(view, locale)
+        fields = fields_of(view, locale, slug_words(paths[locale], urls.prefix(locale)))
         Document.new(
           key: [ record.class.polymorphic_name, record.id, version.id, locale ].join(":"),
           record_type: record.class.polymorphic_name, record_id: record.id, copy_id: version.id, language: locale,
@@ -64,23 +66,35 @@ module SiteSearch
       text.gsub(MARKERS, "").gsub(CONTROL, " ").squish
     end
 
-    def fields_of(view, locale)
+    def fields_of(view, locale, slug)
       blocks = view.is_a?(Page) ? view.content_blocks.to_a : []
       fields = [
         Field.new(name: "title", weight: :a, text: plain(Locales.read(view, :title, locale: locale))),
-        Field.new(name: "summary", weight: :b, text: joined(summary_of(view, locale)))
+        Field.new(name: "summary", weight: :b, text: joined(summary_of(view, locale) << slug))
       ]
-      fields << Field.new(name: "tags", weight: :b, text: joined(view.tags.map(&:name))) if view.is_a?(Post)
+      fields << Field.new(name: "tags", weight: :a, text: joined(view.tags.map(&:name))) if view.is_a?(Post)
       fields << Field.new(name: "body", weight: :c, text: joined(post_text(view, locale) + block_texts(blocks, :body, locale)))
       fields << Field.new(name: "code", weight: :d, text: joined(block_texts(blocks, :code, locale), markup: false))
     end
     private_class_method :fields_of
 
     def summary_of(view, locale)
-      names = view.is_a?(Page) ? %i[subtitle meta_description] : %i[excerpt]
+      names = view.is_a?(Page) ? %i[subtitle meta_title meta_description] : %i[excerpt]
       names.map { |name| Locales.read(view, name, locale: locale) }
     end
     private_class_method :summary_of
+
+    # The last segment of the record's address in a language, `path` with
+    # that language's `prefix` taken off, its hyphens as spaces: the words a
+    # visitor reads in the URL, as parts, where Postgres's parser would read
+    # `zero-downtime-deploys` as one hyphenated compound. The homepage, and a
+    # record with no address in the language, give "".
+    def slug_words(path, prefix)
+      return "" if path.nil?
+
+      path.delete_prefix(prefix).split("/").last.to_s.tr("-", " ")
+    end
+    private_class_method :slug_words
 
     # A post's body and the translated prose of its type's fields (a type
     # answers `translatable` for prose, the string and the text: not a code,

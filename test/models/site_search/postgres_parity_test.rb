@@ -99,6 +99,18 @@ class SiteSearch::PostgresParityTest < ActiveSupport::TestCase
     ok Trash::Restore.call(child.reload)
     assert_parity "a page trashed and restored"
 
+    ok Pages::Save.call(page.reload, translations: { "en" => { slug: "lantern" } })
+    assert_parity "a parent's slug changed, its subpages' addresses moved and their slugs kept"
+
+    ok Posts::Save.call(post.reload, translations: { "en" => { slug: "anchorage" } })
+    assert_parity "a live post's slug changed"
+
+    ok Trash::Move.call(child.reload)
+    namesake = create_page(title: "Other keeper", parent: blog.reload, translations: { "en" => { title: "Other keeper", slug: child.reload.slug } })
+    ok Trash::Restore.call(child.reload)
+    assert_not_equal namesake.slug, child.reload.slug, "the restore freed the slug to a suffix"
+    assert_parity "a page restored with its slug freed to a suffix"
+
     ok Trash::Move.call(child.reload)
     assert_view_parity "a page trashed"
 

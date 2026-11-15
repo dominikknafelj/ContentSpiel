@@ -119,9 +119,11 @@ module Pages
         # a post they take to an address another record holds yields.
         taking = was_unpublished && @page.published_at.present?
         Publishing::Version.take!(@page, by: actor_user) if taking
-        # Unpublished or moved to another time: what the search shows of the
-        # page moves with no copy (a copy taken is indexed by itself).
-        SiteSearch::Indexing.record_changed(@page) if pending.key?("published_at") && !taking
+        # Unpublished, moved to another time or given another slug (which is
+        # immediate, and a word of its documents): what the search shows of
+        # the page moves with no copy (a copy taken is indexed by itself).
+        slug_moved = pending.key?("slug")
+        SiteSearch::Indexing.record_changed(@page, slug: slug_moved) if (pending.key?("published_at") || slug_moved) && !taking
         record_events(creating, Audit::Snapshot.field_changes_for(@page, pending))
         true
       end

@@ -96,8 +96,19 @@ module SiteSearch
 
     # A page's own subpages go and come with it (the trash, a draft parent),
     # so an outside backend's job reads each of them too.
-    def record_changed(record)
-      return nil if inline?
+    #
+    # `slug: true` for a write that changed the record's slug, which is
+    # immediate and in no copy (`docs/reference/publishing.md`) while its
+    # words are in the record's documents (`Documents`, the summary): the
+    # built-in rebuilds the record's own documents from the copies it shows
+    # now or is scheduled to show, in the caller's transaction and after the
+    # address was refreshed. A subpage's documents keep their words, since
+    # its own slug is its address's last segment wherever its parent is.
+    def record_changed(record, slug: false)
+      if inline?
+        copies_rewritten([ Publishing.current(record), Publishing.pending(record) ].compact.map(&:id)) if slug
+        return nil
+      end
 
       type = record.class.polymorphic_name
       ids = record.is_a?(Page) ? record.self_and_descendant_ids : [ record.id ]

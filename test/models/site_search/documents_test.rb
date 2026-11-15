@@ -34,20 +34,54 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
     assert_equal "/de#{PublicSite::Paths.current_path(page, "de")}", docs.find { |each| each.language == "de" }.url
   end
 
-  test "the title is A, subtitle and meta description B, the blocks C, code D" do
-    doc = SiteSearch::Documents.for(Publishing.current(page_with_blocks), now: Time.current).find { |each| each.language == "en" }
+  def document_of(record, locale) = SiteSearch::Documents.for(Publishing.current(record), now: Time.current).find { |each| each.language == locale }
+
+  test "the title is A, the summary B, the blocks C, code D" do
+    doc = document_of(page_with_blocks, "en")
 
     assert_equal [ [ "title", :a ], [ "summary", :b ], [ "body", :c ], [ "code", :d ] ], doc.fields.map { [ _1.name, _1.weight ] }
     assert_equal "Harbour guide", field(doc, "title").text
-    assert_equal "Boats and tides Where to moor", field(doc, "summary").text
+    assert_equal "Boats and tides Where to moor harbour guide", field(doc, "summary").text
     assert_equal "Tides turn twice a day.", field(doc, "body").text
     assert_equal "tide --today", field(doc, "code").text
     assert_equal "Tides turn twice a day.", doc.text
   end
 
+  test "tags are A, meta title and slug B" do
+    page = create_page(title: "Guide", translations: { "en" => { title: "Guide", subtitle: "Sub", meta_title: "Meta words", slug: "zero-downtime-deploys" } })
+    summary = field(document_of(page, "en"), "summary")
+    assert_equal :b, summary.weight
+    assert_includes summary.text, "Meta words"
+    assert_includes summary.text, "zero downtime deploys"
+    assert_not_includes summary.text, "zero-downtime"
+
+    blog = create_page(title: "Blog")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(blog)
+    created = Posts::Save.call(attributes: { content_type: "blog", published: true, tag_names: [ "deployment" ] },
+      translations: { "en" => { title: "P", excerpt: "Ex", slug: "my-post" } })
+    assert created.ok?, created.errors.to_sentence
+    post_doc = document_of(created.record, "en")
+    assert_equal [ :a, "deployment" ], [ field(post_doc, "tags").weight, field(post_doc, "tags").text ]
+    assert_equal "Ex my post", field(post_doc, "summary").text
+  end
+
+  # A page's slug is read in the document's language: the Spanish document
+  # holds the Spanish slug, with no language prefix.
+  test "the slug is the address's last segment in the document's language" do
+    page = create_page(title: "Harbour", translations: { "es" => { title: "Puerto", slug: "puerto-viejo" } })
+    assert_equal "harbour", field(document_of(page, "en"), "summary").text
+    assert_equal "puerto viejo", field(document_of(page, "es"), "summary").text
+  end
+
+  test "the homepage's slug adds nothing to its summary" do
+    home = root_page
+    assert_equal [ "" ], Locales.enabled.map { |code| field(document_of(home, code), "summary").text }.uniq
+  end
+
   # A post has no meta description of its own (`Post` translates title,
   # slug and excerpt): its summary is its excerpt.
-  test "a post gives its excerpt and meta description at B, its copy's tag names at B and its translated_metadata strings at C" do
+  test "a post gives its excerpt and slug at B, its copy's tag names at A and its translated_metadata strings at C" do
     saved = ContentTypes.all.dup
     ContentTypes.register("test/report") do |t|
       t.label "Report"
@@ -63,8 +97,8 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
 
     doc = SiteSearch::Documents.for(Publishing.current(post), now: Time.current).find { |each| each.language == "en" }
 
-    assert_equal [ [ "title", :a ], [ "summary", :b ], [ "tags", :b ], [ "body", :c ], [ "code", :d ] ], doc.fields.map { [ _1.name, _1.weight ] }
-    assert_equal "A short look back", field(doc, "summary").text
+    assert_equal [ [ "title", :a ], [ "summary", :b ], [ "tags", :a ], [ "body", :c ], [ "code", :d ] ], doc.fields.map { [ _1.name, _1.weight ] }
+    assert_equal "A short look back", field(doc, "summary").text, "a post no list shows has no address, so no slug words"
     assert_equal "tides weather", field(doc, "tags").text.split.sort.join(" ")
     assert_equal "The rain was heavy. Rain came early", field(doc, "body").text
     assert_not_includes doc.fields.map(&:text).join(" "), "Untranslated hall"

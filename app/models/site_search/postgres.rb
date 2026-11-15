@@ -44,6 +44,12 @@ module SiteSearch
     START_MARK = "\u{E000}".freeze
     STOP_MARK = "\u{E001}".freeze
 
+    # Moves when what the built-in stores of a document changes for the same
+    # document (a column, a rule of what it keeps beside the tsvector), so an
+    # index stored by older rules is stale (`IndexState.fingerprint`), as
+    # `Documents::REVISION` does for the documents themselves.
+    REVISION = 1
+
     COLUMNS = %i[published_version_id record_type record_id locale config live_at document text created_at].freeze
 
     def self.config_for(code) = CONFIGS.fetch(code.to_s, "simple")

@@ -76,7 +76,7 @@ class SiteSearch::Postgres::QueryTest < ActiveSupport::TestCase
   end
 
   test "a scheduled change is found by its old words before its time and by its new words after it" do
-    page = create_page(title: "Albatross")
+    page = create_page(title: "Albatross", translations: { "en" => { title: "Albatross", slug: "seabird" } })
     assert Pages::Save.call(page, translations: { "en" => { title: "Pelican" } }).ok?
     live_at = 1.day.from_now.change(usec: 0)
     publish_changes(page, at: live_at)

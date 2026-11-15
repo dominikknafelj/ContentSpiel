@@ -1,6 +1,6 @@
 module SiteSearch
   # One weighted text of a search document (spec §4.2): `name` is the field
-  # (`NAMES`), `weight` its rank (`:a` the title, `:b` the summary and tags,
+  # (`NAMES`), `weight` its rank (`:a` the title and tags, `:b` the summary,
   # `:c` the body, `:d` the code). The text is plain and cut at
   # `SiteSearch::MAX_TEXT`, whoever builds the field, so no field can
   # overflow a backend's index inside the publish that writes it.

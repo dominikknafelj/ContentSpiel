@@ -50,7 +50,7 @@ class PublicSearchTest < ActionDispatch::IntegrationTest
 
   test "a change published with a time is found by its old words until the time and by its new words after it, with no job" do
     with_search_block_on_home do
-      page = create_page(title: "Albatross")
+      page = create_page(title: "Albatross", translations: { "en" => { title: "Albatross", slug: "seabird" } })
       assert Pages::Save.call(page.reload, translations: { "en" => { title: "Pelican" } }).ok?
       at = 1.hour.from_now
       publish_changes(page, at: at)
@@ -68,6 +68,23 @@ class PublicSearchTest < ActionDispatch::IntegrationTest
           assert_equal [ "Pelican" ], titles
         end
       end
+    end
+  end
+
+  # The excerpted post is written first, so a tie of ranks would list it
+  # first by its lower id.
+  test "a post matched by a tag outranks one matched by its excerpt" do
+    with_search_block_on_home do
+      blog = create_page(title: "Blog")
+      assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+      publish_changes(blog)
+      excerpted = create_post(title: "Two")
+      assert Posts::Save.call(excerpted.reload, translations: { "en" => { excerpt: "albatross" } }).ok?
+      publish_changes(excerpted)
+      create_post(title: "One", tags: [ "albatross" ])
+
+      search "albatross"
+      assert_equal [ "One", "Two" ], titles
     end
   end
 
