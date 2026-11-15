@@ -3,6 +3,7 @@ import { messages } from "i18n/messages"
 import { openFrame } from "diagram/frame"
 import { digest } from "diagram/digest"
 import { firstMermaidFence } from "diagram/fence"
+import { afterSnapshot } from "diagram/snapshot"
 
 // A Diagram block's source and its preview (`Admin::Fields::MermaidField`,
 // Diagram block spec §2 and §7, the Design System's EditorDiagramBlock and
@@ -76,7 +77,11 @@ import { firstMermaidFence } from "diagram/fence"
 // TAKE-BACK. `disconnect` and `turbo:before-cache` remove the frame, its
 // listener, the timers and everything this script showed, so a copy Turbo
 // keeps holds the server's markup as drawn, and a page shown again from it
-// builds a frame of its own at `connect`.
+// builds a frame of its own at `connect`. The card taken back may be the one
+// still showing (a link inside `#content` can cache the page it has just
+// drawn, as System status's link to Draw diagrams does), so once the copy is
+// made a card still in the document connects again (`diagram/snapshot`), or
+// it would draw nothing as the person types.
 // The fields whose card was disconnected while a person's edit was still to
 // be drawn (inside its debounce, or posted and not yet answered): a block
 // moved in the document (a drop, Move up/down) disconnects and connects the
@@ -127,7 +132,10 @@ export default class extends Controller {
       title: this.text("components.fields.mermaid_field.frame_title"),
       onAnswer: (answer) => this.answered(answer)
     })
-    this.takeBack = () => this.close()
+    this.takeBack = () => {
+      this.close()
+      afterSnapshot(() => { if (this.element.isConnected && !this.frame) this.connect() })
+    }
     this.follow = () => this.placeLine()
     this.described = () => this.showDescribed()
     document.addEventListener("turbo:before-cache", this.takeBack)
