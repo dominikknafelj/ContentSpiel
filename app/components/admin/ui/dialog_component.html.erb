@@ -1,8 +1,15 @@
 <dialog id="<%= id %>" aria-labelledby="<%= id %>-title" data-dialog-width="<%= width %>" <%= "data-destructive" if destructive %> <%= "data-admin--ui--dialog-open-on-load" if open_on_load %> <%= "data-dialog-hang" if hang %> <%= "data-dialog-steady" if steady %>
         class="admin-dialog rounded-card bg-popover p-0 text-ink shadow-3">
-  <header class="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
-    <h2 id="<%= id %>-title" class="text-base font-semibold"><%= title %></h2>
-    <form method="dialog"><button aria-label="<%= t(".close") %>" class="cursor-pointer rounded-cs px-1 text-meta hover:bg-sunken hover:text-ink">×</button></form>
+  <header class="flex items-center gap-4 border-b border-line px-5 py-3">
+    <% if title_aside? %>
+      <div class="admin-dialog__titles flex min-w-0 items-baseline gap-3">
+        <h2 id="<%= id %>-title" class="text-base font-semibold"><%= title %></h2>
+        <span data-dialog-title-aside class="shrink-0 text-small text-meta"><%= title_aside %></span>
+      </div>
+    <% else %>
+      <h2 id="<%= id %>-title" class="text-base font-semibold"><%= title %></h2>
+    <% end %>
+    <form method="dialog" class="ml-auto"><button aria-label="<%= t(".close") %>" class="cursor-pointer rounded-cs px-1 text-meta hover:bg-sunken hover:text-ink">×</button></form>
   </header>
   <div class="admin-dialog__body overflow-y-auto px-5 py-4"><%= content %></div>
   <% if footer? %>

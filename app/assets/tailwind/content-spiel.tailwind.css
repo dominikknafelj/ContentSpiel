@@ -495,6 +495,29 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 .admin-dialog[data-dialog-width="form_narrow"] { max-width: 460px; }
 .admin-dialog[data-dialog-width="form"] { max-width: 560px; }
 .admin-dialog[data-dialog-width="picker"] { max-width: 880px; }
+/* The viewer step (the image viewer's frame): nearly the whole screen, with
+   a body that is a flex column the viewer fills edge to edge (its own stage
+   scrolls or pans), so the body takes no padding and no scrollbar. The title
+   truncates on one line here; other dialogs' titles wrap. */
+.admin-dialog[data-dialog-width="viewer"] { max-width: 1100px; height: calc(100dvh - 48px); max-height: none; }
+.admin-dialog[data-dialog-width="viewer"] > .admin-dialog__body { flex: 1 1 auto; min-height: 0; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.admin-dialog[data-dialog-width="viewer"] h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* On a phone the viewer is the whole screen, and its head is two lines: the
+   title (15px, 600, truncated) over the facts (12px, meta), the facts never
+   dropped, Close at the right of both. Its header and footer clear the
+   notch and the home bar through `env(safe-area-inset-*)`, non-zero only
+   because the admin layout's viewport meta says `viewport-fit=cover`. Only
+   this step: other dialogs keep their frame on a phone. */
+@media (max-width: 639px) {
+  .admin-dialog[data-dialog-width="viewer"] { width: 100vw; max-width: none; height: 100dvh; margin: 0; border-radius: 0; box-shadow: none; }
+  .admin-dialog[data-dialog-width="viewer"] .admin-dialog__titles { flex: 1; flex-direction: column; align-items: stretch; gap: 0; }
+  .admin-dialog[data-dialog-width="viewer"] .admin-dialog__titles h2 { font-size: 15px; font-weight: 600; }
+  .admin-dialog[data-dialog-width="viewer"] .admin-dialog__titles [data-dialog-title-aside] { font-size: 12px; color: var(--cs-meta); }
+  .admin-dialog[data-dialog-width="viewer"] > header { padding-top: max(12px, env(safe-area-inset-top)); }
+  .admin-dialog[data-dialog-width="viewer"] > footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .admin-dialog[data-dialog-width="viewer"] > header,
+  .admin-dialog[data-dialog-width="viewer"] > footer { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+}
 /* The ⌘K palette (Admin::Shell::CommandPaletteComponent): high on the screen, not centred. */
 .admin-palette { margin-top: 10vh; }
 /* A menu's row under the keyboard and the palette's selected row. Their

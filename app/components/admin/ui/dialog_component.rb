@@ -33,14 +33,22 @@ module Admin
         states: %i[rest hover focus],
         script_states: { open: [ "test/system/dialog_test.rb", "a destructive confirm opens on Cancel, Escape backs out, confirming deletes" ] },
         keys: %w[close],
-        slots: %i[footer],
+        slots: %i[footer title_aside],
         controller: nil,
         keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a dialog starts on its first field, its Close is a Tab stop inside it, and Escape or Close gives the focus back to its trigger" ]
       )
 
-      WIDTHS = { confirm: 420, form_narrow: 460, form: 560, picker: 880 }.freeze
+      WIDTHS = { confirm: 420, form_narrow: 460, form: 560, picker: 880, viewer: 1100 }.freeze
 
       renders_one :footer
+
+      # A line of facts beside the title, in the header before Close (the image
+      # viewer's "PNG · 1.2 MB · 800 × 600"). With it the title and the aside
+      # share one `.admin-dialog__titles` element, the h2 first and the aside its
+      # next sibling, so the viewer's phone head can stack them in two lines; a
+      # dialog without it draws the header as it always did. It is never dropped
+      # on a phone, and `shrink-0` keeps it whole while a long title truncates.
+      renders_one :title_aside
 
       # `open_on_load:` marks a dialog the server wants open as soon as the page
       # appears (a form dialog whose submission was refused, with the message

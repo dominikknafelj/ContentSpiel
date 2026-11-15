@@ -54,4 +54,16 @@ class Admin::Ui::DialogComponentTest < ViewComponent::TestCase
     render_inline(Admin::Ui::DialogComponent.new(id: "d8", title: "T", width: :form)) { "body" }
     assert_no_selector "dialog#d8[data-dialog-steady]", visible: :all
   end
+
+  test "the viewer width step is drawn as data-dialog-width viewer" do
+    render_inline(Admin::Ui::DialogComponent.new(id: "v", title: "a.png", width: :viewer))
+    assert_selector "dialog#v[data-dialog-width='viewer']", visible: :all
+  end
+
+  test "title_aside renders in the header after the title and before Close, only when given" do
+    render_inline(Admin::Ui::DialogComponent.new(id: "v", title: "a.png", width: :viewer)) { |d| d.with_title_aside { "PNG · 1 KB" } }
+    assert_selector "dialog header h2#v-title + [data-dialog-title-aside]", text: "PNG · 1 KB", visible: :all
+    render_inline(Admin::Ui::DialogComponent.new(id: "w", title: "x"))
+    assert_no_selector "[data-dialog-title-aside]", visible: :all
+  end
 end

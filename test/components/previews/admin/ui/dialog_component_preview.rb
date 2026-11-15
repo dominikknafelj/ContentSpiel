@@ -21,6 +21,15 @@ module Admin
         end
       end
 
+      # `width: :viewer` (the image viewer's frame): nearly the whole screen, the
+      # body a column the viewer fills, and a facts line beside the title.
+      def viewer
+        render(Admin::Ui::DialogComponent.new(id: "dialog-preview-viewer", title: "photo.png", width: :viewer)) do |dialog|
+          dialog.with_title_aside { "PNG · 1.2 MB · 800 × 600" }
+          "The viewer's stage would go here."
+        end
+      end
+
       def form_narrow
         render(Admin::Ui::DialogComponent.new(id: "dialog-preview-narrow", title: "Rename tag", width: :form_narrow)) { "A short form." }
       end
