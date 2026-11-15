@@ -39,7 +39,7 @@ gem "openid_connect", "~> 2.3"
 # webauthn asks only for openssl >= 2.2, which would take openssl 4, a major version above the 3.3 Ruby 3.4 ships,
 # under Active Record encryption, MessageEncryptor and Net::HTTP alike: held to the 3.x line. It compiles in the
 # image's build stage, whose libpq-dev brings libssl-dev.
-gem "openssl", "~> 3.3"
+gem "openssl", "~> 4.0"
 
 # The registrable domain of the site's host (`PublicSuffix.domain`), a passkey's relying party id. Named here, not only
 # reached through addressable, because the passkey relying party calls it directly.
