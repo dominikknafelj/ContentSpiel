@@ -17,13 +17,19 @@
 # The words are ones a stemmer leaves whole, so a backend's language
 # analysis finds the word as typed and marks it in the snippet.
 #
-# A GEM'S TEST REACHES IT BY PATH, from the ContentSpiel it runs against (a
-# checkout of the release, or the image, which holds `test/` too): this file
-# is that path's promise, `test/support/site_search_backend_contract.rb`
-# under the CMS's root, and needs nothing of this suite's helpers, only the
-# application booted in the test environment and Active Support's test
-# case:
+# A GEM'S TEST REACHES IT BY PATH, from a checkout of the ContentSpiel it
+# runs against (`CONTENTSPIEL_ROOT`): this file is that path's promise,
+# `test/support/site_search_backend_contract.rb` under the CMS's root, and
+# needs nothing of this suite's helpers, only the application booted in the
+# test environment and Active Support's test case. `config/boot.rb` sets up
+# the bundle of `BUNDLE_GEMFILE`, the CMS's own unless it is set, so the
+# gem's test Gemfile holds the CMS's gems and the gem's:
 #
+#   # Gemfile, in the gem's root, with BUNDLE_GEMFILE pointing at it
+#   eval_gemfile File.join(ENV.fetch("CONTENTSPIEL_ROOT"), "Gemfile")
+#   gemspec
+#
+#   # the gem's contract test, run with SEARCH_BACKEND=acme/solr
 #   ENV["RAILS_ENV"] = "test"
 #   require File.join(ENV.fetch("CONTENTSPIEL_ROOT"), "config/environment")
 #   require "active_support/test_case"
@@ -32,8 +38,12 @@
 #   class Acme::SolrBackendTest < ActiveSupport::TestCase
 #     include SiteSearchBackendContract
 #     include SiteSearchBackendContract::BareDocuments
-#     def backend = @backend ||= Acme::SolrBackend.new(url: ENV.fetch("ACME_SOLR_URL"))
+#     def backend = SiteSearch::Backends.current
 #   end
+#
+# The boot's `Bundler.require` loads the gem, whose file calls the hook
+# (`ContentSpiel::Plugins.search_backends`), before the registries are
+# filled, as in a site.
 #
 # So the file stays here, requires nothing, and names no helper of
 # test/support; moving or renaming it, or a contract test a backend that
@@ -212,13 +222,17 @@ module SiteSearchBackendContract
 
     # The text is a visitor's, handed over as typed (normalised, at most
     # `SiteSearch::Query::MAX_LENGTH` characters), never a query in the
-    # engine's own language: an engine whose client takes a query syntax
-    # (Solr's or Lucene's parsers, Elasticsearch's `query_string`) escapes it,
-    # or sends the words as plain text, so a field name, an operator, a
-    # boost or a wildcard is no instruction to it. Each answers results or
-    # raises `SiteSearch::Unavailable`, and syntax alone matches nothing.
+    # engine's own language (`SiteSearch::Backend`): an engine whose client
+    # takes a query syntax (Solr's or Lucene's parsers, Elasticsearch's
+    # `query_string`) escapes it, or sends the words as plain text, so a
+    # field name, an operator, a boost or a wildcard is no instruction to
+    # it. A backend may raise on any of them (the caller scrubs and reports
+    # it, and the block says search is unavailable); what it answers holds
+    # no document that lacks the plain words, and syntax alone, which has
+    # no words, finds nothing.
     test "contract: a query full of an engine's syntax is words, never an instruction" do
-      backend.index([ contract_document(title: "Albatross", body: "the glacier melts"), contract_document(title: "Pelican") ])
+      albatross = contract_document(title: "Albatross", body: "the glacier melts")
+      backend.index([ albatross, contract_document(title: "Pelican") ])
 
       [
         'title:albatross AND (glacier OR walrus)^2 ~ * ? "[',
@@ -232,20 +246,22 @@ module SiteSearchBackendContract
         text = SiteSearch::Query.normalise(raw).first(SiteSearch::Query::MAX_LENGTH)
         begin
           results = contract_search(text)
-          assert_kind_of Array, results.hits, raw
-          assert_kind_of Integer, results.total, raw
-          assert_operator results.total, :>=, results.hits.size, raw
-        rescue SiteSearch::Unavailable
-          nil
+        rescue StandardError
+          next
         end
+        assert_kind_of Array, results.hits, raw
+        assert_kind_of Integer, results.total, raw
+        assert_operator results.total, :>=, results.hits.size, raw
+        assert_empty results.hits.map { |hit| hit_key(hit) } - [ albatross.key ], "#{raw} found a document without its plain words"
       end
 
-      [ "*:*", "*", "?", "id:*", "{!lucene}*:*" ].each do |raw|
+      [ "*:*", "*", "?", "id:*", "{!lucene}*:*", "\"\"", "()" ].each do |raw|
         begin
-          assert_empty contract_search(raw).hits, "#{raw} is no query for every document"
-        rescue SiteSearch::Unavailable
-          nil
+          results = contract_search(raw)
+        rescue StandardError
+          next
         end
+        assert_empty results.hits, "#{raw} is no query for every document"
       end
     end
 

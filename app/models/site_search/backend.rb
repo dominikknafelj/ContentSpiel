@@ -32,7 +32,23 @@ module SiteSearch
   #   ranking above a body's; `query.per_page` hits from `query.offset`, and
   #   `total` counting every match. Each hit's snippet is plain text with
   #   `[start, length]` marks on the query's words, never markup.
-  # - `health(deadline:)` answers `SiteSearch::Health`.
+  #   `query.text` is a visitor's words as typed, normalised
+  #   (`SiteSearch::Query.normalise`) and at most `Query::MAX_LENGTH`
+  #   characters: plain text, never a query in the engine's own language.
+  #   An engine whose client takes a query syntax (Solr's or Lucene's
+  #   parsers, Elasticsearch's `query_string`) escapes the text in that
+  #   language, or hands it to a parser that reads plain text, so a field
+  #   name, an operator, a boost, a wildcard or a local parameter (`{!…}`)
+  #   is a word, never an instruction: `*:*` is no query for every
+  #   document. Text left with no words after the engine's own analysis
+  #   is answered empty (no hits, a total of 0), never sent as an empty or
+  #   placeholder query, which some engines answer with every document
+  #   (Meilisearch's placeholder search).
+  # - `health(deadline:)` answers `SiteSearch::Health`: `status` `:ok`,
+  #   `:warn` or `:failed`, and `detail` one plain sentence for a person or
+  #   nil. System status shows the detail as it is handed (its first line,
+  #   cut at `Setup::SystemCheck::DETAIL_LENGTH`) to whoever may read System
+  #   status, so it holds no address, no credential and no error's message.
   #
   # `deadline` is a `Process.clock_gettime(Process::CLOCK_MONOTONIC)` Float:
   # by then the backend has answered or raised (an HTTP client's open and
