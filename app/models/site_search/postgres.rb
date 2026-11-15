@@ -7,7 +7,7 @@ module SiteSearch
   # searchable at its `live_at` with no job.
   #
   # `search_entries` is derived, like `public_paths`: written only here, in
-  # the caller's transaction (`inline?`), never by hand. Its foreign key to
+  # the caller's transaction (its registration's `inline: true`), never by hand. Its foreign key to
   # the copy is `ON DELETE CASCADE` on purpose: a withdrawn pending copy and
   # a purged record's copies take their entries with them in the same
   # statement, and nothing ever has to refuse a copy's delete for its entries
@@ -65,8 +65,6 @@ module SiteSearch
       end
       Snippet.new(text: text, marks: marks)
     end
-
-    def inline? = true
 
     # Each document's entry replaced: the rows of its copy and language
     # deleted, the new ones inserted, in one transaction.

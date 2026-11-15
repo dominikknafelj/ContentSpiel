@@ -9,13 +9,17 @@ module SiteSearch
     # The block's value; a `StandardError` raised in it comes out as an
     # `Unavailable` with no cause, so whatever records or logs the error
     # from there on (a span, Active Job's retry lines, the error tracker)
-    # meets the backend's name and the class alone.
+    # meets the backend's name and the class alone. It keeps the error's
+    # backtrace, which names files and lines and never the message, so a
+    # report still says where the backend failed.
     def self.scrubbing(backend:)
       yield
     rescue Unavailable
       raise
     rescue StandardError => error
-      raise new(backend: backend, error_class: error.class.name), cause: nil
+      scrubbed = new(backend: backend, error_class: error.class.name)
+      scrubbed.set_backtrace(error.backtrace) if error.backtrace
+      raise scrubbed, cause: nil
     end
 
     def initialize(backend:, error_class:)

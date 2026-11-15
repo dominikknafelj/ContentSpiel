@@ -222,6 +222,14 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
     assert_not_includes rendered_content, "<img", "past the end"
   end
 
+  test "a result's marks that are no Integer range within the text are left out before they are sorted, the words kept" do
+    text = "albatross and walrus"
+    marks = [ [ 14, 6 ], [ nil, 3 ], [ "0", 9 ], [ 0, nil ], [ 0, 9 ], [ -4, 2 ], [ 40, 3 ], [ 3, 0 ], [ 2.0, 3 ] ]
+    result = Blocks::SearchComponent::Result.new(item(snippet: SiteSearch::Snippet.new(text: text, marks: marks)))
+
+    assert_equal "<mark>albatross</mark> and <mark>walrus</mark>", result.snippet
+  end
+
   # The words are the component's own, and nothing else: a key a theme's
   # author mistyped is never I18n's "Translation missing" on a page.
   test "string answers its words and nothing else, and the count with the query marked" do

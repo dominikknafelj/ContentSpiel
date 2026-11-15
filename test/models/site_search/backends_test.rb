@@ -61,6 +61,25 @@ class SiteSearch::BackendsTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { SiteSearch::Backends.register "acme/solr", label: "Solr", backend: SiteSearch::Fake.new }
   end
 
+  test "a built backend that does not answer every method of the contract raises a named error" do
+    partial = Object.new
+    partial.define_singleton_method(:search) { |_query, deadline:| nil }
+    partial.define_singleton_method(:health) { |deadline:| nil }
+    SiteSearch::Backends.register "acme/partial", label: "Partial", backend: -> { partial }
+
+    with_search_backend("acme/partial") do
+      error = assert_raises(SiteSearch::Backends::NotABackend) { SiteSearch::Backends.current }
+      assert_includes error.message, "acme/partial"
+      assert_includes error.message, "index, remove, prune_record, clear"
+      assert_raises(SiteSearch::Backends::NotABackend) { SiteSearch::Backends.current }
+    end
+  end
+
+  test "whether a backend is inline is its registration's, never a method of the built-in" do
+    assert_empty SiteSearch::Backend::METHODS - SiteSearch::Postgres.public_instance_methods
+    assert_not SiteSearch::Postgres.new.respond_to?(:inline?)
+  end
+
   # A gem reads its engine's address when the site has chosen it, not when
   # its hook is replayed, and one process holds one backend.
   test "the backend is built once, after the replay" do

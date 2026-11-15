@@ -22,6 +22,14 @@ module SiteSearch
 
     Entry = Data.define(:name, :label, :backend, :inline)
 
+    # The object a registration's callable built does not answer every
+    # method of the contract (`SiteSearch::Backend::METHODS`).
+    class NotABackend < StandardError
+      def initialize(name, missing)
+        super("the search backend #{name.inspect} built an object that does not answer #{missing.join(", ")} (SiteSearch::Backend)")
+      end
+    end
+
     @entries = []
     @current = nil
     @lock = Mutex.new
@@ -49,8 +57,10 @@ module SiteSearch
       def current_name = ENV["SEARCH_BACKEND"].to_s.strip.presence || BUILT_IN
 
       # The chosen backend, built on the first call and kept for the process.
+      # An object that misses a method of the contract raises `NotABackend`
+      # and is not kept, so every call names the gem's mistake.
       def current
-        @current || @lock.synchronize { @current ||= fetch(current_name).backend.call }
+        @current || @lock.synchronize { @current ||= built(current_name) }
       end
 
       # Tests only: the next `current` builds the backend again, for a
@@ -74,6 +84,14 @@ module SiteSearch
       end
 
       private
+
+      def built(name)
+        backend = fetch(name).backend.call
+        missing = Backend::METHODS.reject { |method| backend.respond_to?(method) }
+        raise NotABackend.new(name, missing) if missing.any?
+
+        backend
+      end
 
       def find(name) = @entries.find { |entry| entry.name == name.to_s }
 

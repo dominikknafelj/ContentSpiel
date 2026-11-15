@@ -43,14 +43,15 @@ module Blocks
       # characters and never markup): each piece is escaped by `safe_join`
       # and each marked piece wrapped by `content_tag`, so the text can add
       # no element and no attribute, and the only markup is the marks. A
-      # mark that overlaps the one before it, or falls outside the text, is
-      # left out; the words are kept.
+      # mark that is no `[start, length]` of Integers starting inside the
+      # text, or that overlaps the one before it, is left out; the words are
+      # kept.
       def snippet
         text = item.snippet&.text.to_s
         parts = []
         at = 0
-        Array(item.snippet&.marks).sort_by(&:first).each do |start, length|
-          next if start.nil? || length.to_i <= 0 || start < at || start >= text.length
+        marks_within(text).sort_by(&:first).each do |start, length|
+          next if start < at
 
           parts << text[at...start] << content_tag(:mark, text[start, length])
           at = start + length
@@ -62,6 +63,12 @@ module Blocks
       private
 
       attr_reader :item
+
+      def marks_within(text)
+        Array(item.snippet&.marks).select do |mark|
+          mark.is_a?(Array) && mark.size == 2 && mark.all?(Integer) && mark.first >= 0 && mark.first < text.length && mark.last.positive?
+        end
+      end
     end
   end
 end

@@ -24,12 +24,23 @@ module SiteSearch
       report_once(BLOCK_TEXT_KEY, BlockTextFailed.new(block_type: block_type, error_class: error.class.name))
     end
 
+    # Never raises: a report is made inside a visitor's search and a
+    # publish, and a store that fails (its database unreachable) must cost
+    # neither. With no store to ask, the report is made unthrottled.
     def report_once(key, error)
-      return nil unless CounterStore.current.write(key, true, expires_in: WITHIN, unless_exist: true)
+      return nil unless first_in_minute?(key)
 
       Rails.error.report(error, handled: true, source: "site_search")
       nil
+    rescue StandardError
+      nil
     end
-    private_class_method :report_once
+
+    def first_in_minute?(key)
+      CounterStore.current.write(key, true, expires_in: WITHIN, unless_exist: true)
+    rescue StandardError
+      true
+    end
+    private_class_method :report_once, :first_in_minute?
   end
 end

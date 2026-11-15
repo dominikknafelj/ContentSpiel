@@ -117,6 +117,96 @@ class SiteSearchTest < ActiveSupport::TestCase
     assert_not_includes text, "engine/select"
   end
 
+  # A backend's answer is checked inside the scrubbed path: what it hands
+  # back is a gem's, and a total that is no Integer or a mark that is no
+  # pair of Integers would raise in the page's drawing, a 500.
+  test "an answer of the wrong shape is unavailable, reported by its class, never a 500" do
+    snippet = SiteSearch::Snippet.new(text: "an albatross", marks: [ [ 3, 9 ] ])
+    hit = ->(**changes) { SiteSearch::Hit.new(record_type: "Page", record_id: 1, copy_id: 1, language: "en", snippet: snippet, rank: 1.0).with(**changes) }
+    answers = {
+      "a nil total" => SiteSearch::Results.new(hits: [], total: nil),
+      "a String total" => SiteSearch::Results.new(hits: [], total: "3"),
+      "nil hits" => SiteSearch::Results.new(hits: nil, total: 1),
+      "a Hash" => { hits: [], total: 0 },
+      "a String record id" => SiteSearch::Results.new(hits: [ hit.(record_id: "1") ], total: 1),
+      "a nil copy id" => SiteSearch::Results.new(hits: [ hit.(copy_id: nil) ], total: 1),
+      "a hit that is no Hit" => SiteSearch::Results.new(hits: [ { record_id: 1 } ], total: 1),
+      "a snippet text that is no String" => SiteSearch::Results.new(hits: [ hit.(snippet: snippet.with(text: 42)) ], total: 1),
+      "a String mark" => SiteSearch::Results.new(hits: [ hit.(snippet: snippet.with(marks: [ [ "3", 9 ] ])) ], total: 1),
+      "a mark of three" => SiteSearch::Results.new(hits: [ hit.(snippet: snippet.with(marks: [ [ 3, 9, 1 ] ])) ], total: 1),
+      "marks that are no Array" => SiteSearch::Results.new(hits: [ hit.(snippet: snippet.with(marks: "3,9")) ], total: 1)
+    }
+
+    answers.each_with_index do |(name, answer), index|
+      fake = SiteSearch::Fake.new
+      fake.define_singleton_method(:search) { |_query, deadline:| answer }
+      fake.installed do
+        travel((SiteSearch::Reports::WITHIN + 1.second) * (index + 1)) do
+          report = assert_error_reported(SiteSearch::Unavailable) { assert_equal SiteSearch::UNAVAILABLE, SiteSearch.search(query), name }
+          assert_equal "test/fake: TypeError", report.error.message, name
+        end
+      end
+    end
+  end
+
+  test "a well-formed answer is handed on, a nil snippet included" do
+    fake = SiteSearch::Fake.new
+    answer = SiteSearch::Results.new(hits: [ SiteSearch::Hit.new(record_type: "Page", record_id: 1, copy_id: 2, language: "en", snippet: nil, rank: 1) ], total: 1)
+    fake.define_singleton_method(:search) { |_query, deadline:| answer }
+
+    fake.installed { assert_equal answer, SiteSearch.search(query) }
+  end
+
+  test "a snippet longer than SNIPPET_LENGTH is cut at a word boundary, and the marks past the cut are dropped" do
+    assert_equal 500, SiteSearch::SNIPPET_LENGTH
+    words = ("albatross " * 80).strip
+    marks = (0...80).map { |index| [ index * 10, 9 ] }
+    fake = SiteSearch::Fake.new
+    fake.define_singleton_method(:search) do |_query, deadline:|
+      SiteSearch::Results.new(hits: [ SiteSearch::Hit.new(record_type: "Page", record_id: 1, copy_id: 2, language: "en",
+        snippet: SiteSearch::Snippet.new(text: words, marks: marks), rank: 1) ], total: 1)
+    end
+
+    snippet = fake.installed { SiteSearch.search(query) }.hits.first.snippet
+
+    assert_operator snippet.text.length, :<=, SiteSearch::SNIPPET_LENGTH
+    assert_equal words[0, snippet.text.length], snippet.text
+    assert snippet.text.end_with?("albatross"), "cut at a word boundary"
+    assert_equal marks.select { |start, length| start + length <= snippet.text.length }, snippet.marks
+    assert(snippet.marks.all? { |start, length| snippet.text[start, length] == "albatross" })
+
+    short = SiteSearch::Snippet.new(text: "an albatross", marks: [ [ 3, 9 ] ])
+    assert_same short, SiteSearch.cut_snippet(short)
+  end
+
+  test "a counter store that raises leaves the search answering, the failure reported" do
+    broken = Object.new
+    broken.define_singleton_method(:write) { |*, **| raise Errno::ECONNREFUSED, "cache at postgres://secret" }
+
+    with_singleton_override(CounterStore, :current, -> { broken }) do
+      SiteSearch::Fake.new(raise_with: RuntimeError.new(SECRET)).installed do
+        assert_error_reported(SiteSearch::Unavailable) { assert_equal SiteSearch::UNAVAILABLE, SiteSearch.search(query) }
+      end
+      assert_nothing_raised { SiteSearch::Reports.report_block_text(block_type: "acme/gallery", error: RuntimeError.new("boom")) }
+    end
+  end
+
+  test "a scrubbed failure keeps the backend's backtrace, and no message or cause" do
+    raised = nil
+    error = assert_raises(SiteSearch::Unavailable) do
+      SiteSearch::Unavailable.scrubbing(backend: "test/fake") do
+        raise RuntimeError, SECRET
+      rescue RuntimeError => original
+        raised = original
+        raise
+      end
+    end
+
+    assert_equal raised.backtrace, error.backtrace
+    assert_equal "test/fake: RuntimeError", error.message
+    assert_nil error.cause
+  end
+
   private
 
   def document(word)
