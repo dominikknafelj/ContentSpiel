@@ -22,7 +22,7 @@ module Blocks
     include Blocks::Contract
 
     contract(
-      accessibility: "A form with role=search, a real label for its type=search field, and a button; the count and every message are role=status; the pager is a named nav whose current page is aria-current=page and whose number links are named \"Page n\"; a match is marked and also in the words.",
+      accessibility: "A form with role=search, a real label for its type=search field, and a button; the count, the close-matches line and every message are role=status; the pager is a named nav whose current page is aria-current=page and whose number links are named \"Page n\"; a match is marked and also in the words, and a matched tag is marked and followed by words a screen reader hears.",
       motion: :none,
       content_edges: %i[long short missing],
       widths: :from_container,
@@ -30,7 +30,9 @@ module Blocks
       words: %w[public.blocks.search.label public.blocks.search.button public.blocks.search.results public.blocks.search.page
                 public.blocks.search.pages public.blocks.search.previous public.blocks.search.next public.blocks.search.none
                 public.blocks.search.past_end public.blocks.search.first_page public.blocks.search.too_long
-                public.blocks.search.limited public.blocks.search.unavailable public.blocks.search.live_note],
+                public.blocks.search.limited public.blocks.search.unavailable public.blocks.search.live_note
+                public.blocks.search.close_matches public.blocks.search.did_you_mean public.blocks.search.tagged
+                public.blocks.search.matched_tag],
       limits: [
         "It finds what a visitor sees now: no draft, no unpublished change, no other language.",
         "No filter, and no sort; suggestions as one types with a script, none without; ten results to a page.",
@@ -127,8 +129,10 @@ module Blocks
     # (`SiteSearch::Answer#correction`).
     def correction = answer.correction
 
-    # The block's own address searching for the correction, or nil.
-    def correction_path = correction && "#{action}?#{{ q: correction }.to_query}"
+    # The block's own address searching for the correction, or nil: its
+    # query encoded as the pager's (`URI.encode_www_form`), the one encoder
+    # of every `?q=` link the block writes.
+    def correction_path = correction && "#{action}?#{URI.encode_www_form(q: correction)}"
 
     # The suggestions endpoint the script posts to, or nil, which offers no
     # suggestions: in the preview (where `live_note?` is true) and on a site

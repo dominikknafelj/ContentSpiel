@@ -1,7 +1,12 @@
 <%# The Search block (search spec §7.2; the SiteSearch card): a GET form to the page it stands on, with
     role=search, a real label for a type=search field named q, and a button; then, for a request with a
     query, its outcome: the preview's note, the count and the results with their pager, or one message.
-    The count and every message are role=status. A sentence that quotes the query hands it to `string` in
+    The count, the close-matches line (which stands in the count's place) and every message are role=status;
+    "Did you mean" stands first, above the close-matches line or above Nothing found, its correction a link
+    to the block's own address (`correction_path`, encoded as the pager's links are) handed to `string` as
+    markup, never prefetched. A post result's tags are one line of text under its date, a matched one in
+    <mark> with words a screen reader hears; a tag's block variable is `result_tag`, never `tag`, which
+    would hide Action View's helper. A sentence that quotes the query hands it to `string` in
     a <q> (`tag.q`), so a language's own quote marks come from its `quotes`, and the query is escaped
     inside it. The pager's links keep q and set page, on the page's own address, and are never
     prefetched: a hovered link would run a search, and count it, before anyone pressed it. The field's
@@ -23,8 +28,15 @@
     <% if live_note? %>
       <p class="search__note"><%= string(:live_note) %></p>
     <% end %>
+    <% if correction && %i[results none].include?(state) %>
+      <p class="search__correction"><%= string(:did_you_mean, correction: link_to(correction, correction_path, data: { turbo_prefetch: "false" })) %></p>
+    <% end %>
     <% if state == :results %>
-      <p class="search__summary" role="status"><%= string(:results, count: total, query: tag.q(query)) %><% if pagination.page > 1 %> <span class="search__page">· <%= string(:page, page: pagination.page) %></span><% end %></p>
+      <% if close_matches? %>
+        <p class="search__close" role="status"><%= string(:close_matches, query: tag.q(query)) %></p>
+      <% else %>
+        <p class="search__summary" role="status"><%= string(:results, count: total, query: tag.q(query)) %><% if pagination.page > 1 %> <span class="search__page">· <%= string(:page, page: pagination.page) %></span><% end %></p>
+      <% end %>
       <ol class="search__results"<% if pagination.first_item > 1 %> start="<%= pagination.first_item %>"<% end %>>
         <% results.each do |result| %>
           <li class="search__result">
@@ -33,6 +45,9 @@
               <p class="search__where search__where--date"><%= result.date %></p>
             <% elsif result.where %>
               <p class="search__where"><%= result.where %></p>
+            <% end %>
+            <% if result.tags.any? %>
+              <p class="search__tags"><%= string(:tagged) %> <% result.tags.each_with_index do |result_tag, index| %><%= ", " if index.positive? %><% if result_tag.matched? %><mark class="search__tag-matched"><%= result_tag.name %><span class="sr-only"> (<%= string(:matched_tag) %>)</span></mark><% else %><span class="search__tag"><%= result_tag.name %></span><% end %><% end %></p>
             <% end %>
             <p class="search__snippet"><%= result.snippet %></p>
           </li>

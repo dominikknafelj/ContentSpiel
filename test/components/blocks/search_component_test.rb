@@ -62,6 +62,35 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
 
   def path = PublicSite::Urls.new.path_for(@shown, "en")
 
+  # A post result found for its tags, under its date.
+  def post_item(tags:)
+    item(title: "Deploy previews for every pull request", url_path: "/blog/previews", kind: :post, where: nil,
+      date: Time.zone.local(2026, 11, 12, 9), tags: tags)
+  end
+
+  def page_item = item
+
+  # The page of results for `items`, as Nokogiri, for a query that found them exactly.
+  def render_results(*items, query: "publish")
+    draw(answer(:results, query: query, results: items, total: items.size))
+  end
+
+  # The results of a search with no exact hit: close matches, with the correction.
+  def close_answer(query:, correction:)
+    answer(:results, query: query, results: [ post_item(tags: %w[deployment]) ], total: 1, correction: correction, close_matches: true)
+  end
+
+  # A search that found nothing, with the correction.
+  def none_answer(query:, correction:)
+    answer(:none, query: query, correction: correction)
+  end
+
+  # `answer` drawn, its results replaced by `items` when given.
+  def render_answer(answer, items: nil)
+    answer = answer.with(results: items, total: items.size) if items
+    draw(answer)
+  end
+
   test "empty draws the field alone" do
     block = search_block
     draw(answer(:empty, query: nil), block: block)
@@ -316,6 +345,48 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
     assert_equal %w[Page Post Tag], %i[kind_page kind_post kind_tag].map { |key| component.send(:string, key) }
     assert_raises(ArgumentError) { component.send(:string, :suggestions) }
     assert_raises(ArgumentError) { component.send(:string, :nope) }
+  end
+
+  test "a post result draws Tagged and its tags under the date, a matched tag in mark and in words" do
+    html = render_results(post_item(tags: %w[deployment previews]), query: "deployment")
+    line = html.at_css(".search__result .search__tags")
+    assert_equal "Tagged", line.children.first.text.strip
+    assert_equal "deployment", line.at_css("mark").text.sub(" (matches your search)", "")
+    assert_equal "(matches your search)", line.at_css("mark .sr-only").text.strip
+    assert line.previous_element.matches?(".search__where--date")
+    assert_equal "Tagged deployment (matches your search), previews", line.text.squish, "the names comma-joined, plain text"
+    assert_empty line.css("a"), "a tag is no link"
+  end
+
+  test "a page result draws no tags line" do
+    assert_nil render_results(page_item).at_css(".search__tags")
+  end
+
+  test "close matches draw one status line above the results; Did you mean stands above it with an unprefetched link" do
+    html = render_answer(close_answer(query: "deplyment", correction: "deployment"))
+    correction, close = html.css(".search__correction, .search__close").to_a
+    assert_equal "No exact matches for deplyment. Close matches:", close.text.squish
+    assert_equal "deplyment", close.at_css("q").text, "the query in its q, whose quote marks are the stylesheet's"
+    assert_equal "status", close["role"]
+    assert_equal "false", correction.at_css("a")["data-turbo-prefetch"]
+    assert_equal "#{path}?q=deployment", correction.at_css("a")["href"]
+    assert_equal "Did you mean deployment?", correction.text.squish
+    assert close.next_element.matches?("ol.search__results"), "the close line stands right above the results"
+    assert_nil html.at_css(".search__summary"), "the close line stands in place of the count"
+  end
+
+  test "Did you mean alone stands above Nothing found" do
+    html = render_answer(none_answer(query: "kamel proxi", correction: "kamal proxy"))
+    assert html.at_css(".search__correction + .search__message")
+    assert_equal "#{path}?q=kamal+proxy", html.at_css(".search__correction a")["href"]
+  end
+
+  test "a tag, a correction and a query like markup are escaped" do
+    html = render_answer(close_answer(query: %(<b>x</b>), correction: %(<img src=x>)), items: [ post_item(tags: [ "<script>t</script>" ]) ])
+    assert_empty html.css("b, img, script")
+    assert_equal "<script>t</script>", html.at_css(".search__tags .search__tag").text
+    assert_equal "Did you mean <img src=x>?", html.at_css(".search__correction").text.squish
+    assert_equal "#{path}?q=%3Cimg+src%3Dx%3E", html.at_css(".search__correction a")["href"]
   end
 
   test "nothing in the component, its result or its template marks a string as safe" do

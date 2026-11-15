@@ -39,7 +39,7 @@ module ContractLedger
     # `tagged`, `matched_tag`, `suggestions`, `no_suggestions`,
     # `suggestions_limited`, `suggestions_unavailable`,
     # `suggestions_loading`, `suggestions_label`, `kind_page`, `kind_post`
-    # and `kind_tag`.
+    # and `kind_tag`; and the themed token `search-active` below.
     "blocks/search_component" => %w[block page label query state results total pagination action live_note?
                                      close_matches? correction correction_path suggest_url string],
     "blocks/card_component" => %w[block page title text link icon icon_name image],
@@ -89,7 +89,7 @@ module ContractLedger
     note-warning-ground note-warning-line note-warning-ink note-warning-border
     table-rule table-line table-head table-caption table-ground
     form-field-ground form-field-line form-field-focus form-error form-done-ground form-done-line
-    search-mark search-mark-ink
+    search-mark search-mark-ink search-active
     card-ground card-line card-icon
   ].freeze
 

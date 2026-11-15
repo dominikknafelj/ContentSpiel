@@ -190,6 +190,9 @@
      block reads the base tokens the band re-values above. */
   --th-search-mark: color-mix(in srgb, var(--th-on-band-strong) 22%, var(--th-band-strong));
   --th-search-mark-ink: var(--th-on-band-strong);
+  /* The active suggestion's ground on this band: the band's text at 11%
+     into the band, under the band's text, its dim and its accent. */
+  --th-search-active: color-mix(in srgb, var(--th-on-band-strong) 11%, var(--th-band-strong));
   /* A diagram on this band (Diagram block spec §4), as the Code block's:
      the labels the band's text, edges the band's dim and the accent the
      band's. A node, a group, a note and a node's outline are the band's

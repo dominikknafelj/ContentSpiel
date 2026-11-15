@@ -89,12 +89,36 @@
   font-size: var(--th-t-body);
   color: var(--th-dim);
 }
-.content-block--search :is(.search__summary, .search__message) q {
+/* Close matches: one line in the count's place, saying once what every
+   result below it is (the results look as exact ones do). */
+.content-block--search .search__close {
+  margin: 1.5rem 0 0;
+  font-size: var(--th-t-body);
+  color: var(--th-dim);
+}
+.content-block--search :is(.search__summary, .search__message, .search__close) q {
   font-weight: 600;
   color: var(--th-ink);
   overflow-wrap: anywhere;
 }
 .content-block--search .search__page { color: var(--th-meta); }
+
+/* "Did you mean": the first line of the outcome, above the close-matches
+   line or above Nothing found, which then stands closer under it. */
+.content-block--search .search__correction {
+  margin: 1.5rem 0 0;
+  font-size: 1.0625rem;
+  color: var(--th-ink);
+  overflow-wrap: anywhere;
+}
+.content-block--search .search__correction a {
+  font-weight: 600;
+  color: var(--th-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.content-block--search .search__correction a:hover { color: var(--th-accent-hover); }
+.content-block--search .search__correction + :is(.search__close, .search__message) { margin-top: 0.5rem; }
 
 /* The results, each ruled off. */
 .content-block--search .search__results {
@@ -134,6 +158,24 @@
   letter-spacing: var(--th-track-mono);
   text-transform: uppercase;
 }
+/* A post's tags under its date: "Tagged", then the names as text, comma-
+   joined. A matched one has the snippet's mark (its ground and weight),
+   and words after it for a screen reader. */
+.content-block--search .search__tags {
+  margin: 0.375rem 0 0;
+  font-size: 0.875rem;
+  color: var(--th-meta);
+  overflow-wrap: anywhere;
+}
+.content-block--search .search__tag { color: var(--th-dim); }
+.content-block--search .search__tag-matched {
+  padding: 0 3px;
+  font-weight: 500;
+  color: var(--th-search-mark-ink);
+  background: var(--th-search-mark);
+  border-radius: 2px;
+}
+
 /* The snippet wraps anywhere, so a long word cannot push the column. A
    match is marked by its ground and its weight, and is in the words
    besides. */
