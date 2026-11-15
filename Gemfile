@@ -147,7 +147,7 @@ gem "mcp", "~> 1.9"
 
 gem "rack-attack", "~> 6.8"
 
-gem "view_component", "~> 4.23"
+gem "view_component", "~> 4.24"
 
 # Colours the Code block's source on the server. A visitor's request runs
 # it, so it is a dependency of its own and not only Lookbook's, a
