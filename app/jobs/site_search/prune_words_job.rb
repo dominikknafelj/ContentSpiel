@@ -15,11 +15,18 @@ module SiteSearch
   # a second one, which is harmless: a prune is idempotent, and the two
   # take the vocabulary's lock in turn (`Postgres::Vocabulary::LOCK`).
   # `SiteSearch::Indexing` enqueues one per transaction, so a branch purged
-  # together prunes once.
+  # together prunes once, and one per run of purges that commit one by one
+  # (`Indexing.one_prune`: `Trash::Empty`, `Trash::PurgeExpiredJob`).
   class PruneWordsJob < ApplicationJob
     queue_as :default
 
     limits_concurrency to: 1, key: "site_search_prune_words"
+
+    # A prune that waited `Vocabulary::LOCK_TIMEOUT` for the writes in
+    # flight gives up rather than hold every new publish behind it, and is
+    # tried again later; after the last attempt the next purge's prune, or
+    # the next build, takes the words.
+    retry_on ActiveRecord::LockWaitTimeout, attempts: 5, wait: :polynomially_longer
 
     def perform
       Postgres::Vocabulary.prune

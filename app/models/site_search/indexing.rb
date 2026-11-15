@@ -47,6 +47,7 @@ module SiteSearch
   module Indexing
     RECORDS = %w[Page Post].freeze
     PRUNE_ASKED = :site_search_prune_asked
+    PRUNE_RUN = :site_search_prune_run
 
     module_function
 
@@ -165,20 +166,47 @@ module SiteSearch
     end
     private_class_method :enqueue_sync
 
+    # One prune for a whole run of purges that each commit on their own
+    # (`Trash::Empty`, `Trash::PurgeExpiredJob`): inside the block a purge's
+    # commit only marks a prune due, and leaving the outermost block
+    # enqueues one when one was marked, after the work and whether the block
+    # finished or raised (what was purged before the error is gone too).
+    # Nested blocks are one run; the mark is the thread's
+    # (`ActiveSupport::IsolatedExecutionState`). Answers the block's value.
+    def one_prune
+      state = ActiveSupport::IsolatedExecutionState
+      return yield if state[PRUNE_RUN]
+
+      state[PRUNE_RUN] = { due: false }
+      begin
+        yield
+      ensure
+        due = state[PRUNE_RUN][:due]
+        state[PRUNE_RUN] = nil
+        enqueue_prune if due
+      end
+    end
+
     # After the outermost commit, as `enqueue_sync`: a rolled-back purge
     # prunes nothing, and an enqueue that raises is reported, never raised.
     # One per transaction, however many records it purged (a page's
-    # branch, `Trash::Empty`): the transaction that asked is remembered
-    # until the callback runs, and one finished without it (rolled back) is
-    # open no more, so the next asks again.
+    # branch): the transaction that asked is remembered until the callback
+    # runs, and one finished without it (rolled back) is open no more, so
+    # the next asks again. Purges that commit one by one are one run only
+    # inside `one_prune`, whose block the callback marks instead.
     def enqueue_prune
+      state = ActiveSupport::IsolatedExecutionState
       transaction = ActiveRecord::Base.current_transaction
-      return if transaction.open? && ActiveSupport::IsolatedExecutionState[PRUNE_ASKED].equal?(transaction)
+      return if transaction.open? && state[PRUNE_ASKED].equal?(transaction)
 
-      ActiveSupport::IsolatedExecutionState[PRUNE_ASKED] = transaction
+      state[PRUNE_ASKED] = transaction
       ActiveRecord.after_all_transactions_commit do
-        ActiveSupport::IsolatedExecutionState[PRUNE_ASKED] = nil
-        PruneWordsJob.perform_later
+        state[PRUNE_ASKED] = nil
+        if (run = state[PRUNE_RUN])
+          run[:due] = true
+        else
+          PruneWordsJob.perform_later
+        end
       rescue StandardError => error
         Reports.report(backend: Backends.current_name, error: error)
       end

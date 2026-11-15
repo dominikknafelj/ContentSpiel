@@ -21,6 +21,20 @@ class Trash::PurgeExpiredJobTest < ActiveJob::TestCase
     assert_equal "system", event.channel
   end
 
+  test "the sweep enqueues one prune of the search's words for all it purged" do
+    other = create_post(title: "Older")
+    Current.actor = users(:one)
+    Trash::Move.call(other)
+    Current.reset
+    [ @old, other ].each { |post| post.update_columns(trashed_at: 31.days.ago) }
+    clear_enqueued_jobs
+
+    assert_enqueued_jobs 1, only: SiteSearch::PruneWordsJob do
+      Trash::PurgeExpiredJob.perform_now
+    end
+    assert_not Post.exists?(other.id)
+  end
+
   # Final fix wave (Task 14 I1): the Trash screen's retention tag promises a
   # date -- "Deleted for good on or after <date>", the date of `trashed_at +
   # retention` in the site's time zone. Whenever the sweep runs, nothing may

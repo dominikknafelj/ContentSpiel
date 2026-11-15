@@ -46,6 +46,11 @@ module SiteSearch
       # namespace of its own beside `Rebuild::ADVISORY_NAMESPACE`, since
       # session and transaction advisory locks share one key space.
       LOCK = [ 0x5EA2C5, 1 ].freeze
+      # How long a prune waits for the writes in flight before it gives up
+      # (`ActiveRecord::LockWaitTimeout`, which `PruneWordsJob` retries): a
+      # prune queued behind a long writer would otherwise stand in
+      # Postgres's lock queue before every new publish's shared lock.
+      LOCK_TIMEOUT = "2s".freeze
 
       # The distinct candidate words of a document, lowercased as written and
       # never stemmed, since a correction is shown to a person; before the
@@ -80,11 +85,13 @@ module SiteSearch
       end
 
       # The words that no entry of their language holds, deleted under the
-      # exclusive lock: one probe of the entries' GIN index per word, a
+      # exclusive lock, waited for `LOCK_TIMEOUT` at most: one probe of the entries' GIN index per word, a
       # language at a time since each has its configuration. Answers the
       # number of words deleted.
       def prune
         Word.transaction do
+          # sql: Arel has no node for SET; the value is a constant
+          Word.connection.execute("SET LOCAL lock_timeout = '#{LOCK_TIMEOUT}'") # version: none (a setting of the prune's own transaction)
           take_lock("pg_advisory_xact_lock")
           Word.distinct.pluck(:locale).sum do |locale|
             Word.where(locale: locale).where.not(SqlNodes.exists(holders(locale, Word.arel_table[:word]))).delete_all # version: none (the vocabulary is no part of a page)

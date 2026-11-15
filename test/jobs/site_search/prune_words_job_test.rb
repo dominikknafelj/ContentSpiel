@@ -22,6 +22,47 @@ class SiteSearch::PruneWordsJobTest < ActiveSupport::TestCase
     assert_equal "site_search_prune_words", SiteSearch::PruneWordsJob.new.concurrency_key.split("/").last
   end
 
+  test "a prune that waits too long for the writes in flight gives up and is tried again" do
+    assert SiteSearch::PruneWordsJob.rescue_handlers.any? { |handler, _| handler == "ActiveRecord::LockWaitTimeout" }
+    SiteSearch::Word.transaction(requires_new: true) do
+      SiteSearch::Postgres::Vocabulary.prune
+      assert_equal SiteSearch::Postgres::Vocabulary::LOCK_TIMEOUT, SiteSearch::Word.connection.select_value("SHOW lock_timeout")
+    end
+  end
+
+  test "a purge outside a run of purges enqueues its own prune" do
+    page = create_page(title: "Uniqueword")
+    ok Trash::Move.call(page.reload)
+    clear_enqueued_jobs
+    ok Trash::Purge.call(page.reload)
+    assert_enqueued_jobs 1, only: SiteSearch::PruneWordsJob
+  end
+
+  test "a run of purges that each commit enqueues one prune when it ends, nested runs as one, a raise after a purge too" do
+    pages = 3.times.map { |n| create_page(title: "Runpage #{n}").tap { |page| ok Trash::Move.call(page.reload) } }
+    clear_enqueued_jobs
+
+    SiteSearch::Indexing.one_prune do
+      ok Trash::Purge.call(pages[0].reload)
+      SiteSearch::Indexing.one_prune { ok Trash::Purge.call(pages[1].reload) }
+      assert_no_enqueued_jobs only: SiteSearch::PruneWordsJob
+    end
+    assert_enqueued_jobs 1, only: SiteSearch::PruneWordsJob
+    clear_enqueued_jobs
+
+    assert_raises(IOError) do
+      SiteSearch::Indexing.one_prune do
+        ok Trash::Purge.call(pages[2].reload)
+        raise IOError
+      end
+    end
+    assert_enqueued_jobs 1, only: SiteSearch::PruneWordsJob
+    clear_enqueued_jobs
+
+    SiteSearch::Indexing.one_prune { nil }
+    assert_no_enqueued_jobs only: SiteSearch::PruneWordsJob
+  end
+
   test "a purge's words are pruned by the job after its commit" do
     create_page(title: "Harbourmaster")
     page = create_page(title: "Uniqueword")
