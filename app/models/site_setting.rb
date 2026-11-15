@@ -336,11 +336,9 @@ class SiteSetting < ApplicationRecord
     end
   end
 
-  CONTENT_TYPE_NAME = %r{\A[a-z][a-z0-9_]*(/[a-z][a-z0-9_]*)?\z}
-
   def content_types_are_well_formed
     names = content_types
-    unless names.is_a?(Array) && names.all? { |name| name.is_a?(String) && name.match?(CONTENT_TYPE_NAME) } && names.uniq.size == names.size
+    unless names.is_a?(Array) && names.all? { |name| name.is_a?(String) && name.match?(::ContentModel::Registry::NAME_FORMAT) } && names.uniq.size == names.size
       errors.add(:content_types, :invalid)
     end
   end

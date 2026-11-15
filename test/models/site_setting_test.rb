@@ -255,7 +255,7 @@ class SiteSettingTest < ActiveSupport::TestCase
     [ [ "blog", "blog" ], [ "Blog" ], [ 1 ], "blog" ].each do |value|
       setting.content_types = value
       assert_not setting.valid?, "#{value.inspect} should be invalid"
-      assert setting.errors.key?(:content_types)
+      assert setting.errors.of_kind?(:content_types, :invalid), value.inspect
     end
   end
 
@@ -265,7 +265,7 @@ class SiteSettingTest < ActiveSupport::TestCase
 
     assert_not setting.valid?
     assert setting.errors.of_kind?(:content_types, :none_switched_on)
-    assert_equal "Keep at least one post type switched on.", setting.errors.messages_for(:content_types).first
+    assert_equal [ "Keep at least one post type switched on." ], setting.errors.full_messages_for(:content_types)
   end
 
   test "a stored list whose declared names went away is valid until it changes" do

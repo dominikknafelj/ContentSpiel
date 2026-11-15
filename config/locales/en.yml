@@ -157,6 +157,7 @@ en:
               format: "%{message}"
               keep_days_range: "Days to keep submissions must be a whole number of days, from 1 to 3650."
             content_types:
+              format: "%{message}"
               none_switched_on: "Keep at least one post type switched on."
         # A Section's anchor is named by its sentence: the attribute is the dotted
         # `settings.anchor` (`ContentBlock#settings_are_valid`).
