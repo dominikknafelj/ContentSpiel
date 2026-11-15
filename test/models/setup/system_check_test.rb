@@ -93,6 +93,24 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     end
   end
 
+  test "an outside backend with no suggest has a note that suggestions offer tags only, and one with suggest none" do
+    row = result("Search", run_check(search: search_status(label: "Typesense", count: nil, tags_only: true)))
+    assert_equal :ok, row.status
+    assert_equal "Suggestions while typing offer tags only: Typesense offers no title suggestions.", row.note
+
+    [ SiteSearch::Fake.new(suggests: false), SiteSearch::Fake.new ].each do |fake|
+      fake.installed do
+        SiteSearch::IndexState.start!(SiteSearch::Fake::NAME, total: 0)
+          .ready!(SiteSearch::IndexState.fingerprint(SiteSearch::Fake::NAME), languages: [], done: 0)
+        status = SiteSearch::Status.read
+        assert_equal !fake.respond_to?(:suggest), status.tags_only
+        note = result("Search", run_check(search: status)).note
+        status.tags_only ? assert_equal("Suggestions while typing offer tags only: Fake offers no title suggestions.", note) : assert_nil(note)
+      end
+    end
+    assert_not SiteSearch::Status.read.tags_only, "the built-in suggests titles"
+  end
+
   test "in production with the request's facts, HTTPS comes second" do
     labels = run_check(production: true, request_ssl: true).map(&:label)
 
@@ -751,7 +769,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
     def search_status(**overrides)
       SiteSearch::Status.new(**{ name: "postgres", label: "Built-in", state: :ready, done: nil, total: nil, count: 1200,
-        health: nil, limited: [] }.merge(overrides))
+        health: nil, limited: [], tags_only: false }.merge(overrides))
     end
 
     def run_check(**overrides)

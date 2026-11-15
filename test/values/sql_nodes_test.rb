@@ -45,6 +45,11 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { SqlNodes.array_contains(@pages[:id], [ "7}'; --" ]) }
   end
 
+  test "array_contains_column asks whether an integer array holds a column's id, cast to integer" do
+    assert_equal %("published_versions"."tag_ids" @> array_append(CAST('{}' AS integer[]), CAST("tags"."id" AS integer))),
+      sql(SqlNodes.array_contains_column(Arel::Table.new(:published_versions)[:tag_ids], Arel::Table.new(:tags)[:id]))
+  end
+
   test "cast names the type" do
     assert_equal %(CAST("pages"."title" AS text)), sql(SqlNodes.cast(@pages[:title], "text"))
     assert_equal "CAST('{}' AS jsonb)", sql(SqlNodes.cast("{}", "jsonb"))

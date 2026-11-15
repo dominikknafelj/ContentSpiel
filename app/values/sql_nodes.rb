@@ -70,6 +70,16 @@ module SqlNodes
     Arel::Nodes::InfixOperation.new("@>", column, cast("{#{values.map { |value| Integer(value) }.join(",")}}", "integer[]"))
   end
 
+  # `column @> ARRAY[other::integer]`, `column` an integer array and
+  # `other` an id column of the statement around a subquery (a correlated
+  # test, which the GIN index on `column` serves row by row; a `bigint` id
+  # is cast, since `integer[] @> bigint[]` is no operator). Spelled
+  # `array_append('{}'::integer[], …)`: Arel has no node for an array
+  # constructor.
+  def array_contains_column(column, other)
+    Arel::Nodes::InfixOperation.new("@>", column, function("array_append", cast("{}", "integer[]"), cast(other, "integer")))
+  end
+
   # `CAST(value AS type)`; `type` is a constant type name, never user text.
   def cast(value, type) = Arel::Nodes::NamedFunction.new("CAST", [ quoted(value).as(type) ])
 

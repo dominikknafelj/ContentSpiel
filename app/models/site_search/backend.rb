@@ -69,6 +69,25 @@ module SiteSearch
   #   (out of time, the exact answer standing) or `"skipped"` (it ran none);
   #   anything else is an answer of the wrong shape. A backend never writes
   #   on ContentSpiel's span: `search.close` is read from the answer.
+  #
+  #   SUGGESTIONS WHILE TYPING (search 2 spec §7.2), optional
+  #   (`OPTIONAL_METHODS`): a backend without `suggest` gives no title
+  #   suggestions; the tags are still suggested (they are ContentSpiel's
+  #   own, `SiteSearch::TagSuggestions`), and System status says the
+  #   suggestions offer tags only. `suggest(suggest_query, deadline:)`
+  #   answers `SiteSearch::Suggestions` for a `SiteSearch::SuggestQuery`
+  #   (`text`, `language`, `now`, `limit`): up to `limit`
+  #   `SiteSearch::Suggestion`s (`record_type`, `record_id`, `copy_id`,
+  #   `rank`), best first, of the documents in `language` only, in view at
+  #   `now`, whose title has a word that begins with each word of `text`.
+  #   The same rules as `search`: `text` is plain words as typed, which the
+  #   engine escapes in its own syntax (a prefix query on escaped words, or
+  #   a field built for "as you type"; never a raw query string with `*`
+  #   appended), and text left with no words answers no items; answered or
+  #   raised by the deadline; a failure scrubbed to its class, the prefix
+  #   never logged. An item names a copy and carries no text: what is drawn
+  #   is read again from the copy in force, as a hit is. An answer of
+  #   another shape is a failure.
   # - `health(deadline:)` answers `SiteSearch::Health`: `status` `:ok`,
   #   `:warn` or `:failed`, and `detail` one plain sentence for a person or
   #   nil. System status shows the detail as it is handed (its first line,
@@ -89,5 +108,9 @@ module SiteSearch
   # that may be used from several threads, or one per thread.
   module Backend
     METHODS = %i[index remove prune_record clear search health].freeze
+
+    # Asked only of a backend that answers them (`respond_to?`), so a
+    # backend written before them still passes `Backends.built`.
+    OPTIONAL_METHODS = %i[suggest].freeze
   end
 end

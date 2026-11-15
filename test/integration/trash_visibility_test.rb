@@ -323,6 +323,28 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_nil tag_page.call
   end
 
+  # The suggestions while typing are a list over pages, posts and tags: the
+  # built-in's titles leave a trashed record out, an outside engine's stale
+  # one is dropped by the re-check, and a tag is offered only while a kept
+  # post carries it (`SiteSearch::TagSuggestions`).
+  test "the site's suggestions never offer a trashed page or post, nor a tag only a trashed post carries" do
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: @kept_page), attributes: { block_type: "search" }).ok?
+    publish_changes(@kept_page)
+    create_post(title: "Shared one", tags: %w[sharedtag])
+    create_post(title: "Gone tagged", tags: %w[gonetag sharedtag]).update!(trashed_at: Time.current)
+    labels = ->(text) { SiteSearch.suggest(text: text, language: "en", now: Time.current).items.map(&:label) }
+
+    assert_equal [ "Kept page", "Kept post" ], labels.("kept").sort
+    assert_empty labels.("gone")
+    assert_equal [ "Shared one", "sharedtag" ], labels.("shared")
+
+    fake = SiteSearch::Fake.new
+    [ @gone_page, @gone_post ].each do |record|
+      fake.index(SiteSearch::Documents.for(Publishing::Version.of(record).order(:id).last, now: Time.current))
+    end
+    fake.installed { assert_empty labels.("gone") }
+  end
+
   # --- CS Studio --------------------------------------------------------------
 
   test "CS Studio 404s a trashed page, post and image by id, and autosave can't revive one" do

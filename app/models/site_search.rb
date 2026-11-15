@@ -40,6 +40,22 @@ module SiteSearch
   # the rest ContentSpiel reads from the query and the hits.
   BACKEND_CLOSE_OUTCOMES = %w[skipped timeout].freeze
 
+  # The suggestions while typing (search 2 spec §4.2, §4.3): the whole
+  # answer has `SUGGEST_TIMEOUT` seconds, of which the backend's `suggest`
+  # gets `SUGGEST_BACKEND_SHARE`, and ContentSpiel's re-check, tags and
+  # addresses what is left. A prefix of `MIN_PREFIX` to `MAX_PREFIX`
+  # characters is asked; up to `SUGGEST_LIMIT` suggestions, up to
+  # `TITLE_SUGGESTIONS` titles then up to `TAG_SUGGESTIONS` tags, each kind
+  # filling the places the other leaves. The backend is asked for
+  # `SUGGEST_LIMIT` titles, so titles can fill what tags leave.
+  SUGGEST_TIMEOUT = 0.3
+  SUGGEST_BACKEND_SHARE = 0.2
+  SUGGEST_LIMIT = 8
+  TITLE_SUGGESTIONS = 5
+  TAG_SUGGESTIONS = 3
+  MIN_PREFIX = 2
+  MAX_PREFIX = 100
+
   module_function
 
   # The one caller of a backend's `search` (spec §5.7): the chosen backend's
@@ -67,6 +83,69 @@ module SiteSearch
         "search.close" => close_of(query, answer), "search.correction" => answer != UNAVAILABLE && !answer.correction.nil?)
       answer
     end
+  end
+
+  # The suggestions for what a visitor has typed so far (search 2 spec
+  # §4.3), a `SiteSearch::SuggestAnswer`: `:ok` with its items, or
+  # `:unavailable` with none. Nothing it meets raises out of it.
+  #
+  # A prefix normalised (`Query.normalise`) to under `MIN_PREFIX`, over
+  # `MAX_PREFIX` or nothing answers `:ok` with no items and asks nothing.
+  # Otherwise the backend's `suggest`, when it has one (`OPTIONAL_METHODS`:
+  # without it the titles are none and the tags still come), with a
+  # deadline `SUGGEST_BACKEND_SHARE` from now, scrubbed by
+  # `Unavailable.scrubbing` and checked for its shape; an answer after the
+  # deadline is a failure, as a search's. Then ContentSpiel's part, under
+  # what is left of `SUGGEST_TIMEOUT` (`SuggestAnswer.build`). Any failure
+  # answers `:unavailable` and is reported through `Reports.report_suggest`,
+  # a minute of its own.
+  #
+  # THE PREFIX travels only as binds and as the backend's query: the span
+  # `search.suggest` records the backend, the outcome and the count, never
+  # the prefix, its length or a digest. A backend never writes on it.
+  def suggest(text:, language:, now:)
+    backend = Backends.current_name
+    started = clock
+    Telemetry.in_span("search.suggest", attributes: { "search.backend" => backend }) do |span|
+      answer = suggest_answer(Query.normalise(text), language.to_s, now, backend, started)
+      Telemetry.record(span, "search.outcome" => answer.state.to_s, "search.suggestions" => answer.items.size)
+      answer
+    end
+  end
+
+  def suggest_answer(prefix, language, now, backend, started)
+    return SuggestAnswer.new(state: :ok, items: []) if prefix.nil? || !(MIN_PREFIX..MAX_PREFIX).cover?(prefix.length)
+
+    Unavailable.scrubbing(backend: backend) do
+      titles = suggested_titles(SuggestQuery.new(text: prefix, language: language, now: now, limit: SUGGEST_LIMIT), started + SUGGEST_BACKEND_SHARE)
+      SuggestAnswer.build(prefix: prefix, titles: titles, language: language, now: now, deadline: started + SUGGEST_TIMEOUT)
+    end
+  rescue Unavailable => error
+    Reports.report_suggest(backend: backend, error: error)
+    SuggestAnswer.new(state: :unavailable, items: [])
+  end
+
+  # The backend's suggestions, checked, or none when it has no `suggest`.
+  def suggested_titles(query, deadline)
+    current = Backends.current
+    return [] unless current.respond_to?(:suggest)
+
+    answer = current.suggest(query, deadline: deadline)
+    raise Timeout::Error if clock > deadline
+
+    checked_suggestions(answer).first(query.limit)
+  end
+
+  # `answer.items` when it is what the contract says (`SiteSearch::Suggestions`,
+  # an Array of `SiteSearch::Suggestion`s with Integer ids); raises
+  # `TypeError` otherwise, which the caller scrubs to its class.
+  def checked_suggestions(answer)
+    raise TypeError, "a backend's suggest answers SiteSearch::Suggestions" unless answer.is_a?(Suggestions)
+    raise TypeError, "suggestions are an Array" unless answer.items.is_a?(Array)
+    answer.items.each do |item|
+      raise TypeError, "a suggestion is a SiteSearch::Suggestion with Integer ids" unless item.is_a?(Suggestion) && item.record_id.is_a?(Integer) && item.copy_id.is_a?(Integer)
+    end
+    answer.items
   end
 
   # `search.close` (`CLOSE_OUTCOMES`), read from the verified answer:
@@ -213,5 +292,5 @@ module SiteSearch
   # video or a rule ("[image]"), which are no words of the page.
   def paragraphs(document) = document.plain_paragraphs - RichText::Document::PLAIN_PLACEHOLDERS.values
 
-  private_class_method :ask, :close_of, :verified, :kept_correction, :shown_exact?, :checked, :snippet?, :cut_snippets, :outcome_of, :clock
+  private_class_method :suggest_answer, :suggested_titles, :checked_suggestions, :ask, :close_of, :verified, :kept_correction, :shown_exact?, :checked, :snippet?, :cut_snippets, :outcome_of, :clock
 end

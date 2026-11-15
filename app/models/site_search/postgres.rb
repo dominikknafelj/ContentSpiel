@@ -130,6 +130,10 @@ module SiteSearch
 
     def search(query, deadline:) = Query.new(query, deadline: deadline).results
 
+    # The titles a visitor sees now whose words begin with the prefix's
+    # (`Suggest`), from `search_entries.title`.
+    def suggest(suggest_query, deadline:) = Suggestions.new(items: Suggest.new(suggest_query, deadline: deadline).items)
+
     # The database is the site's own: when it is down, nothing of the site
     # answers, search least of all.
     def health(deadline:) = Health.new(status: :ok, detail: nil)

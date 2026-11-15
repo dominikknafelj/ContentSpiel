@@ -65,6 +65,7 @@ en:
         problem: "%{backend} reports a problem but says no more. Check the engine itself."
         problem_detail: "%{backend} reports a problem: %{detail}"
         limited: "Search in %{languages} finds the text a page contains, with no stemming and no correction."
+        tags_only: "Suggestions while typing offer tags only: %{label} offers no title suggestions."
       # The "Visitor address" row (`Setup::SystemCheck#visitor_address`):
       # OK with no Cloudflare header, OK when the header is the address the
       # request is counted by, and the warning when it is not.

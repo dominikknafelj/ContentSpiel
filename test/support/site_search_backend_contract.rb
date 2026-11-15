@@ -92,7 +92,29 @@ module SiteSearchBackendContract
     backend.search(contract_query(text, **options), deadline: far_deadline).tap { |results| assert_kind_of SiteSearch::Results, results }
   end
 
-  def index_documents(*documents) = backend.index(documents)
+  def index_documents(*documents)
+    (@contract_indexed ||= []).concat(documents)
+    backend.index(documents)
+  end
+
+  # The record ids of the documents `index_documents` indexed, in order.
+  def contract_ids = (@contract_indexed || []).map(&:record_id)
+
+  # A suggestion's title, read from the document it names, which this test
+  # indexed: a suggestion carries no text.
+  def title_of(item)
+    document = (@contract_indexed || []).find { |each| [ each.record_type, each.record_id, each.copy_id ] == [ item.record_type, item.record_id, item.copy_id ] }
+    assert document, "a suggestion names a document that was indexed"
+    document.fields.find { |field| field.name == "title" }.text
+  end
+
+  def suggest_query(text, language: "en", now: contract_now, limit: SiteSearch::SUGGEST_LIMIT)
+    SiteSearch::SuggestQuery.new(text: text, language: language, now: now, limit: limit)
+  end
+
+  def suggest_of(text, **options)
+    backend.suggest(suggest_query(text, **options), deadline: far_deadline).tap { |answer| assert_kind_of SiteSearch::Suggestions, answer }.items
+  end
 
   def contract_keys(text, **options) = contract_search(text, **options).hits.map { |hit| hit_key(hit) }
 
@@ -302,6 +324,58 @@ module SiteSearchBackendContract
       index_documents(contract_document(title: "deployment"))
       correction = backend.search(contract_query("deploymnet"), deadline: far_deadline).correction
       assert correction.nil? || (correction.is_a?(String) && correction.length <= SiteSearch::Query::MAX_LENGTH)
+    end
+
+    # `suggest` is optional (`SiteSearch::Backend::OPTIONAL_METHODS`): a
+    # backend without it gives no title suggestions and skips these.
+    test "contract: suggest finds a title by the start of its words, in its language and view only" do
+      skip "the backend offers no suggest" unless backend.respond_to?(:suggest)
+
+      index_documents(contract_document(title: "Zero-downtime deployments"), contract_document(title: "Zero-downtime deployments", language: "de"),
+                      contract_document(title: "Later deployments", shown_from: 1.day.from_now))
+      items = backend.suggest(SiteSearch::SuggestQuery.new(text: "zero deploym", language: "en", now: Time.current, limit: 5), deadline: far_deadline).items
+      assert_equal [ contract_ids.first ], items.map(&:record_id)
+      items.each { |item| assert_kind_of SiteSearch::Suggestion, item }
+      assert_empty suggest_of("ployments"), "a word's middle is no prefix"
+    end
+
+    # The prefix is a visitor's, as typed, never the engine's syntax: a
+    # field name, an operator or a wildcard is a word or nothing. "Wren"
+    # holds no word of any of them, so a prefix read as an instruction
+    # (every document, a field query) shows by finding it.
+    test "contract: a prefix full of an engine's syntax is words" do
+      skip "the backend offers no suggest" unless backend.respond_to?(:suggest)
+
+      index_documents(contract_document(title: "Wren"), contract_document(title: "Lucene notes"), contract_document(title: "Title album"),
+                      contract_document(title: "Xenon comment"))
+      [ "*:*", "a:* & !b", "{!lucene}", "title:al*", %("), "\\", "x -- comment" ].each do |prefix|
+        items = suggest_of(prefix)
+        assert items.all? { |item| title_of(item).downcase.include?(prefix.scan(/[\p{L}\p{N}]+/).first.to_s) }, prefix
+        refute items.any? { |item| title_of(item) == "Wren" }, "#{prefix} suggested a title without its words"
+      end
+      { "{!lucene}" => "Lucene notes", "title:al*" => "Title album", "x -- comment" => "Xenon comment" }.each do |prefix, title|
+        assert_equal [ title ], suggest_of(prefix).map { |item| title_of(item) }, prefix
+      end
+    end
+
+    test "contract: syntax alone suggests nothing" do
+      skip "the backend offers no suggest" unless backend.respond_to?(:suggest)
+
+      index_documents(contract_document(title: "Albatross"))
+      [ "*", ":*", "&|!", "()" ].each { assert_empty suggest_of(_1), _1 }
+    end
+
+    test "contract: suggest answers or raises by its deadline" do
+      skip "the backend offers no suggest" unless backend.respond_to?(:suggest)
+
+      index_documents(contract_document(title: "Albatross"))
+      started = contract_clock
+      begin
+        backend.suggest(suggest_query("albatross"), deadline: contract_clock + 0.2)
+      rescue StandardError
+        nil
+      end
+      assert_operator contract_clock - started, :<, 0.4
     end
 
     test "contract: health answers within the deadline" do

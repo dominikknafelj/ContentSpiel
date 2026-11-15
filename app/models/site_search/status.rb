@@ -19,13 +19,16 @@ module SiteSearch
   #   built-in searches by the text a page contains, with no stemming and no
   #   correction; for the built-in only (an outside engine has its own word
   #   handling).
+  # - `tags_only`: whether the backend answers no `suggest`
+  #   (`Backend::OPTIONAL_METHODS`), so the suggestions while typing offer
+  #   tags alone; never for the built-in.
   #
   # While a build runs the backend is not asked. Otherwise `health` runs in a
   # thread that is waited for `TIMEOUT` seconds and no longer, scrubbed
   # (`Unavailable.scrubbing`: a failure is its class alone), so a backend that
   # ignores its deadline holds neither System status nor the wizard; an answer
   # that did not come in time counts as none.
-  Status = Data.define(:name, :label, :state, :done, :total, :count, :health, :limited)
+  Status = Data.define(:name, :label, :state, :done, :total, :count, :health, :limited, :tags_only)
 
   class Status
     TIMEOUT = 3
@@ -51,7 +54,7 @@ module SiteSearch
       label = Backends.label(name)
       limited = name == Backends::BUILT_IN ? Postgres::LIMITED & Locales.enabled : []
       row = IndexState.for(name)
-      facts = { name:, label:, limited: }
+      facts = { name:, label:, limited:, tags_only: tags_only?(name) }
 
       if row&.building?
         state = row.stopped?(now: now, job_running: job_running.call) ? :stopped : :building
@@ -69,12 +72,21 @@ module SiteSearch
       asked(**facts, row:, timeout:)
     end
 
+    # Asks the object only whether it has the method, never the engine. A
+    # backend that cannot be built says nothing here: the row's own state
+    # says it failed.
+    def self.tags_only?(name)
+      name != Backends::BUILT_IN && !Backends.current.respond_to?(:suggest)
+    rescue StandardError
+      false
+    end
+
     # The thread is abandoned when it does not answer in time, never killed: a
     # killed thread can leave a client's connection half used. It ends when
     # the backend's own call does, so while a backend hangs every visit of
     # System status (or the wizard's check) leaves one thread behind: the leak
     # is bounded by how often those pages are opened, and accepted.
-    def self.asked(name:, label:, limited:, row:, timeout:)
+    def self.asked(name:, label:, limited:, tags_only:, row:, timeout:)
       backend = Backends.current
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
       answer = {}
@@ -86,7 +98,7 @@ module SiteSearch
         answer[:failed] = true
       end
       thread.report_on_exception = false
-      facts = { name:, label:, limited:, done: row&.done, total: row&.total, count: nil, health: nil }
+      facts = { name:, label:, limited:, tags_only:, done: row&.done, total: row&.total, count: nil, health: nil }
       return new(**facts, state: :timeout) unless thread.join(timeout) && answer[:health]
 
       health = answer[:health]
@@ -95,8 +107,8 @@ module SiteSearch
       count = Unavailable.scrubbing(backend: name) { backend.entry_count } if name == Backends::BUILT_IN
       new(**facts, state: :ready, count: count, health: health)
     rescue Unavailable
-      new(name:, label:, state: :timeout, done: nil, total: nil, count: nil, health: nil, limited:)
+      new(name:, label:, state: :timeout, done: nil, total: nil, count: nil, health: nil, limited:, tags_only:)
     end
-    private_class_method :asked
+    private_class_method :tags_only?, :asked
   end
 end

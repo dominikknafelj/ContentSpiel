@@ -73,6 +73,7 @@ module Telemetry
     auth.sso.recheck_run
     search.index
     search.query
+    search.suggest
   ].freeze
 
   ATTRIBUTES = %w[
@@ -109,6 +110,7 @@ module Telemetry
     search.page
     search.close
     search.correction
+    search.suggestions
     server.address
     http.response.status_code
     error.type

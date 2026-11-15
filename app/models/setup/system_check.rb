@@ -475,6 +475,7 @@ module Setup
         t = ->(key, **values) { I18n.t("admin.system_status.search.#{key}", **values) }
         progress = { done: delimited(s.done), total: delimited(s.total) }
         note = (t.call(:limited, languages: s.limited.map { |code| Locales.name(code) }.to_sentence) if s.limited.any?)
+        note ||= (t.call(:tags_only, label: s.label) if s.tags_only)
         label = t.call(:label)
         case s.state
         when :building then Result.new(label:, status: :warning, message: t.call(:building, **progress), note:)

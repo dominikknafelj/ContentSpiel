@@ -17,11 +17,18 @@
 #
 #   SiteSearch::Fake.new(raise_with: RuntimeError.new("…"))  # every method raises it
 #   SiteSearch::Fake.new(sleep_for: 5)                        # slow; past the deadline it raises Timeout::Error at the deadline
+#   SiteSearch::Fake.new(suggests: false)                     # answers no `suggest`, as a backend written for 0.7.0
 #   fake.answer_with(results)                                 # every search answers these
 #   fake.answer_for("albatross", results)                     # a search of this text answers these, before answer_with
 #
-# `documents` is every stored document by key, and `asked` every query
-# searched, in order, for a test to read.
+# SUGGESTIONS (`suggest`, optional in the contract): the documents in
+# view whose title has a word that begins with each word of the prefix,
+# a title that begins with the prefix first, then shorter titles. With
+# `suggests: false` the instance has no `suggest` at all, so
+# `respond_to?(:suggest)` is false.
+#
+# `documents` is every stored document by key, `asked` every query
+# searched and `suggested` every suggest query, in order, for a test to read.
 # `installed { … }` makes this fake the site's backend inside the block, as
 # a gem's would be (registered as "test/fake", chosen by SEARCH_BACKEND).
 class SiteSearch::Fake
@@ -29,13 +36,15 @@ class SiteSearch::Fake
   WORD = /[[:alnum:]]+/
   SNIPPET = 160
 
-  attr_reader :documents, :asked
+  attr_reader :documents, :asked, :suggested
 
-  def initialize(raise_with: nil, sleep_for: nil)
+  def initialize(raise_with: nil, sleep_for: nil, suggests: true)
     @raise_with = raise_with
     @sleep_for = sleep_for
     @documents = {}
     @asked = []
+    @suggested = []
+    singleton_class.undef_method(:suggest) unless suggests
     @answers = {}
     @answer = nil
   end
@@ -109,12 +118,30 @@ class SiteSearch::Fake
     SiteSearch::Results.new(hits: hits, total: matches.size, correction: (correction_of(visible, words) if close))
   end
 
+  def suggest(query, deadline:)
+    trouble!(deadline)
+    @suggested << query
+    words = words_of(query.text).uniq
+    return SiteSearch::Suggestions.new(items: []) if words.empty?
+
+    found = @documents.values.select do |document|
+      title = words_of(title_text(document))
+      document.language == query.language && shown?(document, query.now) && words.all? { |word| title.any? { |each| each.start_with?(word) } }
+    end
+    ordered = found.sort_by { |document| [ title_text(document).downcase.start_with?(query.text.downcase) ? 0 : 1, title_text(document).length, document.key ] }
+    SiteSearch::Suggestions.new(items: ordered.first(query.limit).each_with_index.map do |document, index|
+      SiteSearch::Suggestion.new(record_type: document.record_type, record_id: document.record_id, copy_id: document.copy_id, rank: -index)
+    end)
+  end
+
   def health(deadline:)
     trouble!(deadline)
     SiteSearch::Health.new(status: :ok, detail: nil)
   end
 
   private
+
+  def title_text(document) = document.fields.find { |field| field.name == "title" }&.text.to_s
 
   def shown?(document, now) = document.shown_from <= now && (document.shown_until.nil? || now < document.shown_until)
 
