@@ -5,10 +5,15 @@ module SiteSearch
   # §3.5) is the query with its words corrected, as plain words, offered
   # only on an answer with no exact hit; ContentSpiel verifies it by a
   # search before it is drawn (`SiteSearch.search`), and never trusts it
-  # for visibility.
-  Results = Data.define(:hits, :total, :correction)
+  # for visibility. `close_outcome` is what the backend's close pass did
+  # when it found no close hit, for the `search.close` attribute: nil (it
+  # ran and found none, or the backend has none), `"skipped"` (it ran none:
+  # a language or a query it does not judge) or `"timeout"` (it ran out of
+  # time and the exact answer stands); one of
+  # `SiteSearch::BACKEND_CLOSE_OUTCOMES`.
+  Results = Data.define(:hits, :total, :correction, :close_outcome)
 
   class Results
-    def initialize(hits:, total:, correction: nil) = super
+    def initialize(hits:, total:, correction: nil, close_outcome: nil) = super
   end
 end

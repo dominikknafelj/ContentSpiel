@@ -17,8 +17,10 @@ module SiteSearch
   # and `live_note` whether the block says its results come from the live
   # site (the preview's, spec §7.2). `correction` is the verified corrected
   # search as plain text, or nil (`SiteSearch.search` verifies it), and
-  # `close_matches` whether the backend's hits were all close matches, no
-  # exact hit found (spec §8.1), read from its hits before the re-check.
+  # `close_matches` whether the block says its results are close matches
+  # (spec §8.1): on page 1 only, when its first hit is close (no close hit
+  # stands before an exact one, so none was found), read from the backend's
+  # hits before the re-check; a later page does not say it again.
   Answer = Data.define(:query, :state, :results, :total, :pagination, :live_note, :correction, :close_matches)
 
   class Answer
@@ -47,7 +49,7 @@ module SiteSearch
       pagination = Pagination.new(page: asked.page, per_page: PER_PAGE, total: found.total)
       new(query: text, state: found.total.zero? ? :none : :results, results: Shown.for(found, locale: locale, now: now),
         total: found.total, pagination: pagination, live_note: live_note, correction: found.correction,
-        close_matches: found.hits.any? && found.hits.all?(&:close))
+        close_matches: asked.page == 1 && found.hits.first&.close == true)
     end
 
     def live_note? = live_note == true

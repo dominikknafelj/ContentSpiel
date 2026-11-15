@@ -12,7 +12,8 @@
 # (a letter changed, added or dropped, or two neighbours swapped) is a
 # close hit; and the answer's `correction` is the query's words with each
 # that no document in view holds replaced by its first close word (in
-# order), nil when none changed.
+# order), nil when none changed. Its words leave out the `code` field, as
+# the built-in's vocabulary does.
 #
 #   SiteSearch::Fake.new(raise_with: RuntimeError.new("…"))  # every method raises it
 #   SiteSearch::Fake.new(sleep_for: 5)                        # slow; past the deadline it raises Timeout::Error at the deadline
@@ -140,10 +141,11 @@ class SiteSearch::Fake
     end
   end
 
-  # The words, each that no visible document holds replaced by the first
-  # word of theirs one edit from it; nil when no word changed.
+  # The words, each that no visible document holds outside its code
+  # replaced by the first such word one edit from it; nil when no word
+  # changed.
   def correction_of(documents, words)
-    known = documents.flat_map { |document| document.fields.flat_map { |field| words_of(field.text) } }.uniq
+    known = documents.flat_map { |document| document.fields.reject { |field| field.name == "code" }.flat_map { |field| words_of(field.text) } }.uniq
     corrected = words.map { |word| known.include?(word) ? word : known.find { |each| one_edit?(each, word) } || word }
     corrected.join(" ") unless corrected == words
   end

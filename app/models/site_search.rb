@@ -36,6 +36,10 @@ module SiteSearch
   # standing.
   CLOSE_OUTCOMES = %w[none found skipped timeout].freeze
 
+  # The outcomes a backend may answer itself (`Results#close_outcome`):
+  # the rest ContentSpiel reads from the query and the hits.
+  BACKEND_CLOSE_OUTCOMES = %w[skipped timeout].freeze
+
   module_function
 
   # The one caller of a backend's `search` (spec §5.7): the chosen backend's
@@ -51,22 +55,29 @@ module SiteSearch
   # the query or the correction (spec §9).
   #
   # ONE DEADLINE, `TIMEOUT` from here, holds the search and its verifying
-  # search. `search.close` is written before the backend is asked, so a
-  # backend may write its own outcome (`timeout`, `skipped`) on the current
-  # span while it answers a query whose `close_matches` is true; a close hit
-  # in the answer makes it `found`.
+  # search. The span is ContentSpiel's alone: a backend says what its close
+  # pass did in its answer (`Results#close_outcome`), never on the span.
   def search(query)
     backend = Backends.current_name
     deadline = clock + TIMEOUT
-    close = query.close_matches ? "none" : "skipped"
-    Telemetry.in_span("search.query", attributes: { "search.backend" => backend, "search.page" => query.page, "search.close" => close }) do |span|
+    Telemetry.in_span("search.query", attributes: { "search.backend" => backend, "search.page" => query.page }) do |span|
       answer = ask(query, backend, deadline)
       answer = verified(query, answer, deadline: deadline) unless answer == UNAVAILABLE
       Telemetry.record(span, "search.outcome" => outcome_of(answer), "search.results" => answer == UNAVAILABLE ? 0 : answer.total,
-        "search.correction" => answer != UNAVAILABLE && !answer.correction.nil?)
-      Telemetry.record(span, "search.close" => "found") if answer != UNAVAILABLE && answer.hits.any?(&:close)
+        "search.close" => close_of(query, answer), "search.correction" => answer != UNAVAILABLE && !answer.correction.nil?)
       answer
     end
+  end
+
+  # `search.close` (`CLOSE_OUTCOMES`), read from the verified answer:
+  # `skipped` for a query without `close_matches`, `found` when a hit is
+  # close, else the backend's own `close_outcome`, else `none`.
+  def close_of(query, answer)
+    return "skipped" unless query.close_matches
+    return "none" if answer == UNAVAILABLE
+    return "found" if answer.hits.any?(&:close)
+
+    answer.close_outcome || "none"
   end
 
   # The backend's answer, or `UNAVAILABLE` with the failure reported. An
@@ -92,26 +103,36 @@ module SiteSearch
   # engine's spellcheck reads its whole index, scheduled copies included,
   # and the built-in's vocabulary keeps a word a pending or purged copy
   # held, so this search is what keeps a word that is not public yet from
-  # being offered. A correction is weighed only on an answer with no exact
-  # hit. It is normalised as typed text is (`Query.normalise`) and
-  # dropped, unasked, when it is blank, longer than `Query::MAX_LENGTH`,
-  # the query again ignoring case, or made of syntax (no letter or digit,
-  # as `*:*`: that an engine escapes it to nothing is not relied on); and
-  # when no time is left. Otherwise one exact search (`close_matches: false`, page 1, one
-  # hit) in the query's language and view, under the same deadline, must
-  # answer an exact hit that `Shown` keeps. A verifying search that fails
-  # is reported as any failure and drops the correction; the answer stands.
+  # being offered. A verifying search that fails is reported as any
+  # failure and drops the correction; the answer stands.
   def verified(query, results, deadline:)
     return results if results.correction.nil?
 
-    text = Query.normalise(results.correction)
-    keep = text && results.hits.all?(&:close) && correction_text?(text, query) && clock < deadline &&
-      shown_exact?(query.with(text: text, page: 1, per_page: 1, close_matches: false), deadline)
-    results.with(correction: (text if keep))
+    results.with(correction: kept_correction(query, results, deadline))
   end
 
-  def correction_text?(text, query)
-    text.length <= Query::MAX_LENGTH && !text.casecmp?(query.text) && text.match?(/[\p{L}\p{N}]/)
+  # The correction normalised (`Query.normalise`), or nil, the cheap
+  # checks first and the verifying search last. It is weighed only on the
+  # first page of an answer with no exact hit: one with no match at all
+  # (`total` 0, on any page), or a page 1 whose first hit is close (no close
+  # hit stands before an exact one, so it holds none); never on a later
+  # page, nor on an empty page past the end of exact hits. It is dropped,
+  # unasked, when it is blank, longer than `Query::MAX_LENGTH`, the query
+  # again ignoring case, or made of syntax (no letter or digit, as `*:*`:
+  # that an engine escapes it to nothing is not relied on), and when no
+  # time is left. Otherwise one exact search (`close_matches: false`, page
+  # 1, one hit) in the query's language and view, under the same deadline,
+  # must answer an exact hit that `Shown` keeps.
+  def kept_correction(query, results, deadline)
+    return nil unless results.total.zero? || (query.page == 1 && results.hits.first&.close == true)
+
+    text = Query.normalise(results.correction)
+    return nil if text.nil? || text.length > Query::MAX_LENGTH
+    return nil if text.casecmp?(query.text) || !text.match?(/[\p{L}\p{N}]/)
+    return nil if clock >= deadline
+    return nil unless shown_exact?(query.with(text: text, page: 1, per_page: 1, close_matches: false), deadline)
+
+    text
   end
 
   def shown_exact?(query, deadline)
@@ -124,13 +145,15 @@ module SiteSearch
   # `results` when it is what the contract says (`SiteSearch::Results`, an
   # Integer total from 0 below `MAX_TOTAL`, an Array of `SiteSearch::Hit`s
   # with Integer ids and a Boolean `close`, each snippet nil or plain text
-  # with `[start, length]` pairs of Integers, a correction nil or a String);
+  # with `[start, length]` pairs of Integers, a correction nil or a String,
+  # a close outcome nil or one of `BACKEND_CLOSE_OUTCOMES`);
   # raises `TypeError` otherwise, which the caller scrubs to its class.
   def checked(results)
     raise TypeError, "a search backend answers SiteSearch::Results" unless results.is_a?(Results)
     raise TypeError, "a total is an Integer from 0 below 2**53" unless results.total.is_a?(Integer) && (0...MAX_TOTAL).cover?(results.total)
     raise TypeError, "hits are an Array" unless results.hits.is_a?(Array)
     raise TypeError, "a correction is nil or a String" unless results.correction.nil? || results.correction.is_a?(String)
+    raise TypeError, "a close outcome is nil, skipped or timeout" unless results.close_outcome.nil? || BACKEND_CLOSE_OUTCOMES.include?(results.close_outcome)
 
     results.hits.each do |hit|
       raise TypeError, "a hit is a SiteSearch::Hit with Integer ids" unless hit.is_a?(Hit) && hit.record_id.is_a?(Integer) && hit.copy_id.is_a?(Integer)
@@ -190,5 +213,5 @@ module SiteSearch
   # video or a rule ("[image]"), which are no words of the page.
   def paragraphs(document) = document.plain_paragraphs - RichText::Document::PLAIN_PLACEHOLDERS.values
 
-  private_class_method :ask, :verified, :correction_text?, :shown_exact?, :checked, :snippet?, :cut_snippets, :outcome_of, :clock
+  private_class_method :ask, :close_of, :verified, :kept_correction, :shown_exact?, :checked, :snippet?, :cut_snippets, :outcome_of, :clock
 end

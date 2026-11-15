@@ -324,14 +324,34 @@ class SiteSearchTest < ActiveSupport::TestCase
     end
   end
 
-  test "close_matches? is true when every hit is close" do
+  test "a close outcome that is not nil, skipped or timeout is unavailable" do
+    [ "found", "none", :timeout, "late" ].each do |bad|
+      assert_equal SiteSearch::UNAVAILABLE, search_with_answer(SiteSearch::Results.new(hits: [], total: 0, close_outcome: bad)), bad.inspect
+    end
+  end
+
+  # The correction and the close-matches sentence are decided on page 1
+  # (or on an answer with no match at all), never again on a later page.
+  test "close_matches? and the correction are page 1's when its first hit is close" do
     close = hit_with(close: true)
     exact = hit_with(close: false)
     SiteSearch::Fake.new.installed do |fake|
-      fake.answer_with(close)
-      assert answer_for("albatros").close_matches?
-      fake.answer_with(SiteSearch::Results.new(hits: close.hits + exact.hits, total: 2))
-      assert_not answer_for("albatros").close_matches?
+      fake.answer_with(close.with(correction: "albatross"))
+      fake.answer_for("albatross", exact_hit_of(published_page))
+      first = answer_for("albatros")
+      assert first.close_matches?
+      assert_equal "albatross", first.correction
+
+      fake.answer_with(SiteSearch::Results.new(hits: exact.hits + close.hits, total: 2, correction: "albatross"))
+      mixed = answer_for("albatros")
+      assert_not mixed.close_matches?, "an exact hit first"
+      assert_nil mixed.correction
+
+      fake.answer_with(SiteSearch::Results.new(hits: close.hits, total: 12, correction: "albatross"))
+      later = answer_for("albatros", page: 2)
+      assert_not later.close_matches?, "page 2 of a mixed list, all close after page 1's exact hits"
+      assert_nil later.correction
+
       fake.answer_with(SiteSearch::Results.new(hits: [], total: 0))
       assert_not answer_for("albatros").close_matches?
     end
@@ -339,30 +359,48 @@ class SiteSearchTest < ActiveSupport::TestCase
     assert_nil answer_for(nil).correction
   end
 
+  test "an empty page past the end of a list offers no correction" do
+    SiteSearch::Fake.new.installed do |fake|
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 5, correction: "albatross"))
+      fake.answer_for("albatross", exact_hit_of(published_page))
+      assert_nil SiteSearch.search(query("albatros", page: 3)).correction
+      assert_equal [ "albatros" ], fake.asked.map(&:text), "no verifying search"
+    end
+  end
+
+  test "an answer with no match at all is weighed on any page" do
+    SiteSearch::Fake.new.installed do |fake|
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, correction: "albatross"))
+      fake.answer_for("albatross", exact_hit_of(published_page))
+      assert_equal "albatross", SiteSearch.search(query("albatros", page: 3)).correction
+    end
+  end
+
   test "search.query records search.close and search.correction, never the query" do
     span = recorded_span("search.query") { answer_for("albatros") }
     assert_includes SiteSearch::CLOSE_OUTCOMES, span.attributes["search.close"]
     assert_includes [ true, false ], span.attributes["search.correction"]
-    refute_includes span.attributes.values.map(&:to_s), "albatros"
+    assert_not_includes written(@exporter.finished_spans), "albatros"
   end
 
-  test "search.close is skipped without close_matches, found with a close hit, and a backend's own otherwise" do
+  # The span is ContentSpiel's alone: a backend says what its close pass
+  # did in its answer, and `search.close` is read from that.
+  test "search.close is skipped without close_matches, found with a close hit, the backend's outcome, else none" do
     assert_equal %w[none found skipped timeout], SiteSearch::CLOSE_OUTCOMES
     closes = {}
     SiteSearch::Fake.new.installed do |fake|
+      closes[:none] = recorded_span("search.query") { SiteSearch.search(query) }
       closes[:skipped] = recorded_span("search.query") { SiteSearch.search(query.with(close_matches: false)) }
-      fake.answer_with(hit_with(close: true))
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, close_outcome: "timeout"))
+      closes[:timeout] = recorded_span("search.query") { SiteSearch.search(query) }
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, close_outcome: "skipped"))
+      closes[:skipped_by_backend] = recorded_span("search.query") { SiteSearch.search(query) }
+      fake.answer_with(hit_with(close: true).with(close_outcome: "timeout"))
       closes[:found] = recorded_span("search.query") { SiteSearch.search(query) }
     end
-    timing_out = Class.new(SiteSearch::Fake) do
-      def search(query, deadline:)
-        OpenTelemetry::Trace.current_span.set_attribute("search.close", "timeout")
-        super
-      end
-    end
-    timing_out.new.installed { closes[:timeout] = recorded_span("search.query") { SiteSearch.search(query) } }
 
-    assert_equal({ skipped: "skipped", found: "found", timeout: "timeout" }, closes.transform_values { |span| span.attributes["search.close"] })
+    assert_equal({ none: "none", skipped: "skipped", timeout: "timeout", skipped_by_backend: "skipped", found: "found" },
+      closes.transform_values { |span| span.attributes["search.close"] })
   end
 
   test "search.correction is true when a correction is drawn" do
@@ -379,7 +417,7 @@ class SiteSearchTest < ActiveSupport::TestCase
 
   private
 
-  def answer_for(text) = SiteSearch::Answer.for(raw_query: text, raw_page: nil, locale: :en, limited: false, live_note: false)
+  def answer_for(text, page: nil) = SiteSearch::Answer.for(raw_query: text, raw_page: page, locale: :en, limited: false, live_note: false)
 
   def published_page = @published_page ||= create_page(title: "Albatross")
 

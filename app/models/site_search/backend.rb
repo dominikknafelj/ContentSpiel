@@ -64,11 +64,11 @@ module SiteSearch
   #   it when blank, too long, the query again or made of no words, and
   #   draws it only when a search for it finds a page a visitor sees now
   #   (`SiteSearch.search`): a correction is never trusted for visibility.
-  #   A backend that runs a close pass may write its outcome on the current
-  #   span, `OpenTelemetry::Trace.current_span.set_attribute("search.close",
-  #   outcome)` with an outcome of `SiteSearch::CLOSE_OUTCOMES` (`timeout`
-  #   when its pass ran out of time and the exact answer stands, `skipped`
-  #   when it ran none), and only on a query whose `close_matches` is true.
+  #   `Results#close_outcome` says what a close pass did when it found no
+  #   close hit: nil (none found, or no close pass at all), `"timeout"`
+  #   (out of time, the exact answer standing) or `"skipped"` (it ran none);
+  #   anything else is an answer of the wrong shape. A backend never writes
+  #   on ContentSpiel's span: `search.close` is read from the answer.
   # - `health(deadline:)` answers `SiteSearch::Health`: `status` `:ok`,
   #   `:warn` or `:failed`, and `detail` one plain sentence for a person or
   #   nil. System status shows the detail as it is handed (its first line,

@@ -66,7 +66,13 @@ class SiteSearch::FakeTest < ActiveSupport::TestCase
     assert_nil results.correction
   end
 
-  test "answer_with, answer_for and asked, for the callers' tests" do
+  test "a correction leaves out the code field's words, as the built-in's vocabulary does" do
+    backend.index([ contract_document(title: "Notes", code: "kubectl apply") ])
+
+    assert_nil backend.search(query("kubectk"), deadline: deadline_in(1)).correction
+  end
+
+    test "answer_with, answer_for and asked, for the callers' tests" do
     fake = SiteSearch::Fake.new
     everything = SiteSearch::Results.new(hits: [], total: 7)
     albatross = SiteSearch::Results.new(hits: [], total: 1)
