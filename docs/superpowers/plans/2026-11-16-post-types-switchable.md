@@ -229,37 +229,42 @@
 
 ## Part two: after the cards (D1 to D8)
 
+**The design answered** in the Design System's card StudioPostTypes (v241, `1794784635-1aa4`): spec §16 carries every word, tone and component; it wins over §11/§12 and this plan on a word or a look. In short: D1 section family `lists`, icon `posts`, `.cs-toggle` switches with `role="switch"`, a `36px 1fr auto` row, the "For a personal site" band; D2 the "leaving" (warn) and "returning" (neutral) compact notices, shown by CSS from `data-stored` with **no controller and no script**; D3 `ListStateComponent` draws the off chip first, the path line "Not on the site"; D4 a neutral notice replacing the view-only hint, with a `settings.manage` variant; D5 one word "Switched off", `Admin::Ui::TypeStateComponent` (the off `StateChipComponent`, key `admin.components.ui.type_state.switched_off`) where markup fits and "%{label} (switched off)" where only text fits; D6 a compact warn notice under the select; D7 the hub card's chip and line, the list row's chip in place of the count, a `PartsComponent` clone; D8 a neutral Badge.
+
 ### Task 8: Settings › Post types
 
 **Files:**
-- Modify: `app/values/settings_sections.rb` (`post_types`, `settings.manage`, after `languages`; family and icon from D1)
+- Modify: `app/values/settings_sections.rb` (`post_types`, `settings.manage`, after `languages`; family `lists`, icon `posts`)
 - Create: `app/components/admin/settings_screen/post_types_card_component.{rb,html.erb}`
 - Modify: `app/views/admin/settings/show.html.erb` (the card, its counts handed in), `app/controllers/admin/settings_controller.rb` (permit `content_types: []`; read the counts once), `app/components/admin/settings_screen/values.rb` (the field's typed value and changed mark)
 - Modify: `app/queries/jump/search.rb` (`SETTINGS_TITLES["post_types"] = "Settings › Post types"`)
 - Modify: `config/locales/admin/settings_screen.en.yml`
-- Create only if D2 needs a script: `app/javascript/controllers/admin/settings/post_types_controller.js` (`admin--settings--post-types`)
+- Modify: the admin stylesheet that holds `.cs-toggle` (`app/assets/tailwind/…`): the two `:has()` rules of spec §16.3 that show a row's leaving/returning line. No controller, no script (D2).
+- Modify: `test/support/design_system_entries.rb` (`StudioPostTypes` in `ENTRIES`, `VERSION = "1794784635-1aa4"`)
 - Test: `test/components/admin/settings_screen/post_types_card_component_test.rb`, `test/values/settings_sections_test.rb`, `test/integration/admin/settings_test.rb`, `test/integration/admin/settings_post_types_test.rb` (create), `test/queries/jump/search_test.rb`, `test/integration/trash_visibility_test.rb`
 
 **Interfaces:**
 - Produces: `Admin::SettingsScreen::PostTypesCardComponent.new(section:, site_setting:, counts:)`, `counts` a `Hash{String=>Integer}` of kept readable posts per type.
 
 - [ ] **Step 1: Write the failing tests.**
-  - card: `test "a row per declared type: dot, label, description and the switch, ungrouped first, then the personal-site pair under its heading"`; `test "a hidden empty value precedes the checkboxes"`; `test "the post count says 12 posts, 1 post, or nothing"`; `test "an undeclared stored name draws no row"`; `test "a switched-on type with posts carries the line it says when unticked"` (D2's words).
+  - card: `test "a row per declared type: dot, label, description and the switch, ungrouped first, then the personal-site pair under its heading"`; `test "a hidden empty value precedes the checkboxes"`; `test "the post count says 12 posts, 1 post, or nothing"`; `test "an undeclared stored name draws no row"`; `test "a switched-on type with posts carries the line it says when unticked"` and `test "a switched-off type with posts carries the line it says when ticked"` (D2's words, `hidden`, `data-stored`, in the switch's `aria-describedby`); `test "the switch is a role=switch .cs-toggle named by the type's label"`; and a stylesheet assertion that the two `:has()` rules exist.
   - `settings_post_types_test.rb`: `test "the card saves the switch with the save bar and needs settings.manage"`; `test "unticking every type answers 422 with the error on the card"`; `test "the counts are the viewer's readable kept posts, in one statement"`.
   - `trash_visibility_test.rb`: `test "the Post types card counts no trashed post"`.
   - `settings_sections_test.rb`, `settings_test.rb` ("every card is drawn by the card frame, in the nav's order…"), `search_test.rb` ("the Settings rows are SettingsSections'…") take the ninth section.
 - [ ] **Step 2:** run → FAIL.
 - [ ] **Step 3: Implement** per spec §11 and the D1/D2 cards; counts: `AccessControl.scope(actor, "posts.read", Post.kept).group(:content_type).count`.
-- [ ] **Step 4:** run Step 2's files and `test/components/admin/settings_screen/ test/lib/admin_i18n_test.rb test/lib/component_screens_test.rb test/lib/source_layout_test.rb` → PASS. A script added for D2 gets its browser test in `test/system/admin/settings_test.rb`, run alone.
+- [ ] **Step 4:** run Step 2's files and `test/components/admin/settings_screen/ test/lib/admin_i18n_test.rb test/lib/component_screens_test.rb test/lib/source_layout_test.rb test/lib/component_parts_test.rb` → PASS. No browser test (no script).
 - [ ] **Step 5: Commit** `feat: Settings › Post types`.
 
 ### Task 9: The marks of a dormant type in the posts list, the editor and the block card
 
 **Files:**
 - Modify: `app/queries/posts/list.rb` (`#types_present -> Array<String>`, one statement over the read-scoped kept posts), `app/controllers/admin/posts_controller.rb:33` (the filter's types: switched on, then `types_present` off ones; leaves `DECLARED_READERS`)
-- Modify: `app/components/admin/posts_screen/toolbar_component.*`, `table_component.*` (D3, D5)
-- Modify: `app/components/admin/editor_screen/post_form_component.*` or `header_component.*` (D4's notice, its link for `settings.manage`)
-- Modify: the Post list block's card through `content_type_field` (D6's line)
+- Create: `app/components/admin/ui/type_state_component.rb` (`Admin::Ui::TypeStateComponent.new(post:)` or `(name:)`: the off `StateChipComponent` "Switched off" for a switched-off or undeclared type, nothing otherwise; the full component contract; `COVERED_BY` → `StudioPostTypes` in `test/support/design_system_entries.rb`; its key in `config/locales/admin/ui.en.yml`)
+- Modify: `app/components/admin/ui/list_state_component.*` (the type chip first, D3)
+- Modify: `app/components/admin/posts_screen/toolbar_component.*`, `table_component.*` (D3: the filter's suffix, the path line "Not on the site")
+- Modify: `app/components/admin/editor_screen/header_component.*` (D4: the chip after the type in row 2) and the place the view-only hint is drawn (D4's neutral notice in its place, keys `admin.components.editor_screen.switched_off.*`, its link to Settings' `#post_types` for `settings.manage`)
+- Modify: the Post list block's card through `content_type_field` (D6: the compact warn notice `list_empty` under the select, in its `aria-describedby`, with the Settings link for `settings.manage`)
 - Modify: `config/locales/admin/posts.en.yml` ("Choose a content type…" → "post type"), `posts_screen.en.yml`, `editor_screen.en.yml`, `fields.en.yml`
 - Test: `test/queries/posts/list_test.rb`, `test/components/admin/posts_screen/toolbar_component_test.rb`, `table_component_test.rb`, `test/components/admin/editor_screen/post_form_component_test.rb`, `test/integration/admin/posts_test.rb`, `test/integration/trash_visibility_test.rb`
 
@@ -272,7 +277,7 @@
 **Files:**
 - Modify: `app/components/admin/groups_screen/scope_editor_component.*`, `permission_row_component.*` (D8; behaviour unchanged)
 - Modify: `config/locales/admin/groups_screen.en.yml` (`dormant`, `all_types`, `types`: "content type" → "post type")
-- Modify: `app/queries/post_graph/builder.rb` (the type hub carries `switched_on: Boolean` in its data), `app/components/admin/mind_graph_screen/` and `app/javascript/mind_graph/card.js` (D7), `config/locales/admin/mind_graph.en.yml`
+- Modify: `app/queries/post_graph/builder.rb` (the type hub carries `switched_on: Boolean` in its data), `app/components/admin/mind_graph_screen/parts_component.*` (the off chip in the parts, D7) and its markup test, `app/javascript/mind_graph/` (the card's chip and line, the list row's chip in place of the count), `config/locales/admin/mind_graph.en.yml`
 - Test: `test/components/admin/groups_screen/scope_editor_component_test.rb`, `permission_row_component_test.rb`, `test/queries/post_graph/builder_test.rb`, the Mind graph's component tests
 
 - [ ] **Step 1: Write the failing tests:** `test "a switched-off type is offered with its mark and a grant scoped to it stays live"`; `test "the permission row marks a switched-off type's chip"`; `test "a switched-off type's hub says so, and an undeclared one stays retired"`.

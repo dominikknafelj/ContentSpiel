@@ -602,3 +602,150 @@ Only the owner can answer:
 3. On upgrade, should an existing site whose Resume entry and Now update hold
    no posts get them switched off instead of on? The decision as given keeps
    every type on; this spec follows it.
+
+## 16. The design's answers (Design System v241, `1794784635-1aa4`)
+
+The design agent answered D1 to D8 in the card **StudioPostTypes** of the CMS
+Design System (https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT, version
+`1794784635-1aa4`), with pointers in StudioSettings, StateChip, RecordState,
+StudioListTable, StudioFilterBar, StudioEditorHeader, StudioBlockCard,
+StudioMindGraph and StudioGroups, all "Decided, not built (#114)". Where this
+section and §11 or §12 differ on a word or a look, this section wins; on
+behaviour, §1 to §11 do. The owner's answers to §15: the `content_types` hook
+is **not** part of #114 (its own issue, named in the pull request as a
+follow-up); a site keeps at least one type on; an existing site keeps every
+type on at upgrade, even with no posts of a type.
+
+### 16.1 D5, the one word: "Switched off"
+
+- Where markup fits, the type's name (`Admin::Ui::ContentTypeDotComponent`, dot
+  and label) and after it the off state chip,
+  `Admin::Ui::StateChipComponent.new(tone: :off, label:)` reading **"Switched
+  off"**: the posts list's Status cell, the editor header, the Mind graph's hub
+  card and its list row. A type's state is the site's configuration, so it is
+  the system's state chip, never a status chip and never warn. The word is one
+  key for every caller, `admin.components.ui.type_state.switched_off`, read by
+  one shared component, `Admin::Ui::TypeStateComponent` (renders the chip for a
+  switched-off type, nothing otherwise; its card is StudioPostTypes).
+- Where only text fits (a native `<option>`, a Badge's words): the suffix
+  **"%{label} (switched off)"**: the posts filter's Type, the Post list block's
+  select, the Groups scope chips and scope box.
+- The dot keeps its hue. Words: "switched on" / "switched off" everywhere,
+  never "disabled", "inactive", "hidden" or "dormant" (the code's word).
+  "Retired type" and "this type no longer exists" stay for an undeclared type.
+
+### 16.2 D1, Settings › Post types
+
+- Section `post_types`, family `lists`, icon `posts`, after Languages and
+  before Publishing, `settings.manage`; ⌘K "Settings › Post types"; no At a
+  glance row; toast "Settings saved".
+- `Admin::Ui::SettingsCardComponent`, heading "Post types", intro "The kinds of
+  post this site has. Switching a type off takes its posts off the site and
+  keeps them." No `head_end`.
+- A row (`Admin::SettingsScreen::PostTypesCardComponent`): a grid
+  `36px 1fr auto`, `gap-x-3`, `py-3`, divided by `cs-line`:
+  1. the switch: the `.cs-toggle` look (ChoiceFields) on the checkbox
+     `site_setting[content_types][]`, `role="switch"`;
+  2. the type's dot and label (14px, weight 500; the `<label for>` of the
+     switch), under it the description (`text-small cs-dim`, the switch's
+     `aria-describedby`); no description, no line;
+  3. the count, "12 posts" / "1 post", `text-small cs-meta`, right-aligned,
+     nothing at 0.
+- Group heading "For a personal site": a band on `cs-paper` across the card
+  (`-mx-4 px-4 py-1.5`), `text-label cs-meta`, as the permission matrix's area
+  bands. Ungrouped types first. No "switch both on" control.
+- The refused save: "Keep at least one post type switched on." in
+  `text-small cs-danger-ink` under the last row, and in the error summary.
+
+### 16.3 D2, what an unsaved switch will do
+
+- Turning off a type with posts: under its description,
+  `NoticeComponent.new(tone: :warn, size: :compact, role: nil)`: "Its 6 posts
+  leave the site when you save. They are kept, and come back when you switch it
+  on again." (one: "Its 1 post leaves the site when you save. It is kept, and
+  comes back when you switch it on again.").
+- Turning on a type with posts: the neutral compact notice "Its 6 posts come
+  back to the site when you save." (one: "Its 1 post comes back to the site when
+  you save.").
+- Both server-drawn, `hidden` at rest, shown by CSS with **no controller**: the
+  row carries `data-stored="on|off"`, and the rules are
+  `[data-stored="on"]:has(.cs-toggle:not(:checked)) .…__leaving` and
+  `[data-stored="off"]:has(.cs-toggle:checked) .…__returning`. A type with 0
+  posts draws neither. Each line is in the switch's `aria-describedby`.
+
+### 16.4 D3, the posts list
+
+- Status cell: `Admin::Ui::ListStateComponent` draws the type's off chip first,
+  then the record's own chips (Draft, Scheduled, Unpublished changes); a live
+  dormant post shows "Switched off" alone. The mark joins `ListStateComponent`,
+  never the list's template.
+- The path line under the title reads "Not on the site" (`cs-meta`).
+- The Type cell is unchanged.
+- The filter's Type: "All", the switched-on types, then each switched-off type
+  with posts the viewer may read, as "Resume entry (switched off)"
+  (`admin.components.posts_screen.toolbar.switched_off`). No optgroup.
+
+### 16.5 D4, the editor
+
+- Header row 2: "View only" (the dashed badge), the type's dot and name, then
+  the off chip.
+- Above the form, in the place of the view-only hint and replacing it for this
+  cause, `NoticeComponent.new(tone: :neutral)` (role `note`):
+  - holder of `settings.manage`: "Resume entry is switched off. Its posts are
+    kept, and are not on the site. Switch it on to change this post. **Open
+    Post types settings →**", linking to Settings' `#post_types`;
+  - anyone else: the first two sentences, then "Someone who manages Settings
+    can switch it on."
+  - keys `admin.components.editor_screen.switched_off.{body,change,ask,open_settings}`
+    ("%{type} is switched off. Its posts are kept, and are not on the site.",
+    "Switch it on to change this post.", "Someone who manages Settings can
+    switch it on.", "Open Post types settings →").
+- Trash stays in the ⋯ menu; Notes stay open; no publishing action.
+
+### 16.6 D6, the Post list block's card
+
+- The select offers the switched-on types; a stored switched-off or undeclared
+  value is the selected option "Resume entry (switched off)".
+- Under it (8px), `NoticeComponent.new(tone: :warn, size: :compact, role:
+  nil)`: "This list shows nothing on the site while %{type} is switched off."
+  (`admin.components.fields.content_type.list_empty`), plus " **Open Post types
+  settings →**" for a holder of `settings.manage`; in the select's
+  `aria-describedby`. No line for a switched-on value.
+
+### 16.7 D7, the Mind graph
+
+- Hub card: under the title, the off chip, then a `text-small cs-dim` line:
+  one "Its 1 post is kept and is not on the site, so no list links to it." /
+  other "Its %{count} posts are kept and are not on the site, so no list links
+  to them." / zero "It has no posts."
+- List row (Post types group): the off chip at the row's end, replacing the
+  count.
+- The chip is a clone from `PartsComponent`'s template (`mind_graph/parts.js`),
+  as the status chips are, added to the parts and to the parts' markup test.
+- The canvas is unchanged: no legend entry; the missing dotted lines say it.
+
+### 16.8 D8, the Groups screen
+
+- Permission row chips and the scope editor's box: the neutral
+  `BadgeComponent`, the type's dot as its mark, "Resume entry (switched off)"
+  (`admin.components.groups_screen.matrix.switched_off_type`, "%{name}
+  (switched off)"). Neutral: the grant is live. Warn and "%{name} · this type no
+  longer exists" stay for an undeclared type.
+
+### 16.9 Words and keys
+
+The card's keys are written where this codebase's scoping puts them (a
+component's key is `admin.components.<its folder>.<its name>.<leaf>`), with the
+card's leaf names and English verbatim: the Settings card's `intro`, `count`
+(one/other), `leaving` and `returning` (one/other) under
+`admin.components.settings_screen.post_types_card`; the section name
+`admin.components.settings_screen.sections.post_types`;
+`admin.content_types.groups.personal_site` "For a personal site"; the three
+descriptions of §9.4, confirmed as written.
+
+### 16.10 The Design System's copy
+
+`test/support/design_system_entries.rb` gains `StudioPostTypes` in `ENTRIES`,
+`Admin::Ui::TypeStateComponent => "StudioPostTypes"` in `COVERED_BY`, and
+`VERSION` `1794784635-1aa4`. Cards other branches add (Gif, ImageViewer) are
+theirs; a merge with main brings them.
