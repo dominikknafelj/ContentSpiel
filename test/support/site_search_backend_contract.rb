@@ -140,6 +140,19 @@ module SiteSearchBackendContract
       assert_empty contract_search("walrus").hits
     end
 
+    # ContentSpiel checks a correction by an exact search of it
+    # (`SiteSearch.kept_correction`): an engine that found a document by
+    # any one word would pass a correction whose other word only a hidden
+    # copy holds.
+    test "contract: a document is found only when it holds every word of the query" do
+      both = contract_document(title: "Albatross harbour")
+      one = contract_document(title: "Harbour notes")
+      index_documents(both, one)
+      assert_equal [ both.key ], contract_keys("albatross harbour")
+      assert_equal 1, contract_search("albatross harbour").total
+      assert_empty contract_search("albatross walrus").hits, "a word no document holds finds nothing"
+    end
+
     test "contract: the title outranks the body" do
       in_body = contract_document(title: "Harbour notes", body: "a kayak on the water")
       in_title = contract_document(title: "Kayak", body: "water")
@@ -332,7 +345,7 @@ module SiteSearchBackendContract
       skip "the backend offers no suggest" unless backend.respond_to?(:suggest)
 
       index_documents(contract_document(title: "Zero-downtime deployments"), contract_document(title: "Zero-downtime deployments", language: "de"),
-                      contract_document(title: "Later deployments", shown_from: 1.day.from_now))
+                      contract_document(title: "Zero-downtime later deployments", shown_from: 1.day.from_now))
       items = backend.suggest(SiteSearch::SuggestQuery.new(text: "zero deploym", language: "en", now: Time.current, limit: 5), deadline: far_deadline).items
       assert_equal [ contract_ids.first ], items.map(&:record_id)
       items.each { |item| assert_kind_of SiteSearch::Suggestion, item }

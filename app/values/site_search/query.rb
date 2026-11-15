@@ -16,13 +16,19 @@ module SiteSearch
 
     MARKERS = /[\u{E000}\u{E001}]/
     CONTROL = /[[:cntrl:]]/
+    # The bidi controls (marks, embeddings, overrides, isolates) and the
+    # zero-width space and no-break space, which could make an echoed
+    # query read as other text; never the joiners (U+200C, U+200D), which
+    # words and emoji sequences are written with.
+    INVISIBLE = /[\u{061C}\u{200B}\u{200E}\u{200F}\u{202A}-\u{202E}\u{2066}-\u{2069}\u{FEFF}]/
 
     def initialize(text:, language:, page:, per_page:, now:, close_matches: true) = super
 
     # `raw` as one line of words, or nil when nothing is left of it: nil for
     # anything but a String (`?q[]=a` is a parameter's Array). Invalid bytes,
     # the snippet's two marker characters (spec §6.4, which would land in the
-    # marked text) and control characters are taken out after whitespace is
+    # marked text), control characters and the invisible ones (`INVISIBLE`)
+    # are taken out after whitespace is
     # collapsed, so a newline between two words is a space and a NUL inside
     # one is nothing. The length is not cut here: the caller judges it on
     # what this answers.
@@ -30,7 +36,7 @@ module SiteSearch
       return nil unless raw.is_a?(String)
 
       text = raw.dup.force_encoding(Encoding::UTF_8).scrub("")
-      text.squish.gsub(MARKERS, "").gsub(CONTROL, "").squish.presence
+      text.squish.gsub(MARKERS, "").gsub(CONTROL, "").gsub(INVISIBLE, "").squish.presence
     end
 
     # The index of the page's first hit among them all.

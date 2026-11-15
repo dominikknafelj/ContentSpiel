@@ -69,7 +69,9 @@ module SiteSearch
       # The words of `documents`, whose entries were just written in this
       # transaction, added to the vocabulary: one statement keeps the
       # candidates those entries hold, one insert writes them, a word already
-      # there left as it is.
+      # there left as it is. SORTED, so every writer inserts in one order and
+      # two that add the same new words wait for each other instead of each
+      # holding a unique-index entry the other needs (a deadlock).
       def write(documents)
         candidates = documents.group_by(&:language).filter_map do |locale, list|
           words = list.flat_map { |document| words_of(document) }.uniq
@@ -80,7 +82,7 @@ module SiteSearch
         take_lock("pg_advisory_xact_lock_shared")
         # sql: the filter reads a set-returning function (unnest) in FROM, which no model's relation reads
         kept = Word.connection.select_rows(held_by_batch(candidates))
-        Word.insert_all(kept.map { |locale, word| { locale: locale, word: word } }, unique_by: %i[locale word]) if kept.any? # version: none (the vocabulary is no part of a page)
+        Word.insert_all(kept.sort.map { |locale, word| { locale: locale, word: word } }, unique_by: %i[locale word]) if kept.any? # version: none (the vocabulary is no part of a page)
         nil
       end
 

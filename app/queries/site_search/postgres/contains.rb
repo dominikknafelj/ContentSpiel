@@ -17,10 +17,17 @@ module SiteSearch
     # A title that holds the first part comes first, then the earliest
     # place of it in the body.
     #
-    # The snippet is cut here (`ts_headline` cannot mark a part of a word
-    # under `simple`): `SNIPPET_BEFORE` characters before the first
-    # occurrence of a part and `SNIPPET_LENGTH` in all, every occurrence of
-    # every part marked.
+    # The query's operators are read as the exact pass reads them, never as
+    # text: a `"` is taken out, a part beginning with `-` leaves out what
+    # holds the rest of it, a standalone `or` is no part (so every other part
+    # is still held); a query of operators alone finds nothing.
+    #
+    # The snippet is cut by the database (`ts_headline` cannot mark a part
+    # of a word under `simple`, and a hit's text is up to `SiteSearch::MAX_TEXT`
+    # characters, too long to read and scan for every hit):
+    # `SNIPPET_BEFORE` characters before the first occurrence of a part and
+    # `SNIPPET_LENGTH` in all, and only that cut is read and has every
+    # occurrence of every part marked.
     class Contains
       SNIPPET_BEFORE = 80
       SNIPPET_LENGTH = 300
@@ -35,6 +42,8 @@ module SiteSearch
       # In a savepoint of its own, rolled back after, so the statement
       # timeouts end with it.
       def results
+        return Results.new(hits: [], total: 0) if parts.empty?
+
         answer = nil
         Entry.transaction(requires_new: true) do
           answer = Results.new(hits: hits, total: @timed.in_time_left { matches.count })
@@ -45,7 +54,11 @@ module SiteSearch
 
       private
 
-      def parts = @parts ||= @query.text.split.uniq
+      def tokens = @tokens ||= @query.text.delete('"').split.reject { |token| token.casecmp?("or") }.uniq
+
+      def parts = @parts ||= tokens.reject { |token| token.start_with?("-") }
+
+      def left_out = @left_out ||= tokens.filter_map { |token| token.delete_prefix("-").presence if token.start_with?("-") }.uniq
 
       def entries = Entry.arel_table
 
@@ -56,6 +69,7 @@ module SiteSearch
       def matches
         held = parts.map { |part| holds(:title, part).or(holds(:text, part)) }.reduce(:and)
         found = Entry.where(locale: @query.language).where(held).where(Visible.new(now: @query.now).all)
+        found = left_out.reduce(found) { |all, part| all.where(Arel::Nodes::Grouping.new(holds(:title, part).or(holds(:text, part))).not) }
         @exclude ? found.where(Arel::Nodes::Grouping.new(@exclude).not) : found
       end
 
@@ -69,12 +83,11 @@ module SiteSearch
         return [] unless limit.positive?
 
         first = parts.first
-        place = SqlNodes.function("strpos", SqlNodes.function("lower", entries[:text]), SqlNodes.function("lower", SqlNodes.bound(first, name: "q")))
         @timed.in_time_left do
           matches
-            .order(Arel::Nodes::Descending.new(Arel::Nodes::Grouping.new(holds(:title, first))), place.asc, entries[:record_type].asc, entries[:record_id].asc)
+            .order(Arel::Nodes::Descending.new(Arel::Nodes::Grouping.new(holds(:title, first))), place_of(first).asc, entries[:record_type].asc, entries[:record_id].asc)
             .limit(limit).offset(start - @after)
-            .pluck(:record_type, :record_id, :published_version_id, :text)
+            .pluck(:record_type, :record_id, :published_version_id, cut)
             .each_with_index.map do |(record_type, record_id, copy_id, text), index|
               Hit.new(record_type: record_type, record_id: record_id, copy_id: copy_id, language: @query.language,
                 snippet: snippet_of(text), rank: -(start + index), close: false)
@@ -82,10 +95,22 @@ module SiteSearch
         end
       end
 
-      def snippet_of(text)
+      # Where `part` first stands in the text, from 1, case aside; 0 when
+      # it does not.
+      def place_of(part) = SqlNodes.function("strpos", SqlNodes.function("lower", entries[:text]), SqlNodes.function("lower", SqlNodes.bound(part, name: "q")))
+
+      # The text's `SNIPPET_LENGTH` characters from `SNIPPET_BEFORE` before
+      # the first place of any part (`LEAST` passes over a NULL), or from
+      # its start when the text holds none.
+      def cut
+        first = SqlNodes.coalesce(SqlNodes.function("LEAST", *parts.map { |part| SqlNodes.function("NULLIF", place_of(part), 0) }), 1)
+        start = SqlNodes.function("GREATEST", Arel::Nodes::Subtraction.new(first, SqlNodes.quoted(SNIPPET_BEFORE)), 1)
+        SqlNodes.function("substr", entries[:text], start, SNIPPET_LENGTH)
+      end
+
+      def snippet_of(cut)
+        cut = cut.to_s
         finders = parts.map { |part| /#{Regexp.escape(part)}/i }
-        first = finders.filter_map { |finder| text.index(finder) }.min
-        cut = text[first ? [ first - SNIPPET_BEFORE, 0 ].max : 0, SNIPPET_LENGTH].to_s
         marks = finders.flat_map do |finder|
           cut.enum_for(:scan, finder).map { [ Regexp.last_match.begin(0), Regexp.last_match[0].length ] }
         end

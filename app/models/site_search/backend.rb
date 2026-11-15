@@ -28,7 +28,9 @@ module SiteSearch
   # - `search(query, deadline:)` answers `SiteSearch::Results` for a
   #   `SiteSearch::Query`: the documents in `query.language` only, in view at
   #   `query.now` (`shown_from <= now`, and `shown_until` nil or after it),
-  #   matching the words of `query.text` in any field, a title's match
+  #   matching EVERY word of `query.text`, each in any field (never a
+  #   document by one word of two: ContentSpiel checks a correction by
+  #   such a search, `SiteSearch.kept_correction`), a title's match
   #   ranking above a body's; `query.per_page` hits from `query.offset`, and
   #   `total` counting every match. Each hit's snippet is plain text with
   #   `[start, length]` marks on the query's words, never markup; the page

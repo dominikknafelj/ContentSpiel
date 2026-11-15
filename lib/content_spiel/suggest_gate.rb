@@ -14,9 +14,13 @@ require "stringio"
 # is no UTF-8 ("Invalid encoding for parameter: …"), at info. So Rails is
 # handed NOTHING of this body, and here, for this one path and verb alone:
 #
-# - a `Content-Length` over `MAX_BODY` is answered 413 with nothing read;
-#   a body with no length (chunked) is read through `MAX_BODY + 1` bytes at
-#   most, and over `MAX_BODY` is a 413 too. The 413 is answered here, the
+# - a `Content-Length` over `MAX_BODY` is answered 413 with nothing read
+#   by Rails or the gate; a body with no length (chunked) is read through
+#   `MAX_BODY + 1` bytes at most, and over `MAX_BODY` is a 413 too. What
+#   this caps is what Rails parses and logs, not the process's memory:
+#   Puma has buffered the whole body (in memory, or a temporary file past
+#   its threshold) before any middleware runs, as for every route, and a
+#   cap on that is the front proxy's (`docs/reference/hosting.md`). The 413 is answered here, the
 #   controller's empty answer with its headers (`REFUSED`, `HEADERS`), and
 #   is recorded on the request's span as `search.outcome` `refused`;
 # - the bytes read are parsed with `JSON.parse` when they are UTF-8 (RFC

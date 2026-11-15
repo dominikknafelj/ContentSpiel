@@ -99,6 +99,18 @@ class SiteSearch::Postgres::VocabularyTest < ActiveSupport::TestCase
     assert_equal %w[albatross back harbour quay slash], words
   end
 
+  # Two writers that insert the same new words in different orders would
+  # each wait on the other's uncommitted unique-index entries: a deadlock.
+  # Written in one order everywhere, the second waits for the first.
+  test "the words are inserted in their sorted order, whatever order the text holds them in" do
+    inserts = []
+    ActiveSupport::Notifications.subscribed(->(*, payload) { inserts << payload[:sql] if payload[:sql].start_with?("INSERT INTO \"search_words\"") }, "sql.active_record") do
+      index(doc(title: "zephyr mango apple", body: "kestrel bramble"))
+    end
+    found = %w[apple bramble kestrel mango zephyr].map { |word| inserts.sole.index("'#{word}'") }
+    assert_equal found.sort, found, inserts.sole
+  end
+
   test "the words are written in the entry's transaction and go with its rollback" do
     SiteSearch::Entry.transaction(requires_new: true) do
       index(doc(title: "rollbackword"))

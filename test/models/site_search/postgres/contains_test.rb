@@ -61,6 +61,26 @@ class SiteSearch::Postgres::ContainsTest < ActiveSupport::TestCase
     assert_equal [ [ 80, 2 ] ], snippet.marks
   end
 
+  test "a quoted part is found by its text, a part beginning with - leaves out what holds it, and nothing else asks nothing" do
+    both = create_page_in("ja", title: "案内", body: "検索とエンジン")
+    only = create_page_in("ja", title: "案内", body: "検索だけ")
+    assert_equal [ both.id, only.id ].sort, contains(%("検索"), "ja").map(&:record_id).sort
+    assert_equal [ only.id ], contains("検索 -エンジン", "ja").map(&:record_id)
+    assert_empty contains(%(" -検索 or), "ja"), "a query of operators alone finds nothing, not everything"
+  end
+
+  # The text of a hit is up to 200,000 characters: the database cuts the
+  # snippet's part, and only that is read and marked.
+  test "the database cuts the snippet, and no hit's whole text is read" do
+    create_page_in("ja", title: "本文", body: ("あ" * 5_000) + "検索" + ("い" * 5_000))
+    reads = []
+    ActiveSupport::Notifications.subscribed(->(*, payload) { reads << payload[:sql] if payload[:sql].include?("ILIKE") && payload[:sql].include?("LIMIT") }, "sql.active_record") do
+      assert_operator contains("検索", "ja").sole.snippet.text.length, :<=, 300
+    end
+    assert_includes reads.sole, "substr("
+    refute_match(/SELECT[^(]*"search_entries"\."text"\s*FROM/, reads.sole)
+  end
+
   test "every part must be held, and every occurrence of each is marked" do
     page = create_page_in("ja", title: "案内", body: "検索の使い方。エンジンの検索")
     create_page_in("ja", title: "案内", body: "検索だけ")
