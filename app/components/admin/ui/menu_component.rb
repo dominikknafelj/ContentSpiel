@@ -34,6 +34,10 @@ module Admin
     # the window less its margins) and giving a button the grid cell's look; any
     # other count raises. `heading:` is a line of words before the items, hidden
     # from a screen reader because the panel is already named by `aria_label`.
+    # `chips: true` is for a one-column menu whose items lead with an icon
+    # chip (a section lane's "+ Add"): each button is a chip and a name side by
+    # side, as a grid cell is, where the plain list's `block` would draw them
+    # touching.
     # The grid changes nothing the keyboard does: the items are still walked
     # one by one, in document order, which in a grid is reading order
     # (`admin--ui--menu#keydown`: ArrowDown/ArrowUp step to the next/previous).
@@ -49,7 +53,7 @@ module Admin
         motion: :none,
         content_edges: %i[short long many],
         widths: :fluid,
-        interface: %i[label align button_class aria_label close_on_select list list_label panel_id columns heading],
+        interface: %i[label align button_class aria_label close_on_select list list_label panel_id columns heading chips],
         limits: [
           "Each item is the caller's own link or button: the menu gives it its role and its keyboard.",
           "It lays items out in one column, two or three, and another count is refused."
@@ -66,7 +70,7 @@ module Admin
 
       renders_many :items
 
-      def initialize(label:, align: :right, button_class: nil, aria_label: nil, close_on_select: false, list: false, list_label: nil, panel_id: nil, columns: nil, heading: nil)
+      def initialize(label:, align: :right, button_class: nil, aria_label: nil, close_on_select: false, list: false, list_label: nil, panel_id: nil, columns: nil, heading: nil, chips: false)
         raise ArgumentError, "unknown menu alignment #{align.inspect}" unless %i[left right].include?(align)
         raise ArgumentError, "unknown menu column count #{columns.inspect}" unless [ nil, 2, 3 ].include?(columns)
 
@@ -80,11 +84,12 @@ module Admin
         @panel_id = panel_id
         @columns = columns
         @heading = heading
+        @chips = chips
       end
 
       private
 
-      attr_reader :label, :align, :button_class, :aria_label, :close_on_select, :list, :list_label, :panel_id, :columns, :heading
+      attr_reader :label, :align, :button_class, :aria_label, :close_on_select, :list, :list_label, :panel_id, :columns, :heading, :chips
 
       ACTIONS = "click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown turbo:before-cache@document->admin--ui--menu#cache".freeze
       LIST_ACTIONS = "mouseleave->admin--ui--menu#leave focusout->admin--ui--menu#leave".freeze
@@ -116,6 +121,9 @@ module Admin
       LIST_BUTTON = "[&_button]:block [&_button]:w-full [&_button]:cursor-pointer [&_button]:rounded-cs [&_button]:px-2 [&_button]:py-1 [&_button]:text-left [&_button:hover]:bg-sunken [&_button:focus-visible]:bg-sunken".freeze
       # A grid cell is a chip and a name side by side; `flex` stands where the
       # list's `block` would, never beside it, so the two cannot fight.
+      # A one-column item that leads with a chip: the list's padding, laid out as
+      # a grid cell is; `flex` stands where `block` would.
+      CHIP_BUTTON = "[&_button]:flex [&_button]:w-full [&_button]:cursor-pointer [&_button]:items-center [&_button]:gap-2 [&_button]:rounded-cs [&_button]:px-2 [&_button]:py-1 [&_button]:text-left [&_button:hover]:bg-sunken [&_button:focus-visible]:bg-sunken".freeze
       GRID_BUTTON = "[&_button]:flex [&_button]:w-full [&_button]:cursor-pointer [&_button]:items-center [&_button]:gap-2 [&_button]:rounded-button-sm [&_button]:px-1.5 [&_button]:py-1.5 [&_button]:text-left [&_button:hover]:bg-sunken [&_button:focus-visible]:bg-sunken".freeze
 
       def panel_classes
@@ -125,7 +133,7 @@ module Admin
           ("focus:outline-none focus-visible:outline-2 focus-visible:outline-accent" if list),
           align == :right ? "right-0" : "left-0",
           "[&_[aria-current]]:bg-accent-tint [&_a]:block [&_a]:rounded-cs [&_a]:px-2 [&_a]:py-1 [&_a:hover]:bg-sunken [&_a:focus-visible]:bg-sunken",
-          (columns ? GRID_BUTTON : LIST_BUTTON) ].compact.join(" ")
+          (columns ? GRID_BUTTON : (chips ? CHIP_BUTTON : LIST_BUTTON)) ].compact.join(" ")
       end
     end
   end
