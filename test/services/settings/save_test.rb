@@ -1,6 +1,8 @@
 require "test_helper"
 
 class Settings::SaveTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   test "saves the settings and records settings.updated with what changed" do
     result = as_owner { Settings::Save.call(Current.site, attributes: { social_link_rows: [ { name: "Mastodon", url: "https://example.social/@me" } ] }, translations: { "en" => { title: "New title" } }) }
 
@@ -512,5 +514,140 @@ class Settings::SaveTest < ActiveSupport::TestCase
 
     assert result.ok?, result.errors.inspect
     assert_equal "everyone", Current.site.reload.passkey_policy
+  end
+
+  # --- post types (#114) ---
+
+  setup do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    everything = Page.create!(parent: root, title: "Everything", published_at: 1.day.ago)
+    everything.content_blocks.create!(block_type: :post_list, position: 0, settings: {})
+  end
+
+  def stored_types = SiteSetting.find(Current.site.id).content_types
+
+  def publish_resume_post(title: "Lighthouse keeper")
+    post = create_post(title: title, content_type: "resume_entry")
+    assert PublicPath.current.where(record: post).exists?, "the premise: a switched-on post has an address"
+    post
+  end
+
+  test "switching a type off writes the list, takes its posts' addresses and records content_type.switched_off" do
+    post = publish_resume_post
+
+    result = as_owner { Settings::Save.call(Current.site, attributes: { content_types: %w[blog now_update] }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal %w[blog now_update], stored_types
+    assert_not PublicPath.current.where(record: post).exists?
+    event = Audit::Event.find_by!(action: "content_type.switched_off")
+    assert_equal Current.site, event.subject
+    assert_equal({ "name" => "resume_entry", "label" => "Resume entry" }, event.metadata)
+    assert_equal 1, Audit::Event.where(action: "content_type.switched_off").count
+    assert_not Audit::Event.exists?(action: "content_type.switched_on")
+    assert_not Audit::Event.where(action: "settings.updated").any? { |settings_event| settings_event.field_changes.key?("content_types") }
+  end
+
+  test "switching it on again brings back the same address" do
+    post = publish_resume_post
+    before = PublicPath.current.find_by!(record: post).path
+    as_owner { Settings::Save.call(Current.site, attributes: { content_types: %w[blog now_update] }) }
+
+    result = as_owner { Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry now_update] }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal before, PublicPath.current.find_by!(record: post).path
+    event = Audit::Event.find_by!(action: "content_type.switched_on")
+    assert_equal({ "name" => "resume_entry", "label" => "Resume entry" }, event.metadata)
+  end
+
+  test "the stored list keeps registration order whatever order is posted" do
+    switch_on_content_types("blog")
+
+    result = as_owner { Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[now_update blog] }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal %w[blog now_update], SiteSetting.instance.content_types
+  end
+
+  test "an empty list is refused with the field error and changes nothing" do
+    result = as_owner { Settings::Save.call(Current.site, attributes: { content_types: [ "" ] }) }
+
+    assert_not result.ok?
+    assert result.record.errors.of_kind?(:content_types, :none_switched_on)
+    assert_equal %w[blog resume_entry now_update], stored_types
+    assert_not Audit::Event.exists?(action: "content_type.switched_off")
+    assert_not Audit::Event.exists?(action: "settings.updated")
+  end
+
+  test "a forged name switches nothing on and an undeclared stored name is carried" do
+    site_settings(:default).update_columns(content_types: %w[blog gone/type])
+    Current.site = nil
+
+    result = as_owner { Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog evil/type now_update] }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal %w[blog now_update gone/type], SiteSetting.instance.content_types
+    assert_equal [ "now_update" ], Audit::Event.where(action: "content_type.switched_on").map { |event| event.metadata["name"] }
+  end
+
+  test "switching on a type whose post's address is taken saves and reports the clash" do
+    switch_on_content_types("blog")
+    update = create_post(title: "Team", content_type: "now_update")
+    assert_not PublicPath.current.exists?(record: update)
+    holder = create_post(title: "Team")
+    taken = PublicPath.current.find_by!(record: holder)
+
+    reports = []
+    subscriber = Rails.error.subscribe(Class.new { define_method(:report) { |error, context:, **| reports << [ error.class, context[:yielded] ] } }.new)
+    result = as_owner { Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog now_update] }) }
+    Rails.error.unsubscribe(subscriber)
+
+    assert result.ok?, result.errors.inspect
+    assert_equal %w[blog now_update], SiteSetting.instance.content_types
+    assert_equal taken.attributes, PublicPath.current.find_by!(record: holder).attributes
+    assert_not PublicPath.current.exists?(record: update)
+    assert_equal [ [ Publishing::AddressTaken, %w[en de es].map { |locale| { record_type: "Post", record_id: update.id, locale: locale, wanted: taken.path } } ] ], reports
+  end
+
+  test "the addresses follow the saved list when the site passed is not Current.site" do
+    post = publish_resume_post
+    other = SiteSetting.find(Current.site.id)
+    assert_not_same other, Current.site
+
+    result = as_owner { Settings::Save.call(other, attributes: { content_types: %w[blog now_update] }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_not PublicPath.current.where(record: post).exists?
+  end
+
+  test "a switch needs settings.manage, and a languages.manage holder alone is denied" do
+    grant_to_branch_editors("languages.manage")
+
+    result = as(users(:editor_branch)) { Settings::Save.call(Current.site, attributes: { content_types: %w[blog] }) }
+
+    assert result.denied?
+    assert_equal %w[blog resume_entry now_update], stored_types
+    assert_equal 1, Audit::Event.where(action: "access.denied").count
+    assert_not Audit::Event.exists?(action: "content_type.switched_off")
+  end
+
+  test "a save that changes no type refreshes no address and queues no rebuild" do
+    clear_enqueued_jobs
+
+    result = as_owner { Settings::Save.call(Current.site, attributes: { content_types: %w[now_update blog resume_entry], time_zone: "Europe/Berlin" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_no_enqueued_jobs only: SiteSearch::ReindexJob
+    assert_not Audit::Event.exists?(action: "content_type.switched_on")
+    assert_not Audit::Event.exists?(action: "content_type.switched_off")
+  end
+
+  test "a switch queues one rebuild" do
+    clear_enqueued_jobs
+
+    as_owner { Settings::Save.call(Current.site, attributes: { content_types: %w[blog] }) }
+
+    assert_enqueued_jobs 1, only: SiteSearch::ReindexJob
   end
 end

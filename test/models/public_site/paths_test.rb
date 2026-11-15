@@ -841,6 +841,17 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       ok! Locales::Configure.call([ { "code" => "es" }, { "code" => "de" }, { "code" => "en", "fallbacks" => [ "de" ] } ])
       assert_parity "reordering languages and changing a fallback"
 
+      # -- post types ------------------------------------------------------------
+      dispatch = ok! Posts::Save.call(attributes: { content_type: "now_update", published: true }, translations: { "en" => { title: "Dispatch" } })
+      assert current(dispatch)
+      ok! Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry] })
+      assert_nil current(dispatch), "a switched-off type's post has no address"
+      assert_parity "switching a post type off"
+
+      ok! Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry now_update] })
+      assert current(dispatch)
+      assert_parity "switching a post type on"
+
       # -- discarding, and cancelling a scheduled change (Task 7) -----------------
       # A live page's list block changed and removed in its rows, a post's
       # tags and text changed in its rows: nothing moved, and a discard

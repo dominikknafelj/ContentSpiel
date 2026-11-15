@@ -17,6 +17,8 @@ module SiteSearch
   #   the languages change                `Locales::Enable`, `Disable`, `Configure`,       `languages_changed`
   #                                       `MakeDefault`, when the enabled set or a
   #                                       fallback chain moved (`IndexState.languages`)
+  #   a post type is switched on or off   `Settings::Save`, when the switched-on           `content_types_changed`
+  #                                       declared set moved
   #
   # THE BUILT-IN (`Backends.inline?`) is written here, in the caller's
   # transaction, so its entries stand or fall with the copy. It needs only
@@ -127,6 +129,12 @@ module SiteSearch
       end
       nil
     end
+
+    # A post type switched on or off moves which posts have documents at
+    # all (a dormant post has no address, so none), for every post of the
+    # type at once: the index is built again, after the outermost commit,
+    # as `languages_changed` does it and for the same reason.
+    def content_types_changed = languages_changed
 
     def backend = Backends.current
 

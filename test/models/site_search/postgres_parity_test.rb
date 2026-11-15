@@ -112,6 +112,12 @@ class SiteSearch::PostgresParityTest < ActiveSupport::TestCase
     assert_parity "a page unpublished and published again"
     assert_view_parity "a page unpublished and published again"
 
+    create_post(title: "Quay dispatch", content_type: "now_update")
+    ok Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry] })
+    assert_view_parity "a post type switched off"
+    ok Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry now_update] })
+    assert_parity "a post type switched on"
+
     ok Tags::Merge.call(Tag.find_by!(name: "seafaring"), into: Tag.find_by!(name: "maritime"))
     assert_parity "a tag merged"
     SiteSearch::Entry.where(record_type: "Post", record_id: post.id, locale: "en").pluck(:document).sole.then { |vector| assert_includes vector, "'maritim'" }

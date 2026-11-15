@@ -193,7 +193,7 @@ module PublicSite
     # are: the due copies, the subtree's ids, the list blocks as published,
     # and per touched page `sync_subtree`'s, per batch of posts
     # `write_posts`'.
-    def refresh(pages: [], posts: [], everything: false, now: Time.current)
+    def refresh(pages: [], posts: [], everything: false, report_taken: false, now: Time.current)
       PublicPath.transaction do
         # FIRST, so that no derivation acts on a picture the clock has made
         # stale: the copies that began to show with no write
@@ -209,7 +209,7 @@ module PublicSite
 
         post_ids = posts.is_a?(ActiveRecord::Relation) ? posts.select(:id) : ids_of(posts)
         yields = everything ? refresh_all(now) : refresh_touched(ids_of(pages), post_ids, now)
-        report_clash(due, settled + yields, now)
+        report_clash(due, settled + yields, now, unheld: report_taken)
         yields
       end
     end
@@ -241,11 +241,13 @@ module PublicSite
     # the addresses they wanted and nothing of anyone's content. A record
     # met again that stood without an address before is not reported again,
     # and a refresh that is rolled back (a refused publish, `foresee`)
-    # reports nothing.
-    def report_clash(due, yields, now)
+    # reports nothing. `report_taken: true` is for a caller whose records were
+    # asked for an address they never had (a post type switched on): a yield
+    # of those records is the clash, though no row was lost.
+    def report_clash(due, yields, now, unheld: false)
       mine = due.map { |_, type, id| [ type, id ] }
       clashes = yields.select do |change|
-        change.record.published_at&.<=(now) && (change.row_id || mine.include?([ change.record.class.polymorphic_name, change.record.id ]))
+        change.record.published_at&.<=(now) && (unheld || change.row_id || mine.include?([ change.record.class.polymorphic_name, change.record.id ]))
       end
       return if clashes.empty?
 

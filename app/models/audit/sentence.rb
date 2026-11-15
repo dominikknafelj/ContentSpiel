@@ -129,6 +129,7 @@ module Audit
     SPECIAL_ACTIONS = %w[
       starter_content.added trash.emptied media.regenerated user.owner_changed invitation.accepted
       language.enabled language.disabled language.configured language.default_changed
+      content_type.switched_on content_type.switched_off
       session.created session.destroyed session.ended session.failed session.locked access.denied
       passkey.added passkey.renamed passkey.removed recovery_codes.generated recovery_code.used
       session.second_factor_failed session.confirmation_failed
@@ -475,6 +476,7 @@ module Audit
         when "sso.linked" then [ text("linked #{@you ? "your" : "their"} account to single sign-on#{host_words}") ]
         when "sso.refused" then refused_parts
         when "sso.unlinked" then subject_parts("unlinked ", " from single sign-on")
+        when "content_type.switched_on", "content_type.switched_off" then content_type_parts
         else language_parts
         end
       end
@@ -606,6 +608,13 @@ module Audit
       def owner_parts
         owner = Array(event.field_changes.is_a?(Hash) ? event.field_changes["owner"] : nil).last
         owner ? subject_parts("made ", " an owner") : subject_parts("removed owner rights from ")
+      end
+
+      # The label the event kept, so the sentence reads after a gem's type is gone.
+      def content_type_parts
+        label = event.metadata.is_a?(Hash) ? event.metadata["label"].presence : nil
+        verb = @action == "content_type.switched_on" ? "switched on" : "switched off"
+        label ? [ text("#{verb} the post type "), strong(label) ] : [ text("#{verb} a post type") ]
       end
 
       def language_parts

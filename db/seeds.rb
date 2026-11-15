@@ -116,6 +116,10 @@ if Page.none? && Post.none?
     enabled = Locales::Enable.call(code)
     raise "seeds: #{enabled.errors.to_sentence}" unless enabled.ok?
   end
+
+  # A new site starts with Blog alone; the demo has the other post types too.
+  switched = Settings::Save.call(SiteSetting.instance, attributes: { content_types: ContentTypes.names }, actor: nil)
+  raise "seeds: #{switched.errors.to_sentence}" unless switched.ok?
 end
 
 # Bodies are rich-text JSON documents (tiptap spec §3.1/§5 "Writers of

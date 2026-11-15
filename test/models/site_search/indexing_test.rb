@@ -4,6 +4,8 @@ require "test_helper"
 # the transaction of the write that changes a copy, so the entries stand or
 # fall with it.
 class SiteSearch::IndexingTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   def entries_of(record) = SiteSearch::Entry.where(record_type: record.class.polymorphic_name, record_id: record.id)
 
   def copy_ids_of(record) = entries_of(record).distinct.order(:published_version_id).pluck(:published_version_id)
@@ -91,5 +93,15 @@ class SiteSearch::IndexingTest < ActiveSupport::TestCase
     assert_equal "rich_text: ArgumentError", report.error.message
     assert_equal [ [ "Page", page.id ] ], found("lighthouse"), "the page is indexed by its other words"
     assert_empty found("lamp")
+  end
+
+  test "content_types_changed queues one rebuild after the commit" do
+    clear_enqueued_jobs
+    SiteSetting.transaction do
+      SiteSearch::Indexing.content_types_changed
+      assert_no_enqueued_jobs only: SiteSearch::ReindexJob
+    end
+    assert_enqueued_jobs 1, only: SiteSearch::ReindexJob
+    assert_enqueued_with(job: SiteSearch::ReindexJob, args: [ "postgres" ])
   end
 end

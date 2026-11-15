@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Each post type is switched on or off in Settings (the Post types card follows); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`.
+
 ### Changed
 
-- The public site reads the post types a site has switched on (`ContentTypes.switched_on`): a post of a type that is not switched on has no address, is listed by no Post list block, gives no search document and is offered no starter section.
+- A new site starts with Blog alone; Resume entry and Now update are switched on in Settings. The public site reads the post types a site has switched on (`ContentTypes.switched_on`): a post of a switched-off type is kept, with no address, in no list, search or sitemap, offered no starter section, and opens view only.
 
 ## 0.7.0 (2026-11-15)
 
