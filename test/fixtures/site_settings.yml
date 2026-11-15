@@ -9,6 +9,9 @@ default:
   # language and two others; a new site starts with English alone (the
   # column's default, test/models/site_setting_test.rb).
   locales: [ { code: en }, { code: de }, { code: es } ]
+  # The post types switched on: all three built-ins, so every test meets
+  # each; a new site starts with Blog alone (the column's default).
+  content_types: [ blog, resume_entry, now_update ]
   setup_completed_at: <%= Time.current.to_fs(:db) %>
   # A sender address and nothing else of mail: with the test environment's
   # stand-in (`:test`, plan Ruling 1) the settings are complete and untested,

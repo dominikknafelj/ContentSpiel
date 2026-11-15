@@ -95,6 +95,13 @@ class SiteSetting < ApplicationRecord
   before_validation :carry_translations_into_new_default_locale, if: :will_save_change_to_default_locale?
 
   validate :locales_are_well_formed
+  # The post types switched on (docs/reference/content-blocks-and-types.md): a
+  # list of distinct registry-shaped names, whatever is stored. At least one
+  # declared type must stay on, but only when the list changes: a name that
+  # left the registry (a gem removed) leaves the stored list valid until
+  # someone saves it.
+  validate :content_types_are_well_formed
+  validate :a_content_type_is_switched_on, if: :will_save_change_to_content_types?
   validate :social_links_are_safe, if: :will_save_change_to_social_links?
   validate :default_locale_is_enabled
 
@@ -327,6 +334,21 @@ class SiteSetting < ApplicationRecord
     social_links.to_h.each do |name, url|
       errors.add(:social_links, "#{name} must start with https://, http:// or mailto:") unless self.class.safe_social_link?(url)
     end
+  end
+
+  CONTENT_TYPE_NAME = %r{\A[a-z][a-z0-9_]*(/[a-z][a-z0-9_]*)?\z}
+
+  def content_types_are_well_formed
+    names = content_types
+    unless names.is_a?(Array) && names.all? { |name| name.is_a?(String) && name.match?(CONTENT_TYPE_NAME) } && names.uniq.size == names.size
+      errors.add(:content_types, :invalid)
+    end
+  end
+
+  def a_content_type_is_switched_on
+    return unless content_types.is_a?(Array)
+
+    errors.add(:content_types, :none_switched_on) if (content_types & ::ContentTypes.names).empty?
   end
 
   def locales_are_well_formed

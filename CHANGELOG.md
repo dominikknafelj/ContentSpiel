@@ -26,6 +26,7 @@
 
 ### Migrations
 
+- `20261116090000_add_content_types_to_site_settings`: the column `site_settings.content_types`, the post types switched on (a new site: Blog); an existing site keeps all three on.
 - `20261114120000_create_search_index`: the tables `search_entries` (the built-in search's index: one row per published copy and language, its copy's delete taking it along, a weighted `tsvector` with a GIN index and the plain text a snippet is cut from) and `search_index_states` (one row per search backend: the build's fingerprint, status and progress). It writes no row: the index is built in the background after the first boot, and System status's "Search" row shows its progress until it is ready; until then search finds nothing.
 
 ### For a gem or an outside caller

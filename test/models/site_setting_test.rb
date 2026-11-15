@@ -245,4 +245,35 @@ class SiteSettingTest < ActiveSupport::TestCase
     assert_not setting.valid?
     assert setting.errors.of_kind?(:passkey_policy, :inclusion)
   end
+
+  test "a new site has Blog alone switched on" do
+    assert_equal [ "blog" ], SiteSetting.new.content_types
+  end
+
+  test "the post types are distinct names of the registry's shape" do
+    setting = site_settings(:default)
+    [ [ "blog", "blog" ], [ "Blog" ], [ 1 ], "blog" ].each do |value|
+      setting.content_types = value
+      assert_not setting.valid?, "#{value.inspect} should be invalid"
+      assert setting.errors.key?(:content_types)
+    end
+  end
+
+  test "a change that leaves no declared type on is refused" do
+    setting = site_settings(:default)
+    setting.content_types = [ "gallery/album" ]
+
+    assert_not setting.valid?
+    assert setting.errors.of_kind?(:content_types, :none_switched_on)
+    assert_equal "Keep at least one post type switched on.", setting.errors.messages_for(:content_types).first
+  end
+
+  test "a stored list whose declared names went away is valid until it changes" do
+    setting = site_settings(:default)
+    setting.update_columns(content_types: [ "gone/type" ])
+
+    assert setting.reload.update(tagline: { en: "Still saves" })
+    setting.content_types = [ "gone/other" ]
+    assert_not setting.valid?
+  end
 end
