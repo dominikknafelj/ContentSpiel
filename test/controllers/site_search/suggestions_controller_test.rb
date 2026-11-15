@@ -231,6 +231,32 @@ class SiteSearch::SuggestionsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "with every slot in flight a suggestion answers limited at once, and no backend is asked" do
+    slots = SiteSearch::SuggestLimit::SLOTS
+    assert slots.try_acquire(SiteSearch::SuggestLimit::IN_FLIGHT), "the test holds every slot"
+    begin
+      assert_no_backend_asked { suggest }
+      assert_response :too_many_requests
+      assert_equal "limited", response.parsed_body["state"]
+      assert_equal "limited", request_span.attributes["search.outcome"]
+      assert_nil @exporter.finished_spans.find { |span| span.name == "search.suggest" }
+    ensure
+      slots.release(SiteSearch::SuggestLimit::IN_FLIGHT)
+    end
+    suggest; assert_response :ok, "a slot freed is taken again"
+    assert_equal SiteSearch::SuggestLimit::IN_FLIGHT, slots.available_permits
+  end
+
+  test "a suggestion that raises gives its slot back" do
+    # The suite has no minitest/mock: the module's own method is put back.
+    original = SiteSearch.method(:suggest)
+    SiteSearch.define_singleton_method(:suggest) { |**| raise ActiveRecord::ConnectionNotEstablished, "down" }
+    assert_raises(ActiveRecord::ConnectionNotEstablished) { suggest } # raised through: the test environment renders only rescuable errors
+    assert_equal SiteSearch::SuggestLimit::IN_FLIGHT, SiteSearch::SuggestLimit::SLOTS.available_permits
+  ensure
+    SiteSearch.define_singleton_method(:suggest, original)
+  end
+
   test "the site limit refuses the 3,001st" do
     with_suggest_counter("suggest_site", SiteSearch::SuggestLimit::SITE_LIMIT) { suggest; assert_response :too_many_requests }
     assert_equal "limited", response.parsed_body["state"]
