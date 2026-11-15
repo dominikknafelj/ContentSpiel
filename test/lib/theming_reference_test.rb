@@ -173,20 +173,47 @@ class ThemingReferenceTest < ActiveSupport::TestCase
   end
 
   # The Search block's own section: what its template is handed, its
-  # twenty-seven words and what each result answers, each held to the code it
-  # describes, and its two tokens named.
-  test "the Search block's table names exactly the methods of its entry, its twenty-seven words and what a result answers" do
+  # thirty words, the suggestions' markup and what each result answers, each
+  # held to the code it describes (the script's targets and values read from
+  # its file, as the Code block's are), and its three tokens named.
+  test "the Search block's tables name exactly the methods of its entry, its thirty words, the suggestions' markup and what a result answers" do
     section = section("The Search block")
     cells = section.scan(/^\| `([^`]+)` \|/).flatten
     methods = ContractLedger::COMPONENTS.fetch("blocks/search_component").map { |name| name == "string" ? "string(key)" : name }
     words = Blocks::SearchComponent::STRINGS.map { |key| "string(:#{key})" }
+    targets, values = script_names("search_suggest_controller")
+    script = ContractLedger::SCRIPTS.fetch("search-suggest")
+    markup = [ %(data-controller="search-suggest"), "data-search-suggest-state" ] +
+      targets.map { |name| %(data-search-suggest-target="#{name}") } + values.map { |name| "data-search-suggest-#{name}-value" } +
+      script[:parts].map { |name| %([data-part="#{name}"]) }
 
-    assert_equal 27, Blocks::SearchComponent::STRINGS.size
-    assert_equal (methods + words).sort, cells.sort
+    assert_equal 30, Blocks::SearchComponent::STRINGS.size
+    assert_equal (methods + words + markup).sort, cells.sort
     readers = section[/\*\*What each result answers\*\*(.*?)\n/m, 1] or flunk("no paragraph \"What each result answers\"")
     assert_equal %w[close? date kind snippet tags title url_path where], (Blocks::SearchComponent::Result.public_instance_methods(false) - [ :initialize ]).map(&:to_s).sort
     Blocks::SearchComponent::Result.public_instance_methods(false).each { |name| assert_includes readers, "`#{name}`" }
     BlockTypes.fetch(:search).themed_tokens.each { |token| assert_includes section, "--th-#{token}" }
+  end
+
+  # The scripts a theme drives by their markup: one row each, naming every
+  # target, value, part, state and answer key of the ledger, and the
+  # script's own targets and values (read from its file) the ledger's.
+  test "the scripts table names exactly the contract's scripts, each with its markup, its states and its answer's keys" do
+    table = rows("Scripts")
+    assert_equal ContractLedger::SCRIPTS.keys.sort, table.keys.sort
+
+    ContractLedger::SCRIPTS.each do |name, script|
+      script.each { |list, names| names.each { |each| assert_includes table.fetch(name), "`#{each}`", "the #{list} of #{name}" } }
+      targets, values = script_names("#{name.tr("-", "_")}_controller")
+      assert_equal script[:targets].sort, targets.sort, "the targets of #{name}'s file"
+      assert_equal script[:values].sort, values.sort, "the values of #{name}'s file"
+    end
+  end
+
+  # A controller's `static targets` and `static values`, read from its file.
+  def script_names(file)
+    script = Rails.root.join("app/javascript/controllers/#{file}.js").read
+    [ script[/static targets = \[(.*?)\]/m, 1].scan(/"(\w+)"/).flatten, script[/static values = \{(.*)\}\s*$/, 1].scan(/(\w+):\s*(?:String|Object|\{)/).flatten ]
   end
 
   test "CLAUDE.md's reference index points here" do

@@ -35,8 +35,9 @@ module ContractLedger
     # Release note (search 2): added `close_matches?`, `correction`,
     # `correction_path` and `suggest_url` to the Search block's line, `tags`
     # (each with `name` and `matched?`) and `close?` to what each result
-    # answers, and thirteen words: `close_matches`, `did_you_mean`,
-    # `tagged`, `matched_tag`, `suggestions`, `no_suggestions`,
+    # answers, and sixteen words: `close_matches`, `did_you_mean`,
+    # `tagged`, `tags_separator`, `matched_tag`, `matched_tag_before`,
+    # `matched_tag_after`, `suggestions`, `no_suggestions`,
     # `suggestions_limited`, `suggestions_unavailable`,
     # `suggestions_loading`, `suggestions_label`, `kind_page`, `kind_post`
     # and `kind_tag`; and the themed token `search-active` below.
@@ -67,6 +68,21 @@ module ContractLedger
   ATTRIBUTES = {
     "img[data-image-preview]" => "an image whose widths are not made yet: `src` is its ~24px preview",
     "img[data-image-empty]" => "an image with neither widths nor a preview: no `src`, a box of the image's size"
+  }.freeze
+
+  # The CMS's own scripts a theme's template drives by their markup
+  # (`Theme::Contract::SCRIPTS`).
+  # Release note (search 2): added the `search-suggest` script: its targets,
+  # values, the option template's parts, its states and the keys of the
+  # suggestions' JSON (docs/reference/theming.md, "Scripts").
+  SCRIPTS = {
+    "search-suggest" => {
+      targets: %w[input listbox popup message option status loading],
+      values: %w[url unavailable],
+      parts: %w[label kind where],
+      states: %w[closed loading open empty limited unavailable],
+      answer: %w[state status suggestions kind kind_label label where url marks]
+    }
   }.freeze
 
   # The locals every page template is handed, and the folder of the templates

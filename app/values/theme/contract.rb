@@ -85,6 +85,25 @@ class Theme
 
     def self.attributes = ATTRIBUTES
 
+    # The CMS's own scripts a theme's template drives by writing their
+    # markup (search 2 spec §8.2), by identifier: the `data-<identifier>-target`
+    # names, the `data-<identifier>-<name>-value` names, the parts of the
+    # option's template (`[data-part="…"]`), the states the script writes on
+    # its element (`data-<identifier>-state`, which a stylesheet may read)
+    # and the keys of the JSON its endpoint answers, which a theme's own
+    # controller may read instead, every value plain text.
+    SCRIPTS = {
+      "search-suggest" => {
+        targets: %w[input listbox popup message option status loading],
+        values: %w[url unavailable],
+        parts: %w[label kind where],
+        states: %w[closed loading open empty limited unavailable],
+        answer: %w[state status suggestions kind kind_label label where url marks]
+      }.freeze
+    }.freeze
+
+    def self.scripts = SCRIPTS
+
     # The templates a theme may replace through its `views/` folder, by
     # their path under it, with what each is. The default is the file of the
     # same path under app/views.

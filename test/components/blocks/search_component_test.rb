@@ -101,9 +101,27 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
     assert_selector "label.search__label[for='#{input[:id]}']", text: "Search this site"
     assert_selector "button.search__button[type=submit]", text: "Search"
     assert_no_selector "ol"
-    assert_no_selector "[role=status]"
+    # No outcome's line: only the suggestions' live region, empty.
+    assert_no_selector "[role=status]:not([data-search-suggest-target=status])"
     assert_no_selector ".search__note"
     assert_no_selector "input[type=hidden]", visible: :all
+  end
+
+  test "the form carries the suggestions' markup: the controller, its values, its targets and the option's template, all hidden until the script shows them" do
+    block = search_block
+    draw(answer(:empty, query: nil), block: block)
+
+    form = page.find("form.search__form[data-controller='search-suggest']")
+    assert_equal "Suggestions aren't available right now. Press Enter to search.", form["data-search-suggest-unavailable-value"]
+    assert_selector ".search-suggest input.search__input[data-search-suggest-target=input]"
+    assert_selector ".search-suggest__loading[data-search-suggest-target=loading][hidden]", text: "Looking…", visible: :all
+    assert_selector ".search-suggest__list[data-search-suggest-target=popup][hidden] ul#search-#{block.id}-suggestions[data-search-suggest-target=listbox][aria-label='Suggestions']", visible: :all
+    assert_selector ".search-suggest__list p.search-suggest__message[data-search-suggest-target=message][hidden]", visible: :all
+    assert_selector "template[data-search-suggest-target=option]", visible: :all
+    option = Nokogiri::HTML5.fragment(rendered_content).at_css("template[data-search-suggest-target=option]")
+    assert_equal %w[label kind where], option.css("li.search-suggest__option [data-part]").map { it["data-part"] }
+    assert_selector ".search__hidden[data-search-suggest-target=status][role=status][aria-live=polite]", visible: :all, text: ""
+    assert_nil page.find("input.search__input")["role"], "the field is a combobox only with the script"
   end
 
   test "results draw the count, the list starting at the first result's number and the snippet marked and escaped" do
@@ -352,7 +370,7 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
     line = html.at_css(".search__result .search__tags")
     assert_equal "Tagged", line.children.first.text.strip
     assert_equal "deployment", line.at_css("mark").text.sub(" (matches your search)", "")
-    assert_equal "(matches your search)", line.at_css("mark .sr-only").text.strip
+    assert_equal " (matches your search)", line.at_css("mark .search__hidden").text
     assert line.previous_element.matches?(".search__where--date")
     assert_equal "Tagged deployment (matches your search), previews", line.text.squish, "the names comma-joined, plain text"
     assert_empty line.css("a"), "a tag is no link"

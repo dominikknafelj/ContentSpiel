@@ -69,11 +69,159 @@
   outline: 2px solid var(--th-accent);
   outline-offset: 2px;
 }
+/* What a screen reader alone hears: a matched tag's words and the
+   suggestions' live region. Hidden by this rule and not by a utility, so a
+   theme that writes its own template, or builds no utilities, keeps them
+   hidden by writing the class. */
+.content-block--search .search__hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The suggestions while typing (the SiteSearchSuggest card): the field and
+   its list in one box the field's width, the list 4px under the field and
+   floating over what follows, on the surface with a strong edge and the
+   menu's shadow. */
+.content-block--search .search-suggest {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.content-block--search .search-suggest > .search__input {
+  flex: none;
+  width: 100%;
+}
+.content-block--search .search-suggest__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  padding: 4px;
+  background: var(--th-surface);
+  border: 1px solid var(--th-line-strong);
+  border-radius: var(--th-radius);
+  box-shadow: var(--th-shadow-menu);
+}
+.content-block--search .search-suggest__list > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* A row: at least 44px, the label and its kind on one line, a page's place
+   or a post's date under them. */
+.content-block--search .search-suggest__option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  align-items: baseline;
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  padding: 8px 10px;
+  border-radius: var(--th-radius);
+  cursor: pointer;
+}
+/* The active row, by the keys or the pointer (one state): its ground and a
+   bar of the accent inside its left edge. */
+.content-block--search .search-suggest__option[aria-selected="true"] {
+  background: var(--th-search-active);
+  box-shadow: inset 3px 0 0 var(--th-accent);
+}
+/* The tags after the titles, ruled off from them. */
+.content-block--search .search-suggest__option--first-tag:not(:first-child) {
+  position: relative;
+  margin-top: 9px;
+}
+.content-block--search .search-suggest__option--first-tag:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 6px;
+  right: 6px;
+  height: 1px;
+  background: var(--th-line);
+}
+.content-block--search .search-suggest__label {
+  font-size: 1rem;
+  line-height: 1.35;
+  color: var(--th-ink);
+  overflow-wrap: anywhere;
+}
+/* The typed prefix in bold, on no ground: a ground on every row is noise. */
+.content-block--search .search-suggest__label mark {
+  padding: 0;
+  font-weight: 700;
+  color: inherit;
+  background: none;
+}
+.content-block--search .search-suggest__kind {
+  font-size: var(--th-t-small);
+  color: var(--th-meta);
+  white-space: nowrap;
+}
+.content-block--search .search-suggest__where {
+  grid-column: 1 / -1;
+  margin-top: 1px;
+  font-size: var(--th-t-small);
+  color: var(--th-meta);
+  overflow-wrap: anywhere;
+}
+/* No suggestions, unavailable, limited: one quiet line in the list's frame,
+   which is no option. */
+.content-block--search .search-suggest__message {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  color: var(--th-dim);
+}
+/* Loading, after 300 ms without an answer: the last rows dimmed and one
+   still word at the field's right end. Nothing moves. */
+.content-block--search .search-suggest__loading:not([hidden]) {
+  position: absolute;
+  top: 0;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  height: 2.75rem;
+  font-size: var(--th-t-small);
+  color: var(--th-meta);
+  pointer-events: none;
+}
+.content-block--search [data-search-suggest-state="loading"] .search__input { padding-right: 6rem; }
+.content-block--search [data-search-suggest-state="loading"] .search-suggest__list { opacity: 0.55; }
+/* The field keeps its focus ring while its list is open. */
+.content-block--search [data-search-suggest-state="open"] .search__input {
+  outline: 2px solid var(--th-accent);
+  outline-offset: 2px;
+}
+/* On a strong band the surface is a veil over what is behind it, and the
+   list floats over the page: it stands on the band's field ground, the
+   band's text 6% into the band, opaque. */
+.content-section--strong .content-block--search .search-suggest__list {
+  background: color-mix(in srgb, var(--th-on-band-strong) 6%, var(--th-band-strong));
+}
+
 /* Narrower than 30rem (a phone, a lane): the button under the field, full
-   width. */
+   width, and the list in the flow under the field, so the button stands
+   under the list. */
 @container (max-width: 30rem) {
   .content-block--search .search__row { flex-direction: column; }
   .content-block--search .search__button { width: 100%; }
+  .content-block--search .search-suggest__list {
+    position: static;
+    margin-top: 4px;
+  }
 }
 
 /* The preview's one line, between the field and the outcome. */

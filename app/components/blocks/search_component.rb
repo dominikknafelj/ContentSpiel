@@ -22,7 +22,7 @@ module Blocks
     include Blocks::Contract
 
     contract(
-      accessibility: "A form with role=search, a real label for its type=search field, and a button; the count, the close-matches line and every message are role=status; the pager is a named nav whose current page is aria-current=page and whose number links are named \"Page n\"; a match is marked and also in the words, and a matched tag is marked and followed by words a screen reader hears.",
+      accessibility: "A form with role=search, a real label for its type=search field, and a button; with the script the field is an ARIA 1.2 combobox with a named listbox, walked with the arrow keys with the caret in the field, its count said by a polite live region; the count, the close-matches line and every message are role=status; the pager is a named nav whose current page is aria-current=page and whose number links are named \"Page n\"; a match is marked and also in the words, and a matched tag is marked and followed by words a screen reader hears.",
       motion: :none,
       content_edges: %i[long short missing],
       widths: :from_container,
@@ -32,7 +32,9 @@ module Blocks
                 public.blocks.search.past_end public.blocks.search.first_page public.blocks.search.too_long
                 public.blocks.search.limited public.blocks.search.unavailable public.blocks.search.live_note
                 public.blocks.search.close_matches public.blocks.search.did_you_mean public.blocks.search.tagged
-                public.blocks.search.matched_tag],
+                public.blocks.search.matched_tag public.blocks.search.tags_separator public.blocks.search.matched_tag_before
+                public.blocks.search.matched_tag_after public.blocks.search.suggestions_unavailable
+                public.blocks.search.suggestions_loading public.blocks.search.suggestions_label],
       limits: [
         "It finds what a visitor sees now: no draft, no unpublished change, no other language.",
         "No filter, and no sort; suggestions as one types with a script, none without; ten results to a page.",
@@ -44,13 +46,14 @@ module Blocks
     # (`config/locales/public.en.yml`): what `string` answers, and nothing
     # else.
     # `close_matches` and `did_you_mean` are the results' (`query:`, and
-    # `correction:` the corrected search as its link), `tagged` and
-    # `matched_tag` a post result's tags line (`matched_tag` the words a
-    # screen reader hears after a matched tag), and the rest the suggestions'
-    # as one types: the endpoint's sentences, the listbox's name, the loading
-    # word and each suggestion's kind.
+    # `correction:` the corrected search as its link); `tagged`,
+    # `tags_separator` and `matched_tag` a post result's tags line
+    # (`matched_tag` the words a screen reader hears after a matched tag,
+    # between `matched_tag_before` and `matched_tag_after`); and the rest the
+    # suggestions' as one types: the endpoint's sentences, the listbox's
+    # name, the loading word and each suggestion's kind.
     STRINGS = %i[label button results page pages previous next none past_end first_page too_long limited unavailable live_note
-                 close_matches did_you_mean tagged matched_tag
+                 close_matches did_you_mean tagged tags_separator matched_tag matched_tag_before matched_tag_after
                  suggestions no_suggestions suggestions_limited suggestions_unavailable suggestions_loading suggestions_label
                  kind_page kind_post kind_tag].freeze
 

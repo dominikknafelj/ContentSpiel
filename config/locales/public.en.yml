@@ -45,7 +45,9 @@ en:
       # own; `%{results}` in `past_end` is the count's sentence. `live_note`
       # is said in the preview only. `did_you_mean`'s `%{correction}` is
       # handed in as its link; `matched_tag` is heard by a screen reader
-      # after a matched tag. The `suggestions*` and `kind_*` words are the
+      # after a matched tag, between `matched_tag_before` and
+      # `matched_tag_after`, and `tags_separator` joins a result's tags (a
+      # language's own comma and parentheses, the spaces with them). The `suggestions*` and `kind_*` words are the
       # suggestions' as one types: the endpoint's sentences, the listbox's
       # name, the loading word and each suggestion's kind.
       search:
@@ -68,7 +70,10 @@ en:
         close_matches: "No exact matches for %{query}. Close matches:"
         did_you_mean: "Did you mean %{correction}?"
         tagged: "Tagged"
+        tags_separator: ", "
         matched_tag: "matches your search"
+        matched_tag_before: " ("
+        matched_tag_after: ")"
         suggestions:
           one: "%{count} suggestion"
           other: "%{count} suggestions"

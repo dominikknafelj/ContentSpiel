@@ -515,18 +515,20 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   SEARCH_TOKENS = %w[--th-search-mark --th-search-mark-ink --th-search-active].freeze
 
   # The Search block's mark: the warn hue mixed into the page (never the
-  # accent, a result's link), and the text colour on it, in both schemes.
+  # accent, a result's link), and the text colour on it, in both schemes;
+  # the active suggestion's ground, the accent's tint, and on a strong band
+  # the band's text mixed into the band.
   test "the search mark's tokens are defined from the theme's base tokens in both schemes, never a literal, and search.css draws with them" do
     theme_tokens.each do |theme, tokens|
       assert_match(/\Acolor-mix\(in srgb, var\(--th-warn\) \d+%, var\(--th-paper\)\)\z/, tokens.fetch("--th-search-mark") { flunk("--th-search-mark is not defined for #{theme}") })
       assert_equal "var(--th-ink)", tokens.fetch("--th-search-mark-ink")
+      assert_equal "var(--th-accent-tint)", tokens.fetch("--th-search-active") { flunk("--th-search-active is not defined for #{theme}") }
     end
+    assert_match(/\Acolor-mix\(in srgb, var\(--th-on-band-strong\) \d+%, var\(--th-band-strong\)\)\z/, band_values("strong").fetch("--th-search-active"))
     assert_equal SEARCH_TOKENS.map { |name| name.delete_prefix("--th-") }, BlockTypes.fetch(:search).themed_tokens
     bare = Rails.root.join("app/assets/tailwind/themes/default/search.css").read.gsub(%r{/\*.*?\*/}m, "")
     refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, bare)
-    # The active row's ground is the suggestions list's, which search.css
-    # does not draw yet: a list drawn with it joins this check.
-    (SEARCH_TOKENS - %w[--th-search-active]).each { |name| assert_includes bare, "var(#{name})", "search.css draws with #{name}" }
+    SEARCH_TOKENS.each { |name| assert_includes bare, "var(#{name})", "search.css draws with #{name}" }
     assert_match(/font-size:\s*1rem/, bare, "the field's text is 16px: below it a phone zooms the page on focus")
     assert_no_match(/data-theme/, bare, "nothing in search.css names a scheme: the tokens follow it")
   end
