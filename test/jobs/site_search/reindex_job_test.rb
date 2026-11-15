@@ -86,6 +86,30 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
     assert_no_enqueued_jobs only: SiteSearch::ReindexJob
   end
 
+  test "switching a post type off and on again takes its posts out of the index and puts them back" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    everything = create_page(title: "Everything", parent: root)
+    ok = ContentBlocks::Save.call(ContentBlock.new(owner: everything), attributes: { block_type: "post_list", settings: {} })
+    assert ok.ok?, ok.errors.to_sentence
+    publish_changes(everything)
+    post = create_post(title: "Foghorn", content_type: "resume_entry")
+    SiteSearch::Rebuild.new.call
+    assert_equal [ [ "Post", post.id ] ], found("foghorn")
+
+    assert Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog now_update] }, actor: nil).ok?
+    assert SiteSearch::IndexState.empty_or_stale?("postgres"), "a switch makes a ready index stale"
+    perform_enqueued_jobs(only: SiteSearch::ReindexJob)
+    assert_empty found("foghorn")
+    # A copy that came into force while the type was off was indexed with no
+    # documents.
+    entries_of(post).delete_all
+
+    assert Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry now_update] }, actor: nil).ok?
+    perform_enqueued_jobs(only: SiteSearch::ReindexJob)
+
+    assert_equal [ [ "Post", post.id ] ], found("foghorn")
+  end
+
   test "a fallback change makes the index stale and the job rebuilds it" do
     page = create_page(title: "Lighthouse", translations: { "de" => { title: "Leuchtturm" } })
     SiteSearch::Rebuild.new.call

@@ -121,7 +121,9 @@ module SiteSearch
     # the build (spec §6.5). Until it has run, a language just enabled finds
     # nothing and the others answer from their old fallback text. An
     # enqueue that raises is reported, never raised, as `enqueue_sync`'s.
-    def languages_changed
+    def languages_changed = rebuild_after_commit
+
+    def rebuild_after_commit
       ActiveRecord.after_all_transactions_commit do
         ReindexJob.perform_later(Backends.current_name)
       rescue StandardError => error
@@ -133,8 +135,10 @@ module SiteSearch
     # A post type switched on or off moves which posts have documents at
     # all (a dormant post has no address, so none), for every post of the
     # type at once: the index is built again, after the outermost commit,
-    # as `languages_changed` does it and for the same reason.
-    def content_types_changed = languages_changed
+    # as `languages_changed` does it and for the same reason. The job builds
+    # only when the index is stale, which a switch makes it through the
+    # switched-on types in `IndexState.fingerprint`.
+    def content_types_changed = rebuild_after_commit
 
     def backend = Backends.current
 
