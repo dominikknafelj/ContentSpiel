@@ -10,7 +10,7 @@ require "application_system_test_case"
 # The requests are watched and held through Cuprite's network domain:
 # `count_requests_to` reads the traffic, `delay_answers_for` and
 # `answer_suggestions_with` pause the suggestion requests (`Fetch` interception)
-# and continue or answer them, and `block_script` aborts one module's request.
+# and continue or answer them, and `with_script_blocked` aborts one module's request.
 class SearchSuggestionsSystemTest < ApplicationSystemTestCase
   FORM = ".content-block--search form[role=search]".freeze
   SUGGESTIONS = %r{/search/suggestions\z}
@@ -93,6 +93,13 @@ class SearchSuggestionsSystemTest < ApplicationSystemTestCase
   test "a press outside closes the list" do
     field = type_in("alba")
     find(".content-block--search .search__label").click
+    assert_equal "false", field["aria-expanded"]
+    assert_no_selector "[role=option]"
+  end
+
+  test "the focus leaving the field closes the list" do
+    field = type_in("alba")
+    page.execute_script("document.querySelector('.search__button').focus()")
     assert_equal "false", field["aria-expanded"]
     assert_no_selector "[role=option]"
   end
@@ -199,12 +206,13 @@ class SearchSuggestionsSystemTest < ApplicationSystemTestCase
   end
 
   test "with the script blocked, the form sends as 0.7.0's" do
-    block_script("search_suggest_controller")
-    open_page(connected: false)
-    expect_js_error(/Failed to register controller: search-suggest/)
-    type_in("alba", answered: false).send_keys(:enter)
-    assert_current_path(/\?q=alba/)
-    assert_nil find("input[type=search]")["role"]
+    with_script_blocked("search_suggest_controller") do
+      open_page(connected: false)
+      expect_js_error(/Failed to register controller: search-suggest/)
+      type_in("alba", answered: false).send_keys(:enter)
+      assert_current_path(/\?q=alba/)
+      assert_nil find("input[type=search]")["role"]
+    end
   end
 
   private
@@ -256,28 +264,37 @@ class SearchSuggestionsSystemTest < ApplicationSystemTestCase
   end
 
   # The suggestion requests the block sends, each paused: one whose prefix
-  # is `prefix` is continued `by` seconds later, any other at once. Returns
-  # after the held one was let go and the browser has heard of it (its
-  # answer, or the abort the script made of it), so a test asserts on what
-  # the page made of it rather than before it arrived.
+  # is `prefix` is continued `by` seconds later, any other at once. WAITS,
+  # after the block, until that held request's exchange is finished in the
+  # browser's traffic (its answer loaded, or the abort the script made of it
+  # recorded), and then `await_frames` for the script's work on it, so a
+  # test asserts on what the page made of the stale answer, not before it
+  # arrived.
   def delay_answers_for(prefix, by:)
     held = Queue.new
     intercept_suggestions do |request|
-      if (JSON.parse(request.post_data.to_s)["suggest"] rescue nil) == prefix
+      if suggest_of(request) == prefix
         Thread.new do
           sleep by # sleep: the answer for the stale prefix is held this long, inside the browser's request
           request.continue
-          held << true
+          held << request.network_id
         end
       else
         request.continue
       end
     end
     yield
-    assert held.pop(timeout: by + 5), "the request for #{prefix.inspect} was never held"
+    id = held.pop(timeout: by + 5) or flunk("the request for #{prefix.inspect} was never held")
+    assert_eventually(message: "the held request for #{prefix.inspect} never finished") { network.traffic.find { |exchange| exchange.id == id }&.finished? }
     await_frames
   ensure
     stop_intercepting
+  end
+
+  def suggest_of(request)
+    JSON.parse(request.post_data.to_s)["suggest"]
+  rescue JSON::ParserError
+    nil
   end
 
   # Every suggestion request the block sends is answered with `body` (JSON)
@@ -302,11 +319,16 @@ class SearchSuggestionsSystemTest < ApplicationSystemTestCase
     @interception = nil
   end
 
-  # The next page's request for the module whose URL holds `name` is
+  # Within the block, a request for the module whose URL holds `name` is
   # aborted, as a browser that cannot fetch it would; the cache is off, so
-  # the copy `setup`'s visit fetched is not used instead.
-  def block_script(name)
+  # the copy `setup`'s visit fetched is not used instead. Both are put back
+  # after, also when the block fails: the browser is shared.
+  def with_script_blocked(name)
     network.cache(disable: true)
     network.blocklist = [ %r{/controllers/#{Regexp.escape(name)}[-.]} ]
+    yield
+  ensure
+    network.blocklist = []
+    network.cache(disable: false)
   end
 end

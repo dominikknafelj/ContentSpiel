@@ -47,9 +47,10 @@ en:
       # handed in as its link; `matched_tag` is heard by a screen reader
       # after a matched tag, between `matched_tag_before` and
       # `matched_tag_after`, and `tags_separator` joins a result's tags (a
-      # language's own comma and parentheses, the spaces with them). The `suggestions*` and `kind_*` words are the
-      # suggestions' as one types: the endpoint's sentences, the listbox's
-      # name, the loading word and each suggestion's kind.
+      # language's own comma and parentheses, the spaces with them). The
+      # `suggestions*` and `kind_*` words are the suggestions' as one types:
+      # the endpoint's sentences, the listbox's name, the loading word and
+      # each suggestion's kind.
       search:
         label: "Search this site"
         button: "Search"

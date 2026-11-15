@@ -47,7 +47,8 @@ import { Controller } from "@hotwired/stimulus"
 // template; its parts are filled with `textContent`, and each mark is a
 // `<mark>` made with `document.createElement` between text nodes, from the
 // answer's `[start, length]` ranges, which count characters (code points),
-// as the server's do. An address is followed only when it is this site's.
+// as the server's do. A suggestion whose address is not this site's is
+// not drawn.
 //
 // WHAT IS TAKEN BACK, AND WHEN. Turbo keeps a copy of a page and shows it
 // again on Back. At `turbo:before-cache` and at `disconnect` everything this
@@ -100,6 +101,10 @@ export default class extends Controller {
     this.listen("pointermove", this.popup, (event) => this.pointed(event))
     this.listen("click", this.popup, (event) => this.pressed(event))
     this.listen("pointerdown", document, (event) => { if (!this.field.contains(event.target) && !this.popup.contains(event.target)) this.close() })
+    // The focus leaving the combobox any way (a screen reader's cursor, a
+    // script's focus(), an access key) closes the list. A press on an option
+    // never blurs the field: its `mousedown` is cancelled above.
+    this.listen("focusout", this.field, (event) => { if (!this.popup.contains(event.relatedTarget)) this.close() })
     this.listen("turbo:before-cache", document, () => this.reset())
 
     this.live = true
@@ -257,7 +262,7 @@ export default class extends Controller {
     this.list.removeAttribute("aria-busy")
     this.loading.hidden = true
     this.drawnFor = prefix
-    const suggestions = answer?.state === "ok" ? answer.suggestions.filter((item) => typeof item?.label === "string" && typeof item?.url === "string") : []
+    const suggestions = answer?.state === "ok" ? answer.suggestions.filter((item) => typeof item?.label === "string" && this.address(item.url)) : []
     if (answer?.state === "ok" && suggestions.length > 0) return this.open(suggestions, answer.status)
 
     const state = answer?.state === "ok" ? "empty" : answer?.state === "limited" ? "limited" : "unavailable"
@@ -439,9 +444,21 @@ export default class extends Controller {
   }
 
   // To an address of this site only, by Turbo when it is on the page.
+  // A suggestion's address as a URL of this site, or null: one that does
+  // not parse or leads elsewhere is never drawn, so it is never followed.
+  address(url) {
+    if (typeof url !== "string") return null
+    try {
+      const address = new URL(url, window.location.href)
+      return address.origin === window.location.origin ? address : null
+    } catch (error) {
+      return null
+    }
+  }
+
   go(url) {
-    const address = new URL(url, window.location.href)
-    if (address.origin !== window.location.origin) return
+    const address = this.address(url)
+    if (!address) return
 
     this.close()
     if (window.Turbo) {
