@@ -1189,6 +1189,12 @@ upgrade's migration stops there, naming the requirement.
   site's own header box moves to `search_page` and `search_suggest_url` with
   the controller (§4.6).
 
+### 12.x Settled after the builder check (controller's calls, 2026-11-15)
+
+- **One pull request, design requested at once.** The design agent is asked for the cards when this spec is committed, so they are drawn while steps 1-4 are built. Steps 1-4 land the data and the contract only (`Result#tags`, `Result#close?`, the answer's `correction`, the ledger entries) and change no template; every template change of §8.1 and every state of §10 (the tags line, the close-matches sentence, "Did you mean", the suggestion list) is built after the cards, in the same pull request. No placeholder look ships. The CHANGELOG's Breaking entry for the database requirements ships with that one pull request.
+- **Stopwords stay out of the vocabulary.** A word whose `to_tsvector(config, word)` is empty in its language is not written to `search_words` (one statement per batch), so the prune and the parity test agree: "every word of every entry is in `search_words`" reads "every word that is not a stopword of its language".
+- **Tags are preloaded.** `SiteSearch::Shown` does not load tags today; the plan adds one preload there, and the statement-count test of `Shown` is updated to the new constant.
+
 ## 13. Open questions, and what this spec corrected
 
 ### Open owner questions
