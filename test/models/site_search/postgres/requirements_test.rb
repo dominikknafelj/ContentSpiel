@@ -26,18 +26,33 @@ class SiteSearch::Postgres::RequirementsTest < ActiveSupport::TestCase
 
   test "the migration refused the extension stops with the message naming the requirement and the docs section" do
     error = assert_raises(SiteSearch::Postgres::DatabaseRequirementMissing) do
-      with_enable_extension_raising(ActiveRecord::StatementInvalid.new("permission denied")) { run_search_two_up }
+      with_enable_extension_raising(driver_error(PG::InsufficientPrivilege, "permission denied to create extension")) { run_search_two_up }
     end
-    assert_includes error.message, "ContentSpiel requires the Postgres extension pg_trgm"
+    assert_includes error.message, "ContentSpiel requires the Postgres extension pg_trgm and a UTF-8 character type"
     assert_includes error.message, %(docs/reference/hosting.md, "Database requirements")
-    assert_includes error.message, "ActiveRecord::StatementInvalid"
-    refute_includes error.message, "permission denied" # the cause is the class, never the message
+    assert_includes error.message, "pg_trgm is missing: PG::InsufficientPrivilege."
+    assert_includes error.message, "a superuser runs CREATE EXTENSION pg_trgm first"
+    refute_includes error.message, "permission denied" # the cause is the driver's class, never the server's text
+  end
+
+  test "a server without the contrib package is named by the driver's class" do
+    error = assert_raises(SiteSearch::Postgres::DatabaseRequirementMissing) do
+      with_enable_extension_raising(driver_error(PG::FeatureNotSupported, %(extension "pg_trgm" is not available))) { run_search_two_up }
+    end
+    assert_includes error.message, "pg_trgm is missing: PG::FeatureNotSupported."
+  end
+
+  test "a cancelled statement or a lock wait at enable_extension is raised as itself" do
+    [ ActiveRecord::QueryCanceled, ActiveRecord::LockWaitTimeout ].each do |error_class|
+      error = error_class.new("canceling statement due to statement timeout")
+      assert_raises(error_class) { with_enable_extension_raising(error) { run_search_two_up } }
+    end
   end
 
   test "a schema load whose enable_extension fails says the same" do
     error = assert_raises(SiteSearch::Postgres::DatabaseRequirementMissing) { load_schema_with_extension_error(%(extension "pg_trgm" is not available)) }
     assert_includes error.message, "Database requirements"
-    assert_includes error.message, "pg_trgm is missing: ActiveRecord::StatementInvalid."
+    assert_includes error.message, "pg_trgm is missing: PG::FeatureNotSupported."
   end
 
   test "a schema load error that does not name pg_trgm is raised as it is" do
@@ -45,10 +60,23 @@ class SiteSearch::Postgres::RequirementsTest < ActiveSupport::TestCase
     assert_includes error.message, "pages"
   end
 
+  test "a schema load that names pg_trgm but failed for another reason is raised as it is" do
+    assert_raises(ActiveRecord::QueryCanceled) do
+      schema_loader { raise ActiveRecord::QueryCanceled, %(canceling statement: CREATE EXTENSION "pg_trgm") }.load_schema(primary)
+    end
+  end
+
   test "a schema load on a C character type stops after the load" do
     with_probe_false do
       error = assert_raises(SiteSearch::Postgres::DatabaseRequirementMissing) { load_schema_that_succeeds }
-      assert_includes error.message, "the database's character type is C"
+      assert_includes error.message, "a UTF-8 character type is missing: pg_trgm cannot read letters outside ASCII"
+    end
+  end
+
+  test "a schema load that leaves the extension out blames the schema, not the host" do
+    without_extension_row do
+      error = assert_raises(SiteSearch::Postgres::DatabaseRequirementMissing) { load_schema_that_succeeds }
+      assert_includes error.message, "pg_trgm is missing: db/schema.rb did not enable it (run bin/rails db:migrate)."
     end
   end
 
@@ -56,7 +84,9 @@ class SiteSearch::Postgres::RequirementsTest < ActiveSupport::TestCase
     with_probe_false do
       assert_raises(SiteSearch::Postgres::DatabaseRequirementMissing) { run_search_two_up }
       error = assert_raises(SiteSearch::Postgres::DatabaseRequirementMissing) { Requirements.check! }
-      assert_includes error.message, "the database's character type is C"
+      assert_includes error.message, "pg_trgm cannot read letters outside ASCII in this database's character type"
+      error = assert_raises(SiteSearch::Postgres::DatabaseRequirementMissing) { boot_check(serving: true) }
+      assert_includes error.message, "pg_trgm cannot read letters outside ASCII in this database's character type"
     end
   end
 
@@ -95,7 +125,20 @@ class SiteSearch::Postgres::RequirementsTest < ActiveSupport::TestCase
     end
 
     def load_schema_with_extension_error(message)
-      schema_loader { raise ActiveRecord::StatementInvalid, message }.load_schema(primary)
+      error = driver_error(PG::FeatureNotSupported, message)
+      schema_loader { raise error }.load_schema(primary)
+    end
+
+    # What Active Record raises for a driver's error: a `StatementInvalid`
+    # whose cause is the `PG::` class.
+    def driver_error(driver_class, message)
+      raise driver_class, message
+    rescue driver_class
+      begin
+        raise ActiveRecord::StatementInvalid, "#{driver_class}: ERROR:  #{message}"
+      rescue ActiveRecord::StatementInvalid => error
+        error
+      end
     end
 
     def load_schema_that_succeeds

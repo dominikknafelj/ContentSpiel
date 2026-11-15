@@ -50,13 +50,14 @@ module DbTriggers
       begin
         result = super
       rescue ActiveRecord::StatementInvalid => error
-        raise unless error.message.include?("pg_trgm")
+        requirements = SiteSearch::Postgres::Requirements
+        raise unless error.message.include?("pg_trgm") && requirements.unavailable?(error)
 
-        raise SiteSearch::Postgres::DatabaseRequirementMissing, SiteSearch::Postgres::Requirements.message_for(missing: "pg_trgm", cause: error.class.name)
+        raise SiteSearch::Postgres::DatabaseRequirementMissing, requirements.message_for(missing: "pg_trgm", cause: requirements.cause_of(error))
       end
       migration_connection_pool.with_connection do |connection|
         DbTriggers.apply!(connection)
-        SiteSearch::Postgres::Requirements.check!(connection)
+        SiteSearch::Postgres::Requirements.check_loaded!(connection)
       end
       result
     end
