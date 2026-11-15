@@ -12,6 +12,8 @@ module BlockTypes
         t.field :text, :text, translated: true
         t.component Blocks::<%= class_name %>Component
         t.theme_methods :block, :page
+        # An empty list is a decision: the type has no searchable text.
+        t.search_text ->(block, locale:) { [] }
         # t.icon "pilcrow", family: :text   # optional: one of ContentModel::BlockTypeDefinition::ICONS, drawn in the picker, on the card and on the tile on a chip in the hue of family: (ICON_FAMILIES; none is neutral)
         # t.preview ->(block, locale:) { ContentModel::Preview.new(heading: "A heading", text: "A few words") }   # optional: what the tile shows beside its line, as plain text (CS Studio only, no theme reads it); a type with none is drawn from its summary
         t.stylesheet "<%= file_name %>.css"

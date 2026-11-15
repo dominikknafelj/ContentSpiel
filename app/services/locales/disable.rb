@@ -60,6 +60,9 @@ module Locales
         # the natural thing to move into a job later.
         Translations::StateIndex.rebuild_all
         record_event("language.disabled", subject: site, field_changes: Audit::Snapshot.field_changes_for(site), metadata: { "code" => @code })
+        # The enabled set moved: the search index is built again, and loses
+        # this language's documents at its end.
+        SiteSearch::Indexing.languages_changed
         true
       end
 

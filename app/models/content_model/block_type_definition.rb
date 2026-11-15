@@ -19,13 +19,16 @@ module ContentModel
     # `theme_methods` and `tokens` by `Theme::Contract`, `stylesheet` by the
     # public stylesheet's build (`BlockTypes.theme_css_blocks`), `summary`,
     # `preview` and `tile_picture` by the editor's tile, `read_only_actions`
-    # by the held form's allow-list, `sample` by the shared tests. A
+    # by the held form's allow-list, `sample` by the shared tests,
+    # `search_text` by the search documents (`SiteSearch::Documents`). A
     # declaration nothing reads would be documentation in code; none of
     # these is.
 
     # The capabilities something in the CMS asks for (`capability?`): a type
     # claiming another is refused at registration, since nothing would read it.
-    CAPABILITIES = %i[container lists_posts].freeze
+    # `:search` is a block that draws its request's search
+    # (`PublicPageRendering#search_answer`, search spec §7.1).
+    CAPABILITIES = %i[container lists_posts search].freeze
 
     # The count every tile's text, and a type's own tile line (`summary`), is
     # cut at. It lives here because a model may not name a component: the
@@ -40,11 +43,12 @@ module ContentModel
     # Ruling 6): each is a branch of CS Studio's icon partial
     # (`app/views/admin/shared/_icon.html.erb`, Lucide), which a model may
     # not name; `block_icon_component_test.rb` draws every one. A type names
-    # one or none; an outside type picks from the same list. The last four
-    # are the Note block's kinds (note block plan, rulings 11 and 12), which
-    # its blocks' cards and tiles draw through `for_block:`; `table`
-    # is the Table block's and `diagram` the Diagram block's.
-    ICONS = %w[pilcrow image code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list].freeze
+    # one or none; an outside type picks from the same list. `info` to
+    # `triangle_alert` are the Note block's kinds (note block plan, rulings
+    # 11 and 12), which its blocks' cards and tiles draw through
+    # `for_block:`; `table` is the Table block's, `diagram` the Diagram
+    # block's and `search` the Search block's.
+    ICONS = %w[pilcrow image code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list search].freeze
 
     # The hue families an icon may be drawn in: the chip behind a
     # type's icon takes the family's colour pair
@@ -235,6 +239,19 @@ module ContentModel
       @preview = callable
     end
 
+    # A note the type's block card draws under its fields, on every tab, as
+    # a neutral `Admin::Ui::NoticeComponent` (`role="note"`): a Symbol naming
+    # its key under `admin.components.fields`, in CS Studio's language (the
+    # Search block's: only the live site is searched). Read by
+    # `Admin::EditorScreen::BlockCardComponent` alone; nil for a type with
+    # none. An outside type may declare one, its key in its own locale file.
+    def editor_note(key = nil)
+      return @editor_note if key.nil?
+      refuse "`editor_note` is a Symbol naming a key under admin.components.fields" unless key.is_a?(Symbol) && key != :""
+
+      @editor_note = key
+    end
+
     # The small picture a closed block's tile draws beside its line, as
     # markup: a callable taking the block and `locale:` and answering an
     # `ActiveSupport::SafeBuffer` or nil (nothing to draw). The tile prints
@@ -248,6 +265,29 @@ module ContentModel
 
       @tile_picture = callable
     end
+
+    SEARCH_TEXT_KINDS = { nil => :body, code: :code }.freeze
+
+    # The words a block of the type gives the site's search (search spec
+    # §4.3): a callable taking the block AS THE PUBLISHED COPY HOLDS IT (a
+    # rebuilt, read-only `ContentBlock`) and `locale:`, answering an Array of
+    # plain Strings, the text the type's public component draws in that
+    # language, read with the same fallback-aware readers. Plain text goes to
+    # the document's body field (weight C); `search_text :code, ->…` to its
+    # code field (weight D), the Code block's alone. A type that declares
+    # none gives nothing, which is a decision a built-in states (the guard in
+    # test/models/site_search/block_text_test.rb). Read by
+    # `SiteSearch::Documents` alone.
+    def search_text(kind_or_callable = nil, callable = nil)
+      kind, callable = kind_or_callable.is_a?(Symbol) ? [ kind_or_callable, callable ] : [ nil, kind_or_callable ]
+      refuse "search_text's kind is :code (the code field, weight D) or none (the body, weight C): #{kind.inspect}" unless SEARCH_TEXT_KINDS.key?(kind)
+      refuse "`search_text` is a callable taking the block and `locale:`" unless callable.respond_to?(:call) && takes_block_and_locale?(callable)
+
+      @search_texts = search_texts.merge(SEARCH_TEXT_KINDS.fetch(kind) => callable).freeze
+    end
+
+    # The declared texts by field: `:body`, `:code`, or empty for a type with none.
+    def search_texts = @search_texts || {}
 
     # The type's editor-script actions that only read or move focus: they
     # survive in a form someone else holds (decision 10).
@@ -404,9 +444,13 @@ module ContentModel
     # (block types spec, decisions 3 and 12): neither `:container`, which is
     # bound to the section classes and `BlockOutline`, nor `:lists_posts`,
     # bound to `BlockTypes::PostList`'s criteria, which decide posts'
-    # addresses; tokens named after its owner, so two gems cannot claim one
-    # name and none a built-in's; a stylesheet of its own, given as an
-    # absolute path, whose colours are the theme's base tokens; and no
+    # addresses; nor `:search`, whose block is handed the request's search
+    # answer: the request's limit, its no-store answer and the query's
+    # privacy are the CMS's (search spec §8), and only the built-in
+    # component is handed them; tokens named after its owner, so two gems
+    # cannot claim one name and none a built-in's; a stylesheet of its own,
+    # given as an absolute path, whose colours are the theme's base tokens;
+    # and no
     # `read_only_actions`: the held form's allow-list is one list for every
     # form of the site (`HeldFields.allowed_actions`), an outside type has no
     # editor script of its own until step 2, so any action it named would be
@@ -416,7 +460,7 @@ module ContentModel
     # stylesheet is read here, once, at registration: one that is not there
     # stops the boot as this type's, not as a bare system error.
     def refuse_outside!
-      %i[container lists_posts].each do |capability|
+      %i[container lists_posts search].each do |capability|
         refuse "a block type from outside may not claim :#{capability} (it has no seam for one yet)" if capability?(capability)
       end
       if read_only_actions.any?
@@ -433,6 +477,12 @@ module ContentModel
         refuse "a block type from outside may not declare a :#{field.type} field: #{ContentModel::FieldTypes::BLOCK_ONLY.dig(field.type, :outside)}"
       end
       refuse "a block type from outside holds rich text only: `body_content :table` is the CMS's own" unless body_content == :rich
+      # D is the built-in Code block's weight, so prose outranks a listing
+      # that mentions a thing; a gem's text is body text.
+      if search_texts.key?(:code)
+        refuse "a block type from outside declares no :code search text: the code field is the Code block's own; " \
+               "its words go in `search_text ->(block, locale:) { … }`"
+      end
       if tile_picture
         refuse "a block type from outside draws no tile picture: the tile prints its answer as markup, unescaped, " \
                "on every editor page holding a block of the type"

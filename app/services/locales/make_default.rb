@@ -50,6 +50,7 @@ module Locales
           next false
         end
 
+        languages = SiteSearch::IndexState.languages(site)
         site.default_locale = @code
         # The new default has nothing to fall back to: the default IS the last
         # resort of every chain (`Locales.fallback_chain`), and the card shows its
@@ -64,6 +65,9 @@ module Locales
         Translations::StateIndex.rebuild_all
         record_event("language.default_changed", subject: site,
           field_changes: Audit::Snapshot.field_changes_for(site), metadata: { "code" => @code })
+        # The default stands in every chain: the search index is built again
+        # when one moved (with two languages none does).
+        SiteSearch::Indexing.languages_changed if SiteSearch::IndexState.languages(site) != languages
         true
       end
       return success(site) if outcome == :unchanged

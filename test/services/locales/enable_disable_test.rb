@@ -1,6 +1,8 @@
 require "test_helper"
 
 class Locales::EnableDisableTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup do
     @about = create_page(title: "About")
   end
@@ -74,6 +76,25 @@ class Locales::EnableDisableTest < ActiveSupport::TestCase
   test "the default language can't be disabled and unknown codes fail" do
     assert_not Locales::Disable.call(Locales.default, actor: nil).ok?
     assert_not Locales::Enable.call("xx", actor: nil).ok?
+  end
+
+  test "a change of languages enqueues the search index's rebuild after the commit" do
+    clear_enqueued_jobs
+    SiteSetting.transaction do
+      assert Locales::Enable.call("fr", actor: nil).ok?
+      assert_no_enqueued_jobs only: SiteSearch::ReindexJob
+    end
+    assert_enqueued_with(job: SiteSearch::ReindexJob, args: [ "postgres" ])
+
+    clear_enqueued_jobs
+    assert Locales::Disable.call("fr", actor: nil).ok?
+    assert_enqueued_with(job: SiteSearch::ReindexJob, args: [ "postgres" ])
+
+    clear_enqueued_jobs
+    assert Locales::Disable.call("fr", actor: nil).ok?
+    assert Locales::Enable.call("de", actor: nil).ok?
+    # Asking for what is already true moves nothing.
+    assert_no_enqueued_jobs(only: SiteSearch::ReindexJob)
   end
 end
 

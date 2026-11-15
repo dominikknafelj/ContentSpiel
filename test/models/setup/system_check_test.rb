@@ -6,13 +6,97 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "reports every check, in order" do
     labels = run_check.map(&:label)
 
-    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail", "Forms" ], labels
+    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Search", "Mail", "Forms" ], labels
+  end
+
+  test "the search row while the index is built is a warning with the progress and no command" do
+    row = result("Search", run_check(search: search_status(state: :building, done: 340, total: 1200, count: nil)))
+
+    assert_equal :warning, row.status
+    assert_equal "Building the search index: 340 of 1,200 records.", row.message
+    assert_nil row.command
+  end
+
+  test "a build stopped for an hour offers search:reindex" do
+    row = result("Search", run_check(search: search_status(state: :stopped, done: 340, total: 1200, count: nil)))
+
+    assert_equal :warning, row.status
+    assert_equal "The search index stopped building at 340 of 1,200 records. Run this to finish it:", row.message
+    assert_equal "bin/rails search:reindex", row.command
+  end
+
+  test "the built-in ready says how many records it finds" do
+    assert_equal "Search finds 1,200 pages and posts (built-in).", result("Search", run_check(search: search_status)).message
+    one = result("Search", run_check(search: search_status(count: 1)))
+    assert_equal "Search finds 1 page or post (built-in).", one.message
+    assert one.ok?
+  end
+
+  test "an outside backend ready names it, and one that does not answer in time is a warning" do
+    ready = result("Search", run_check(search: search_status(label: "Typesense", count: nil)))
+    assert ready.ok?
+    assert_equal "Typesense answers.", ready.message
+
+    late = result("Search", run_check(search: search_status(label: "Typesense", state: :timeout, count: nil)))
+    assert_equal :warning, late.status
+    assert_equal "Typesense did not answer in 3 seconds. Visitors see “Search isn't available right now.”", late.message
+  end
+
+  test "an outside backend's own warning is its sentence, cut to one line, and without one says no more" do
+    health = SiteSearch::Health.new(status: :failed, detail: "The collection is missing.\nSecond line.")
+    row = result("Search", run_check(search: search_status(label: "Typesense", state: :unhealthy, count: nil, health: health)))
+
+    assert_equal :warning, row.status
+    assert_equal "Typesense reports a problem: The collection is missing.", row.message
+
+    bare = SiteSearch::Health.new(status: :warn)
+    plain = result("Search", run_check(search: search_status(label: "Typesense", state: :unhealthy, count: nil, health: bare)))
+    assert_equal :warning, plain.status
+    assert_equal "Typesense reports a problem but says no more. Check the engine itself.", plain.message
+  end
+
+  test "an outside backend that is OK and says something shows it, and the built-in shows its count" do
+    health = SiteSearch::Health.new(status: :ok, detail: "3 nodes")
+    row = result("Search", run_check(search: search_status(label: "Typesense", count: nil, health: health)))
+
+    assert row.ok?
+    assert_equal "Typesense answers: 3 nodes", row.message
+  end
+
+  test "an index never built, and one built for other languages, are warnings that offer search:reindex" do
+    missing = result("Search", run_check(search: search_status(state: :not_built, count: nil)))
+    assert_equal :warning, missing.status
+    assert_equal "The search index isn't built yet, so search finds nothing. Run this to build it:", missing.message
+    assert_equal "bin/rails search:reindex", missing.command
+
+    old = result("Search", run_check(search: search_status(state: :out_of_date, count: nil)))
+    assert_equal :warning, old.status
+    assert_equal "The search index is out of date: the site's languages or ContentSpiel's search rules changed since it was built. Run this to rebuild it:", old.message
+    assert_equal "bin/rails search:reindex", old.command
+  end
+
+  test "the limited note names only those of Japanese, Chinese, Thai and Korean switched on, and only with the built-in" do
+    row = result("Search", run_check(search: search_status(limited: %w[ja ko])))
+
+    assert_equal :ok, row.status
+    assert_equal "Search is limited in Japanese and Korean: a word is found only as part of the whole run of text it stands in.", row.note
+
+    assert_nil result("Search", run_check(search: search_status)).note
+
+    Locales::Enable.call("ja")
+    SiteSearch::Fake.new.installed do
+      SiteSearch::IndexState.start!(SiteSearch::Fake::NAME, total: 0)
+        .ready!(SiteSearch::IndexState.fingerprint(SiteSearch::Fake::NAME), languages: [], done: 0)
+      status = SiteSearch::Status.read
+      assert_empty status.limited
+      assert_nil result("Search", run_check(search: status)).note
+    end
   end
 
   test "in production with the request's facts, HTTPS comes second" do
     labels = run_check(production: true, request_ssl: true).map(&:label)
 
-    assert_equal [ "Site address", "Single sign-on", "HTTPS", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail", "Forms" ], labels
+    assert_equal [ "Site address", "Single sign-on", "HTTPS", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Search", "Mail", "Forms" ], labels
   end
 
   test "a configured site address is named by its origin" do
@@ -478,7 +562,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     results = nil
     logged = capture_log { results = run_check(image_progress: failing) }
 
-    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Background jobs", "Mail", "Forms" ], results.map(&:label)
+    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Background jobs", "Search", "Mail", "Forms" ], results.map(&:label)
     assert_includes logged, "ActiveRecord::StatementInvalid"
     assert_not_includes logged, "PG::QueryCanceled"
   end
@@ -506,18 +590,20 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
   # A command is shown to anyone who may view the status page and, in the
   # wizard, before anyone is signed in: each is a fixed string.
-  test "only the site address and the not-ready mail warnings carry a command, each a fixed string" do
+  test "only the site address, the not-ready mail and the stopped search warnings carry a command, each a fixed string" do
     results = with_mail_state(:not_set_up) do
       run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
         remote_ip: "173.245.48.10", cf_connecting_ip: "203.0.113.5",
         storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
-        stylesheet_probe: -> { false }, image_progress: progress(total: 3, made: 0, failed: 1))
+        stylesheet_probe: -> { false }, image_progress: progress(total: 3, made: 0, failed: 1),
+        search: search_status(state: :stopped, done: 1, total: 3, count: nil))
     end
 
     # Every row that can warn does. The theme's carries no command in
     # production, where the build is the image's and no one command.
     assert results.none?(&:ok?)
-    assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND, "Mail" => Setup::SystemCheck::MAIL_FALLBACK_COMMAND },
+    assert_equal({ "Site address" => Setup::SystemCheck::SITE_ADDRESS_COMMAND, "Mail" => Setup::SystemCheck::MAIL_FALLBACK_COMMAND,
+        "Search" => Setup::SystemCheck::SEARCH_REINDEX_COMMAND },
       results.select(&:command).to_h { |check| [ check.label, check.command ] })
     assert Setup::SystemCheck::SITE_ADDRESS_COMMAND.frozen?
   end
@@ -663,8 +749,14 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       Rails.logger = previous
     end
 
+    def search_status(**overrides)
+      SiteSearch::Status.new(**{ name: "postgres", label: "Built-in", state: :ready, done: nil, total: nil, count: 1200,
+        health: nil, limited: [] }.merge(overrides))
+    end
+
     def run_check(**overrides)
       defaults = {
+        search: search_status,
         storage_probe: -> { true }, image_probe: -> { true }, worker_alive_probe: -> { true },
         queue_adapter: "async", address: SiteAddress.parse("https://cms.example.org"), stylesheet_probe: -> { true }
       }

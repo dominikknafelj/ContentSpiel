@@ -97,6 +97,16 @@ class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
     assert_no_selector "a"
   end
 
+  test "a note is drawn under the message" do
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(index: 0, result: result(status: :ok, command: nil, note: "Limited in Korean.")))
+
+    assert_selector "li[data-status=ok] .admin-state-chip[data-state-tone=ok]"
+    assert_selector "li p.bg-sunken", text: "Limited in Korean."
+
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(index: 0, result: result(command: nil)))
+    assert_no_selector "p.bg-sunken"
+  end
+
   test "a diagram-drawings link is Draw diagrams at the address the screen hands over, and nowhere without one" do
     row = result(command: nil, link: :diagram_drawings)
     render_inline(Admin::Ui::SystemCheckRowComponent.new(index: 0, result: row, diagram_drawings_href: "/cs-studio/diagram-drawings"))

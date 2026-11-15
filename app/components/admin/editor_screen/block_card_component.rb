@@ -352,9 +352,18 @@ module Admin
       # choice stored now, which is the same in every language and so read
       # from the default one, and the select's input name and labels, for
       # `admin--ui--placeholder-from` to follow a new choice before it is
-      # saved. Nil for every other field. A translation tab draws no input
-      # for the select, so there the placeholder stays the stored choice's.
+      # saved. A field whose placeholder is a visitor's word
+      # (`placeholder_public:`, the Search block's label) shows that word in
+      # the language being edited (`PublicStrings.read`, English where the
+      # language has none), the word a visitor of that language reads when
+      # the field is left blank. Nil for every other field. A translation tab
+      # draws no input for the select, so there the placeholder stays the
+      # stored choice's.
       def placeholder_for(field)
+        if (key = field.options[:placeholder_public])
+          return { text: ::PublicStrings.read("public.#{key}", locale: locale) }
+        end
+
         source = field.options[:placeholder_from] or return nil
         choice = definition.fields.find { |candidate| candidate.name == source.to_s } or return nil
         options = choice.options[:options]
@@ -382,6 +391,13 @@ module Admin
       end
 
       def field_errors(field) = block.errors.full_messages_for("settings.#{field.name}")
+
+      # The type's own note under the form (`t.editor_note`), on every tab,
+      # neutral, so it is read where it stands; nil for a type with none.
+      def editor_note
+        key = definition.editor_note or return nil
+        Admin::Ui::NoticeComponent.new(tone: :neutral, role: "note", class: "mt-2.5 max-w-[560px]").with_content(t("admin.components.fields.#{key}"))
+      end
 
       def uses_columns = definition.uses_columns
 

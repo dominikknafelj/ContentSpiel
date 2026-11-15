@@ -1,6 +1,8 @@
 require "test_helper"
 
 class Locales::ConfigureTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup do
     # The fixture's own default (`site_settings.yml`) leaves `locales` at the
     # schema default -- en, de, es, in that order, none with fallbacks.
@@ -57,5 +59,23 @@ class Locales::ConfigureTest < ActiveSupport::TestCase
     assert_not result.ok?
     assert_includes result.errors.join, "exactly the enabled languages"
     assert_equal %w[en de es fr], SiteSetting.find(@site.id).locale_codes
+  end
+
+  test "a change of languages enqueues the search index's rebuild after the commit" do
+    clear_enqueued_jobs
+    SiteSetting.transaction do
+      assert Locales::Configure.call([ { code: "en" }, { code: "de", fallbacks: [ "es" ] }, { code: "es" } ], actor: nil).ok?
+      assert_no_enqueued_jobs only: SiteSearch::ReindexJob
+    end
+    assert_enqueued_with(job: SiteSearch::ReindexJob, args: [ "postgres" ])
+
+    clear_enqueued_jobs
+    assert Locales::Configure.call([ { code: "en" }, { code: "de", fallbacks: [ "es" ] }, { code: "es" } ], actor: nil).ok?
+    # The default and de's own fallback come before the order's tier in
+    # every chain, so putting de first moves none.
+    assert Locales::Configure.call([ { code: "de", fallbacks: [ "es" ] }, { code: "en" }, { code: "es" } ], actor: nil).ok?
+    assert_equal %w[de en es], Current.site.reload.locale_codes
+    # A configure that moves no chain enqueues none.
+    assert_no_enqueued_jobs(only: SiteSearch::ReindexJob)
   end
 end

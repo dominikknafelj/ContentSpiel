@@ -49,6 +49,7 @@ Rails.application.config.to_prepare do
     BlockTypes::Note.register
     BlockTypes::Table.register
     BlockTypes::Form.register
+    BlockTypes::Search.register
     BlockTypes::Card.register
     BlockTypes::PostList.register
     BlockTypes::Section.register

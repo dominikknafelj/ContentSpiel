@@ -18,9 +18,20 @@ module BlockTypes
         t.uses :image, :caption, :alt
         t.component Blocks::ImageComponent
         t.theme_methods :block, :page, :asset, :alt, :caption, :sizes
+        t.search_text ->(block, locale:) { Image.search_text(block, locale: locale) }
         t.sample image: true, translations: { "en" => { caption: "Sample caption words", alt: "Sample alt words" } },
                  shows: [ "Sample caption words", %(alt="Sample alt words") ]
       end
+    end
+
+    # The block's own caption and alt override, drawn only with an image: the
+    # library image's own alt text and caption are the asset's, looked up
+    # live and in no copy (`Publishing::Snapshot`), so they would drift with
+    # every library edit and are not searched.
+    def self.search_text(block, locale:)
+      return [] unless block.media_asset&.file&.attached?
+
+      [ ::Locales.read(block, :caption, locale: locale), ::Locales.read(block, :alt, locale: locale) ]
     end
   end
 end

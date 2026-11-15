@@ -20,7 +20,12 @@ Rails.application.config.filter_parameters += [
   /\Acredential\z/,
   # A recovery code typed at the second step or shown once when made: a one-time password that no entry above
   # matches (not :passw, not :token).
-  :recovery_code
+  :recovery_code,
+  # A visitor's search (search spec §8.4): personal data, which reaches no log. It arrives as `q`, and reaches the
+  # database as the bind named `q` too, which Active Record's debug line prints through this list. The whole name: a
+  # bare :q matches by substring, so it would mask every parameter with a "q" in it (`quote`, `note_quote`), and
+  # `Audit::Snapshot.scrub` drops every snapshot key this list matches.
+  /\Aq\z/
 ]
 
 # The single sign-on's one-time secrets in a request: the callback's query (`code`, an authorization code, and

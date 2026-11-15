@@ -81,6 +81,26 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Older"
   end
 
+  # `ThemeHelper#search_page` reads the pages' copies in force, which the
+  # content version covers: a page that draws a header form pointing at it
+  # (every page of such a theme) is stale the moment a Search block is published.
+  test "publishing a Search block moves the ETag of a page that points at search_page" do
+    get "/"
+    etag = response.headers["ETag"]
+    page = create_page(title: "Find")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "search" }).ok?
+    get "/"
+    etag_before_publishing = response.headers["ETag"]
+
+    publish_changes(page)
+
+    get "/", headers: { "If-None-Match" => etag_before_publishing }
+    assert_response :success
+    assert_not_equal etag_before_publishing, response.headers["ETag"]
+    assert_equal page.id, SiteSearch::SearchPage.new.page.id
+    assert etag.present?
+  end
+
   # --- The content version (technical cleanup spec §4.8) -----------------------
 
   # The point of a version that moves only on published changes: an editor
@@ -393,5 +413,47 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
       get "/"
       assert_equal plain, response.headers["ETag"]
     end
+  end
+
+  # Search spec §8.1: a public response is kept by a CDN under its URL, so a
+  # page asked with `q` (whether it searches or not, since the 304 is
+  # decided before its blocks are) is rendered every time and kept nowhere.
+  test "a page asked with a query is stored by no cache; the same page without one answers 304" do
+    get "/"
+    etag = response.headers["ETag"]
+    assert etag.present?
+
+    [ "/?q=albatross", "/?q=albatross&page=2" ].each do |address|
+      get address, headers: { "If-None-Match" => etag }
+      assert_response :success, address
+      assert_equal "private, no-store", response.headers["Cache-Control"], address
+      assert_includes response.body, "Home"
+    end
+
+    get "/nowhere?q=albatross"
+    assert_response :not_found
+    assert_equal "private, no-store", response.headers["Cache-Control"], "a 404 with q"
+
+    get "/en?q=albatross"
+    assert_response :found
+    assert_equal "private, no-store", response.headers["Cache-Control"], "the default language's redirect with q"
+
+    [ "%20%20", "%00%01", "%EE%80%80" ].each do |typed|
+      get "/?q=#{typed}"
+      assert_equal "max-age=0, public, must-revalidate", response.headers["Cache-Control"], "#{typed}: no words, no query"
+    end
+
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :not_modified
+  end
+
+  test "a response with q says noindex and sends only the origin as referrer" do
+    get "/?q=albatross"
+    assert_equal "noindex", response.headers["X-Robots-Tag"]
+    assert_equal "origin", response.headers["Referrer-Policy"]
+
+    get "/"
+    assert_nil response.headers["X-Robots-Tag"]
+    assert_not_equal "origin", response.headers["Referrer-Policy"]
   end
 end

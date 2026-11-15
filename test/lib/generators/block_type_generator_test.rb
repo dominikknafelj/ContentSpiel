@@ -53,7 +53,8 @@ class BlockTypeGeneratorTest < Rails::Generators::TestCase
     run_generator [ NAME ]
 
     assert_file "app/models/block_types/generated_callout.rb", /BlockTypes.register :generated_callout/, /t.theme_methods :block, :page/,
-                /t.stylesheet "generated_callout.css"/, /t.sample /, /#{BlockTypeGenerator::GENERATED}/
+                /t.stylesheet "generated_callout.css"/, /t.sample /,
+                /# An empty list is a decision: the type has no searchable text.\n\s+t.search_text ->\(block, locale:\) \{ \[\] \}/, /#{BlockTypeGenerator::GENERATED}/
     assert_file "config/initializers/types.rb", /\n    BlockTypes::GeneratedCallout.register\n    # bin\/rails generate block_type adds/
     assert_file "app/components/blocks/generated_callout_component.rb", /include Blocks::Contract/, /contract\(/, /def initialize\(block:, page:\)/, /def render\?/
     assert_file "app/components/blocks/generated_callout_component.html.erb", /content-block content-block--generated_callout/

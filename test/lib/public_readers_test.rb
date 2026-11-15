@@ -66,6 +66,7 @@ class PublicReadersTest < ActiveSupport::TestCase
     app/models/public_site/urls.rb
     app/queries/publishing/listing.rb
     app/queries/public_site/branch.rb
+    app/queries/site_search/shown.rb
   ].freeze
 
   # Folders of components that are public readers whether or not a template

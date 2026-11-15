@@ -158,6 +158,18 @@ module Admin
       # The help line under the input, named for its `aria-describedby`.
       def help_id = "#{input_id}-help"
 
+      # The help line's words, or nil for none: the input reads them
+      # (`Admin::Fields::Base#help_text`), so the line and the input's
+      # `aria-describedby` agree.
+      def help_text = input_component.help_text
+
+      # A `help:` key that could not be read as one line of words.
+      class HelpKeyUnreadable < StandardError
+        def initialize(key, error_class)
+          super("the help: key admin.components.fields.#{key} could not be drawn (#{error_class}); the field is drawn without its help line") # i18n-ok: an error report for whoever runs the site, not a word of CS Studio
+        end
+      end
+
       # True once the caller has handed over something to compare against --
       # see the class comment for why that's the caller's call, not this
       # component re-deriving "non-default locale and translated" itself --

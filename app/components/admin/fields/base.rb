@@ -77,7 +77,38 @@ module Admin
         @importable = importable
       end
 
+      # The help line's words: the type's literal, or, for a `help:` that is
+      # a Symbol, its key under `admin.components.fields` in CS Studio's
+      # language, `%{placeholder}` the input's placeholder text (empty where
+      # the caller handed none over: only the block card does). A key is a
+      # gem's as often as ours, and read only here: one that is missing,
+      # names a subtree or interpolates a name this hands none of answers
+      # nil, so the line is left out and the editor drawn, and the mistake
+      # is reported with the key (`Ui::FieldComponent::HelpKeyUnreadable`)
+      # once per process per key (`UNREADABLE_REPORTED`), as a block type's
+      # raising summary is logged once (`EditorScreen::TileSummaryComponent`).
+      def help_text
+        return @help_text if defined?(@help_text)
+
+        help = field.help
+        @help_text = help.is_a?(Symbol) ? help_from_key(help) : help
+      end
+
+      UNREADABLE_REPORTED = Set.new
+      UNREADABLE_LOCK = Mutex.new
+
       private
+
+      def help_from_key(key)
+        text = t("admin.components.fields.#{key}", placeholder: placeholder&.dig(:text).to_s)
+        raise TypeError, "a help key names one string" unless text.is_a?(String)
+
+        text
+      rescue StandardError => error
+        first = UNREADABLE_LOCK.synchronize { UNREADABLE_REPORTED.add?(key) }
+        Rails.error.report(Admin::Ui::FieldComponent::HelpKeyUnreadable.new(key, error.class.name), handled: true, source: "content_spiel.fields") if first
+        nil
+      end
 
       attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :placeholder
 
@@ -88,8 +119,10 @@ module Admin
       def input_id = "#{id_prefix}-#{field.name}"
 
       # The id of the help line `Admin::Ui::FieldComponent` draws under a
-      # field whose type gives one (`help:`), for the input's `aria-describedby`.
-      def help_id = field.help ? "#{input_id}-help" : nil
+      # field whose help could be read (`help_text`), for the input's
+      # `aria-describedby`: nil when no line is drawn.
+      def help_id = help_text ? "#{input_id}-help" : nil
+
 
       # A container may be a `ContentModel::FieldSet` instance (a real
       # reader per field name), a plain Hash (an admin form's raw params, or

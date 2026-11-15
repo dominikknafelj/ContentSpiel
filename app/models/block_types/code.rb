@@ -43,6 +43,8 @@ module BlockTypes
         t.stylesheet "code.css"
         t.summary ->(block, locale:) { Code.summary(block, locale: locale) }
         t.preview ->(block, locale:) { Code.preview(block, locale: locale) }
+        t.search_text ->(block, locale:) { Code.search_text(block, locale: locale) }
+        t.search_text :code, ->(block, locale:) { [ block.settings_object(locale: locale, fallback: true)&.code ] }
         # The counter under the code field reads the field and writes nothing
         # but its own line.
         t.read_only_actions "admin--editor--code-limit#update"
@@ -54,6 +56,15 @@ module BlockTypes
                  translations: { "en" => { caption: "A template" }, "de" => { caption: "Code caption de" }, "es" => { caption: "Code caption es" } },
                  shows: [ "show.html.erb", %(<span class="syn-embed">), "A template" ]
       end
+    end
+
+    # The file name and caption, drawn only with code (`Blocks::CodeComponent`):
+    # prose around a listing, found above the code itself.
+    def self.search_text(block, locale:)
+      settings = block.settings_object(locale: locale, fallback: true)
+      return [] if settings&.code.blank?
+
+      [ settings.filename, ::Locales.read(block, :caption, locale: locale) ]
     end
 
     # The tile's preview: the file name, else the language's label, over the

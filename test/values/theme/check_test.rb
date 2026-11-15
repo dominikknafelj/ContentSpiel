@@ -361,6 +361,23 @@ class Theme::CheckTest < ActiveSupport::TestCase
     end
   end
 
+  # The Search block draws a visitor's query and what was found: a theme's
+  # template of it that prints unescaped is refused at boot, whichever way.
+  test "a Search template that prints unescaped is refused, and one that escapes is not" do
+    search = "components/blocks/search_component.html.erb"
+    [ "<p><%= raw query %></p>", "<p><%= query.html_safe %></p>", "<p><%== query %></p>", "<p><%= result.snippet.safe_concat(query) %></p>",
+      "<% results.each do |result| %><a><%= raw(result.title) %></a><% end %>" ].each do |template|
+      problems = problems_with(search => "#{template}\n")
+
+      assert_equal 1, problems.size, template
+      assert_includes problems.first, "#{search} prints something unescaped", template
+    end
+    [ "<p><%= query %></p>", "<p><%= string(:none, query: tag.q(query)) %></p>", %(<p><%= "raw words" %> <%# raw %></p>), "<p><%= drawing %></p>" ].each do |template|
+      assert_empty problems_with(search => "#{template}\n"), template
+    end
+    assert_empty problems_with("components/blocks/note_component.html.erb" => "<%= raw heading %>\n"), "only the Search template is read for it"
+  end
+
   test "a frame that never yields the page is refused, and says what to add" do
     [ "<div class=\"frame\"><%= render \"layouts/public/header\" %></div>\n", "<main><%# <%= yield %> %></main>\n", "<main><% yield %></main>\n",
       "<main><%= yield :sidebar %></main>\n" ].each do |frame|

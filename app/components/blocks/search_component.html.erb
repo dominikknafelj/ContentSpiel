@@ -1,0 +1,72 @@
+<%# The Search block (search spec §7.2; the SiteSearch card): a GET form to the page it stands on, with
+    role=search, a real label for a type=search field named q, and a button; then, for a request with a
+    query, its outcome: the preview's note, the count and the results with their pager, or one message.
+    The count and every message are role=status. A sentence that quotes the query hands it to `string` in
+    a <q> (`tag.q`), so a language's own quote marks come from its `quotes`, and the query is escaped
+    inside it. The pager's links keep q and set page, on the page's own address, and are never
+    prefetched: a hovered link would run a search, and count it, before anyone pressed it. The field's
+    id is written from `block`, so two blocks on a page have their own; the arrows are this template's
+    and hidden from a screen reader. The class names are the default theme's own (search.css), not a
+    promise. Everything printed goes through ERB's own escaping; `result.snippet` is already escaped,
+    with its marks. %>
+<% field_id = "search-#{block.id}-q" %>
+<% link_to_page = ->(number) { "#{action}?#{URI.encode_www_form(q: query, page: number)}" } %>
+<div class="content-block content-block--search">
+  <form class="search__form" role="search" method="get" action="<%= action %>">
+    <label class="search__label" for="<%= field_id %>"><%= label %></label>
+    <div class="search__row">
+      <input class="search__input" id="<%= field_id %>" type="search" name="q" maxlength="<%= SiteSearch::Query::MAX_LENGTH %>" value="<%= query %>">
+      <button class="search__button" type="submit"><%= string(:button) %></button>
+    </div>
+  </form>
+  <% unless state == :empty %>
+    <% if live_note? %>
+      <p class="search__note"><%= string(:live_note) %></p>
+    <% end %>
+    <% if state == :results %>
+      <p class="search__summary" role="status"><%= string(:results, count: total, query: tag.q(query)) %><% if pagination.page > 1 %> <span class="search__page">· <%= string(:page, page: pagination.page) %></span><% end %></p>
+      <ol class="search__results"<% if pagination.first_item > 1 %> start="<%= pagination.first_item %>"<% end %>>
+        <% results.each do |result| %>
+          <li class="search__result">
+            <a class="search__title" href="<%= result.url_path %>"><%= result.title %></a>
+            <% if result.date %>
+              <p class="search__where search__where--date"><%= result.date %></p>
+            <% elsif result.where %>
+              <p class="search__where"><%= result.where %></p>
+            <% end %>
+            <p class="search__snippet"><%= result.snippet %></p>
+          </li>
+        <% end %>
+      </ol>
+      <% unless pagination.single_page? %>
+        <nav class="search-pager" aria-label="<%= string(:pages) %>" data-turbo-prefetch="false">
+          <% if pagination.page > 1 %>
+            <a href="<%= link_to_page.(pagination.page - 1) %>" rel="prev"><span aria-hidden="true">← </span><%= string(:previous) %></a>
+          <% end %>
+          <% pagination.series.each do |number| %>
+            <% if number == :gap %>
+              <span class="search-pager__gap" aria-hidden="true">…</span>
+            <% elsif number == pagination.page %>
+              <span class="search-pager__current" aria-current="page"><%= number %></span>
+            <% else %>
+              <a href="<%= link_to_page.(number) %>" aria-label="<%= string(:page, page: number) %>"><%= number %></a>
+            <% end %>
+          <% end %>
+          <% if pagination.page < pagination.total_pages %>
+            <a href="<%= link_to_page.(pagination.page + 1) %>" rel="next"><%= string(:next) %><span aria-hidden="true"> →</span></a>
+          <% end %>
+        </nav>
+      <% end %>
+    <% elsif state == :past_end %>
+      <p class="search__message" role="status"><%= string(:past_end, results: string(:results, count: total, query: tag.q(query)), page: pagination.page) %> <a href="<%= link_to_page.(1) %>" data-turbo-prefetch="false"><%= string(:first_page) %></a></p>
+    <% elsif state == :none %>
+      <p class="search__message" role="status"><%= string(:none, query: tag.q(query)) %></p>
+    <% elsif state == :too_long %>
+      <p class="search__message" role="status"><%= string(:too_long) %></p>
+    <% elsif state == :limited %>
+      <p class="search__message" role="status"><%= string(:limited) %></p>
+    <% elsif state == :unavailable %>
+      <p class="search__message" role="status"><%= string(:unavailable) %></p>
+    <% end %>
+  <% end %>
+</div>

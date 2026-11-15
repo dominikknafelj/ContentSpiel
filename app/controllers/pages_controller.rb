@@ -19,6 +19,14 @@ class PagesController < PublicController
   # old default takes effect on the very next request, not after a deploy.
   before_action :redirect_default_locale_prefix
 
+  # After the redirect, so a search sent to its canonical address counts
+  # once, there.
+  include SiteSearch::QueryLimit
+
+  # `q` as the bytes it came in (`PublicPageRendering#search_requested?`
+  # says why).
+  param_encoding :show, :q, Encoding::BINARY
+
   # The content version is read before anything it stands for: ahead of the
   # resolver, the record and the settings row. A write that commits while
   # this request runs is then seen as new content under the old version -- a
@@ -50,6 +58,16 @@ class PagesController < PublicController
       # not the page's weight.
       light = result.record.is_a?(Page) # public: rows (the resolver's record is only asked its class here)
       return render(:not_found, status: :not_found) unless light || assign_record(result.record) # public: rows (assign_record reads the copy through as_published)
+
+      # A search is rendered every time, with no ETag and no `stale?`
+      # (`answer_search_privately` set its headers): a 304 would be
+      # decided before the page's blocks are, and the answer is the
+      # visitor's own.
+      if search_requested?
+        assign_record(result.record) if light # public: rows (assign_record reads the copy through as_published)
+        preload_page_images(@page)
+        return render(:show, status: search_status)
+      end
 
       # `stale?` answers a matching `If-None-Match` with a bare 304 itself --
       # `render :show` below only ever runs for a genuinely stale request.
@@ -133,11 +151,21 @@ class PagesController < PublicController
     Current.site = nil
   end
 
+  # The location is a path, which `redirect_to` answers on the request's own
+  # host: its leading slashes and backslashes taken off, each decoded
+  # segment percent-encoded again, and the query rebuilt from the query
+  # parameters. `/en/%2Fevil.com` decodes to the path "/evil.com", and
+  # "//evil.com" (or "/\evil.com", which a browser reads alike) is another
+  # host; a decoded space, tab, quote, brace, line break or letter outside
+  # ASCII (`/en/caf%C3%A9`) is a location Rails cannot parse. Rails refuses
+  # both with an error whose message holds the location and so the query.
+  # Encoded, the path names the same page: the router decodes it again.
   def redirect_default_locale_prefix
     return unless public_urls.redundant_prefix?(params[:locale])
 
-    path = "/#{params[:path]}".sub(%r{/+$}, "").presence || "/"
-    path += "?#{request.query_string}" if request.query_string.present?
-    redirect_to path, status: :found
+    segments = params[:path].to_s.sub(%r{\A[/\\]+}, "").sub(%r{/+\z}, "").split("/", -1)
+    path = "/#{segments.map { |segment| ERB::Util.url_encode(segment) }.join("/")}"
+    query = request.query_parameters.to_query
+    redirect_to "#{path}#{"?#{query}" if query.present?}", status: :found
   end
 end

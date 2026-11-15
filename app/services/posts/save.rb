@@ -108,6 +108,7 @@ module Posts
         unknown_keys = unknown_language_keys_refusal(@post, @translations, LANGUAGE_KEYS, hint: "A post type's own fields go in fields.")
         raise ActiveRecord::Rollback if unknown_keys
 
+        moved_in_time = @post.published_at_changed?
         (@post.save && tags_valid? && assign_related_posts) || raise(ActiveRecord::Rollback)
         touch_for_join_rows(related_before)
         # A post is touched for its tags only when nothing else of it changed;
@@ -120,6 +121,9 @@ module Posts
         # The post's stored translation state (`translation_states`).
         Translations::StateIndex.refresh(@post)
         keep_address(was_unpublished, related_before)
+        # Unpublished or moved to another time: what the search shows of the
+        # post moves with no copy (a copy taken is indexed by itself).
+        SiteSearch::Indexing.record_changed(@post) if moved_in_time && !(was_unpublished && @post.published_at.present?)
         record_events(related_before)
         true
       end

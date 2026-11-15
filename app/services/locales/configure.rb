@@ -71,11 +71,16 @@ module Locales
         return [ "must list exactly the enabled languages" ]
       end
 
+      languages = SiteSearch::IndexState.languages(site)
       site.locales = @entries
       return site.errors.full_messages.presence || [ "Languages could not be saved" ] unless site.save
 
       changes = Audit::Snapshot.field_changes_for(site)
       record_event("language.configured", subject: site, field_changes: changes) if changes.any?
+      # A fallback, or the order's last tier of a chain: the search index is
+      # built again when a chain moved, after the commit of whichever
+      # transaction this runs in.
+      SiteSearch::Indexing.languages_changed if SiteSearch::IndexState.languages(site) != languages
       []
     end
 

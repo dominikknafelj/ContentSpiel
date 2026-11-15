@@ -135,6 +135,19 @@ module ThemeHelper
     @navigation_pages = theme_root_page ? published_views(theme_root_page.children.kept.published) : [] # public: rows (the menu's membership and order are the rows' (the tree); titles come from published_views)
   end
 
+  # The page that holds the site's first Search block, as published, or nil:
+  # where a theme's own header search box points (`page_url_path` of it, a
+  # form with `method="get"` and `name="q"`). With nil a theme draws no
+  # header form. Read from the copies in force, so it moves with the content
+  # version and the ETag of every page that draws such a form stays right
+  # (`SiteSearch::SearchPage`); memoised for the render, because a theme may
+  # draw the form in a header and a drawer.
+  def search_page
+    return @search_page if defined?(@search_page)
+
+    @search_page = SiteSearch::SearchPage.new.page
+  end
+
   def home_url_path
     theme_root_page ? page_url_path(theme_root_page) : "/"
   end

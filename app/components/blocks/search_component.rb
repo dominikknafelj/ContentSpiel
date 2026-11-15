@@ -1,0 +1,122 @@
+module Blocks
+  # The Search block on the public site (`BlockTypes::Search`, search spec
+  # §7.2; the SiteSearch card): a GET form to the page it stands on, and for
+  # a request with a query, the outcome below it. Works with no script.
+  #
+  # IT NEVER READS THE REQUEST. The query and the outcome are the request's
+  # `SiteSearch::Answer`, handed over by the controller as the helper
+  # `search_answer` (`PublicPageRendering`), which searches the first time a
+  # block asks and keeps the answer for the render: two blocks on a page
+  # draw one search. The block it is handed is read for its label alone.
+  #
+  # EVERYTHING IT PRINTS IS TEXT. A result's title and place, the query in
+  # the field, in the count and in a message, are printed through ERB's own
+  # escaping; the snippet is escaped by `Result#snippet` before its marks are
+  # wrapped in `<mark>`, the one markup that is the component's own; and a
+  # sentence that quotes the query is built by `string` from the escaped
+  # words and the quote's element (`<q>`, made by `tag.q`). Nothing here, in
+  # `Result` or in the template marks a string as safe
+  # (`test/components/blocks/search_component_test.rb`).
+  class SearchComponent < ApplicationComponent
+    include Blocks::FixedWords
+    include Blocks::Contract
+
+    contract(
+      accessibility: "A form with role=search, a real label for its type=search field, and a button; the count and every message are role=status; the pager is a named nav whose current page is aria-current=page and whose number links are named \"Page n\"; a match is marked and also in the words.",
+      motion: :none,
+      content_edges: %i[long short missing],
+      widths: :from_container,
+      interface: %i[block page label query state results total pagination action live_note? string],
+      words: %w[public.blocks.search.label public.blocks.search.button public.blocks.search.results public.blocks.search.page
+                public.blocks.search.pages public.blocks.search.previous public.blocks.search.next public.blocks.search.none
+                public.blocks.search.past_end public.blocks.search.first_page public.blocks.search.too_long
+                public.blocks.search.limited public.blocks.search.unavailable public.blocks.search.live_note],
+      limits: [
+        "It finds what a visitor sees now: no draft, no unpublished change, no other language.",
+        "No filter, no sort and no suggestion as one types; ten results to a page.",
+        "A results page is stored by no cache."
+      ]
+    )
+
+    # The block's words, the keys of `public.blocks.search`
+    # (`config/locales/public.en.yml`): what `string` answers, and nothing
+    # else.
+    STRINGS = %i[label button results page pages previous next none past_end first_page too_long limited unavailable live_note].freeze
+
+    # The words that are a plural, which I18n answers as a Hash of its forms
+    # when no `count:` is given.
+    COUNTED = %i[results].freeze
+
+    # What stands in a sentence for a value handed in as markup, while I18n
+    # interpolates: two NULs around its index. No locale's words hold a NUL.
+    HOLE = /\u0000(\d+)\u0000/
+
+    def initialize(block:, page:)
+      @block = block
+      @page = page
+    end
+
+    private
+
+    attr_reader :block, :page
+
+    def answer = @answer ||= helpers.search_answer
+
+    # The settings in the visitor's language, with the site's fallback for
+    # the translated label.
+    def settings = @settings ||= block.settings_object(fallback: true)
+
+    # The editor's label, else the CMS's word.
+    def label = settings&.label.presence || string(:label)
+
+    # The text the field holds: the normalised query, or what was typed when
+    # it is too long to search; nil for none.
+    def query = answer.query
+
+    # The answer's state (`SiteSearch::Answer::STATES`), and `:past_end`
+    # where it found results but none on the page asked for.
+    def state = answer.past_end? ? :past_end : answer.state
+
+    def results = @results ||= answer.results.map { |item| Result.new(item) }
+
+    def total = answer.total
+
+    def pagination = answer.pagination
+
+    # The shown page's own address, the preview's under the preview: the
+    # form is sent there, and the pager's links go there with `q` and `page`.
+    def action = page_url_path(page)
+
+    def live_note? = answer.live_note?
+
+    # One of the words of `STRINGS` in the visitor's language, English where
+    # that language has none; `options` are I18n's (`count:`, and the
+    # values a sentence holds: `query:`, `page:`, `results:`). `too_long`'s
+    # `max:` is the query's limit unless one is handed in.
+    #
+    # A value handed in as markup (an `ActiveSupport::SafeBuffer`: the
+    # query in its `<q>`, a sentence this method made) is placed into the
+    # escaped words as it is, and the answer is then markup too; any other
+    # value is part of the words and escaped with them where they are
+    # printed. So a quoted query is the escaped query in the CMS's element
+    # and never a string marked safe.
+    #
+    # ONLY THOSE WORDS (`Blocks::FixedWords`): another key raises where a
+    # theme is written and is empty in production, and `results` without
+    # `count:` too.
+    def string(key, **options)
+      if COUNTED.include?(key.to_s.to_sym) && !options.key?(:count)
+        return refused_word(key, "Blocks::SearchComponent#string(#{key.to_s.to_sym.inspect}) is a plural and needs count: (string(#{key.to_s.to_sym.inspect}, count: 2, query: …))")
+      end
+
+      options = { max: SiteSearch::Query::MAX_LENGTH }.merge(options) if key.to_s == "too_long"
+      marked = options.select { |_, value| value.is_a?(ActiveSupport::SafeBuffer) }
+      return fixed_word(key, scope: "public.blocks.search", owner: "the Search block's", **options) if marked.empty?
+
+      holes = marked.keys.each_with_index.to_h { |name, index| [ name, "\u0000#{index}\u0000" ] }
+      words = fixed_word(key, scope: "public.blocks.search", owner: "the Search block's", **options.merge(holes))
+      values = marked.values
+      safe_join(words.split(HOLE).each_with_index.map { |part, index| index.odd? ? values.fetch(part.to_i) : part })
+    end
+  end
+end

@@ -1,6 +1,7 @@
 # The registration hooks for code outside the CMS (block types spec,
 # decision 11), one per registry: `block_types`, `form_field_types`,
-# `form_destinations`, `studio_modules` and `sign_in_methods`. An engine calls, for example,
+# `form_destinations`, `studio_modules`, `sign_in_methods` and
+# `search_backends`. An engine calls, for example,
 #
 #   ContentSpiel::Plugins.block_types do |types|
 #     types.register "gallery/album" do |t| … end
@@ -10,7 +11,8 @@
 # block, for the life of the process, and the application's initializer
 # (config/initializers/types.rb for the three type hooks,
 # config/initializers/studio_modules.rb for the modules',
-# config/initializers/sign_in_methods.rb for the sign-in methods') calls every kept
+# config/initializers/sign_in_methods.rb for the sign-in methods',
+# config/initializers/site_search.rb for the search backends') calls every kept
 # block after the built-ins on every `to_prepare`, so a reload registers the
 # outside entries again against freshly loaded classes, as it does the
 # built-ins. An engine's own `to_prepare` would not do: it runs before the
@@ -18,7 +20,7 @@
 # registers `owner/name`, under the same owner rules (`Registrar`), and an
 # owner named like one of the CMS's own top-level constants is refused.
 #
-# These five are the only registries a gem can reach. Every other one is
+# These six are the only registries a gem can reach. Every other one is
 # emptied and refilled with the built-ins on every `to_prepare` and replays
 # nothing from outside, so a gem's own `register` there is wiped at boot and
 # on every reload, without an error: the content types and field groups, the
@@ -107,6 +109,7 @@ module ContentSpiel
     REPLAYED_ALL = [ REPLAYED, REPLAYED_FORM_FIELD_TYPES, REPLAYED_FORM_DESTINATIONS ].freeze
     REPLAYED_STUDIO_MODULES = "ContentSpiel::Plugins.studio_modules, called at".freeze
     REPLAYED_SIGN_IN_METHODS = "ContentSpiel::Plugins.sign_in_methods, called at".freeze
+    REPLAYED_SEARCH_BACKENDS = "ContentSpiel::Plugins.search_backends, called at".freeze
 
     # What a studio modules hook's block is handed: `register` and `badge`
     # with `StudioModules`' own signatures, and nothing else of the registry
@@ -138,7 +141,7 @@ module ContentSpiel
 
     # One hook list per registry: a hook is replayed into its own registry
     # only, in the order it was called.
-    @hooks = { block_types: [], form_field_types: [], form_destinations: [], studio_modules: [], sign_in_methods: [] }
+    @hooks = { block_types: [], form_field_types: [], form_destinations: [], studio_modules: [], sign_in_methods: [], search_backends: [] }
 
     class << self
       def block_types(&block)
@@ -225,6 +228,27 @@ module ContentSpiel
         keep(:sign_in_methods, block, caller_locations(1, 1).first)
       end
 
+      # Where the public site's search is answered, from a gem:
+      #
+      #   ContentSpiel::Plugins.search_backends do |backends|
+      #     backends.register "acme/solr", label: "Solr",
+      #       backend: -> { Acme::SolrBackend.new(url: ENV.fetch("ACME_SOLR_URL")) }
+      #   end
+      #
+      # The arguments are `SiteSearch::Backends.register`'s, with the owner
+      # rules of `Registrar` (`inline:` is the built-in's alone), and the
+      # backend's contract is in `SiteSearch::Backend`'s comment. `backend:`
+      # is called once per process, when the site has chosen the backend by
+      # `SEARCH_BACKEND`, so a gem reads its engine's variables then and not
+      # when the hook is replayed. Kept and replayed by
+      # config/initializers/site_search.rb on every `to_prepare`, after the
+      # built-in, for the reasons the studio modules' hook gives.
+      def search_backends(&block)
+        raise ArgumentError, "ContentSpiel::Plugins.search_backends takes a block" unless block
+
+        keep(:search_backends, block, caller_locations(1, 1).first)
+      end
+
       # Every kept block, in the order the hooks were called (the Gemfile's
       # order), each with a registrar of its own. Whatever a block raises is
       # raised again, as the same class, with the place of the hook's call in
@@ -264,6 +288,15 @@ module ContentSpiel
       def register_sign_in_methods(registry)
         replay(:sign_in_methods, REPLAYED_SIGN_IN_METHODS) do |location, owners|
           Registrar.new(registry, location, owners, kind: "sign-in method", takes: %i[attributes],
+            build: ->(name, attributes, _definition) { registry.register(name, **attributes) })
+        end
+      end
+
+      # Every kept search backend hook, replayed the same way into
+      # `SiteSearch::Backends`.
+      def register_search_backends(registry)
+        replay(:search_backends, REPLAYED_SEARCH_BACKENDS) do |location, owners|
+          Registrar.new(registry, location, owners, kind: "search backend", takes: %i[attributes],
             build: ->(name, attributes, _definition) { registry.register(name, **attributes) })
         end
       end

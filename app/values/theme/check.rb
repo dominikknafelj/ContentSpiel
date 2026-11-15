@@ -112,6 +112,17 @@ class Theme
     TITLE = "views/layouts/public/_title.html.erb".freeze
     HEAD = "views/layouts/public/_head.html.erb".freeze
 
+    # A theme's Search template, and what it may never print with: every
+    # word the block draws is a visitor's query or a record's title, place
+    # or snippet, and printed unescaped any of them adds markup to the page
+    # (`Blocks::SearchComponent`'s comment). Asked of this one template,
+    # where the default's escaping is the whole of the block's safety; the
+    # Code, Note and Card templates are told so in the reference and not
+    # here. `raw` and `html_safe` are read in a tag's code (`reads?`), so a
+    # word in a string is no call; `<%==` is ERB's own.
+    SEARCH = "components/blocks/search_component.html.erb".freeze
+    UNESCAPED = /(?<![\w.@:])raw\b|\.html_safe\b|\bsafe_concat\b/
+
     # An attribute or a helper's option with a value, however it is written:
     # `rel="canonical"`, `rel: "canonical"`, `rel: :canonical`,
     # `:rel => "canonical"`, `"rel" => "canonical"`, and the value among
@@ -532,6 +543,11 @@ class Theme
         found << "#{file} assigns an instance variable: a template is rendered before the layout, which reads the page, the post " \
                  "and the preview from instance variables to write the title and the head's tags. Use a local variable " \
                  "(`name = …`), or pass the value to a partial as a local."
+      end
+      if file == SEARCH && (code.include?("<%==") || tags.any? { |tag| reads?(tag, UNESCAPED) })
+        found << "#{file} prints something unescaped (raw, html_safe, safe_concat or <%==): the Search block draws a visitor's query " \
+                 "and the titles, places and snippets of what was found, and any of them printed so can add markup to the page. " \
+                 "Print each with <%= %>; `result.snippet` is already escaped, with its marks, and `string` quotes the query itself."
       end
       if file == FRAME && !yields?(code)
         found << "#{file} never prints the page: `yield` is the page, and without it every address of the site shows the frame " \

@@ -29,6 +29,7 @@ module BlockTypes
         t.stylesheet "table.css"
         t.summary ->(block, locale:) { Table.summary(block, locale: locale) }
         t.preview ->(block, locale:) { Table.preview(block, locale: locale) }
+        t.search_text ->(block, locale:) { Table.search_text(block, locale: locale) }
         t.sample translations: { "en" => { caption: "Plans compared" }, "de" => { caption: "Tarife im Vergleich" }, "es" => { caption: "Planes comparados" } },
                  body: <<~MARKDOWN,
                    | Plan | Monthly price | Storage |
@@ -38,6 +39,16 @@ module BlockTypes
                  MARKDOWN
                  shows: [ "Plans compared", "Monthly price", "Unlimited" ]
       end
+    end
+
+    # Every cell, row by row (`RichText::Document#plain_paragraphs` reads a
+    # table one entry per cell), then the caption; nothing for an empty
+    # table, which is not drawn.
+    def self.search_text(block, locale:)
+      document = ::Locales.read(block, :body, locale: locale)
+      return [] if TableBody.new(document).blank?
+
+      SiteSearch.paragraphs(document) + [ ::Locales.read(block, :caption, locale: locale) ]
     end
 
     # The tile's preview: the caption over the first row's cells.

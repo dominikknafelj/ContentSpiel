@@ -1,0 +1,145 @@
+# A search backend that keeps its documents in memory, for the tests of the
+# code around a backend (indexing, the sync job, the results, System
+# status). It obeys the contract (`SiteSearch::Backend`), which
+# test/models/site_search/fake_test.rb holds it to with the shared
+# contract test. Words are split, then matched downcased and whole,
+# every word of the query in some field of the document; a match in a
+# heavier field ranks higher.
+#
+#   SiteSearch::Fake.new(raise_with: RuntimeError.new("…"))  # every method raises it
+#   SiteSearch::Fake.new(sleep_for: 5)                        # slow; past the deadline it raises Timeout::Error at the deadline
+#
+# `documents` is every stored document by key, for a test to read.
+# `installed { … }` makes this fake the site's backend inside the block, as
+# a gem's would be (registered as "test/fake", chosen by SEARCH_BACKEND).
+class SiteSearch::Fake
+  WEIGHTS = { a: 1.0, b: 0.4, c: 0.2, d: 0.1 }.freeze
+  WORD = /[[:alnum:]]+/
+  SNIPPET = 160
+
+  attr_reader :documents
+
+  def initialize(raise_with: nil, sleep_for: nil)
+    @raise_with = raise_with
+    @sleep_for = sleep_for
+    @documents = {}
+  end
+
+  NAME = "test/fake".freeze
+
+  def installed
+    fake = self
+    SiteSearch::Backends.register NAME, label: "Fake", backend: -> { fake }
+    was = ENV["SEARCH_BACKEND"]
+    ENV["SEARCH_BACKEND"] = NAME
+    SiteSearch::Backends.forget!
+    yield self
+  ensure
+    was.nil? ? ENV.delete("SEARCH_BACKEND") : ENV["SEARCH_BACKEND"] = was
+    SiteSearch::Backends.forget!
+    Rails.application.reloader.prepare!
+  end
+
+  def index(documents)
+    trouble!
+    documents.each { |document| @documents[document.key] = document }
+    nil
+  end
+
+  def remove(record_type:, record_id:, copy_ids: nil, languages: nil)
+    trouble!
+    @documents.delete_if do |_key, document|
+      document.record_type == record_type && document.record_id == record_id &&
+        (copy_ids.nil? || copy_ids.include?(document.copy_id)) && (languages.nil? || languages.include?(document.language))
+    end
+    nil
+  end
+
+  def prune_record(record_type:, record_id:, except_copy_ids:)
+    trouble!
+    @documents.delete_if do |_key, document|
+      document.record_type == record_type && document.record_id == record_id && !except_copy_ids.include?(document.copy_id)
+    end
+    nil
+  end
+
+  def clear
+    @documents.clear
+    nil
+  end
+
+  def search(query, deadline:)
+    trouble!(deadline)
+    words = words_of(query.text).uniq
+    matches = @documents.values.filter_map do |document|
+      next unless document.language == query.language && shown?(document, query.now)
+
+      rank = rank_of(document, words)
+      [ document, rank ] if rank
+    end
+    matches.sort_by! { |document, rank| [ -rank, document.key ] }
+    hits = matches.drop(query.offset).first(query.per_page).map do |document, rank|
+      SiteSearch::Hit.new(record_type: document.record_type, record_id: document.record_id, copy_id: document.copy_id,
+        language: document.language, snippet: snippet_of(document, words), rank: rank)
+    end
+    SiteSearch::Results.new(hits: hits, total: matches.size)
+  end
+
+  def health(deadline:)
+    trouble!(deadline)
+    SiteSearch::Health.new(status: :ok, detail: nil)
+  end
+
+  private
+
+  def shown?(document, now) = document.shown_from <= now && (document.shown_until.nil? || now < document.shown_until)
+
+  # Nil unless every word is in some field; else the sum, per word, of the
+  # heaviest field it is in.
+  def rank_of(document, words)
+    return nil if words.empty?
+
+    words.sum do |word|
+      weights = document.fields.select { |field| words_of(field.text).include?(word) }.map { |field| WEIGHTS.fetch(field.weight) }
+      return nil if weights.empty?
+
+      weights.max
+    end
+  end
+
+  # A window of the first text (the body's first) that holds a word, from
+  # shortly before that word's first whole occurrence, with every whole
+  # occurrence of a word inside it marked. The words are found in the text
+  # itself and compared downcased one by one, so an offset is always the
+  # text's (a downcase can be longer than its word: "İ" is two characters).
+  def snippet_of(document, words)
+    text = [ document.text, *document.fields.map(&:text) ].find { |each| (words_of(each) & words).any? } || ""
+    first = whole_words(text, words).first&.first || 0
+    window = text[[ first - 40, 0 ].max, SNIPPET]
+    SiteSearch::Snippet.new(text: window, marks: whole_words(window, words))
+  end
+
+  # The words of `text` as matched: split first, then downcased, so a
+  # letter whose downcase is longer ("İ", "i" and a combining dot) splits
+  # no word. `whole_words` splits the same way.
+  def words_of(text) = text.scan(WORD).map(&:downcase)
+
+  # `[start, length]` of each whole word of `text` that is one of `words`.
+  def whole_words(text, words)
+    marks = []
+    text.scan(WORD) do
+      match = Regexp.last_match
+      marks << [ match.begin(0), match[0].length ] if words.include?(match[0].downcase)
+    end
+    marks
+  end
+
+  def trouble!(deadline = nil)
+    if @sleep_for
+      left = deadline ? deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC) : @sleep_for
+      sleep [ @sleep_for, left ].min.clamp(0, nil)
+      raise Timeout::Error, "the search backend did not answer by its deadline" if @sleep_for > left
+    end
+    raise @raise_with if @raise_with
+  end
+end

@@ -157,6 +157,59 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_no_selector text
   end
 
+  # The Design System's EditorSearchBlock: the label is the heading, a
+  # blank one the visitor's word standing quiet with "Default label", and
+  # every tile ends "Searches the live site". A blank label is a finished
+  # block, so the tile never says Empty.
+  def tile_line = ".admin-block-tile__summary > .admin-block-tile__line"
+
+  test "a Search tile never says Empty" do
+    blank = block("search")
+    render_summary blank
+
+    assert_selector "#{heading}.text-meta.font-medium", exact_text: "Search this site"
+    assert_no_selector "#{heading}.font-semibold"
+    assert_no_selector "#{heading}.text-ink"
+    assert_selector "#{tile_line}##{Admin::EditorScreen::TileSummaryComponent.text_id(blank)}.text-xs.text-meta", exact_text: "Default label · Searches the live site"
+    assert_no_selector text
+    assert_no_text "Empty"
+    assert_no_selector attention
+
+    filled = block("search")
+    filled.assign_settings({ "label" => "Search the guide" }, locale: "en")
+    filled.save!
+    render_summary filled
+
+    assert_selector "#{heading}.font-semibold.text-ink", exact_text: "Search the guide"
+    assert_no_selector "#{heading}.text-meta"
+    assert_selector tile_line, exact_text: "Searches the live site"
+    assert_no_text "Empty"
+
+    render_summary filled, invalid: true
+    assert_selector tile_line, exact_text: "Searches the live site"
+    assert_selector ".admin-block-tile__summary > span", exact_text: "Needs fixing"
+  end
+
+  # A type's preview that asks for its line (`line: true`) draws the line
+  # under its heading, where a text would stand, and is described by it; a
+  # preview without one keeps today's tile.
+  test "a preview that asks for the line draws the summary under its heading, in place of the text" do
+    with_test_types do
+      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :text, "Plain" ], [ :mono, "x = 1" ] ] })
+      BlockTypes.fetch("test/quote").preview(->(block, locale:) { ContentModel::Preview.new(heading: "Quoted", line: true) })
+      shown = block("test/quote", settings: { "text" => "Q" })
+      render_summary shown
+      assert_selector heading, exact_text: "Quoted"
+      assert_selector "#{tile_line}##{Admin::EditorScreen::TileSummaryComponent.text_id(shown)}", exact_text: "Plainx = 1"
+      assert_selector "#{tile_line} > span.font-cs-mono", exact_text: "x = 1"
+
+      BlockTypes.fetch("test/quote").preview(->(block, locale:) { ContentModel::Preview.new(heading: "Quoted", quiet_heading: true) })
+      render_summary block("test/quote", settings: { "text" => "Q" })
+      assert_selector "#{heading}.text-meta.font-medium", exact_text: "Quoted"
+      assert_no_selector tile_line
+    end
+  end
+
   test "a preview that looks like markup is drawn as text" do
     body = { "type" => "doc", "content" => [
       { "type" => "heading", "attrs" => { "level" => 2 }, "content" => [ { "type" => "text", "text" => "<i>Head</i>" } ] },

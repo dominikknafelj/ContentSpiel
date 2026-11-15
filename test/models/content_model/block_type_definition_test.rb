@@ -310,7 +310,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
 
   test "every built-in block type declares the family the design gives it" do
     families = { "rich_text" => :text, "note" => :text, "image" => :media, "card" => :media, "code" => :code, "diagram" => :code, "table" => :code,
-                 "form" => :form, "post_list" => :lists, "section" => :structure }
+                 "form" => :form, "search" => :form, "post_list" => :lists, "section" => :structure }
     assert_equal families, BlockTypes.all.to_h { |type| [ type.name, type.family ] }.slice(*BuiltInBlockTypes.names)
   end
 
@@ -383,6 +383,36 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_equal (("a" * (length - 1)) + "…"), cut
   end
 
+  # A preview's heading may stand quiet (the meta colour, weight 500: a
+  # word the CMS supplies, not one the editor typed), and a preview may ask
+  # for the type's summary line under its heading in place of a text.
+  test "a preview's heading is quiet and its line drawn only when asked, and a line stands in place of a text" do
+    plain = ContentModel::Preview.new(heading: "Search")
+    assert_not plain.quiet_heading
+    assert_not plain.line
+
+    quiet = ContentModel::Preview.new(heading: "Search this site", quiet_heading: "yes", line: 1)
+    assert_equal true, quiet.quiet_heading
+    assert_equal true, quiet.line
+    assert_not quiet.blank?
+
+    error = assert_raises(ArgumentError) { ContentModel::Preview.new(heading: "A", text: "Some words", line: true) }
+    assert_includes error.message, "in place of its text"
+    assert ContentModel::Preview.new(heading: "A", text: "  ", line: true).line, "a blank text is no text"
+  end
+
+  test "editor_note names a key of the card's own note, and anything else is refused, the type's name first" do
+    d = definition
+    assert_nil d.editor_note
+    d.editor_note :"search.note"
+    assert_equal :"search.note", d.editor_note
+
+    [ "search.note", :"", 3 ].each do |bad|
+      error = assert_raises(ArgumentError, bad.inspect) { definition.editor_note bad }
+      assert_match(/\Atest_shape: `editor_note` is a Symbol naming a key under admin\.components\.fields/, error.message)
+    end
+  end
+
   test "preview is a callable taking the block and locale:, and anything else is refused, the type's name first" do
     d = definition
     assert_nil d.preview
@@ -417,6 +447,60 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
 
     error = assert_raises(ArgumentError) { definition.finalize! }
     assert_match(/\Agallery\/flag: a block type from outside draws no tile picture/, error.message)
+  end
+
+  test "search_text is refused unless it takes the block and locale:" do
+    d = definition
+    assert_equal({}, d.search_texts)
+    text = ->(_block, locale:) { [ locale ] }
+    code = ->(_block, locale:) { [ locale ] }
+    d.search_text text
+    d.search_text :code, code
+    assert_equal({ body: text, code: code }, d.search_texts)
+
+    [ "words", ->(block) { block }, ->(locale:) { locale } ].each do |bad|
+      error = assert_raises(ArgumentError) { definition.search_text bad }
+      assert_match(/\Atest_shape: `search_text` is a callable taking the block and `locale:`/, error.message)
+    end
+    assert_raises(ArgumentError) { definition.search_text :code }
+    assert_raises(ArgumentError) { definition.search_text }
+  end
+
+  test "search_text's kind is :code or none" do
+    error = assert_raises(ArgumentError) { definition.search_text :title, ->(_block, locale:) { [] } }
+    assert_match(/\Atest_shape: search_text's kind is :code/, error.message)
+  end
+
+  # D is the built-in Code block's weight: a gem's code would outrank no
+  # prose, and its listing would sit beside the CMS's own.
+  test "an outside type may not declare :code search text" do
+    outside = ContentModel::BlockTypeDefinition.new("gallery/listing")
+    outside.search_text ->(_block, locale:) { [] }
+    outside.theme_methods :block, :page
+    outside.sample shows: [ "content-block" ]
+    outside.finalize!
+
+    outside.search_text :code, ->(_block, locale:) { [] }
+    error = assert_raises(ArgumentError) { outside.finalize! }
+    assert_match(/\Agallery\/listing: a block type from outside declares no :code search text/, error.message)
+  end
+
+  # A `:search` block makes its page's request search (spec §8): the
+  # request's limit, its no-store answer and the query's privacy are the
+  # CMS's, and a gem's block would be a second door to them with no seam.
+  test "an outside type may not claim :search" do
+    outside = ContentModel::BlockTypeDefinition.new("gallery/finder")
+    TestTypes.declare(outside)
+    outside.capability :search
+
+    error = assert_raises(ArgumentError) { outside.finalize! }
+    assert_match(/\Agallery\/finder: a block type from outside may not claim :search/, error.message)
+
+    built_in = ContentModel::BlockTypeDefinition.new("finder")
+    TestTypes.declare(built_in)
+    built_in.capability :search
+    built_in.finalize!
+    assert built_in.capability?(:search)
   end
 
   test "a type that declares no preview answers nil" do

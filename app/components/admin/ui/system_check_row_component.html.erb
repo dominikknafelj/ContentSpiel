@@ -5,6 +5,9 @@
   <div class="min-w-0 flex-1">
     <p class="font-semibold text-ink"><%= result.label %></p>
     <p class="text-dim"><%= result.message %></p>
+    <% if result.note.present? %>
+      <p class="mt-2 rounded-card bg-sunken px-[10px] py-[6px] text-small text-dim"><%= result.note %></p>
+    <% end %>
     <% if result.command.present? %>
       <%= render copy_value %>
     <% end %>

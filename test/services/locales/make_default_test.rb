@@ -1,6 +1,8 @@
 require "test_helper"
 
 class Locales::MakeDefaultTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup { with_locales(%w[en de es], default: "en") }
 
   test "makes an enabled language the default, carries the title and records the event" do
@@ -125,5 +127,18 @@ class Locales::MakeDefaultTest < ActiveSupport::TestCase
     fresh = SiteSetting.find(stale.id)
     assert_equal "de", fresh.default_locale
     assert_equal %w[en de es fr], fresh.locale_codes
+  end
+
+  test "a change of languages enqueues the search index's rebuild after the commit" do
+    clear_enqueued_jobs
+    SiteSetting.transaction do
+      assert as_owner { Locales::MakeDefault.call("de") }.ok?
+      assert_no_enqueued_jobs only: SiteSearch::ReindexJob
+    end
+    assert_enqueued_with(job: SiteSearch::ReindexJob, args: [ "postgres" ])
+
+    clear_enqueued_jobs
+    assert as_owner { Locales::MakeDefault.call("de") }.ok?
+    assert_no_enqueued_jobs only: SiteSearch::ReindexJob
   end
 end

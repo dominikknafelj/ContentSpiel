@@ -184,6 +184,12 @@
   --th-form-error: color-mix(in srgb, var(--th-danger) 60%, var(--th-on-band-strong));
   --th-form-done-ground: var(--th-band-strong);
   --th-form-done-line: color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong));
+  /* A search's mark on this band: the band's text at 22% into the band,
+     and the band's text on it. The computed tokens would otherwise keep
+     the page's light tint under the band's light text. The rest of the
+     block reads the base tokens the band re-values above. */
+  --th-search-mark: color-mix(in srgb, var(--th-on-band-strong) 22%, var(--th-band-strong));
+  --th-search-mark-ink: var(--th-on-band-strong);
   /* A diagram on this band (Diagram block spec §4), as the Code block's:
      the labels the band's text, edges the band's dim and the accent the
      band's. A node, a group, a note and a node's outline are the band's
@@ -211,6 +217,9 @@
 /* A form's native controls (the select's list, the checkbox, the radio)
    drawn for the band's dark ground, in both schemes, as a code block's. */
 .content-section--strong .content-block--form { color-scheme: dark; }
+/* A search field's own drawing (its clear button) for the band's dark
+   ground, in both schemes, as a form's. */
+.content-section--strong .content-block--search { color-scheme: dark; }
 
 /* `content` keeps the band inside the content column; `full` runs it edge to
    edge and puts the content back on the page's content width. The content

@@ -35,11 +35,14 @@ end
 # `with_leaked_password_check`, neither of which asks the network
 # (test/support/sign_in_helper.rb). The SSO variables go too: a developer's
 # provider would otherwise sign every test's page with a button.
+# SEARCH_BACKEND goes too: a developer's outside engine would otherwise stop
+# the test boot, which registers the built-in alone.
 %w[PUBLIC_HOST ADMIN_HOST THEME_PATH
    MAIL_SMTP_SERVER MAIL_SMTP_PORT MAIL_SMTP_SECURITY MAIL_SMTP_USERNAME MAIL_SMTP_PASSWORD
    MAIL_SENDER_NAME MAIL_SENDER_ADDRESS
    TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY LEAKED_PASSWORD_CHECK
-   SSO_ISSUER SSO_CLIENT_ID SSO_CLIENT_SECRET SSO_NAME SSO_REQUIRED].each { |name| ENV.delete(name) }
+   SSO_ISSUER SSO_CLIENT_ID SSO_CLIENT_SECRET SSO_NAME SSO_REQUIRED
+   SEARCH_BACKEND].each { |name| ENV.delete(name) }
 
 require_relative "../config/environment"
 SiteAddress.reset!
@@ -64,6 +67,7 @@ require_relative "support/invites"
 require_relative "support/smtp_stub"
 require_relative "support/encryption_keys"
 require_relative "support/form_sends"
+require_relative "support/search_block"
 require_relative "support/log_capture"
 require_relative "support/sanitizer_parses"
 require_relative "support/contrast_measure"
@@ -71,6 +75,9 @@ require_relative "support/theme_test_helper"
 require_relative "support/sign_in_helper"
 require_relative "support/passkey_helper"
 require_relative "support/oidc_helper"
+require_relative "support/site_search_fake"
+require_relative "support/site_search_backend_contract"
+require_relative "support/search_build_lock"
 
 # What tests themselves print -- the statements a migration test runs
 # ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise
@@ -146,6 +153,9 @@ module ActiveSupport
     # `aged_drawn(form)`, `clear_form_send_limits`, `place_form(page, form)`:
     # a visitor's send -- see test/support/form_sends.rb.
     include FormSends
+    # `place_search_block(page)` and `search_drawn`, what the response's
+    # Search block drew -- see test/support/search_block.rb.
+    include SearchBlock
 
     # `with_plain_theme { ... }`: the second theme for a block -- see
     # test/support/theme_test_helper.rb.

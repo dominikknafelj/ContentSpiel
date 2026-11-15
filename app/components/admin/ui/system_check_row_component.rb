@@ -22,6 +22,10 @@ module Admin
     # in its list, required, which keeps the command's id one of a kind on
     # the page.
     #
+    # A result's `note` (the Search row's limited languages) is a sunken box of
+    # dim 13px text under the message, before the command; it is no state, so
+    # the chip is the result's own.
+    #
     # A result may carry a `link` (a symbol: the model names no route):
     # `:mail_settings`, `:image_settings`, `:forms` and `:diagram_drawings`,
     # drawn as "Open Mail settings →" at `mail_settings_href`, "Open Image
@@ -41,6 +45,7 @@ module Admin
         widths: :from_container,
         interface: %i[result index copyable mail_settings_href image_settings_href forms_href diagram_drawings_href],
         limits: [
+          "A note is drawn under the message, whatever the state: it adds to the row and never changes its chip.",
           "Without copyable (the setup wizard) the command is selectable text with no Copy button."
         ],
         states: %i[ok warning off hover focus],

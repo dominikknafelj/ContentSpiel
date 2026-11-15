@@ -62,6 +62,7 @@ module Trash
         # so the URL sync above happens as usual. `Trash::Restore` keeps
         # full validation: what comes back to the live site must be valid.
         @record.save!(validate: false)
+        SiteSearch::Indexing.record_changed(@record) if page? || @record.is_a?(Post)
         record_event("#{event_prefix}.trashed", subject: @record, metadata: descendant_ids.any? ? { descendant_ids: } : {})
         # A form has no published copy and no callback that moves the public
         # content version: a placed form that went

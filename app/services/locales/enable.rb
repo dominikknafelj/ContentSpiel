@@ -67,6 +67,8 @@ module Locales
         Translations::StateIndex.rebuild_all
 
         record_event("language.enabled", subject: site, field_changes: changes, metadata: { "code" => @code })
+        # The enabled set moved: the search index is built again.
+        SiteSearch::Indexing.languages_changed
       end
 
       return success(site) if already_enabled

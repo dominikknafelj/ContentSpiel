@@ -27,10 +27,11 @@ module Locales
   # The order translations are tried in for `code`: the language itself, the
   # fallbacks configured for it, the site's default language, then every other
   # enabled language in order -- so a page titled only in German still shows
-  # *something* in Spanish rather than a blank heading.
-  def fallback_chain(code)
-    configured = Array(Current.site.locale_entry(code)&.fetch("fallbacks", nil)).map(&:to_s)
-    ([ code.to_s ] + configured + [ default ] + enabled).uniq
+  # *something* in Spanish rather than a blank heading. `site:` is the
+  # settings row to read, for a caller holding the row it locked.
+  def fallback_chain(code, site: Current.site)
+    configured = Array(site.locale_entry(code)&.fetch("fallbacks", nil)).map(&:to_s)
+    ([ code.to_s ] + configured + [ site.default_locale.to_s ] + site.locale_codes).uniq
   end
 
   # The one fallback-aware reader for public output (spec §4.3): the first

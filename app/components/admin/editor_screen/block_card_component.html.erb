@@ -199,6 +199,8 @@
       <% end %>
       <% end %>
       <% end %>
+      <%# The type's note: words, not a field, so outside the form (`#editor_note`). %>
+      <%= render editor_note if definition.editor_note %>
       <%# Outside the form: see the component. %>
       <%= render Admin::EditorScreen::TableDeleteDialogsComponent.new(block: block) if table_controls? %>
       <% outside_form_parts.each do |part| %>

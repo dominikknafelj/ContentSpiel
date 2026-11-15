@@ -80,6 +80,7 @@ module BlockTypes
         t.summary ->(block, locale:) { Diagram.summary(block, locale: locale) }
         t.preview ->(block, locale:) { Diagram.preview(block, locale: locale) }
         t.tile_picture ->(block, locale:) { Diagram.tile_picture(block, locale: locale) }
+        t.search_text ->(block, locale:) { Diagram.search_text(block, locale: locale) }
         t.sample settings: {},
                  translations: {
                    "en" => { source: SAMPLE_SOURCES["en"], drawing: -> { sample_drawing("en") },
@@ -155,6 +156,18 @@ module BlockTypes
       ].compact
     end
     private_class_method :hints
+
+    # The description and the caption, as the public page draws them: only
+    # with a drawing that passes on read and a description
+    # (`Blocks::DiagramComponent`). Never the source, which is syntax
+    # (`flowchart LR`, arrows, ids) and would match every query for "graph"
+    # or "end".
+    def self.search_text(block, locale:)
+      shown = Shown.for(block, locale: locale)
+      return [] unless shown&.shown_drawing && shown.description.present?
+
+      [ shown.description, ::Locales.read(block, :caption, locale: locale) ]
+    end
 
     # The tile's words: the description's opening words over the source's
     # first three lines in the monospace face. Nil with no source.
