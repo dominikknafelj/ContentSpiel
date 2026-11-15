@@ -46,7 +46,7 @@ module SiteSearch
 
       answer = nil
       ApplicationRecord.transaction(requires_new: true) do
-        # sql: Arel has no node for SET; the value is an Integer
+        # sql: Arel has no node for SET; the value is an Integer, and `.to_i` says so to Brakeman
         ApplicationRecord.connection.execute("SET LOCAL statement_timeout = #{timeout.to_i}") # version: none (a setting of the suggestion's own transaction, which writes nothing)
         answer = new(state: :ok, items: items_for(prefix, titles, language, now))
         raise ActiveRecord::Rollback

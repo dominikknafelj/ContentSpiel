@@ -50,6 +50,13 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
     data.map { |key, entry| [ key, entry.respond_to?(:value) ? entry.value : entry ].inspect }.join("\n")
   end
 
+  # Every place the CMS writes to, as one text: `log`, the spans, the
+  # tables, the counters' store and the errors reported with their messages.
+  def everything_text(log)
+    [ log, spans_text, tables_text, store_text(CounterStore.current), @reports.all.inspect,
+      @reports.all.map { |error, _| error.message }.join ].join("\n")
+  end
+
   test "a query reaches no log, span, table, cache or error report, at debug either" do
     log = nil
     place_search_block(root_page)
@@ -74,14 +81,9 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
     assert_match(/Started GET "\/\?q=\[FILTERED\]"/, log)
     assert_match(/Redirected to \S+\?q=\[FILTERED\]/, log)
     assert_match(/search_entries.*\["q", "\[FILTERED\]"\]/, log, "the search's statement is logged at debug, with its bind filtered")
-    assert_not_includes log, CANARY
-    assert_not_includes spans_text, CANARY
     assert @exporter.finished_spans.any? { |span| span.name == "search.query" }, "the search's span is recorded"
-    assert_not_includes tables_text, CANARY
-    assert_not_includes store_text(CounterStore.current), CANARY
     assert @reports.all.any?, "the failure was reported"
-    assert_not_includes @reports.all.inspect, CANARY
-    assert_not_includes @reports.all.map { |error, _| error.message }.join, CANARY
+    assert_not_includes everything_text(log), CANARY
   end
 
   # Old links and Latin-1 forms send bytes that are no UTF-8 (`caf%E9`):
@@ -195,15 +197,12 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
   end
 
   # The block run with the request loggers at debug, then every place the
-  # CMS writes to as one text: the log, the spans, the tables, the counters'
-  # store and the errors reported with their messages.
-  def capture_everything
-    log = capture_log(LogCapture::REQUEST_LOGGERS) do
+  # CMS writes to as one text (`everything_text`).
+  def capture_everything(&block)
+    everything_text(capture_log(LogCapture::REQUEST_LOGGERS) do
       Rails.logger.level = :debug
-      yield
-    end
-    [ log, spans_text, tables_text, store_text(CounterStore.current), @reports.all.inspect,
-      @reports.all.map { |error, _| error.message }.join ].join("\n")
+      block.call
+    end)
   end
 
   test "a suggestion's prefix reaches no log, span, table, cache or error report" do
@@ -222,8 +221,38 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
       end
     end
 
-    assert_match(/"suggest" => "\[FILTERED\]"/, everything, "the Parameters line names the key, filtered")
+    assert_match(/Processing by SiteSearch::SuggestionsController#create/, everything)
+    assert_no_match(/Parameters:/, everything, "Rails parses nothing of the body (ContentSpiel::SuggestGate)")
     assert @exporter.finished_spans.any? { |span| span.name == "search.suggest" }, "the suggestion's span is recorded"
+    refute_includes everything, planted
+  end
+
+  # Every body Rails would parse into a parameter, or refuse with a message
+  # quoting it, is a body the gate hands on empty: a byte that is no UTF-8
+  # in a JSON string or key, a key of the visitor's own, a nested value, a
+  # form field (which `Rack::MethodOverride` parses before the gate), a
+  # multipart body, `_method`.
+  test "a body Rails would quote, of any shape or type, leaves its text in no log, span, table, cache or error report" do
+    planted = "zqxbody#{SecureRandom.hex(3)}"
+    json = { "Content-Type" => "application/json", "Sec-Fetch-Site" => "same-origin" }
+    answers = []
+    everything = capture_everything do
+      bodies = [
+        [ json, "{\"suggest\":\"#{planted}\xFFab\"}".b ],
+        [ json, "{\"suggest\":\"ab\",\"#{planted}\xFF\":1}".b ],
+        [ json, "{\"suggest\":\"ab\",\"#{planted}\":\"#{planted}\",\"x\":#{"[" * 40}\"#{planted}\"#{"]" * 40}}" ],
+        [ json, "{\"suggest\":\"ab\",\"_method\":\"#{planted}\"}" ],
+        [ json.merge("Content-Type" => "application/x-www-form-urlencoded"), "suggest=#{planted}%FF" ],
+        [ json.merge("Content-Type" => "application/x-www-form-urlencoded"), "\"a=#{planted}%FF\"" ],
+        [ json.merge("Content-Type" => "multipart/form-data; boundary=zz"), "\"#{planted}\"" ]
+      ]
+      bodies.each do |headers, body|
+        post "/search/suggestions", params: body, headers: headers
+        answers << [ response.status, response.parsed_body["state"] ]
+      end
+    end
+
+    assert_equal [ [ 400, "refused" ], [ 400, "refused" ], [ 200, "ok" ], [ 200, "ok" ], [ 403, "refused" ], [ 403, "refused" ], [ 403, "refused" ] ], answers
     refute_includes everything, planted
   end
 

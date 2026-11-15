@@ -26,8 +26,9 @@ Rails.application.config.filter_parameters += [
   # bare :q matches by substring, so it would mask every parameter with a "q" in it (`quote`, `note_quote`), and
   # `Audit::Snapshot.scrub` drops every snapshot key this list matches.
   /\Aq\z/,
-  # What a visitor has typed so far, sent for suggestions (search 2 spec §4.2) as the JSON body's `suggest`, which
-  # the "Parameters:" line logs by its key: personal data as `q` is, and the whole name for the same reasons.
+  # What a visitor has typed so far, sent for suggestions (search 2 spec §4.2) as the JSON body's `suggest`: personal
+  # data as `q` is, and the whole name for the same reasons. Rails is handed none of that body
+  # (`ContentSpiel::SuggestGate`), so this holds for anything that later logs it under its name.
   /\Asuggest\z/
 ]
 

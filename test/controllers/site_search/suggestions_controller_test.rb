@@ -273,7 +273,7 @@ class SiteSearch::SuggestionsControllerTest < ActionDispatch::IntegrationTest
     SiteSearch::Fake.new(sleep_for: 1).installed do
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       suggest
-      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 1
+      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 0.6, "0.3 s, with a margin for a busy machine"
       assert_response :ok
       assert_equal({ "state" => "unavailable", "status" => "Suggestions aren't available right now. Press Enter to search.", "suggestions" => [] }, response.parsed_body)
     end

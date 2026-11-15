@@ -67,26 +67,44 @@ class ContentSpiel::SuggestGateTest < ActiveSupport::TestCase
     assert_nil input.asked
   end
 
-  test "a body at the cap is parsed, handed on as the bytes read, its length set" do
+  test "a body at the cap is parsed, and Rails is handed an empty body in its place" do
     text = { suggest: "a" * (Gate::MAX_BODY - 14) }.to_json
     assert_equal Gate::MAX_BODY, text.bytesize
     status, = call(body: text, length: nil, "HTTP_TRANSFER_ENCODING" => "chunked")
 
     assert_equal 200, status
     assert_equal({ "suggest" => "a" * (Gate::MAX_BODY - 14) }, @app.env["content_spiel.suggest.body"])
-    assert_equal text, @app.env["rack.input"].read
-    assert_equal text.bytesize.to_s, @app.env["CONTENT_LENGTH"]
+    assert_equal "", @app.env["rack.input"].read
+    assert_equal "0", @app.env["CONTENT_LENGTH"]
     assert_nil @app.env["HTTP_TRANSFER_ENCODING"]
   end
 
-  test "malformed JSON is flagged and replaced by {}, its content type kept" do
+  test "malformed JSON is flagged, its content type kept, and Rails is handed an empty body" do
     call(body: "{\"suggest\": \"secret", "CONTENT_TYPE" => "application/json")
     assert_equal :malformed, @app.env["content_spiel.suggest.body"]
-    assert_equal "{}", @app.env["rack.input"].read
-    assert_equal "2", @app.env["CONTENT_LENGTH"]
+    assert_equal "", @app.env["rack.input"].read
+    assert_equal "0", @app.env["CONTENT_LENGTH"]
     assert_equal "application/json", @app.env["CONTENT_TYPE"]
 
     call(body: "\xFF\xFE".b)
     assert_equal :malformed, @app.env["content_spiel.suggest.body"], "bytes that are no UTF-8"
+  end
+
+  # `JSON.parse` takes a byte that is no UTF-8 inside a string as it is, and
+  # Rails' parameters would then refuse the value with a message quoting it.
+  test "a JSON string with a byte that is no UTF-8, in a value or a key, is malformed" do
+    call(body: "{\"suggest\":\"secret\xFFab\"}".b, "CONTENT_TYPE" => "application/json")
+    assert_equal :malformed, @app.env["content_spiel.suggest.body"]
+    assert_equal "", @app.env["rack.input"].read
+
+    call(body: "{\"suggest\":\"ab\",\"secret\xFF\":1}".b, "CONTENT_TYPE" => "application/json")
+    assert_equal :malformed, @app.env["content_spiel.suggest.body"]
+  end
+
+  test "what Rack kept of a form body it parsed before the gate is forgotten" do
+    error = Rack::Utils::InvalidParameterError.new("Invalid encoding for parameter: secret")
+    call(body: "suggest=secret%FF", "CONTENT_TYPE" => "application/x-www-form-urlencoded", "rack.request.form_error" => error,
+      "rack.request.form_hash" => { "suggest" => "secret" }, "rack.request.form_pairs" => [ [ "suggest", "secret" ] ])
+    Gate::FORM_CACHE.each { |key| assert_nil @app.env[key], key }
   end
 end

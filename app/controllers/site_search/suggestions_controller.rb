@@ -29,10 +29,10 @@
 # neither header (curl, a script) is answered: it could write either header
 # anyway, and the limits bound it as they bound a crawler's `?q=`.
 #
-# THE PREFIX IS PERSONAL DATA, as a search's query is: `suggest` is in
-# `filter_parameters` (the "Parameters:" line), the body is capped and
-# parsed by the gate before Rails reads it (so a parse error never quotes
-# it), the spans carry no prefix (`SiteSearch.suggest`; a refusal is the
+# THE PREFIX IS PERSONAL DATA, as a search's query is: the body is capped
+# and parsed by the gate, which hands Rails none of it (no "Parameters:"
+# line, no parse error that could quote it; `suggest` is in
+# `filter_parameters` all the same), the spans carry no prefix (`SiteSearch.suggest`; a refusal is the
 # request span's `search.outcome`), and nothing here logs, stores or
 # reports it. The controller reads the gate's parsed body and never
 # `params`. A POST keeps it out of the front servers' access logs too.
@@ -42,6 +42,10 @@ class SiteSearch::SuggestionsController < ActionController::Base
   # The token is not checked here, by design (above). `Cookieless` already
   # answers `protect_against_forgery?` false; this says so where Rails looks.
   skip_forgery_protection
+
+  # The body is the gate's (`ContentSpiel::SuggestGate`) and Rails parses
+  # none of it, so there is nothing to wrap under the controller's name.
+  wrap_parameters false
 
   # In this order, ahead of the limit: a refusal answers no-store, halts and
   # counts nothing.
