@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.7.0 (2026-11-15)
+
 ### Added
 
 - The Search block, a ninth block type: a search field for the visitors of any page (an optional label, translated; blank draws "Search this site" in each visitor's language), and for a request with `?q=` the live pages and posts that hold the words, in the page's language with its fallback, ten to a page, each with its title linked, its place (a page's) or its date (a post's) and a few words around the match marked, a pager, and a sentence for nothing found, a page past the last, a query too long, too many searches and search unavailable. It finds only what a visitor sees now: the published copy in force of a kept, visible record with an address in the language, never a draft, an unpublished change, a scheduled change before its time, a trashed record or one under a draft page; a scheduled change is found at its time with no job. Works with no script. In the preview it searches the live site and says so. On the card the label shows the visitor's word as its placeholder and the card notes that only the live site is searched; the tile never says Empty (`docs/reference/content-blocks-and-types.md`, "The Search block"; `docs/reference/search.md`).
