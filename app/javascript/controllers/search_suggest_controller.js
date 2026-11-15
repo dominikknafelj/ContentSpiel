@@ -443,7 +443,6 @@ export default class extends Controller {
     this.status.textContent = ""
   }
 
-  // To an address of this site only, by Turbo when it is on the page.
   // A suggestion's address as a URL of this site, or null: one that does
   // not parse or leads elsewhere is never drawn, so it is never followed.
   address(url) {
@@ -456,6 +455,7 @@ export default class extends Controller {
     }
   }
 
+  // To an address of this site only, by Turbo when it is on the page.
   go(url) {
     const address = this.address(url)
     if (!address) return

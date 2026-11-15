@@ -170,6 +170,22 @@ class SearchSuggestionsSystemTest < ApplicationSystemTestCase
     assert_current_path(/\?q=alba/)
   end
 
+  # The endpoint never answers such an address; a script that drew one would
+  # follow it on Enter or a press, so it is left out of the list.
+  test "a suggestion whose address is another site's, a script's or does not parse is not drawn" do
+    item = ->(label, url) { { kind: "page", kind_label: "Page", label: label, where: nil, url: url, marks: [] } }
+    answer = { state: "ok", status: "1 suggestion",
+               suggestions: [ item.("Elsewhere", "https://evil.example/x"), item.("Scripted", "javascript:alert(1)"),
+                              item.("Unparsed", "http://["), item.("Albatross", @albatross_path) ] }
+    answer_suggestions_with(answer, status: 200) { type_in("zzzz") }
+
+    assert_equal [ "Albatross" ], find_all("[role=option] [data-part=label]").map(&:text)
+    assert_equal "1 suggestion", status_text
+    assert_equal find_all("[role=option]").size, status_text[/\d+/].to_i, "the count announced is the options drawn"
+    find("input[type=search]").send_keys(:down, :enter)
+    assert_current_path(@albatross_path)
+  end
+
   test "the live region says only the answer that is drawn" do
     type_in("al", answered: false)
     type_in("ba", clear: false)
