@@ -43,7 +43,7 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
 
   def answer(state, query: "publish", results: [], total: 0, page: 1, live_note: false)
     SiteSearch::Answer.new(query: query, state: state, results: results, total: total,
-      pagination: Pagination.new(page: page, per_page: SiteSearch::Answer::PER_PAGE, total: total), live_note: live_note)
+      pagination: Pagination.new(page: page, per_page: SiteSearch::Answer::PER_PAGE, total: total), live_note: live_note, correction: nil, close_matches: false)
   end
 
   def draw(answer, block: search_block)

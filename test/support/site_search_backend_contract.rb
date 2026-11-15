@@ -81,10 +81,18 @@ module SiteSearchBackendContract
 
   def contract_clock = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-  def contract_search(text, language: "en", page: 1, per_page: SiteSearch::Query::PER_PAGE, now: contract_now)
-    query = SiteSearch::Query.new(text: text, language: language, page: page, per_page: per_page, now: now)
-    backend.search(query, deadline: contract_deadline).tap { |results| assert_kind_of SiteSearch::Results, results }
+  # A deadline no contract search comes near.
+  def far_deadline = contract_deadline
+
+  def contract_query(text, language: "en", page: 1, per_page: SiteSearch::Query::PER_PAGE, now: contract_now, close_matches: true)
+    SiteSearch::Query.new(text: text, language: language, page: page, per_page: per_page, now: now, close_matches: close_matches)
   end
+
+  def contract_search(text, **options)
+    backend.search(contract_query(text, **options), deadline: far_deadline).tap { |results| assert_kind_of SiteSearch::Results, results }
+  end
+
+  def index_documents(*documents) = backend.index(documents)
 
   def contract_keys(text, **options) = contract_search(text, **options).hits.map { |hit| hit_key(hit) }
 
@@ -276,6 +284,24 @@ module SiteSearchBackendContract
         nil
       end
       assert_operator contract_clock - start, :<=, deadline - start + 0.2
+    end
+
+    # A backend may add close matches (a word one typo away) when
+    # `close_matches` is true, by its own rule; one that adds none passes.
+    # Every exact hit comes first, and a verifying search
+    # (`close_matches: false`) is answered exact.
+    test "contract: a close hit never stands before an exact hit, and close_matches: false answers no close hit" do
+      index_documents(contract_document(title: "deployment guide"), contract_document(title: "deploymnet notes"))
+      hits = backend.search(contract_query("deploymnet"), deadline: far_deadline).hits
+      first_close = hits.index(&:close) || hits.size
+      assert hits.drop(first_close).all?(&:close)
+      refute backend.search(contract_query("deploymnet", close_matches: false), deadline: far_deadline).hits.any?(&:close)
+    end
+
+    test "contract: a correction is plain text no longer than MAX_LENGTH, or nil" do
+      index_documents(contract_document(title: "deployment"))
+      correction = backend.search(contract_query("deploymnet"), deadline: far_deadline).correction
+      assert correction.nil? || (correction.is_a?(String) && correction.length <= SiteSearch::Query::MAX_LENGTH)
     end
 
     test "contract: health answers within the deadline" do

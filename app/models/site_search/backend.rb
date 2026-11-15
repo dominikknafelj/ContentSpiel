@@ -46,6 +46,29 @@ module SiteSearch
   #   is answered empty (no hits, a total of 0), never sent as an empty or
   #   placeholder query, which some engines answer with every document
   #   (Meilisearch's placeholder search).
+  #
+  #   CLOSE MATCHES AND A CORRECTION (spec §7.1), both optional: a backend
+  #   that offers neither answers every hit `close: false` and no
+  #   correction, and passes.
+  #   `query.close_matches` is true for a visitor's search, on which the
+  #   backend MAY add close matches, by its own rule and when it judges
+  #   them due (a word one typo away, an engine's fuzzy operator applied to
+  #   words it has already escaped, its spellcheck); false for
+  #   ContentSpiel's verifying search, which it answers with exact and
+  #   stemmed matches only. A close hit is `Hit#close` true and matches
+  #   each query word or a close variant of it; NO CLOSE HIT STANDS BEFORE
+  #   AN EXACT HIT, and `total` counts both. `Results#correction` is the
+  #   query with its words corrected, as plain words (never the engine's
+  #   syntax), at most `Query::MAX_LENGTH` characters, offered only on an
+  #   answer with no exact hit, or nil. ContentSpiel normalises it, drops
+  #   it when blank, too long, the query again or made of no words, and
+  #   draws it only when a search for it finds a page a visitor sees now
+  #   (`SiteSearch.search`): a correction is never trusted for visibility.
+  #   A backend that runs a close pass may write its outcome on the current
+  #   span, `OpenTelemetry::Trace.current_span.set_attribute("search.close",
+  #   outcome)` with an outcome of `SiteSearch::CLOSE_OUTCOMES` (`timeout`
+  #   when its pass ran out of time and the exact answer stands, `skipped`
+  #   when it ran none), and only on a query whose `close_matches` is true.
   # - `health(deadline:)` answers `SiteSearch::Health`: `status` `:ok`,
   #   `:warn` or `:failed`, and `detail` one plain sentence for a person or
   #   nil. System status shows the detail as it is handed (its first line,

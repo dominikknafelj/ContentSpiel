@@ -89,7 +89,8 @@ class SiteSearchTest < ActiveSupport::TestCase
     assert_equal :internal, span.kind
     server = @exporter.finished_spans.find { |each| each.kind == :server }
     assert_equal server.span_id, span.parent_span_id, "under the request's server span"
-    assert_equal({ "search.backend" => "test/fake", "search.outcome" => "results", "search.results" => 1, "search.page" => 2 }, span.attributes.to_h)
+    assert_equal({ "search.backend" => "test/fake", "search.outcome" => "results", "search.results" => 1, "search.page" => 2,
+      "search.close" => "none", "search.correction" => false }, span.attributes.to_h)
     assert_not_includes written(@exporter.finished_spans), QUERY
   end
 
@@ -111,7 +112,7 @@ class SiteSearchTest < ActiveSupport::TestCase
     span = @exporter.finished_spans.find { |each| each.name == "search.query" }
     assert span, @exporter.finished_spans.map(&:name).inspect
     assert_equal "unavailable", span.attributes["search.outcome"]
-    assert_equal %w[search.backend search.outcome search.page search.results], span.attributes.keys.sort
+    assert_equal %w[search.backend search.close search.correction search.outcome search.page search.results], span.attributes.keys.sort
     text = written(@exporter.finished_spans)
     assert_not_includes text, QUERY
     assert_not_includes text, "engine/select"
@@ -209,7 +210,226 @@ class SiteSearchTest < ActiveSupport::TestCase
     assert_nil error.cause
   end
 
+  # The correction (spec §3.5) is the backend's, and ContentSpiel verifies
+  # it whatever the backend: an outside engine's spellcheck reads its whole
+  # index, scheduled copies included, so it is drawn only when a search for
+  # it finds a page a visitor sees now.
+  test "a correction is drawn only when a search for it finds a live page" do
+    SiteSearch::Fake.new.installed do |fake|
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, correction: "albatross"))
+      fake.answer_for("albatross", exact_hit_of(published_page))
+      assert_equal "albatross", answer_for("albatros").correction
+      fake.answer_for("albatross", SiteSearch::Results.new(hits: [], total: 0))
+      assert_nil answer_for("albatros").correction
+    end
+  end
+
+  test "a correction blank, too long, equal to the query ignoring case, or made of syntax is dropped" do
+    [ " ", "a" * 201, "ALBATROS", "*:*" ].each do |bad|
+      with_fake_correction(bad) { assert_nil answer_for("albatros").correction, bad.inspect }
+    end
+  end
+
+  test "a correction is normalised before it is verified and drawn" do
+    with_fake_correction("  albatross\n ") { assert_equal "albatross", answer_for("albatros").correction }
+  end
+
+  # The anti-goal (spec §1): a word that only a scheduled copy holds, or
+  # only a live page's scheduled change, is never offered before its time,
+  # whatever an engine answers for it.
+  test "a word only a scheduled copy holds is never a correction" do
+    scheduled = create_page(title: "Placeholder", published: false)
+    assert Pages::Save.call(scheduled.reload, translations: { "en" => { title: "Zephyrine" } }, attributes: { published_at: 1.day.from_now }).ok?
+    live = create_page(title: "Harbour")
+    assert Pages::Save.call(live.reload, translations: { "en" => { title: "Quillwort" } }).ok?
+    publish_changes(live, at: 1.day.from_now)
+
+    # The scheduled page's copy is taken at once and waits for its
+    # `published_at`; the live page's change is a copy that waits for its
+    # `live_at`.
+    { "zephyrine" => Publishing.baseline(scheduled), "quillwort" => Publishing.pending(live) }.each do |word, copy|
+      page = copy.record
+      assert_equal word.capitalize, Locales.read(Publishing::Snapshot.rebuild(copy, page), :title, locale: "en"), "the copy holds the word"
+      SiteSearch::Fake.new.installed do |fake|
+        fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, correction: word))
+        fake.answer_for(word, SiteSearch::Results.new(hits: [ hit_of(page, copy) ], total: 1))
+        assert_nil answer_for(word.chop).correction, word
+      end
+    end
+  end
+
+  test "an answer with an exact hit offers no correction and asks no verifying search" do
+    asked = []
+    SiteSearch::Fake.new.installed do |fake|
+      fake.answer_with(exact_hit_of(published_page).with(correction: "albatross"))
+      assert_nil answer_for("albatros").correction
+      asked.concat(fake.asked)
+    end
+    assert_equal 1, asked.size
+  end
+
+  test "the verifying search is exact, page 1, per_page 1, and not counted" do
+    asked = []
+    with_fake_recording(asked) { answer_for("albatros") }
+    assert_equal [ true, false ], asked.map(&:close_matches)
+    assert_equal [ 1, 1 ], [ asked.last.page, asked.last.per_page ]
+  end
+
+  test "the verifying search is in the query's language and view, and the total stays the search's" do
+    asked = []
+    found = nil
+    with_fake_recording(asked) { found = SiteSearch.search(query.with(page: 3)) }
+    assert_equal [ "en", "en" ], asked.map(&:language)
+    assert_equal 1, asked.map(&:now).uniq.size
+    assert_equal 0, found.total
+  end
+
+  # One deadline holds the search and its verification: with none left,
+  # the correction is dropped unasked. The clock reads the deadline itself
+  # once the search has answered.
+  test "no time left skips the verifying search" do
+    readings = 0
+    clock = -> { (readings += 1) == 1 ? 100.0 : 100.0 + SiteSearch::TIMEOUT }
+    SiteSearch::Fake.new.installed do |fake|
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, correction: "albatross"))
+      with_singleton_override(SiteSearch, :clock, clock) do
+        assert_nil SiteSearch.search(query).correction
+      end
+      assert_equal [ true ], fake.asked.map(&:close_matches)
+    end
+  ensure
+    SiteSearch.private_class_method :clock
+  end
+
+  test "a verifying search that fails drops the correction and keeps the answer" do
+    failing = Class.new(SiteSearch::Fake) do
+      def search(query, deadline:)
+        raise RuntimeError, SECRET unless query.close_matches
+
+        super
+      end
+    end
+    failing.new.installed do |fake|
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, correction: "albatross"))
+      found = nil
+      assert_error_reported(SiteSearch::Unavailable) { found = SiteSearch.search(query) }
+      assert_kind_of SiteSearch::Results, found
+      assert_nil found.correction
+    end
+  end
+
+  test "a close that is not a Boolean, or a correction that is not a String, is unavailable" do
+    [ hit_with(close: "yes"), SiteSearch::Results.new(hits: [], total: 0, correction: 42) ].each do |bad|
+      assert_equal SiteSearch::UNAVAILABLE, search_with_answer(bad)
+    end
+  end
+
+  test "close_matches? is true when every hit is close" do
+    close = hit_with(close: true)
+    exact = hit_with(close: false)
+    SiteSearch::Fake.new.installed do |fake|
+      fake.answer_with(close)
+      assert answer_for("albatros").close_matches?
+      fake.answer_with(SiteSearch::Results.new(hits: close.hits + exact.hits, total: 2))
+      assert_not answer_for("albatros").close_matches?
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 0))
+      assert_not answer_for("albatros").close_matches?
+    end
+    assert_not answer_for(nil).close_matches?
+    assert_nil answer_for(nil).correction
+  end
+
+  test "search.query records search.close and search.correction, never the query" do
+    span = recorded_span("search.query") { answer_for("albatros") }
+    assert_includes SiteSearch::CLOSE_OUTCOMES, span.attributes["search.close"]
+    assert_includes [ true, false ], span.attributes["search.correction"]
+    refute_includes span.attributes.values.map(&:to_s), "albatros"
+  end
+
+  test "search.close is skipped without close_matches, found with a close hit, and a backend's own otherwise" do
+    assert_equal %w[none found skipped timeout], SiteSearch::CLOSE_OUTCOMES
+    closes = {}
+    SiteSearch::Fake.new.installed do |fake|
+      closes[:skipped] = recorded_span("search.query") { SiteSearch.search(query.with(close_matches: false)) }
+      fake.answer_with(hit_with(close: true))
+      closes[:found] = recorded_span("search.query") { SiteSearch.search(query) }
+    end
+    timing_out = Class.new(SiteSearch::Fake) do
+      def search(query, deadline:)
+        OpenTelemetry::Trace.current_span.set_attribute("search.close", "timeout")
+        super
+      end
+    end
+    timing_out.new.installed { closes[:timeout] = recorded_span("search.query") { SiteSearch.search(query) } }
+
+    assert_equal({ skipped: "skipped", found: "found", timeout: "timeout" }, closes.transform_values { |span| span.attributes["search.close"] })
+  end
+
+  test "search.correction is true when a correction is drawn" do
+    span = recorded_span("search.query") do
+      SiteSearch::Fake.new.installed do |fake|
+        fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, correction: "albatross"))
+        fake.answer_for("albatross", exact_hit_of(published_page))
+        SiteSearch.search(query("albatros"))
+      end
+    end
+    assert_equal true, span.attributes["search.correction"]
+    assert_not_includes written(@exporter.finished_spans), "albatross"
+  end
+
   private
+
+  def answer_for(text) = SiteSearch::Answer.for(raw_query: text, raw_page: nil, locale: :en, limited: false, live_note: false)
+
+  def published_page = @published_page ||= create_page(title: "Albatross")
+
+  def hit_of(page, copy) = SiteSearch::Hit.new(record_type: "Page", record_id: page.id, copy_id: copy.id, language: "en", snippet: nil, rank: 1.0)
+
+  # Results of one exact hit of `page`'s copy in force.
+  def exact_hit_of(page) = SiteSearch::Results.new(hits: [ hit_of(page, Publishing.current(page)) ], total: 1)
+
+  # Results of one hit, of a record that exists nowhere, with `changes`.
+  def hit_with(**changes)
+    hit = SiteSearch::Hit.new(record_type: "Page", record_id: 1, copy_id: 1, language: "en", snippet: nil, rank: 1.0)
+    SiteSearch::Results.new(hits: [ hit.with(**changes) ], total: 1)
+  end
+
+  # A fake that answers no hits and `correction`, and an exact hit of a live
+  # page to a search for `correction` as it is normalised, so only the
+  # rules before the verifying search can drop it.
+  def with_fake_correction(correction)
+    SiteSearch::Fake.new.installed do |fake|
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, correction: correction))
+      text = SiteSearch::Query.normalise(correction)
+      fake.answer_for(text, exact_hit_of(published_page)) if text
+      yield fake
+    end
+  end
+
+  # The block's searches, with a correction offered, each query it asks
+  # appended to `asked`.
+  def with_fake_recording(asked)
+    SiteSearch::Fake.new.installed do |fake|
+      fake.answer_with(SiteSearch::Results.new(hits: [], total: 0, correction: "albatross"))
+      yield fake
+    ensure
+      asked.concat(fake.asked)
+    end
+  end
+
+  def search_with_answer(results)
+    SiteSearch::Fake.new.installed do |fake|
+      fake.answer_with(results)
+      SiteSearch.search(query)
+    end
+  end
+
+  # The finished span `name` of the block's work, run inside a request.
+  def recorded_span(name, &block)
+    @exporter.reset
+    in_request(&block)
+    @exporter.finished_spans.find { |each| each.name == name }.tap { |span| assert span, @exporter.finished_spans.map(&:name).inspect }
+  end
 
   def document(word)
     now = 1.day.ago

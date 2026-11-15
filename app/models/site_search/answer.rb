@@ -15,8 +15,11 @@ module SiteSearch
   # Only `:results` and `:none` asked a backend. `results` is an Array of
   # `SiteSearch::Shown::Item`, `pagination` a `Pagination` of `PER_PAGE`,
   # and `live_note` whether the block says its results come from the live
-  # site (the preview's, spec §7.2).
-  Answer = Data.define(:query, :state, :results, :total, :pagination, :live_note)
+  # site (the preview's, spec §7.2). `correction` is the verified corrected
+  # search as plain text, or nil (`SiteSearch.search` verifies it), and
+  # `close_matches` whether the backend's hits were all close matches, no
+  # exact hit found (spec §8.1), read from its hits before the re-check.
+  Answer = Data.define(:query, :state, :results, :total, :pagination, :live_note, :correction, :close_matches)
 
   class Answer
     STATES = %i[empty results none too_long limited unavailable].freeze
@@ -31,20 +34,25 @@ module SiteSearch
     def self.for(raw_query:, raw_page:, locale:, limited:, live_note:, now: Time.current)
       text = Query.normalise(raw_query)
       asked = Pagination.new(page: raw_page, per_page: PER_PAGE, total: 0)
-      quiet = ->(state, query = text) { new(query: query, state: state, results: [], total: 0, pagination: asked, live_note: live_note) }
+      quiet = ->(state, query = text) do
+        new(query: query, state: state, results: [], total: 0, pagination: asked, live_note: live_note, correction: nil, close_matches: false)
+      end
       return quiet.(:empty) if text.nil?
       return quiet.(:limited) if limited
       return quiet.(:too_long, raw_query.dup.force_encoding(Encoding::UTF_8).scrub("")) if text.length > Query::MAX_LENGTH
 
-      found = SiteSearch.search(Query.new(text: text, language: locale.to_s, page: asked.page, per_page: PER_PAGE, now: now))
+      found = SiteSearch.search(Query.new(text: text, language: locale.to_s, page: asked.page, per_page: PER_PAGE, now: now, close_matches: true))
       return quiet.(:unavailable) if found == UNAVAILABLE
 
       pagination = Pagination.new(page: asked.page, per_page: PER_PAGE, total: found.total)
       new(query: text, state: found.total.zero? ? :none : :results, results: Shown.for(found, locale: locale, now: now),
-        total: found.total, pagination: pagination, live_note: live_note)
+        total: found.total, pagination: pagination, live_note: live_note, correction: found.correction,
+        close_matches: found.hits.any? && found.hits.all?(&:close))
     end
 
     def live_note? = live_note == true
+
+    def close_matches? = close_matches == true
 
     # Results were found, but none on the page asked for (`?page=99`).
     def past_end? = state == :results && pagination.out_of_range?

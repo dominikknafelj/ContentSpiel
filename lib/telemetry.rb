@@ -107,6 +107,8 @@ module Telemetry
     search.outcome
     search.results
     search.page
+    search.close
+    search.correction
     server.address
     http.response.status_code
     error.type

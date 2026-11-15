@@ -4,8 +4,11 @@ module SiteSearch
   # 1 and `per_page` (`PER_PAGE`), and `now`, the visitor's view: a document
   # is in it when `shown_from <= now` and `shown_until` is nil or after
   # `now`. A text over `MAX_LENGTH` is never made a query (spec §8.3), so a
-  # backend never meets one.
-  Query = Data.define(:text, :language, :page, :per_page, :now)
+  # backend never meets one. `close_matches` (spec §7.1) is true for a
+  # visitor's search, on which a backend may add close matches by its own
+  # rule, and false for ContentSpiel's verifying search of a correction,
+  # which a backend answers exact and stemmed matches only.
+  Query = Data.define(:text, :language, :page, :per_page, :now, :close_matches)
 
   class Query
     MAX_LENGTH = 200
@@ -13,6 +16,8 @@ module SiteSearch
 
     MARKERS = /[\u{E000}\u{E001}]/
     CONTROL = /[[:cntrl:]]/
+
+    def initialize(text:, language:, page:, per_page:, now:, close_matches: true) = super
 
     # `raw` as one line of words, or nil when nothing is left of it: nil for
     # anything but a String (`?q[]=a` is a parameter's Array). Invalid bytes,
