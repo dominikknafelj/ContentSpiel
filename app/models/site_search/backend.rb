@@ -31,7 +31,9 @@ module SiteSearch
   #   matching the words of `query.text` in any field, a title's match
   #   ranking above a body's; `query.per_page` hits from `query.offset`, and
   #   `total` counting every match. Each hit's snippet is plain text with
-  #   `[start, length]` marks on the query's words, never markup.
+  #   `[start, length]` marks on the query's words, never markup; the page
+  #   draws at most `SiteSearch::SNIPPET_LENGTH` characters of it, and an
+  #   answer of another shape is a failure (`SiteSearch.search`).
   #   `query.text` is a visitor's words as typed, normalised
   #   (`SiteSearch::Query.normalise`) and at most `Query::MAX_LENGTH`
   #   characters: plain text, never a query in the engine's own language.
@@ -56,6 +58,12 @@ module SiteSearch
   # failure is raised as any `StandardError`; the caller reports its class
   # alone, never its message, which for an engine may hold the address it
   # asked and so the query. A backend never logs the query text.
+  #
+  # ONE INSTANCE PER PROCESS, shared by every thread that asks it: Puma's
+  # request threads, the job threads and System status's health thread
+  # call the same object at once. A backend is thread-safe: a client it
+  # keeps (an HTTP connection pool, a cache of the engine's schema) is one
+  # that may be used from several threads, or one per thread.
   module Backend
     METHODS = %i[index remove prune_record clear search health].freeze
   end
