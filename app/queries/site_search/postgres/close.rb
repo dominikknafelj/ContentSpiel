@@ -6,8 +6,9 @@ module SiteSearch
     #
     # A query word is corrected when it is at least `CLOSE_WORD_LENGTH`
     # characters, not digits alone, no stopword of the language (its
-    # `plainto_tsquery` is empty) and not in the vocabulary
-    # (`SiteSearch::Word`); the first `MAX_CLOSE_WORDS` of those get the
+    # `plainto_tsquery` is empty) and held by no entry a visitor sees now
+    # (`Visible`; the vocabulary, `SiteSearch::Word`, holds hidden copies'
+    # words too); the first `MAX_CLOSE_WORDS` of those get the
     # `CANDIDATES` words of the vocabulary at least `SIMILARITY` like it
     # (`pg_trgm`'s `%`, through the words' trigram index), most similar
     # first, then the smallest difference in length, then alphabetically,
@@ -106,16 +107,21 @@ module SiteSearch
         answer
       end
 
-      # `asked` less the stopwords and the words the vocabulary holds, in
-      # their order: one statement over `unnest($q)`.
+      # `asked` less the stopwords and the words an entry a visitor sees now
+      # holds, in their order: one statement over `unnest($q)`. KNOWN IS
+      # JUDGED BY A VISIBLE ENTRY (`held_now`), never by the vocabulary,
+      # which holds the words of every indexed copy (a scheduled change, a
+      # trashed record until its purge, a superseded copy until the next
+      # prune): a word only such a copy holds would otherwise go uncorrected,
+      # and whether a search is corrected would say whether a hidden copy
+      # holds the word.
       def to_correct(asked)
         word = Arel::Table.new("word")[:word]
-        known = Word.where(locale: @query.language).where(Word.arel_table[:word].eq(word))
         statement = Arel::SelectManager.new
           .from(Arel::Nodes::TableAlias.new(SqlNodes.function("unnest", SqlNodes.bound_text_array(asked, name: "q")), "word"))
           .project(word)
           .where(SqlNodes.function("numnode", SqlNodes.function("plainto_tsquery", @timed.regconfig, word)).gt(0))
-          .where(SqlNodes.exists(known).not)
+          .where(SqlNodes.exists(held_now(word)).not)
         # sql: the filter reads a set-returning function (unnest) in FROM, which no model's relation reads
         kept = @timed.in_time_left { Word.connection.select_values(statement) }
         asked & kept

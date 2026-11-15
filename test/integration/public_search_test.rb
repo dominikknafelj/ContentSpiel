@@ -246,6 +246,24 @@ class PublicSearchTest < ActionDispatch::IntegrationTest
     travel(2.days) { assert_equal "cormorant", answer_for("cormorat").correction }
   end
 
+  # The vocabulary holds every indexed copy's words, a scheduled change's
+  # among them; whether a typed word is "known" (and so not corrected) is
+  # judged by what a visitor sees now, or the answer would say whether a
+  # hidden copy holds the word.
+  test "a typed word only a scheduled change holds is still corrected, so the answer says nothing of the hidden copy" do
+    colony = create_page(title: "Cormorant colony")
+    before = answer_for("cormorand")
+    assert_equal [ :results, "cormorant", [ colony.id ] ], [ before.state, before.correction, found_ids(before) ]
+
+    page = create_page(title: "Plain")
+    assert Pages::Save.call(page.reload, translations: { "en" => { title: "Cormorand" } }).ok?
+    publish_changes(page, at: 1.day.from_now)
+    assert SiteSearch::Word.exists?(locale: "en", word: "cormorand"), "the vocabulary holds the scheduled change's word"
+
+    after = answer_for("cormorand")
+    assert_equal [ before.state, before.correction, found_ids(before) ], [ after.state, after.correction, found_ids(after) ]
+  end
+
   test "contains finds a Japanese page by a word inside its text" do
     with_locales(Locales.enabled | %w[ja], default: Locales.default)
     page = create_page_in("ja", title: "検索エンジンの使い方")

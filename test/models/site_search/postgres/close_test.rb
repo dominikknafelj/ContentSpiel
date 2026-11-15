@@ -1,8 +1,8 @@
 require "test_helper"
 
 # The built-in's close pass (search 2 spec §3.3): for a plain query that
-# found nothing, each query word of 4 or more characters that the
-# vocabulary does not hold gets the 3 most similar words some entry in
+# found nothing, each query word of 4 or more characters that no entry a
+# visitor sees now holds gets the 3 most similar words some entry in
 # force holds, every word and candidate a bind; the close tsquery ORs each
 # word with its candidates and ANDs the words; the correction takes each
 # word's first candidate.
@@ -41,9 +41,15 @@ class SiteSearch::Postgres::CloseTest < ActiveSupport::TestCase
     assert_equal %w[deploymet deploymnt deploymen], close("deploymnet").candidates["deploymnet"]
   end
 
-  test "a word already in the vocabulary, or shorter than 4, is not corrected" do
+  test "a word a visible entry holds, or shorter than 4, is not corrected" do
     words!("en", %w[albatross])
     assert_empty close("albatross gul").candidates
+  end
+
+  test "a word only the vocabulary holds, with no entry a visitor sees now, is still corrected" do
+    words!("en", %w[albatross])
+    SiteSearch::Word.insert_all([ { locale: "en", word: "albatros" } ], unique_by: %i[locale word]) # version: none (a test puts a word in the vocabulary that no live entry holds)
+    assert_equal [ "albatross" ], close("albatros").candidates["albatros"]
   end
 
   test "a word only a page that is not live holds is no candidate" do
@@ -58,7 +64,7 @@ class SiteSearch::Postgres::CloseTest < ActiveSupport::TestCase
     assert_nil close("zero downtime").correction, "no word changed"
   end
 
-  test "close hits are close, ranked and marked by the variant found" do
+  test "close hits are close and marked by the variant found" do
     page = create_page(title: "Zero-downtime deployment")
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, translations: { "en" => { body: rich_doc("We plan every deployment.") } })
     assert block.ok?, block.errors.to_sentence
