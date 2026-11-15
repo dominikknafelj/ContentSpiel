@@ -151,11 +151,16 @@ class PagesController < PublicController
     Current.site = nil
   end
 
+  # The location is built on the request's own host, from the path with its
+  # leading slashes and backslashes taken off: `/en/%2Fevil.com` decodes to
+  # the path "/evil.com", and "//evil.com" (or "/\evil.com", which a
+  # browser reads alike) is another host, which `redirect_to` refuses with
+  # an error whose message holds the location and so the query.
   def redirect_default_locale_prefix
     return unless public_urls.redundant_prefix?(params[:locale])
 
-    path = "/#{params[:path]}".sub(%r{/+$}, "").presence || "/"
-    path += "?#{request.query_string}" if request.query_string.present?
-    redirect_to path, status: :found
+    path = "/#{params[:path].to_s.sub(%r{\A[/\\]+}, "")}".sub(%r{/+$}, "").presence || "/"
+    query = request.query_parameters.to_query
+    redirect_to "#{request.base_url}#{path}#{"?#{query}" if query.present?}", status: :found
   end
 end

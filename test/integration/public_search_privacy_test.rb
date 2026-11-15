@@ -110,6 +110,25 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
     assert_not_includes log, "BadRequest"
   end
 
+  # `/en/%2Fevil.com` decodes to the path "/evil.com", and the default
+  # language's redirect would point at `//evil.com`: another host, which
+  # Rails refuses with an error whose message holds the location, and so
+  # the query, in the span and the report.
+  test "a path that begins with a slash once decoded redirects on the site's own host, never a 500 that carries the query" do
+    log = capture_log(LogCapture::REQUEST_LOGGERS) do
+      [ "/en/%2Fevil.com", "/en/%2F%2Fevil.com", "/en/%5Cevil.com", "/en/%2F%5Cevil.com" ].each do |path|
+        get "#{path}?q=#{CANARY}"
+        assert_response :found, path
+        assert_equal "http://www.example.com/evil.com?q=#{CANARY}", response.location, path
+      end
+    end
+
+    assert_not_includes log, CANARY
+    assert_not_includes spans_text, CANARY
+    assert_not_includes @reports.all.inspect, CANARY
+    assert_empty @reports.all, "nothing was raised"
+  end
+
   test "an outside backend's failure is reported without its exception's message" do
     place_search_block(root_page)
 
