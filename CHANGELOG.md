@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Breaking
+
+- ContentSpiel requires the Postgres extension `pg_trgm` and a database with a UTF-8 character type (not `C` or `POSIX`), besides Postgres 15 or later. The stack ContentSpiel ships (`postgres:17`, the site template's databases) has both, and the migration enables the extension itself. On a managed database, allow `pg_trgm` before upgrading. Where the migration cannot enable it, or the character type is `C`, the migration stops with a message naming the requirement and `docs/reference/hosting.md`, "Database requirements"; a serving process whose database lost it does not start.
+
+### Migrations
+
+- `20261115120000_search_two`: enables `pg_trgm` and checks the character type (stopping with a message when either is missing); `search_entries.title` with its expression index; `search_words`, the site's words per language, with a trigram index. All of it is in `db/schema.rb`.
+
 ## 0.7.0 (2026-11-15)
 
 ### Added
