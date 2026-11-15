@@ -85,8 +85,10 @@ module Admin
         own = { controller: "admin--ui--gif", action: "turbo:before-cache@document->admin--ui--gif#cache",
                 "admin--ui--gif-src-value": src.to_s, "admin--ui--gif-gif-value": "true", messages: messages_data(*MESSAGES) }
         # A caller's own controller or action is kept beside the frame's.
-        data = @html.fetch(:data, {}).merge(own) { |key, theirs, ours| %i[controller action].include?(key) ? "#{ours} #{theirs}" : ours }
-        @html.merge(class: [ FRAME_CLASS, @html[:class] ].compact.join(" "), data: data)
+        # Its keys are Symbols first, so a String key meets the frame's own.
+        data = @html.fetch(:data, {}).transform_keys(&:to_sym).merge(own) { |key, theirs, ours| %i[controller action].include?(key) ? "#{ours} #{theirs}" : ours }
+        classes = [ FRAME_CLASS, @html[:class] ].compact.join(" ").split.uniq.join(" ")
+        @html.merge(class: classes, data: data)
       end
 
       def link_attributes

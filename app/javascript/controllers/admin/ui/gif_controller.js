@@ -64,8 +64,12 @@ export default class extends Controller {
     this.stop()
   }
 
-  gifValueChanged() {
-    if (this.hasButtonTarget) this.draw()
+  // True again with the same address: the picture may have loaded while it
+  // was false, when its `load` painted nothing, so the still is painted now.
+  gifValueChanged(value) {
+    if (!this.hasButtonTarget) return
+    this.draw()
+    if (value && !this.playing) this.paint()
   }
 
   // `load` on the picture, and on connect for one that was there already.

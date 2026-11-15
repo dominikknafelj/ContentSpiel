@@ -42,11 +42,22 @@ class Admin::Ui::GifComponentTest < ViewComponent::TestCase
 
   test "a tile draws the label GIF · name after the button, the stage none" do
     render_inline(Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif"))
-    assert_selector "[data-controller='admin--ui--gif'] > button + span", exact_text: "GIF · loop.gif"
+    label = page.find("[data-controller='admin--ui--gif'] > button + span", exact_text: "GIF · loop.gif")
+    # The Gif card's ground: the surface at 85%, 1px 6px, a small radius.
+    assert_empty %w[bg-surface/85 px-1.5 py-px rounded-cs text-label text-dim bottom-1.5 left-1.5] - label[:class].split
 
     render_inline(Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", placement: :stage))
     assert_no_text "GIF · loop.gif"
     assert_no_selector "[data-controller='admin--ui--gif'] > button + span"
+  end
+
+  test "a caller's data under String keys merges with the frame's, and its class adds no second relative" do
+    render_inline(Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", class: "relative flex", data: { "controller" => "other", "action" => "click->other#go", "note_gif" => true }))
+
+    root = page.find("[data-note-gif]")
+    assert_equal "admin--ui--gif other", root["data-controller"]
+    assert_equal "turbo:before-cache@document->admin--ui--gif#cache click->other#go", root["data-action"]
+    assert_equal %w[relative flex], root[:class].split
   end
 
   test "an unknown placement, or link: on the stage, raises" do
