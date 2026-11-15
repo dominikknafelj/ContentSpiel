@@ -173,15 +173,27 @@ class SiteSearch::SuggestTest < ActiveSupport::TestCase
     end
   end
 
-  test "the statements are the same for two suggestions as for eight, and the prefix is a bind" do
+  # The statements of one suggestion request, at most: SUGGEST_STATEMENTS,
+  # whatever the count of titles and tags, a tag with a listing page and one
+  # searched for on the search page among them (the costliest answer).
+  SUGGEST_STATEMENTS = 28
+
+  test "the statements are at most SUGGEST_STATEMENTS, the same for four suggestions as for eight, and the prefix is a bind" do
     place_search_page
     create_page(title: "Zanzibar one")
-    create_post(title: "Zanzibar post", tags: %w[zanzibar-a])
-    few = statements_of { assert_equal 3, suggest("zanzib").items.size }
+    create_post(title: "Zanzibar post", tags: %w[zanzibar-a zanzibar-b])
+    listing = create_page(title: "Listing")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "tag" => "zanzibar-a" } }).ok?
+    publish_changes(listing)
+    few = statements_of { assert_equal 4, suggest("zanzib").items.size }
+    tags = suggest("zanzib").items.select { _1.kind == :tag }.to_h { [ _1.label, _1.url ] }
+    assert_equal PublicPath.where(record_type: "Page", record_id: listing.id, current: true).pick(:path), tags.fetch("zanzibar-a"), "one tag goes to its listing page"
+    assert_includes tags.fetch("zanzibar-b"), "?q=", "and one to a search for it"
     4.times { create_page(title: "Zanzibar #{_1}") }
-    create_post(title: "Zanzibar later", tags: %w[zanzibar-b zanzibar-c])
+    create_post(title: "Zanzibar later", tags: %w[zanzibar-c])
     many = statements_of { assert_equal 8, suggest("zanzib").items.size }
     assert_equal few.size, many.size, (many - few).join("\n")
+    assert_operator many.size, :<=, SUGGEST_STATEMENTS, many.join("\n")
     refute many.any? { _1.downcase.include?("zanzib") }
   end
 end

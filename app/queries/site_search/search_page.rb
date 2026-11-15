@@ -16,6 +16,13 @@ module SiteSearch
   # page that gains or loses a Search block moves the version, and so does
   # every page's ETag that draws a form pointing here.
   class SearchPage
+    # The containment that finds the copies holding a block of a `:search`
+    # type, or nil when no type has the capability.
+    def self.holding
+      names = BlockTypes.with_capability(:search).map(&:name)
+      names.map { |name| SqlNodes.json_contains(Publishing::Version.arel_table[:blocks], [ { "block_type" => name } ]) }.reduce(:or)
+    end
+
     def initialize(now: Time.current, locale: I18n.locale)
       @now = now
       @locale = locale.to_s
@@ -39,10 +46,7 @@ module SiteSearch
     end
 
     def find_holders
-      names = BlockTypes.with_capability(:search).map(&:name)
-      return [] if names.empty?
-
-      holding = names.map { |name| SqlNodes.json_contains(Publishing::Version.arel_table[:blocks], [ { "block_type" => name } ]) }.reduce(:or)
+      holding = self.class.holding or return []
       FirstHolder.copies_holding(holding, now: @now).pluck(:record_id)
     end
   end

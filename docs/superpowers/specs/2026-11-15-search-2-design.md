@@ -453,8 +453,14 @@ The same rules as a search:
     keystroke and asks from 2 characters, so a query of 12 characters costs
     about 3 to 6 requests. A person who searches ten times in a minute stays
     near 60.
-  - **3,000 a minute across the site**: 50 a second. Each answer is about 4
-    indexed statements, bounded by the deadline.
+  - **3,000 a minute across the site**: 50 a second. Each answer is at most
+    28 statements (the backend's title query, `Shown`'s check of the titles,
+    the tags, one pass for the tags' listing pages and the search page, the
+    addresses; `SUGGEST_STATEMENTS` in `test/models/site_search/suggest_test.rb`)
+    plus the two counters, bounded by the deadline.
+  - **At most 2 in flight per process**: a suggestion that finds both slots
+    taken answers `limited` at once, so a flood the counters let through
+    never holds every one of Puma's three default threads.
   - **Why not share the search's counters**: twenty searches a minute would
     be spent by typing two queries, and a visitor would then be refused the
     search they finally send.

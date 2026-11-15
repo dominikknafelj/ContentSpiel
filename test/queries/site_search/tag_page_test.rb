@@ -60,6 +60,20 @@ class SiteSearch::TagPageTest < ActiveSupport::TestCase
     assert_equal later.id, tag_pages([ one.id ])[one.id].id
   end
 
+  test "with_search_page answers the listings and the search page as for and SearchPage do" do
+    tag = Tag.create!(name: "deployment")
+    listing = page_with_post_list(tag: tag)
+    search = create_page(title: "Search")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: search), attributes: { block_type: "search" }).ok?
+    publish_changes(search)
+
+    listings, page = SiteSearch::TagPage.with_search_page([ tag.id ], locale: "en", now: Time.current)
+    assert_equal({ tag.id => listing.id }, listings.transform_values(&:id))
+    assert_equal SiteSearch::SearchPage.new(now: Time.current, locale: "en").page.id, page.id
+    assert_predicate page, :readonly?, "the page as published"
+    assert_equal [ {}, page.id ], SiteSearch::TagPage.with_search_page([], locale: "en", now: Time.current).then { [ _1, _2.id ] }
+  end
+
   test "no tags ask nothing" do
     assert_queries_count(0) { assert_equal({}, tag_pages([])) }
   end

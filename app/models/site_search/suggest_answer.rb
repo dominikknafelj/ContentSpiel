@@ -30,7 +30,8 @@ module SiteSearch
     # label, the place and the address are read from the copy in force and
     # `public_paths`; the tags (`TagSuggestions`); a tag's address, its
     # listing page (`TagPage`) or else a search for it on the site's search
-    # page (`SearchPage`), a tag with neither left out. Up to
+    # page (`SearchPage`), a tag with neither left out, both read in one
+    # pass (`TagPage.with_search_page`). Up to
     # `TITLE_SUGGESTIONS` titles and `TAG_SUGGESTIONS` tags, each kind
     # filling the other's gap up to `SUGGEST_LIMIT`.
     #
@@ -38,8 +39,10 @@ module SiteSearch
     # statement_timeout` of what is left before `deadline`, so its
     # statements end with it; with nothing left, nothing is asked and it
     # raises. THE STATEMENTS are a constant number, whatever the count of
-    # titles and tags: `Shown`'s, one for the tags, `TagPage`'s, and the
-    # search page's and the addresses' when a tag needs them.
+    # titles and tags: the `SET LOCAL`, `Shown`'s, one for the tags, and,
+    # when there is a tag, `TagPage.with_search_page`'s and the addresses'
+    # (test/models/site_search/suggest_test.rb holds the ceiling,
+    # `SUGGEST_STATEMENTS`).
     def self.build(prefix:, titles:, language:, now:, deadline:)
       timeout = Postgres::Query.timeout_in_ms(deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC))
       raise ActiveRecord::QueryCanceled, "the suggestion's deadline passed before the database was asked" unless timeout
@@ -99,8 +102,7 @@ module SiteSearch
     def self.tag_items(tags, language, now)
       return [] if tags.empty?
 
-      listings = TagPage.for(tags.map(&:id), locale: language, now: now)
-      search = SearchPage.new(now: now, locale: language).page if tags.any? { |tag| !listings.key?(tag.id) }
+      listings, search = TagPage.with_search_page(tags.map(&:id), locale: language, now: now)
       urls = PublicSite::Urls.new.prefetch([ *listings.values, search ].compact, language)
       search_path = urls.path_for(search, language) if search
       tags.filter_map do |tag|
