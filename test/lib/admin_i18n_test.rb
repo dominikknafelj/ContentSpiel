@@ -517,7 +517,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/controllers/admin/note_files_controller.rb
     app/components/admin/notes_screen/files_component.rb
     app/components/admin/notes_screen/files_component.html.erb
-    app/javascript/controllers/admin/notes/gif_controller.js
+    app/javascript/controllers/admin/ui/gif_controller.js
+    app/components/admin/ui/gif_component.rb
+    app/components/admin/ui/gif_component.html.erb
     app/components/admin/notes_screen/rail_panel_component.rb
     app/components/admin/notes_screen/rail_panel_component.html.erb
     app/javascript/controllers/admin/notes/drawer_controller.js

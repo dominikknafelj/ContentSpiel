@@ -1658,15 +1658,17 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-table-scroll--x :is(.admin-forms-table, .admin-form-submissions-table) tbody tr:hover > td { background: var(--cs-paper); }
 }
 
-/* A picture in a note or a still GIF's tile
+/* A picture in a note or a GIF's tile
    (`Admin::NotesScreen::FilesComponent`). Its box is the picture's own size and shows
-   the placeholder gradient behind a picture that is partly transparent.
-   A GIF's Play / Pause is shown with reduced motion only (the component's
-   `motion-reduce:` classes): centred over the still, and in the corner while
-   the picture plays (`data-playing`), so it does not lie over what moves. */
+   the placeholder gradient behind a picture that is partly transparent. */
 .admin-note-picture { background: linear-gradient(135deg, var(--cs-ph-a), var(--cs-ph-b)); }
-.admin-note-gif-button { top: 50%; left: 50%; transform: translate(-50%, -50%); }
-.admin-note-gif-button[data-playing="true"] { top: auto; left: auto; right: 6px; bottom: 6px; transform: none; }
+/* A GIF's Play / Pause (`Admin::Ui::GifComponent`, on a note's tile and the
+   image viewer's stage), shown with reduced motion only (the component's
+   `motion-safe:hidden`): centred over the still, and 8px in from the bottom
+   right while the picture plays (`data-playing`), so it does not lie over
+   what moves. */
+.admin-gif-button { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.admin-gif-button[data-playing="true"] { top: auto; left: auto; right: 8px; bottom: 8px; transform: none; }
 
 /* The bubble of a record's open notes (`Admin::Ui::NoteMarkerComponent` on
    rows, tiles and Waiting for you; `Admin::NotesScreen::MarkerComponent` on a

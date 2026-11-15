@@ -365,17 +365,14 @@ en:
           # text put back, so a person sees where text still waits.
           unsaved: "Unsaved edit"
         # A message's files: the attachment row and the inline image or
-        # still GIF tile. `file` is the kind of a file whose stored type is
-        # none of the allowed ones; `open` names an image's link, `download`
-        # a document's; `play` and `pause` are the control of a GIF with
-        # reduced motion; `gif` its label.
+        # GIF tile (the GIF's own words are `Admin::Ui::GifComponent`'s,
+        # `components.ui.gif` in ui.en.yml). `file` is the kind of a file
+        # whose stored type is none of the allowed ones; `open` names the
+        # link of an image or a GIF, `download` a document's.
         files:
           file: "File"
           open: "Open %{name} in a new tab"
           download: "Download %{name}"
-          play: "Play"
-          pause: "Pause"
-          gif: "GIF · %{name}"
         # A message's reaction chips. A chip's name for a screen reader says
         # the emoji in words, how many, whether one is the viewer's, and who
         # (its `title` shows the same names to a mouse). `add` names the chip

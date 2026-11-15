@@ -1,0 +1,23 @@
+<%= tag.div(**frame_attributes) do %>
+  <% holder = capture do %>
+    <%= picture %>
+    <canvas class="pointer-events-none absolute inset-0 hidden size-full motion-reduce:block" aria-hidden="true" data-admin--ui--gif-target="still"></canvas>
+  <% end %>
+  <% if tile? %>
+    <%= tag.a(holder, **link_attributes) %>
+  <% else %>
+    <%= tag.span(holder, class: HOLDER_CLASS) %>
+  <% end %>
+  <%# Drawn only when motion is reduced (`motion-safe:hidden`). Centred over the still; in the corner while the picture plays (`data-playing`), so it does not lie over it. Both icons are drawn, and the script shows the one for what the button does. %>
+  <%= tag.button type: "button", data: { playing: "false", action: "admin--ui--gif#toggle", "admin--ui--gif-target": "button" },
+        class: "admin-gif-button absolute #{Admin::Ui::ButtonComponent.classes(:secondary, size: :small)} motion-safe:hidden" do %>
+    <span data-admin--ui--gif-target="icon" class="flex">
+      <span data-gif-icon="play" class="flex"><%= helpers.render "admin/shared/icon", name: :play, size: "size-3" %></span>
+      <span data-gif-icon="pause" class="flex" hidden><%= helpers.render "admin/shared/icon", name: :pause, size: "size-3" %></span>
+    </span>
+    <span data-admin--ui--gif-target="label"><%= t(".play") %></span>
+  <% end %>
+  <% if tile? %>
+    <span class="pointer-events-none absolute bottom-1.5 left-1.5 max-w-[calc(100%-12px)] truncate text-label text-dim"><%= t(".label", name: name) %></span>
+  <% end %>
+<% end %>

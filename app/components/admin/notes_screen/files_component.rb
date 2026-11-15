@@ -24,12 +24,12 @@ module Admin
     # ground, so a GIF's label and its Play control always fit. A larger
     # picture is its own tile, as before.
     #
-    # A GIF moves. Without reduced motion it plays, like any image. With it,
-    # the tile shows a STILL: the picture itself is drawn invisible
-    # (`motion-reduce:opacity-0`, so it keeps the tile's shape) and
-    # `admin--notes--gif` paints its first frame on the canvas over it, under a
-    # Play button; Play shows the picture and reads Pause. No variant is
-    # made for the still: the browser has the frame already.
+    # A GIF moves. Its tile is `Admin::Ui::GifComponent` on this box (the
+    # same part the image viewer's stage draws): without reduced motion it
+    # plays, like any image; with it, the tile shows a STILL, the first frame
+    # `admin--ui--gif` paints on a canvas over the invisible picture, under a
+    # Play button that shows the picture and reads Pause. No variant is made
+    # for the still: the browser has the frame already.
     class FilesComponent < Admin::AdminComponent
       # The handoff's attachment row; the composer's chosen files are the
       # same row with a remove button for the download.

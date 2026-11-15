@@ -51,6 +51,16 @@ en:
           saved: "I have saved these codes"
           done: "Done"
 
+        # A GIF on a note's tile or the image viewer's stage. `play` and
+        # `pause` are its control, drawn only under reduced motion, and what
+        # `admin--ui--gif` writes on it (from the frame's `data-messages`);
+        # `label` is a tile's "GIF · loop.gif" at its bottom left (the stage
+        # draws none: the viewer's head names the file).
+        gif:
+          play: "Play"
+          pause: "Pause"
+          label: "GIF · %{name}"
+
         # The "+N" circle's letters: `many` past nine, where three characters
         # would not stand in the circle.
         avatar:

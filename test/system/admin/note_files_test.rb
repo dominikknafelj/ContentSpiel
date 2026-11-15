@@ -20,7 +20,7 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
   teardown { page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}") }
 
   def open_thread
-    visit "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}"
+    visit_screen "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}"
     await_notes_live
     assert_selector "#notes-drawer [data-notes-view=thread]"
     assert_eventually(message: "the thread never took the focus") { page.evaluate_script("document.activeElement === document.querySelector('#note-thread-#{@thread.id}')") }
@@ -352,6 +352,34 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
     find("#{tile} button").click
     assert_selector "#{tile} button", text: "Play"
     assert_equal [ false, true ], [ visible.call("img"), visible.call("canvas") ]
+  ensure
+    reduce_motion(false)
+  end
+
+  # `Admin::Ui::GifComponent`'s keyboard: the picture is a link, and under
+  # reduced motion the Play after it is a button of its own, whose Enter
+  # plays the GIF and pauses it again without the focus leaving it.
+  test "with reduced motion a GIF's Play is the Tab stop after its picture, and Enter plays and pauses it" do
+    as(users(:two)) { assert Notes::Reply.call(@thread, body: "A loop", files: [ fixture_upload("small.gif", name: "loop.gif") ]).ok? }
+    reduce_motion(true)
+    open_thread
+    tile = "#note-thread-#{@thread.id}-messages [data-note-gif]"
+    shown = -> { page.evaluate_script("getComputedStyle(document.querySelector(#{"#{tile} img".to_json})).opacity !== '0'") }
+    assert_selector "#{tile} button", text: "Play"
+
+    stop_on("#{tile} a")
+    page.send_keys(:tab)
+    assert page.evaluate_script("document.activeElement === document.querySelector(#{"#{tile} button".to_json})"), "Play is not the Tab stop after the picture"
+    assert_not shown.call
+
+    page.send_keys(:enter)
+    assert_selector "#{tile} button", text: "Pause"
+    assert shown.call, "the picture is not shown while it plays"
+    assert page.evaluate_script("document.activeElement === document.querySelector(#{"#{tile} button".to_json})"), "the focus left the button"
+
+    page.send_keys(:enter)
+    assert_selector "#{tile} button", text: "Play"
+    assert_not shown.call
   ensure
     reduce_motion(false)
   end
