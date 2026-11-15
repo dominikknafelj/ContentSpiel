@@ -55,7 +55,7 @@ en:
         building: "Building the search index: %{done} of %{total} records."
         stopped: "The search index stopped building at %{done} of %{total} records. Run this to finish it:"
         not_built: "The search index isn't built yet, so search finds nothing. Run this to build it:"
-        out_of_date: "The search index is out of date. Run this to rebuild it:"
+        out_of_date: "The search index is out of date: the site's languages or ContentSpiel's search rules changed since it was built. Run this to rebuild it:"
         ready_builtin:
           one: "Search finds 1 page or post (built-in)."
           other: "Search finds %{number} pages and posts (built-in)."
