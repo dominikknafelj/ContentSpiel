@@ -10,8 +10,10 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
   include SearchBuildLock
 
   # The built-in, wrapped: each `index` is counted, `on_index` is called
-  # with the count before the real one, and `raise_on` makes that call
-  # raise, as an engine that stops answering half way.
+  # with the count before the real one, and `raise_on` (a page) makes the
+  # call that sends its documents raise, as an engine that stops answering
+  # half way. By the record and not by the count, since the fixtures' pages
+  # are sent too, in an order of their own.
   class Wrapped
     attr_reader :indexed
 
@@ -25,7 +27,7 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
     def index(documents)
       @indexed += 1
       @on_index&.call(@indexed)
-      raise IOError, "http://engine/update?secret" if @indexed == @raise_on
+      raise IOError, "http://engine/update?secret" if @raise_on && documents.any? { |document| document.record_id == @raise_on.id }
 
       @backend.index(documents)
     end
@@ -146,7 +148,7 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
     second = create_page(title: "Foghorn")
     old = entries_of(second).pluck(:id).sort
 
-    assert_raises(SiteSearch::Unavailable) { SiteSearch::Rebuild.new(backend: Wrapped.new(raise_on: 2)).call }
+    assert_raises(SiteSearch::Unavailable) { SiteSearch::Rebuild.new(backend: Wrapped.new(raise_on: second)).call }
 
     assert state.building?
     assert_nil state.fingerprint, "a build that stopped is stale"
@@ -240,6 +242,24 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
     end
   end
 
+  test "an outside backend's build forgets the documents of a record no longer kept and published" do
+    with_fake do |fake|
+      page = create_page(title: "Lighthouse")
+      post = create_post(title: "Harbour")
+      [ page, post ].each { |record| fake.index(SiteSearch::Documents.for_record(record.reload, now: Time.current)) }
+      assert Pages::Save.call(page.reload, attributes: { published: false }).ok?
+      assert Trash::Move.call(post.reload).ok?
+      kept = create_page(title: "Foghorn")
+
+      SiteSearch::Rebuild.new(name: "test/fake", backend: fake).call
+
+      held = ->(record) { fake.documents.values.select { |document| document.record_type == record.class.polymorphic_name && document.record_id == record.id } }
+      assert_empty held.(page), "an unpublished page's stale documents are gone"
+      assert_empty held.(post), "a trashed post's stale documents are gone"
+      assert_not_empty held.(kept)
+    end
+  end
+
   test "a second build while one holds the backend raises Busy and touches nothing" do
     create_page(title: "Lighthouse")
 
@@ -287,8 +307,8 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
   end
 
   test "a stalled build is a building row over an hour old with no job running" do
-    create_page(title: "Lighthouse")
-    assert_raises(SiteSearch::Unavailable) { SiteSearch::Rebuild.new(backend: Wrapped.new(raise_on: 1)).call }
+    page = create_page(title: "Lighthouse")
+    assert_raises(SiteSearch::Unavailable) { SiteSearch::Rebuild.new(backend: Wrapped.new(raise_on: page)).call }
     started = state.started_at
 
     assert_not state.stopped?(now: started + 59.minutes, job_running: false)

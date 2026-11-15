@@ -16,7 +16,9 @@ module SiteSearch
   # Nothing is cleared first, so search keeps answering from the old
   # documents of the records not reached yet, and a build that stops half
   # way leaves every record with documents. `done` is written after every
-  # batch, for System status.
+  # batch, for System status. For an outside backend the records that are
+  # not kept and published are synced after (`prune_unkept`), which forgets
+  # whatever the engine still holds of them.
   #
   # A COPY TAKEN DURING THE BUILD IS NEVER LOST. A record's documents are
   # built right before they are sent, never ahead for a batch. For the
@@ -26,8 +28,9 @@ module SiteSearch
   # documents sent are of the copies that stand. An outside backend is never called
   # inside a transaction (a row lock held open on the network), so there
   # the copies to keep are read again after the send, right before the
-  # prune: a copy taken in between is kept, and the copy it superseded goes;
-  # its own `SyncJob`, enqueued after its commit, sends its documents.
+  # prune (`SyncJob.sync`, the one routine both run): a copy taken in
+  # between is kept, and the copy it superseded goes; its own `SyncJob`,
+  # enqueued after its commit, sends its documents.
   #
   # At the end the documents of the languages switched off since the last
   # finished build go (the row's `languages`, what that build indexed; a
@@ -88,6 +91,7 @@ module SiteSearch
         end
       end
 
+      prune_unkept
       drop_languages(Array(indexed_before || SUPPORTED_LOCALES.keys) - Locales.enabled)
       state.ready!(fingerprint, languages: Locales.enabled.sort, done: done)
       done
@@ -102,31 +106,35 @@ module SiteSearch
       end
     end
 
-    # The number of documents sent.
+    # The number of documents sent, through the one routine that syncs a
+    # record (`SyncJob.sync`).
     def send_record(model, id)
-      return send_record_now(model.find_by(id: id)) unless @inline
+      type = model.polymorphic_name
+      unless @inline
+        return SyncJob.sync(@backend, name: @name, record_type: type, record_id: id)
+      end
 
-      model.transaction { send_record_now(kept(model).lock("FOR SHARE").find_by(id: id)) }
+      model.transaction do
+        record = kept(model).lock("FOR SHARE").find_by(id: id)
+        record ? SyncJob.sync(@backend, name: @name, record_type: type, record_id: id, record: record) : 0
+      end
     end
 
-    def send_record_now(record)
-      return 0 if record.nil?
+    # An outside engine's documents of the records not kept and published
+    # (in the trash, unpublished, a draft), which a lost or failed job of
+    # theirs could have left behind: each is synced, so a record published
+    # since the build read it keeps its documents. The built-in needs none:
+    # its query reads each record's state as it searches.
+    def prune_unkept
+      return if @inline
 
-      now = Time.current
-      documents = Documents.for_record(record, now: now)
-      @backend.index(documents) if documents.any?
-      keep = kept_copy_ids(record)
-      @backend.prune_record(record_type: record.class.polymorphic_name, record_id: record.id, except_copy_ids: keep)
-      documents.size
-    end
-
-    # The copies that stand now, read after the send: by the clock of the
-    # read, so a copy taken since the documents were built is in force here.
-    def kept_copy_ids(record)
-      return [] if record.trashed? || record.published_at.nil?
-
-      now = Time.current
-      [ Publishing.current(record, now: now), Publishing.pending(record, now: now) ].compact.map(&:id)
+      RECORDS.each do |model|
+        model.where.not(id: kept(model).select(:id)).in_batches(of: BATCH) do |batch|
+          Unavailable.scrubbing(backend: @name) do
+            batch.ids.each { |id| SyncJob.sync(@backend, name: @name, record_type: model.polymorphic_name, record_id: id) }
+          end
+        end
+      end
     end
 
     def drop_languages(off)

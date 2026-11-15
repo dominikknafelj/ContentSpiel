@@ -11,10 +11,11 @@ class SiteSearch::SyncJobTest < ActiveSupport::TestCase
 
   # The fake counts the calls that reach it, failed ones included.
   # `failing_index` makes `index` alone raise, as an engine that takes
-  # removals and refuses new documents.
+  # removals and refuses new documents; `before_index`, when set, is called
+  # once before the next `index` stores anything.
   class CountingFake < SiteSearch::Fake
     attr_reader :calls
-    attr_accessor :failing_index
+    attr_accessor :failing_index, :before_index
 
     def initialize(...)
       super
@@ -24,6 +25,9 @@ class SiteSearch::SyncJobTest < ActiveSupport::TestCase
     def index(documents)
       @calls += 1
       raise IOError, "http://engine/update?doc=secret" if failing_index
+
+      hook, self.before_index = before_index, nil
+      hook&.call
 
       super
     end
@@ -242,6 +246,36 @@ class SiteSearch::SyncJobTest < ActiveSupport::TestCase
     assert_equal copies, Publishing::Version.of(page).count, "a reschedule takes no copy"
     assert_not_empty documents_of(page)
     assert documents_of(page).all? { |document| document.shown_from == later }
+  end
+
+  test "a job that built a superseded copy's documents leaves the new copy's in place" do
+    page = perform_enqueued_jobs(only: SiteSearch::SyncJob) { create_page(title: "Lighthouse") }
+    old = Publishing.current(page)
+
+    # Job A has built the old copy's documents; before they reach the
+    # engine an editor publishes, and job B, for the new copy, runs in full.
+    @fake.before_index = lambda do
+      assert Pages::Save.call(page.reload, translations: { "en" => { title: "Beacon" } }).ok?
+      publish_changes(page)
+      SiteSearch::SyncJob.perform_now("Page", page.id)
+    end
+    SiteSearch::SyncJob.perform_now("Page", page.id)
+
+    current = Publishing.current(page)
+    assert_not_equal old.id, current.id
+    assert_equal [ current.id ], documents_of(page).map(&:copy_id).uniq, "the new copy's documents stand, the old copy's are pruned"
+  end
+
+  test "a database error while the job reads the record is retried with the job's backoff" do
+    page = create_page(title: "Lighthouse")
+    clear_enqueued_jobs
+
+    with_singleton_override(Page, :find_by, ->(*) { raise ActiveRecord::Deadlocked, "deadlock detected" }) do
+      SiteSearch::SyncJob.perform_now("Page", page.id)
+    end
+
+    assert_enqueued_with(job: SiteSearch::SyncJob, args: [ "Page", page.id ])
+    assert_equal 0, @fake.calls, "nothing reached the engine"
   end
 
   test "an enqueue that raises after the commit is reported and the write stands" do
