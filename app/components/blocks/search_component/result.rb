@@ -12,9 +12,13 @@ module Blocks
     #             homepage
     #   date      a post's date as `post_date` writes it; nil for a page
     #   snippet   the words around the match, escaped, each match in <mark>
+    #   tags      a post's tags as its copy in force holds them, in its order,
+    #             each a `Result::Tag` (`name`, `matched?`); [] for a page
+    #   close?    whether it was found as a close match, not an exact one
     #
     # Every one but `snippet` is plain text, which a template prints through
-    # ERB's escaping.
+    # ERB's escaping: a tag's name too, and whether it matched is a flag,
+    # never markup.
     class Result
       include ActionView::Helpers::TagHelper
       include ActionView::Helpers::OutputSafetyHelper
@@ -25,8 +29,18 @@ module Blocks
       # the two equal).
       DATE_FORMAT = "%-d %b %Y".freeze
 
-      def initialize(item)
+      # One of a post's tags: `name` as the copy holds it, plain text;
+      # `matched?` whether it matches the search
+      # (`Blocks::SearchComponent.matched_tag?`).
+      Tag = Data.define(:name, :matched) do
+        def matched? = matched == true
+      end
+
+      # `words` are what a tag is matched by: the query's words, and on close
+      # matches the correction's too (`Blocks::SearchComponent#match_words`).
+      def initialize(item, words:)
         @item = item
+        @words = words
       end
 
       def title = item.title
@@ -38,6 +52,13 @@ module Blocks
       def where = item.where&.join(PLACE_SEPARATOR)
 
       def date = item.date&.strftime(DATE_FORMAT)
+
+      # Built with `Tag[…]`: `Tag.` reads, to the public readers' guard
+      # (`test/lib/public_readers_test.rb`), as the model's rows, which this
+      # value is not.
+      def tags = @tags ||= item.tags.map { |name| Tag[name: name, matched: SearchComponent.matched_tag?(name, words)] }
+
+      def close? = item.close == true
 
       # The backend's text with its marks (`SiteSearch::Snippet`, ranges in
       # characters and never markup): each piece is escaped by `safe_join`
@@ -62,7 +83,7 @@ module Blocks
 
       private
 
-      attr_reader :item
+      attr_reader :item, :words
 
       def marks_within(text)
         Array(item.snippet&.marks).select do |mark|

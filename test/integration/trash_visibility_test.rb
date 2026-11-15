@@ -302,6 +302,27 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A tag's listing page is where a tag suggestion goes (`SiteSearch::TagPage`):
+  # a trashed page keeps its copy, list block and all, and is never it.
+  test "a tag's listing page is never a trashed page" do
+    tag = Tag.create!(name: "seabirds")
+    listing = ->(title) do
+      page = create_page(title: title)
+      assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "tag" => tag.name } }).ok?
+      publish_changes(page)
+    end
+    kept = listing.("Kept listing")
+    gone = listing.("Gone listing")
+    assert Pages::Move.call(gone.reload, parent: root_page, position: 0).ok?
+    tag_page = -> { SiteSearch::TagPage.for([ tag.id ], locale: "en", now: Time.current)[tag.id]&.id }
+    assert_equal gone.id, tag_page.call, "the first in reading order while it is kept"
+
+    gone.reload.update!(trashed_at: Time.current)
+    assert_equal kept.id, tag_page.call
+    kept.reload.update!(trashed_at: Time.current)
+    assert_nil tag_page.call
+  end
+
   # --- CS Studio --------------------------------------------------------------
 
   test "CS Studio 404s a trashed page, post and image by id, and autosave can't revive one" do

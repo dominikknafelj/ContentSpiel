@@ -43,7 +43,11 @@ en:
       # and the one line of each other outcome. `%{query}` is handed in its
       # quote's element (`<q>`), so the words hold no quote marks of their
       # own; `%{results}` in `past_end` is the count's sentence. `live_note`
-      # is said in the preview only.
+      # is said in the preview only. `did_you_mean`'s `%{correction}` is
+      # handed in as its link; `matched_tag` is heard by a screen reader
+      # after a matched tag. The `suggestions*` and `kind_*` words are the
+      # suggestions' as one types: the endpoint's sentences, the listbox's
+      # name, the loading word and each suggestion's kind.
       search:
         label: "Search this site"
         button: "Search"
@@ -61,6 +65,21 @@ en:
         limited: "Too many searches. Please wait a minute, then try again."
         unavailable: "Search isn't available right now. Please try again later."
         live_note: "Results come from the live site."
+        close_matches: "No exact matches for %{query}. Close matches:"
+        did_you_mean: "Did you mean %{correction}?"
+        tagged: "Tagged"
+        matched_tag: "matches your search"
+        suggestions:
+          one: "%{count} suggestion"
+          other: "%{count} suggestions"
+        no_suggestions: "No suggestions. Press Enter to search."
+        suggestions_limited: "Too many suggestions asked. Press Enter to search."
+        suggestions_unavailable: "Suggestions aren't available right now. Press Enter to search."
+        suggestions_loading: "Looking…"
+        suggestions_label: "Suggestions"
+        kind_page: "Page"
+        kind_post: "Post"
+        kind_tag: "Tag"
     # A form's own words: what a visitor reads that no editor
     # typed, read through `PublicStrings.read` (`Forms::PublicField#word`,
     # `Forms::BuiltInFieldTypes`). `yes` and `no` are what a checkbox answer

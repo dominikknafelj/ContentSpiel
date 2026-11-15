@@ -32,7 +32,16 @@ module ContractLedger
     # tokens below, and what each of its results answers (`title`,
     # `url_path`, `kind`, `where`, `date`, `snippet`;
     # docs/reference/theming.md, "The Search block").
-    "blocks/search_component" => %w[block page label query state results total pagination action live_note? string],
+    # Release note (search 2): added `close_matches?`, `correction`,
+    # `correction_path` and `suggest_url` to the Search block's line, `tags`
+    # (each with `name` and `matched?`) and `close?` to what each result
+    # answers, and thirteen words: `close_matches`, `did_you_mean`,
+    # `tagged`, `matched_tag`, `suggestions`, `no_suggestions`,
+    # `suggestions_limited`, `suggestions_unavailable`,
+    # `suggestions_loading`, `suggestions_label`, `kind_page`, `kind_post`
+    # and `kind_tag`.
+    "blocks/search_component" => %w[block page label query state results total pagination action live_note?
+                                     close_matches? correction correction_path suggest_url string],
     "blocks/card_component" => %w[block page title text link icon icon_name image],
     "blocks/post_list_component" => %w[block page list_component],
     "blocks/section_component" => %w[block page columns layout background width style anchor],

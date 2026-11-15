@@ -36,14 +36,23 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
     SiteSearch::Snippet.new(text: text, marks: marks)
   end
 
-  def item(title: "Publishing a page", url_path: "/guide/publishing", kind: :page, where: %w[Guide Editors], date: nil, snippet: nil)
+  def item(title: "Publishing a page", url_path: "/guide/publishing", kind: :page, where: %w[Guide Editors], date: nil, snippet: nil, tags: [], close: false)
     SiteSearch::Shown::Item.new(kind: kind, record: nil, title: title, url_path: url_path, where: where, date: date,
-      snippet: snippet || snippet("a page goes live when you press Publish", "live", "Publish"))
+      snippet: snippet || snippet("a page goes live when you press Publish", "live", "Publish"), tags: tags, close: close)
   end
 
-  def answer(state, query: "publish", results: [], total: 0, page: 1, live_note: false)
+  def answer(state, query: "publish", results: [], total: 0, page: 1, live_note: false, correction: nil, close_matches: false)
     SiteSearch::Answer.new(query: query, state: state, results: results, total: total,
-      pagination: Pagination.new(page: page, per_page: SiteSearch::Answer::PER_PAGE, total: total), live_note: live_note, correction: nil, close_matches: false)
+      pagination: Pagination.new(page: page, per_page: SiteSearch::Answer::PER_PAGE, total: total), live_note: live_note,
+      correction: correction, close_matches: close_matches)
+  end
+
+  # The component drawn for `answer`, to ask its private methods.
+  def drawn(answer)
+    component = Blocks::SearchComponent.new(block: search_block, page: @shown)
+    vc_test_controller.search_answer = answer
+    render_inline(component)
+    component
   end
 
   def draw(answer, block: search_block)
@@ -225,7 +234,7 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
   test "a result's marks that are no Integer range within the text are left out before they are sorted, the words kept" do
     text = "albatross and walrus"
     marks = [ [ 14, 6 ], [ nil, 3 ], [ "0", 9 ], [ 0, nil ], [ 0, 9 ], [ -4, 2 ], [ 40, 3 ], [ 3, 0 ], [ 2.0, 3 ] ]
-    result = Blocks::SearchComponent::Result.new(item(snippet: SiteSearch::Snippet.new(text: text, marks: marks)))
+    result = Blocks::SearchComponent::Result.new(item(snippet: SiteSearch::Snippet.new(text: text, marks: marks)), words: [])
 
     assert_equal "<mark>albatross</mark> and <mark>walrus</mark>", result.snippet
   end
@@ -248,6 +257,65 @@ class Blocks::SearchComponentTest < ActiveSupport::TestCase
     assert_predicate marked, :html_safe?
     assert_equal "2 results for &lt;b&gt;", ERB::Util.html_escape(component.send(:string, :results, count: 2, query: "<b>")),
       "a plain string handed in is escaped where it is printed"
+  end
+
+  test "a tag is matched when a word of it begins with a query word of 3 or more, or equals a shorter one" do
+    assert Blocks::SearchComponent.matched_tag?("deployments", %w[deploy])
+    assert_not Blocks::SearchComponent.matched_tag?("running", %w[ran])
+    assert Blocks::SearchComponent.matched_tag?("ci", %w[ci])
+    assert_not Blocks::SearchComponent.matched_tag?("cicd", %w[ci])
+    assert Blocks::SearchComponent.matched_tag?("Zero-Downtime deploys", %w[downtime]), "any word of the tag, folded to lower case"
+    assert_not Blocks::SearchComponent.matched_tag?("deployments", [])
+  end
+
+  test "a result's tags are its item's, each matched by the query's words, and on close matches the correction's too" do
+    results = [ item(kind: :post, where: nil, tags: %w[deployments previews kamal-proxy], close: true), item ]
+    component = drawn(answer(:results, query: "Deploy", results: results, total: 2))
+    post, page = component.send(:results)
+
+    assert_equal [ Blocks::SearchComponent::Result::Tag.new(name: "deployments", matched: true),
+                   Blocks::SearchComponent::Result::Tag.new(name: "previews", matched: false),
+                   Blocks::SearchComponent::Result::Tag.new(name: "kamal-proxy", matched: false) ], post.tags
+    assert_predicate post.tags.first, :matched?
+    assert_predicate post, :close?
+    assert_equal [], page.tags
+    assert_not_predicate page, :close?
+
+    close = drawn(answer(:results, query: "kamel proxi", results: results, total: 2, correction: "kamal proxy", close_matches: true))
+    assert_equal [ false, false, true ], close.send(:results).first.tags.map(&:matched?)
+    exact = drawn(answer(:results, query: "kamel proxi", results: results, total: 2, correction: "kamal proxy", close_matches: false))
+    assert_equal [ false, false, false ], exact.send(:results).first.tags.map(&:matched?), "the correction's words count on close matches only"
+  end
+
+  test "close_matches?, correction and correction_path come from the answer" do
+    component = drawn(answer(:results, query: "deplyment", results: [ item(close: true) ], total: 1, correction: "albatross & co", close_matches: true))
+
+    assert component.send(:close_matches?)
+    assert_equal "albatross & co", component.send(:correction)
+    assert_equal "#{path}?q=albatross+%26+co", component.send(:correction_path)
+    assert_nil component.send(:suggest_url)
+
+    plain = drawn(answer(:results, query: "live", results: [ item ], total: 1))
+    assert_not plain.send(:close_matches?)
+    assert_nil plain.send(:correction)
+    assert_nil plain.send(:correction_path)
+  end
+
+  test "string answers the new keys and no other" do
+    component = drawn(answer(:empty, query: nil))
+    values = { query: "q", correction: "c", page: 2, results: "r" }
+    (Blocks::SearchComponent::STRINGS - %i[results suggestions]).each { |key| assert_kind_of String, component.send(:string, key, **values) }
+
+    assert_equal "Tagged", component.send(:string, :tagged)
+    assert_equal "matches your search", component.send(:string, :matched_tag)
+    assert_equal "No exact matches for q. Close matches:", component.send(:string, :close_matches, query: "q")
+    assert_equal "Did you mean c?", component.send(:string, :did_you_mean, correction: "c")
+    assert_equal "6 suggestions", component.send(:string, :suggestions, count: 6)
+    assert_equal "1 suggestion", component.send(:string, :suggestions, count: 1)
+    assert_equal "Looking…", component.send(:string, :suggestions_loading)
+    assert_equal %w[Page Post Tag], %i[kind_page kind_post kind_tag].map { |key| component.send(:string, key) }
+    assert_raises(ArgumentError) { component.send(:string, :suggestions) }
+    assert_raises(ArgumentError) { component.send(:string, :nope) }
   end
 
   test "nothing in the component, its result or its template marks a string as safe" do

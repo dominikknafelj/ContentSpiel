@@ -20,7 +20,8 @@ class BlockTypes::SearchTest < ActiveSupport::TestCase
     assert definition.capability?(:search)
     assert_not definition.capability?(:container)
     assert_equal Blocks::SearchComponent, definition.component
-    assert_equal %w[block page label query state results total pagination action live_note? string], definition.theme_methods
+    assert_equal %w[block page label query state results total pagination action live_note? close_matches? correction correction_path suggest_url string],
+      definition.theme_methods
     assert_equal %w[search-mark search-mark-ink], definition.themed_tokens
     assert_empty definition.fixed_tokens
     assert_equal Rails.root.join("app/assets/tailwind/themes/default/search.css"), definition.stylesheet_path
