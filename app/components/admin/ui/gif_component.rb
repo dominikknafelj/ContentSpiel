@@ -30,8 +30,8 @@ module Admin
     # the picture's address after the first render.
     #
     # `gif: false` is a picture that is no GIF (the viewer's stage, whose
-    # script sets the value per picture): no still and no button, and the
-    # picture is not drawn invisible under reduced motion.
+    # script sets the value per picture): the script hides the still and the
+    # button, and the picture is not drawn invisible under reduced motion.
     #
     # `image:` is for the picture itself: a class added to its own, data
     # merged beside the GIF's target, and an action after the GIF's `load`

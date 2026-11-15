@@ -27,7 +27,7 @@ class Admin::Ui::ImageViewerComponentTest < ViewComponent::TestCase
     refute_includes page.native.to_html, Admin::Ui::ButtonComponent.classes(:primary)
   end
 
-  test "a long name truncates in the head and the title holds it whole" do
+  test "the dialog is named by its title element, the h2 the head truncates" do
     # The h2 is the CSS-truncated title (the viewer step) and the dialog's
     # aria-labelledby, so its whole text is the dialog's name.
     render_inline(Admin::Ui::ImageViewerComponent.new)

@@ -23,8 +23,8 @@ module Admin
     #
     # THE STAGE is `cs-sunken`, the picture centred on it at its own size and
     # never enlarged. The picture is `Admin::Ui::GifComponent` on the stage
-    # placement, with `gif: false` until the script says the picture is a
-    # GIF, so a GIF's still and Play are the thread's own part. Its `<img>`
+    # placement, the same GIF part a note's tile draws, with `gif: false`
+    # until the script says the picture is a GIF. Its `<img>`
     # is also the viewer's `picture` target, whose `load` and `error` the
     # viewer hears. The stage is a size container
     # (`.admin-image-viewer__stage`) and the picture's height is capped at
