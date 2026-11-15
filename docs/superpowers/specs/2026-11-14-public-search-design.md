@@ -358,8 +358,9 @@ The failure is reported through `Rails.error.report` as
 `SiteSearch::Unavailable` carrying the backend's name and the error's class
 name only, **never the exception itself**: an HTTP client's message often
 holds the address it asked, and an engine's address holds the query
-(`/select?q=…`). At most one report per process per minute (a counter in
-`CounterStore`), so an engine that is down does not flood the error tracker.
+(`/select?q=…`). At most one report per site per minute (a key in
+`CounterStore.current`, Solid Cache in production, which every process of the
+site shares), so an engine that is down does not flood the error tracker.
 
 Indexing failures in `SyncJob` retry with the job's backoff (5 attempts) and
 are reported the same way; the site stays up and searches the engine's last

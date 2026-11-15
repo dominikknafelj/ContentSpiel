@@ -16,6 +16,30 @@
 #
 # The words are ones a stemmer leaves whole, so a backend's language
 # analysis finds the word as typed and marks it in the snippet.
+#
+# A GEM'S TEST REACHES IT BY PATH, from the ContentSpiel it runs against (a
+# checkout of the release, or the image, which holds `test/` too): this file
+# is that path's promise, `test/support/site_search_backend_contract.rb`
+# under the CMS's root, and needs nothing of this suite's helpers, only the
+# application booted in the test environment and Active Support's test
+# case:
+#
+#   ENV["RAILS_ENV"] = "test"
+#   require File.join(ENV.fetch("CONTENTSPIEL_ROOT"), "config/environment")
+#   require "active_support/test_case"
+#   require Rails.root.join("test/support/site_search_backend_contract").to_s
+#
+#   class Acme::SolrBackendTest < ActiveSupport::TestCase
+#     include SiteSearchBackendContract
+#     include SiteSearchBackendContract::BareDocuments
+#     def backend = @backend ||= Acme::SolrBackend.new(url: ENV.fetch("ACME_SOLR_URL"))
+#   end
+#
+# So the file stays here, requires nothing, and names no helper of
+# test/support; moving or renaming it, or a contract test a backend that
+# obeys `SiteSearch::Backend` cannot pass, is a breaking change for every
+# gem (test/lib/site_search_backend_contract_test.rb runs it the way a gem
+# does, in a process of its own).
 module SiteSearchBackendContract
   extend ActiveSupport::Concern
 
@@ -183,6 +207,45 @@ module SiteSearchBackendContract
         assert_operator start, :>=, 0
         assert_operator start + length, :<=, snippet.text.length
         assert_includes snippet.text[start, length].downcase, "lighthouse"
+      end
+    end
+
+    # The text is a visitor's, handed over as typed (normalised, at most
+    # `SiteSearch::Query::MAX_LENGTH` characters), never a query in the
+    # engine's own language: an engine whose client takes a query syntax
+    # (Solr's or Lucene's parsers, Elasticsearch's `query_string`) escapes it,
+    # or sends the words as plain text, so a field name, an operator, a
+    # boost or a wildcard is no instruction to it. Each answers results or
+    # raises `SiteSearch::Unavailable`, and syntax alone matches nothing.
+    test "contract: a query full of an engine's syntax is words, never an instruction" do
+      backend.index([ contract_document(title: "Albatross", body: "the glacier melts"), contract_document(title: "Pelican") ])
+
+      [
+        'title:albatross AND (glacier OR walrus)^2 ~ * ? "[',
+        "+albatross -walrus || !glacier && {a TO z} [* TO *]",
+        'albatross" OR "1"="1',
+        "albatross\\ /glac.*/ ((( ))) ^ ~2 \\",
+        "albatross} ] ) ; DROP TABLE search_entries; --",
+        "_query_:{!lucene}albatross {!xmlparser v='<x/>'}",
+        "albatross" + " OR walrus" * 40
+      ].each do |raw|
+        text = SiteSearch::Query.normalise(raw).first(SiteSearch::Query::MAX_LENGTH)
+        begin
+          results = contract_search(text)
+          assert_kind_of Array, results.hits, raw
+          assert_kind_of Integer, results.total, raw
+          assert_operator results.total, :>=, results.hits.size, raw
+        rescue SiteSearch::Unavailable
+          nil
+        end
+      end
+
+      [ "*:*", "*", "?", "id:*", "{!lucene}*:*" ].each do |raw|
+        begin
+          assert_empty contract_search(raw).hits, "#{raw} is no query for every document"
+        rescue SiteSearch::Unavailable
+          nil
+        end
       end
     end
 
