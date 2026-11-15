@@ -1,4 +1,4 @@
-<dialog id="<%= id %>" aria-labelledby="<%= id %>-title" data-dialog-width="<%= width %>" <%= "data-destructive" if destructive %> <%= "data-admin--ui--dialog-open-on-load" if open_on_load %> <%= "data-dialog-hang" if hang %> <%= "data-dialog-steady" if steady %>
+<dialog id="<%= id %>" aria-labelledby="<%= id %>-title" data-dialog-width="<%= width %>" <%= "data-destructive" if destructive %> <%= "data-admin--ui--dialog-open-on-load" if open_on_load %> <%= "data-dialog-hang" if hang %> <%= "data-dialog-steady" if steady %> <%= tag.attributes(data: data) %>
         class="admin-dialog rounded-card bg-popover p-0 text-ink shadow-3">
   <header class="flex items-center gap-4 border-b border-line px-5 py-3">
     <% if title_aside? %>

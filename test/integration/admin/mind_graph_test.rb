@@ -326,7 +326,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph"
 
     assert_select "[data-mind-graph-empty=no-content]", text: "No pages or posts yet."
-    assert_select "canvas", count: 0
+    # The screen's own: the layout's image viewer holds a GIF's still canvas.
+    assert_select "#content canvas", count: 0
     assert_select "[data-mind-graph-legend], [data-legend-state]", count: 0
     assert_select "[data-controller='admin--mind-graph--graph']", count: 0
     assert_not_includes response.body, "Hidden from them"

@@ -64,4 +64,22 @@ class Admin::Ui::GifComponentTest < ViewComponent::TestCase
     assert_raises(ArgumentError) { Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", placement: :wall) }
     assert_raises(ArgumentError) { Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", placement: :stage, link: { title: "x" }) }
   end
+
+  test "image: puts the caller's attributes on the picture, its class added and its action after the GIF's own" do
+    render_inline(Admin::Ui::GifComponent.new(src: nil, name: "", placement: :stage,
+      image: { class: "object-contain", data: { "viewer-target" => "picture", action: "error->viewer#failed" } }))
+
+    picture = page.find("img[data-admin--ui--gif-target='moving']", visible: :all)
+    assert_equal "picture", picture["data-viewer-target"]
+    assert_equal "load->admin--ui--gif#paint error->viewer#failed", picture["data-action"]
+    assert_includes picture[:class].split, "object-contain"
+    assert_includes picture[:class].split, "block"
+  end
+
+  test "gif: false is a picture that is no GIF: the value says so and the picture is not drawn invisible under reduced motion" do
+    render_inline(Admin::Ui::GifComponent.new(src: nil, name: "", placement: :stage, gif: false))
+
+    assert_equal "false", page.find("[data-controller='admin--ui--gif']", visible: :all)["data-admin--ui--gif-gif-value"]
+    assert_not_includes page.find("img", visible: :all)[:class].split, "motion-reduce:opacity-0"
+  end
 end

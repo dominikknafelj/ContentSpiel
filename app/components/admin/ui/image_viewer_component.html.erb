@@ -1,0 +1,38 @@
+<%= render Admin::Ui::DialogComponent.new(id: DIALOG_ID, title: "", width: :viewer,
+      data: { controller: "admin--ui--image-viewer", messages: messages_data(*MESSAGES) }) do |dialog| %>
+  <% dialog.with_title_aside do %><%= tag.span(data: target("facts")) %><% end %>
+
+  <%= tag.div class: "admin-image-viewer__stage relative isolate grid min-h-0 flex-1 place-items-center bg-sunken", data: target("stage") do %>
+    <%= render Admin::Ui::GifComponent.new(src: nil, name: "", placement: :stage, gif: false, image: picture_html,
+          class: "col-start-1 row-start-1 min-w-0", data: target("frame")) %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :warn, hidden: true, class: "col-start-1 row-start-1 max-w-[420px]", data: target("notice")) do %><%= t(".failed") %><% end %>
+    <%# Shown by the script when a picture has neither loaded nor failed 400 ms
+        after a step or the opening, so a cached picture never flickers. %>
+    <%= tag.div role: "status", hidden: true, class: "col-start-1 row-start-1 flex flex-col items-center gap-2.5 text-small text-meta", data: target("loading") do %>
+      <span class="admin-spinner" aria-hidden="true"></span>
+      <span><%= t(".loading") %></span>
+    <% end %>
+    <%= stage_arrow("previous", side: "left-3", icon: :arrow_left) %>
+    <%= stage_arrow("next", side: "right-3", icon: :arrow_right) %>
+  <% end %>
+
+  <%# Written at a step only: the opening is said by the dialog's own name,
+      and the visible position is no live region, so nothing is heard twice. %>
+  <%= tag.p class: "sr-only", "aria-live": "polite", data: target("announcer") %>
+
+  <% dialog.with_footer do %>
+    <%# Off a phone this row is not a box (`sm:contents`): the position stands
+        first in the foot and pushes the actions right. On a phone it is the
+        foot's first row, ← "2 of 3" →, and the actions wrap under it. %>
+    <div class="flex items-center gap-2 max-sm:w-full sm:contents">
+      <%= phone_arrow("previous", target_name: "phonePrevious", icon: :arrow_left) %>
+      <%= tag.span class: "mr-auto text-small text-dim tabular-nums max-sm:flex-1 max-sm:text-center", data: target("position") %>
+      <%= phone_arrow("next", target_name: "phoneNext", icon: :arrow_right) %>
+    </div>
+    <%# No address until the script writes the picture's: an empty viewer offers nothing. %>
+    <%= tag.a target: "_blank", rel: "noopener", class: "#{Admin::Ui::ButtonComponent.classes(:tertiary)} max-sm:mr-auto", data: { **target("original"), turbo: false } do %>
+      <%= t(".open_original") %><%= helpers.render "admin/shared/icon", name: :arrow_up_right, size: "size-4" %>
+    <% end %>
+    <%= tag.a t(".download"), download: "", class: Admin::Ui::ButtonComponent.classes(:secondary), data: { **target("download"), turbo: false } %>
+  <% end %>
+<% end %>

@@ -25,7 +25,7 @@ module Admin
         motion: :none,
         content_edges: %i[long short],
         widths: :fixed_width,
-        interface: %i[id title width destructive open_on_load hang steady],
+        interface: %i[id title width destructive open_on_load hang steady data],
         limits: [
           "It draws the frame, the title, Close and the footer slot: the actions and the form inside are the caller's.",
           "It opens only through admin--ui--dialog on the body, by its id or marked by open_on_load."
@@ -68,7 +68,11 @@ module Admin
       # top edge and lets the foot move; this fixes the height, so nothing of the
       # frame moves, and what is longer scrolls in the body. See the comment on
       # `.admin-dialog[data-dialog-steady]`.
-      def initialize(id:, title:, width: :confirm, destructive: false, open_on_load: false, hang: false, steady: false)
+      #
+      # `data:` goes on the `<dialog>` itself, beside its own attributes: the
+      # controller of a dialog that is a part with a script of its own (the
+      # image viewer's `admin--ui--image-viewer`) and the words it says.
+      def initialize(id:, title:, width: :confirm, destructive: false, open_on_load: false, hang: false, steady: false, data: {})
         raise ArgumentError, "unknown dialog width #{width.inspect}" unless WIDTHS.key?(width)
 
         @id = id
@@ -78,11 +82,12 @@ module Admin
         @open_on_load = open_on_load
         @hang = hang
         @steady = steady
+        @data = data
       end
 
       private
 
-      attr_reader :id, :title, :width, :destructive, :open_on_load, :hang, :steady
+      attr_reader :id, :title, :width, :destructive, :open_on_load, :hang, :steady, :data
     end
   end
 end

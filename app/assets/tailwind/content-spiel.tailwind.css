@@ -517,6 +517,29 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
   .admin-dialog[data-dialog-width="viewer"] > footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
   .admin-dialog[data-dialog-width="viewer"] > header,
   .admin-dialog[data-dialog-width="viewer"] > footer { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  /* The foot's two rows: ← "2 of 3" → (a full-width row), then the actions. */
+  .admin-dialog[data-dialog-width="viewer"] > footer { flex-wrap: wrap; }
+}
+/* The image viewer's stage (`Admin::Ui::ImageViewerComponent`): 64px at the
+   sides off a phone, where the round arrows stand over its edges; on a phone
+   the safe areas', its sunken ground still running edge to edge under them.
+   A size container, so the picture's height is capped in `cqh`: a percentage
+   would resolve against the GIF part's holder, which is the picture's own
+   size, and cap nothing. */
+.admin-image-viewer__stage { container-type: size; padding: 16px 64px; }
+@media (max-width: 639px) {
+  .admin-image-viewer__stage { padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); }
+}
+/* The checkerboard behind the picture's own box, never the stage: 8px
+   squares, the same in both schemes, so a transparent picture (a dark logo)
+   always shows and an opaque one covers it. */
+.admin-image-viewer__stage img {
+  background-color: var(--cs-checker-a);
+  background-image:
+    linear-gradient(45deg, var(--cs-checker-b) 25%, transparent 25%, transparent 75%, var(--cs-checker-b) 75%),
+    linear-gradient(45deg, var(--cs-checker-b) 25%, transparent 25%, transparent 75%, var(--cs-checker-b) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
 }
 /* The ⌘K palette (Admin::Shell::CommandPaletteComponent): high on the screen, not centred. */
 .admin-palette { margin-top: 10vh; }

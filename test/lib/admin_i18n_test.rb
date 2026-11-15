@@ -563,6 +563,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/media/upload_tiles.js
     app/components/admin/ui/media_picker_component.rb
     app/components/admin/ui/media_picker_component.html.erb
+    app/components/admin/ui/image_viewer_component.rb
+    app/components/admin/ui/image_viewer_component.html.erb
     app/javascript/controllers/admin/media/select_controller.js
     app/components/admin/trash_screen/list_component.rb
     app/components/admin/trash_screen/list_component.html.erb

@@ -14,7 +14,7 @@ module DesignSystemEntries
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
     ActionZone Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog EditorDiagramBlock EditorDiagramError EditorSearchBlock FieldFrame FoundationComponentContract FoundationContrast
-    FoundationFocus FoundationIcons FoundationLayout FoundationMotion Gif GroupFields IconChip ImageField Mails MediaPicker Menu NoteMarker Notice
+    FoundationFocus FoundationIcons FoundationLayout FoundationMotion Gif GroupFields IconChip ImageField ImageViewer Mails MediaPicker Menu NoteMarker Notice
     PasswordField PatternDestructiveActions PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation PatternNotifications PatternSaving Person
     PrefixInput PresenceMarker PublicDiagramBlock RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage
     SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSearch SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog

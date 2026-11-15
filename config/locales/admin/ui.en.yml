@@ -61,6 +61,21 @@ en:
           pause: "Pause"
           label: "GIF · %{name}"
 
+        # The image viewer, a picture opened over CS Studio. `position` is the
+        # foot's "2 of 3" and `stepped` the polite announcement at a step
+        # ("hero.png, 2 of 3"), both written by `admin--ui--image-viewer`
+        # (from the dialog's `data-messages`); `loading` stands on the stage
+        # when a picture is slow, `failed` when it cannot be drawn.
+        image_viewer:
+          previous: "Previous image"
+          next: "Next image"
+          position: "%{index} of %{count}"
+          open_original: "Open original"
+          download: "Download"
+          failed: "This image couldn't be shown here. Open the original, or download it."
+          loading: "Loading…"
+          stepped: "%{name}, %{position}"
+
         # The "+N" circle's letters: `many` past nine, where three characters
         # would not stand in the circle.
         avatar:

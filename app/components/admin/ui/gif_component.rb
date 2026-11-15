@@ -29,8 +29,15 @@ module Admin
     # which its script fills): the script's `src` value is the one writer of
     # the picture's address after the first render.
     #
-    # Anything else the caller hands it (`class:`, `data:`) goes on the frame:
-    # a class added to its own, data merged beside the controller's.
+    # `gif: false` is a picture that is no GIF (the viewer's stage, whose
+    # script sets the value per picture): no still and no button, and the
+    # picture is not drawn invisible under reduced motion.
+    #
+    # `image:` is for the picture itself: a class added to its own, data
+    # merged beside the GIF's target, and an action after the GIF's `load`
+    # (the viewer makes the picture its own target and hears its `load` and
+    # `error`). Anything else the caller hands it (`class:`, `data:`) goes on
+    # the frame: a class added to its own, data merged beside the controller's.
     class GifComponent < AdminComponent
       include Admin::Ui::Contract
 
@@ -39,7 +46,7 @@ module Admin
         motion: :reduced,
         content_edges: %i[short long],
         widths: :from_container,
-        interface: %i[src name placement link],
+        interface: %i[src name placement link gif image],
         limits: [
           "It draws no still of its own: the still is the browser's first frame of the picture, painted on a canvas, and no variant is made.",
           "What a click on the picture does is the caller's: the tile's link and its link: attributes, or nothing on the stage.",
@@ -60,11 +67,14 @@ module Admin
       # The holder: the picture's own size, and the containing block of the
       # still that lies over it.
       HOLDER_CLASS = "relative block min-w-0 max-w-full".freeze
-      PICTURE_CLASS = "block h-auto w-auto min-w-0 max-w-full motion-reduce:opacity-0".freeze
+      PICTURE_CLASS = "block h-auto w-auto min-w-0 max-w-full".freeze
+      # Invisible under reduced motion, so the still painted over it is what
+      # shows: a GIF's only (`admin--ui--gif#draw` keeps it after a render).
+      STILL_UNDER_CLASS = "motion-reduce:opacity-0".freeze
       # What the script says on the button, read from the frame's `data-messages`.
       MESSAGES = %w[components.ui.gif.play components.ui.gif.pause].freeze
 
-      def initialize(src:, name:, placement: :tile, link: {}, **html)
+      def initialize(src:, name:, placement: :tile, link: {}, gif: true, image: {}, **html)
         raise ArgumentError, "unknown GIF placement #{placement.inspect}" unless PLACEMENTS.include?(placement)
         raise ArgumentError, "a GIF on the stage is no link: link: is for a tile" if placement == :stage && link.present?
 
@@ -72,6 +82,8 @@ module Admin
         @name = name
         @placement = placement
         @link = link
+        @gif = gif
+        @image = image
         @html = html
       end
 
@@ -83,7 +95,7 @@ module Admin
 
       def frame_attributes
         own = { controller: "admin--ui--gif", action: "turbo:before-cache@document->admin--ui--gif#cache",
-                "admin--ui--gif-src-value": src.to_s, "admin--ui--gif-gif-value": "true", messages: messages_data(*MESSAGES) }
+                "admin--ui--gif-src-value": src.to_s, "admin--ui--gif-gif-value": @gif.to_s, messages: messages_data(*MESSAGES) }
         # A caller's own controller or action is kept beside the frame's.
         # Its keys are Symbols first, so a String key meets the frame's own.
         data = @html.fetch(:data, {}).transform_keys(&:to_sym).merge(own) { |key, theirs, ours| %i[controller action].include?(key) ? "#{ours} #{theirs}" : ours }
@@ -97,7 +109,10 @@ module Admin
       end
 
       def picture
-        image_attributes = { alt: name, class: PICTURE_CLASS, data: { "admin--ui--gif-target": "moving", action: "load->admin--ui--gif#paint" } }
+        own = { "admin--ui--gif-target": "moving", action: "load->admin--ui--gif#paint" }
+        data = @image.fetch(:data, {}).transform_keys(&:to_sym).merge(own) { |key, theirs, ours| key == :action ? "#{ours} #{theirs}" : ours }
+        classes = [ PICTURE_CLASS, (STILL_UNDER_CLASS if @gif), @image[:class] ].compact.join(" ")
+        image_attributes = @image.merge(alt: name, class: classes, data: data)
         image_attributes[:loading] = "lazy" if tile?
         image_attributes[:src] = src if src.present?
         tag.img(**image_attributes)

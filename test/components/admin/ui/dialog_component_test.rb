@@ -66,4 +66,9 @@ class Admin::Ui::DialogComponentTest < ViewComponent::TestCase
     render_inline(Admin::Ui::DialogComponent.new(id: "w", title: "x"))
     assert_no_selector "[data-dialog-title-aside]", visible: :all
   end
+
+  test "data: goes on the dialog beside its own attributes" do
+    render_inline(Admin::Ui::DialogComponent.new(id: "v", title: "", width: :viewer, data: { controller: "viewer", messages: "{}" }))
+    assert_selector "dialog#v[data-controller='viewer'][data-messages='{}'][data-dialog-width='viewer'][aria-labelledby='v-title']", visible: :all
+  end
 end
