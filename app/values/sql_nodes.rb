@@ -93,6 +93,11 @@ module SqlNodes
   # Postgres); the pattern is `like_pattern`'s.
   def like(value, pattern) = value.matches(pattern, nil, true)
 
+  # `value ILIKE pattern`, ignoring case; the pattern is `like_pattern`'s,
+  # whose escape is Postgres's own (`\`), handed as a value or a node (a
+  # bind: a visitor's text, `bound`).
+  def ilike(value, pattern) = Arel::Nodes::Matches.new(value, quoted(pattern), nil, false)
+
   # `EXISTS (SELECT 1 FROM jsonb_each_text(column) AS t WHERE <the block's
   # condition on t.value>)`: whether any VALUE of a jsonb object satisfies it
   # (`column::text` would also test the keys and the JSON punctuation).

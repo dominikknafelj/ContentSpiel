@@ -49,7 +49,7 @@ en:
       # pages and posts found, `number` the same with its delimiters) or `ready`
       # for an outside backend, `timeout`, `problem_detail` (a backend's own warning, its
       # `Health` sentence, cut to one line) or `problem` when it gave none, and `ready_detail` for an OK one that gave one and `limited`, the note
-      # under the row for the languages the built-in finds only whole runs of text in.
+      # under the row for the languages the built-in searches by the text a page contains.
       search:
         label: "Search"
         building: "Building the search index: %{done} of %{total} records."
@@ -64,7 +64,7 @@ en:
         timeout: "%{backend} did not answer in 3 seconds. Visitors see “Search isn't available right now.”"
         problem: "%{backend} reports a problem but says no more. Check the engine itself."
         problem_detail: "%{backend} reports a problem: %{detail}"
-        limited: "Search is limited in %{languages}: a word is found only as part of the whole run of text it stands in."
+        limited: "Search in %{languages} finds the text a page contains, with no stemming and no correction."
       # The "Visitor address" row (`Setup::SystemCheck#visitor_address`):
       # OK with no Cloudflare header, OK when the header is the address the
       # request is counted by, and the warning when it is not.

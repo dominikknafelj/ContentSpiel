@@ -164,5 +164,23 @@ class SiteSearch::ShownTest < ActiveSupport::TestCase
 
     assert_equal [ [ "Page", visible.id ], [ "Post", post.id ] ].sort, found.hits.map { |hit| [ hit.record_type, hit.record_id ] }.sort
     assert_equal found.hits.map { |hit| [ hit.record_type, hit.record_id ] }, items.map { |item| [ item.record.class.polymorphic_name, item.record.id ] }
+
+    # The close pass, for a typo, and the contains pass, in Japanese, by the
+    # same rules.
+    typo = postgres_results(query("albatros"))
+    assert typo.hits.any? && typo.hits.all?(&:close), "the typo finds close hits"
+    assert_equal [ [ "Page", visible.id ], [ "Post", post.id ] ].sort, typo.hits.map { |hit| [ hit.record_type, hit.record_id ] }.sort
+    assert_equal typo.hits.size, SiteSearch::Shown.for(typo, locale: "en", now: query.now).size
+
+    with_locales(Locales.enabled | %w[ja], default: Locales.default)
+    live = create_page(title: "Japanese live", translations: { "ja" => { title: "検索エンジン", slug: "japanese-live" } })
+    create_page(title: "Japanese draft", published: false, translations: { "ja" => { title: "検索エンジン案", slug: "japanese-draft" } })
+    create_page(title: "Japanese below", parent: hidden, translations: { "ja" => { title: "検索エンジン下", slug: "japanese-below" } })
+    japanese = query("エンジン").with(language: "ja")
+    contained = postgres_results(japanese)
+    assert_equal [ [ "Page", live.id ] ], contained.hits.map { |hit| [ hit.record_type, hit.record_id ] }
+    assert_equal 1, SiteSearch::Shown.for(contained, locale: "ja", now: japanese.now).size
   end
+
+  def postgres_results(query) = SiteSearch::Postgres::Query.new(query, deadline: Process.clock_gettime(Process::CLOCK_MONOTONIC) + 3).results
 end

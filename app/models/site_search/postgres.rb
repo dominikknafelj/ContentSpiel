@@ -34,9 +34,27 @@ module SiteSearch
 
     # The languages `simple` splits on spaces they do not write between
     # words (Japanese, Chinese, Thai) or between the words of a phrase
-    # (Korean): a query finds a page only by a whole run of text. System
-    # status says so while one is switched on (spec §10).
+    # (Korean), so a whole run of text alone matches: they are searched by
+    # the text a page contains (`Contains`), with no vocabulary, no close
+    # pass and no correction. System status says so while one is switched
+    # on (spec §10).
     LIMITED = %w[ja ko th zh].freeze
+
+    # The close pass (search 2 spec §3.3, `Close`): it runs when the exact
+    # pass found fewer than `CLOSE_BELOW` hits, so with 1 only when it found
+    # nothing, and a page is all exact or all close; it and the contains
+    # pass (`Contains`) get `CLOSE_SHARE` seconds of the deadline at most.
+    # A query word of `CLOSE_WORD_LENGTH` characters or more is corrected,
+    # up to `MAX_CLOSE_WORDS` of them, each to the `CANDIDATES` words of the
+    # vocabulary at least `SIMILARITY` like it, `pg_trgm`'s own default:
+    # measured, deploymnet/deployment is 0.47, serch/search 0.44,
+    # recieve/receive 0.33, so 0.4 would lose "recieve".
+    CLOSE_BELOW = 1
+    CLOSE_SHARE = 1
+    SIMILARITY = 0.3
+    CANDIDATES = 3
+    MAX_CLOSE_WORDS = 6
+    CLOSE_WORD_LENGTH = 4
 
     # The snippet's marks as `ts_headline` writes them (spec §6.4): two
     # characters `SiteSearch::Documents` takes out of every stored text, so

@@ -116,8 +116,10 @@ class SiteSearch::Postgres::QueryTest < ActiveSupport::TestCase
       expected = text == '"unclosed' ? 1 : 0
       assert_equal expected, results.total, text
     end
-    [ "-", "or", "the", '""' ].each do |text|
-      assert_equal SiteSearch::Results.new(hits: [], total: 0), search(text), text
+    # A query of syntax is no plain words, so the close pass skips it; a
+    # stop word has nothing to correct.
+    { "-" => "skipped", "or" => "skipped", "the" => nil, '""' => "skipped" }.each do |text, close_outcome|
+      assert_equal SiteSearch::Results.new(hits: [], total: 0, close_outcome: close_outcome), search(text), text
     end
   end
 

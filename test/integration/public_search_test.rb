@@ -190,4 +190,96 @@ class PublicSearchTest < ActionDispatch::IntegrationTest
       end
     end
   end
+  # The built-in's close pass and contains pass (search 2 spec §3.3, §3.4),
+  # read from the answer the Search block draws.
+  def answer_for(text, locale: "en")
+    SiteSearch::Answer.for(raw_query: text, raw_page: nil, locale: locale.to_sym, limited: false, live_note: false)
+  end
+
+  def typos = YAML.load_file(file_fixture("search_typos.yml"))
+
+  def found_ids(answer) = answer.results.map { _1.record.id }
+
+  # A live page titled `title` in `locale`, in the default language too.
+  def create_page_in(locale, title:)
+    return create_page(title: title) if locale == Locales.default
+
+    @pages = (@pages || 0) + 1
+    create_page(title: "Host #{@pages}", translations: { locale => { title: title, slug: "host-#{@pages}" } })
+  end
+
+  # Measured on Postgres 17 (test/fixtures/files/search_typos.yml): each typo
+  # stems to a word no entry holds, so the exact pass finds nothing, and is
+  # 0.3 or more similar to its correction.
+  test "a close match finds a typo's page and ranks after every exact hit" do
+    typos.each do |typo|
+      page = create_page_in(typo.fetch("language", "en"), title: typo["page"])
+      answer = answer_for(typo["typo"], locale: typo.fetch("language", "en"))
+      assert answer.close_matches?, typo["typo"]
+      assert_includes found_ids(answer), page.id
+      assert_equal typo["correction"], answer.correction
+    end
+  end
+
+  test "invoice finds its page exact, with no close pass" do
+    page = create_page(title: "Invoice")
+    create_page(title: "Voice")
+    answer = answer_for("invoice")
+    refute answer.close_matches?
+    assert_equal [ page.id ], found_ids(answer)
+  end
+
+  test "a correction is offered only when a search for it finds a live page" do
+    draft = create_page(title: "Albatross", published: false)
+    assert_nil answer_for("albatros").correction
+    assert Pages::Save.call(draft.reload, attributes: { published: true }).ok?
+    assert_equal "albatross", answer_for("albatros").correction
+  end
+
+  test "a word only a scheduled copy holds is never a correction or a close match before its time" do
+    page = create_page(title: "Plain")
+    assert Pages::Save.call(page.reload, translations: { "en" => { title: "Cormorant" } }).ok?
+    publish_changes(page, at: 1.day.from_now)
+    answer = answer_for("cormorat")
+    assert_empty answer.results
+    assert_nil answer.correction
+    travel(2.days) { assert_equal "cormorant", answer_for("cormorat").correction }
+  end
+
+  test "contains finds a Japanese page by a word inside its text" do
+    with_locales(Locales.enabled | %w[ja], default: Locales.default)
+    page = create_page_in("ja", title: "検索エンジンの使い方")
+    assert_equal [ page.id ], found_ids(answer_for("エンジン", locale: "ja"))
+  end
+
+  test "a close pass that passes its share leaves the exact answer standing" do
+    create_page(title: "Zero-downtime deployment")
+    timing_out = Object.new.tap { |pass| def pass.plain? = true; def pass.results = raise(ActiveRecord::QueryCanceled, "statement timeout") }
+    with_singleton_override(SiteSearch::Postgres::Close, :new, ->(*, **) { timing_out }) do
+      answer = answer_for("deploymnet")
+      assert_equal [ :none, nil ], [ answer.state, answer.correction ]
+      query = SiteSearch::Query.new(text: "deploymnet", language: "en", page: 1, per_page: 10, now: Time.current)
+      found = SiteSearch::Postgres::Query.new(query, deadline: Process.clock_gettime(Process::CLOCK_MONOTONIC) + 3).results
+      assert_equal [ [], 0, "timeout" ], [ found.hits, found.total, found.close_outcome ]
+    end
+  end
+
+  test "a close pass with no time left is a timeout, the exact answer standing" do
+    create_page(title: "Zero-downtime deployment")
+    stub_const(SiteSearch::Postgres, :CLOSE_SHARE, 0) do
+      query = SiteSearch::Query.new(text: "deploymnet", language: "en", page: 1, per_page: 10, now: Time.current)
+      found = SiteSearch::Postgres::Query.new(query, deadline: Process.clock_gettime(Process::CLOCK_MONOTONIC) + 3).results
+      assert_equal [ [], 0, nil, "timeout" ], [ found.hits, found.total, found.correction, found.close_outcome ]
+    end
+  end
+
+  test "a query that is not plain, and a limited language, skip the close pass" do
+    create_page(title: "Zero-downtime deployment")
+    with_locales(Locales.enabled | %w[ja], default: Locales.default)
+    { "deploymnet -guide" => "en", "deploymnet" => "ja" }.each do |text, language|
+      query = SiteSearch::Query.new(text: text, language: language, page: 1, per_page: 10, now: Time.current)
+      found = SiteSearch::Postgres::Query.new(query, deadline: Process.clock_gettime(Process::CLOCK_MONOTONIC) + 3).results
+      assert_equal [ 0, nil, "skipped" ], [ found.total, found.correction, found.close_outcome ], text
+    end
+  end
 end

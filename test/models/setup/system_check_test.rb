@@ -79,7 +79,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     row = result("Search", run_check(search: search_status(limited: %w[ja ko])))
 
     assert_equal :ok, row.status
-    assert_equal "Search is limited in Japanese and Korean: a word is found only as part of the whole run of text it stands in.", row.note
+    assert_equal "Search in Japanese and Korean finds the text a page contains, with no stemming and no correction.", row.note
 
     assert_nil result("Search", run_check(search: search_status)).note
 

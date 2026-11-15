@@ -15,8 +15,10 @@ module SiteSearch
   #   (`:ready` or `:unhealthy`).
   #   Its `detail` is the one sentence of the backend contract, which holds
   #   no address and no credential; an error's message is never read here.
-  # - `limited`: the switched-on languages of `Postgres::LIMITED`, for the
-  #   built-in only (an outside engine has its own word handling).
+  # - `limited`: the switched-on languages of `Postgres::LIMITED`, which the
+  #   built-in searches by the text a page contains, with no stemming and no
+  #   correction; for the built-in only (an outside engine has its own word
+  #   handling).
   #
   # While a build runs the backend is not asked. Otherwise `health` runs in a
   # thread that is waited for `TIMEOUT` seconds and no longer, scrubbed

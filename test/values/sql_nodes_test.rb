@@ -79,6 +79,11 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_equal %(LOWER("pages"."content_type") LIKE 'bl\\%%'), sql(SqlNodes.like(@pages[:content_type].lower, SqlNodes.like_pattern("bl%", prefix: true)))
   end
 
+  test "ilike ignores case and takes a value or a bind" do
+    assert_equal %("pages"."content_type" ILIKE '%50\\%%'), sql(SqlNodes.ilike(@pages[:content_type], SqlNodes.like_pattern("50%")))
+    assert_equal %("pages"."content_type" ILIKE $1), sql(SqlNodes.ilike(@pages[:content_type], SqlNodes.bound("%a%", name: "q")))
+  end
+
   test "any_json_value tests the values of a jsonb object, not its keys" do
     node = SqlNodes.any_json_value(@pages[:title]) { |value| value.matches("%x%") }
 
