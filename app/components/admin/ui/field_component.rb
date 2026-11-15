@@ -158,21 +158,10 @@ module Admin
       # The help line under the input, named for its `aria-describedby`.
       def help_id = "#{input_id}-help"
 
-      # The help line's words: the type's literal, or, for a `help:` that is
-      # a Symbol, its key under `admin.components.fields` in CS Studio's
-      # language, `%{placeholder}` the input's placeholder text (empty where
-      # the caller handed none over: only the block card does). A key is a
-      # gem's as often as ours, and read only here: one that is missing,
-      # names a subtree or interpolates a name this hands none of answers
-      # nil, so the line is left out and the editor drawn, and the mistake
-      # is reported with the key (`HelpKeyUnreadable`), as a block type's
-      # raising summary is logged (`EditorScreen::TileSummaryComponent`).
-      def help_text
-        return @help_text if defined?(@help_text)
-
-        help = field.help
-        @help_text = help.is_a?(Symbol) ? help_from_key(help) : help
-      end
+      # The help line's words, or nil for none: the input reads them
+      # (`Admin::Fields::Base#help_text`), so the line and the input's
+      # `aria-describedby` agree.
+      def help_text = input_component.help_text
 
       # A `help:` key that could not be read as one line of words.
       class HelpKeyUnreadable < StandardError
@@ -221,16 +210,6 @@ module Admin
       end
 
       private
-
-      def help_from_key(key)
-        text = t("admin.components.fields.#{key}", placeholder: placeholder&.dig(:text).to_s)
-        raise TypeError, "a help key names one string" unless text.is_a?(String)
-
-        text
-      rescue StandardError => error
-        Rails.error.report(HelpKeyUnreadable.new(key, error.class.name), handled: true, source: "content_spiel.fields")
-        nil
-      end
 
       def translatable? = field.field_type&.translatable == true
 

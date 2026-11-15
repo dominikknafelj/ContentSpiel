@@ -133,8 +133,19 @@ class Admin::Ui::FieldComponentTranslationTest < ViewComponent::TestCase
       end
       assert_selector "input#block-7-title", count: 1
       assert_no_selector "#block-7-title-help"
+      assert_no_selector "input[aria-describedby]" # the input points at no line that is not drawn
       assert_includes report.error.message, key.to_s, key
     end
+  end
+
+  test "an unreadable help key is reported once per process" do
+    I18n.backend.store_translations(:en, admin: { components: { fields: { acme_help_probe: { twice: "Shows %{count} images" } } } })
+    field = Field.new(name: "title", type: :string, options: { help: :"acme_help_probe.twice" })
+    draw = -> { render_inline Admin::Ui::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "en", id_prefix: "block-7") }
+
+    assert_error_reported(Admin::Ui::FieldComponent::HelpKeyUnreadable) { draw.call }
+    assert_no_error_reported { draw.call }
+    assert_no_selector "#block-7-title-help"
   end
 
   test "a placeholder handed to the field reaches its input" do

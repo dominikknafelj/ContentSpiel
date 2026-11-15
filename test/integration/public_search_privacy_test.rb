@@ -129,6 +129,54 @@ class PublicSearchPrivacyTest < ActionDispatch::IntegrationTest
     assert_empty @reports.all, "nothing was raised"
   end
 
+  # Rails' redirect check parses the location and raises on one it cannot
+  # read (a space, a tab, a quote, a brace, a letter outside ASCII), with
+  # the location in the message: each segment is percent-encoded, so the
+  # location is always a plain path on the site's own host.
+  test "a path with characters no location may hold redirects encoded on the site's own host, never a 500 that carries the query" do
+    cases = {
+      "/en/%09/evil.com" => "/%09/evil.com",
+      "/en/%2F%09%2Fevil.com" => "/%09/evil.com",
+      "/en/%09%2F%2Fevil.com" => "/%09//evil.com",
+      "/en/%20//evil.com" => "/%20/evil.com",
+      "/en/%E2%80%8B//evil.com" => "/%E2%80%8B/evil.com",
+      "/en/a%0D%0ALocation:%20http://evil.com" => "/a%0D%0ALocation%3A%20http%3A/evil.com",
+      "/en/a%20b" => "/a%20b",
+      "/en/caf%C3%A9" => "/caf%C3%A9",
+      "/en/%22x" => "/%22x",
+      "/en/%7Bx%7D" => "/%7Bx%7D"
+    }
+    log = capture_log(LogCapture::REQUEST_LOGGERS) do
+      cases.each do |path, location|
+        get "#{path}?q=#{CANARY}"
+        assert_response :found, path
+        assert_equal "http://www.example.com#{location}?q=#{CANARY}", response.location, path
+      end
+    end
+
+    assert_not_includes log, CANARY
+    assert_not_includes spans_text, CANARY
+    assert_not_includes @reports.all.inspect, CANARY
+    assert_empty @reports.all, "nothing was raised"
+  end
+
+  test "an accented slug under the default language's prefix redirects to its page" do
+    page = create_page(title: "Über uns", translations: { "en" => { title: "Über uns", slug: "über-uns" }, "de" => { title: "Über uns", slug: "über-uns" } })
+
+    get "/en/%C3%BCber-uns?q=#{CANARY}"
+    assert_response :found
+    assert_equal "http://www.example.com/%C3%BCber-uns?q=#{CANARY}", response.location
+
+    get "/%C3%BCber-uns"
+    assert_response :success
+    assert_includes response.body, "Über uns"
+    assert_equal "/über-uns", PublicSite::Urls.new.path_for(page, "en")
+
+    get "/de/%C3%BCber-uns"
+    assert_response :success, "a language that is not the default is not redirected, and its encoded slug finds the page"
+    assert_includes response.body, "Über uns"
+  end
+
   test "an outside backend's failure is reported without its exception's message" do
     place_search_block(root_page)
 

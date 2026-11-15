@@ -23,6 +23,11 @@ module SiteSearch
   # back a whole field; the built-in's `ts_headline` stays far under it.
   SNIPPET_LENGTH = 500
 
+  # A total at or past this is no count of documents but a broken answer:
+  # it is past what a JavaScript number, a JSON reader or the pager's
+  # arithmetic holds exactly.
+  MAX_TOTAL = 2**53
+
   module_function
 
   # The one caller of a backend's `search` (spec §5.7): the chosen backend's
@@ -64,12 +69,12 @@ module SiteSearch
   end
 
   # `results` when it is what the contract says (`SiteSearch::Results`, an
-  # Integer total, an Array of `SiteSearch::Hit`s with Integer ids, each
+  # Integer total from 0 below `MAX_TOTAL`, an Array of `SiteSearch::Hit`s with Integer ids, each
   # snippet nil or plain text with `[start, length]` pairs of Integers);
   # raises `TypeError` otherwise, which the caller scrubs to its class.
   def checked(results)
     raise TypeError, "a search backend answers SiteSearch::Results" unless results.is_a?(Results)
-    raise TypeError, "a total is an Integer" unless results.total.is_a?(Integer)
+    raise TypeError, "a total is an Integer from 0 below 2**53" unless results.total.is_a?(Integer) && (0...MAX_TOTAL).cover?(results.total)
     raise TypeError, "hits are an Array" unless results.hits.is_a?(Array)
 
     results.hits.each do |hit|

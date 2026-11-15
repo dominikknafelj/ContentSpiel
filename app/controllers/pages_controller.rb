@@ -152,15 +152,19 @@ class PagesController < PublicController
   end
 
   # The location is a path, which `redirect_to` answers on the request's own
-  # host, with its leading slashes and backslashes taken off and the query
-  # rebuilt from the query parameters: `/en/%2Fevil.com` decodes to the path
-  # "/evil.com", and "//evil.com" (or "/\evil.com", which a browser reads
-  # alike) is another host, which `redirect_to` refuses with an error whose
-  # message holds the location and so the query.
+  # host: its leading slashes and backslashes taken off, each decoded
+  # segment percent-encoded again, and the query rebuilt from the query
+  # parameters. `/en/%2Fevil.com` decodes to the path "/evil.com", and
+  # "//evil.com" (or "/\evil.com", which a browser reads alike) is another
+  # host; a decoded space, tab, quote, brace, line break or letter outside
+  # ASCII (`/en/caf%C3%A9`) is a location Rails cannot parse. Rails refuses
+  # both with an error whose message holds the location and so the query.
+  # Encoded, the path names the same page: the router decodes it again.
   def redirect_default_locale_prefix
     return unless public_urls.redundant_prefix?(params[:locale])
 
-    path = "/#{params[:path].to_s.sub(%r{\A[/\\]+}, "")}".sub(%r{/+$}, "").presence || "/"
+    segments = params[:path].to_s.sub(%r{\A[/\\]+}, "").sub(%r{/+\z}, "").split("/", -1)
+    path = "/#{segments.map { |segment| ERB::Util.url_encode(segment) }.join("/")}"
     query = request.query_parameters.to_query
     redirect_to "#{path}#{"?#{query}" if query.present?}", status: :found
   end

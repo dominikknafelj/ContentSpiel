@@ -126,6 +126,8 @@ class SiteSearchTest < ActiveSupport::TestCase
     answers = {
       "a nil total" => SiteSearch::Results.new(hits: [], total: nil),
       "a String total" => SiteSearch::Results.new(hits: [], total: "3"),
+      "a total past 2**53" => SiteSearch::Results.new(hits: [], total: 10**309),
+      "a negative total" => SiteSearch::Results.new(hits: [], total: -1),
       "nil hits" => SiteSearch::Results.new(hits: nil, total: 1),
       "a Hash" => { hits: [], total: 0 },
       "a String record id" => SiteSearch::Results.new(hits: [ hit.(record_id: "1") ], total: 1),
