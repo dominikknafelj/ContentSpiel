@@ -81,6 +81,26 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Older"
   end
 
+  # `ThemeHelper#search_page` reads the pages' copies in force, which the
+  # content version covers: a page that draws a header form pointing at it
+  # (every page of such a theme) is stale the moment a Search block is published.
+  test "publishing a Search block moves the ETag of a page that points at search_page" do
+    get "/"
+    etag = response.headers["ETag"]
+    page = create_page(title: "Find")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "search" }).ok?
+    get "/"
+    etag_before_publishing = response.headers["ETag"]
+
+    publish_changes(page)
+
+    get "/", headers: { "If-None-Match" => etag_before_publishing }
+    assert_response :success
+    assert_not_equal etag_before_publishing, response.headers["ETag"]
+    assert_equal page.id, SiteSearch::SearchPage.new.page.id
+    assert etag.present?
+  end
+
   # --- The content version (technical cleanup spec §4.8) -----------------------
 
   # The point of a version that moves only on published changes: an editor

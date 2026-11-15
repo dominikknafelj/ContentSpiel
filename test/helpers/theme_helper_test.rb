@@ -389,4 +389,20 @@ class ThemeHelperTest < ActionView::TestCase
     assert_equal "standard", page_template
     assert_includes Theme::Contract::HELPERS, "page_template"
   end
+
+  test "search_page names the page of the first Search block, as published, and is memoised for the render" do
+    page = create_page(title: "Find")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "search" }).ok?
+    publish_changes(page)
+
+    first = nil
+    assert_operator count_statements { first = search_page }, :>, 0
+    assert_equal page.id, first.id
+    assert_equal 0, count_statements { assert_same first, search_page }
+  end
+
+  test "search_page is nil with no Search block, and is on the contract" do
+    assert_nil search_page
+    assert_includes Theme::Contract::HELPERS, "search_page"
+  end
 end

@@ -540,6 +540,7 @@ What a page or layout template may call (`ThemeHelper`, `PagesHelper`). `public_
 | `pages_in_reading_order(node)` | a branch flattened: a page, then its subpages |
 | `neighbouring_pages(tree)` | the shown page's previous and next |
 | `with_heading_ids(html)` | rendered blocks with an id on each heading, and the headings |
+| `search_page` | the page that holds the site's first Search block, as published (a page, `page_url_path` gives its address), or nil: with nil a theme draws no header form |
 
 ### Rich text selectors
 
