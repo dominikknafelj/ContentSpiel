@@ -62,6 +62,27 @@ class SiteSearch::ShownTest < ActiveSupport::TestCase
     assert_empty shown("albatross")
   end
 
+  test "a hit whose record was purged since it was indexed is not drawn" do
+    page = index(create_page(title: "Albatross"))
+    assert delete_for_good(page.reload)
+
+    assert_equal 1, results("albatross").hits.size, "the index is stale: it holds the purged page"
+    assert_equal [], shown("albatross")
+  end
+
+  # A visitor's search asks at the request's moment, and the rule that a
+  # post's listing page is live is asked at that moment too, not at the
+  # clock's when the check runs.
+  test "a post is judged live at the moment asked" do
+    listing
+    post = index(create_post(title: "Albatross sighting"))
+    Post.where(id: post.id).update_all(published_at: 1.day.from_now) # version: none (a test schedules the record around the services)
+    later = 2.days.from_now
+
+    assert_empty shown("albatross")
+    assert_equal [ post.id ], shown("albatross", now: later).map { |item| item.record.id }
+  end
+
   test "title, address and date come from the copy in force and public_paths, never the engine" do
     listing
     parent = create_page(title: "Seabirds")

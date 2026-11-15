@@ -2,9 +2,9 @@
 # code around a backend (indexing, the sync job, the results, System
 # status). It obeys the contract (`SiteSearch::Backend`), which
 # test/models/site_search/fake_test.rb holds it to with the shared
-# contract test. Words are matched downcased and whole, every word of the
-# query in some field of the document; a match in a heavier field ranks
-# higher.
+# contract test. Words are split, then matched downcased and whole,
+# every word of the query in some field of the document; a match in a
+# heavier field ranks higher.
 #
 #   SiteSearch::Fake.new(raise_with: RuntimeError.new("…"))  # every method raises it
 #   SiteSearch::Fake.new(sleep_for: 5)                        # slow; past the deadline it raises Timeout::Error at the deadline
@@ -70,7 +70,7 @@ class SiteSearch::Fake
 
   def search(query, deadline:)
     trouble!(deadline)
-    words = query.text.downcase.scan(WORD).uniq
+    words = words_of(query.text).uniq
     matches = @documents.values.filter_map do |document|
       next unless document.language == query.language && shown?(document, query.now)
 
@@ -100,7 +100,7 @@ class SiteSearch::Fake
     return nil if words.empty?
 
     words.sum do |word|
-      weights = document.fields.select { |field| field.text.downcase.scan(WORD).include?(word) }.map { |field| WEIGHTS.fetch(field.weight) }
+      weights = document.fields.select { |field| words_of(field.text).include?(word) }.map { |field| WEIGHTS.fetch(field.weight) }
       return nil if weights.empty?
 
       weights.max
@@ -113,11 +113,16 @@ class SiteSearch::Fake
   # itself and compared downcased one by one, so an offset is always the
   # text's (a downcase can be longer than its word: "İ" is two characters).
   def snippet_of(document, words)
-    text = [ document.text, *document.fields.map(&:text) ].find { |each| (each.downcase.scan(WORD) & words).any? } || ""
+    text = [ document.text, *document.fields.map(&:text) ].find { |each| (words_of(each) & words).any? } || ""
     first = whole_words(text, words).first&.first || 0
     window = text[[ first - 40, 0 ].max, SNIPPET]
     SiteSearch::Snippet.new(text: window, marks: whole_words(window, words))
   end
+
+  # The words of `text` as matched: split first, then downcased, so a
+  # letter whose downcase is longer ("İ", "i" and a combining dot) splits
+  # no word. `whole_words` splits the same way.
+  def words_of(text) = text.scan(WORD).map(&:downcase)
 
   # `[start, length]` of each whole word of `text` that is one of `words`.
   def whole_words(text, words)

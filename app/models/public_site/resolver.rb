@@ -30,20 +30,21 @@ module PublicSite
     # `visible_among` is that rule for several records in a constant number of
     # statements (`canonical_pages` is one pass, and one closure query asks
     # which chains hold anything unpublished); `visible?` is the same rule for
-    # one, so the two can't drift apart. It answers the records that are visible.
+    # one, so the two can't drift apart. It answers the records that are
+    # visible at `now`: a post live then, under pages published then.
     def self.visible?(record) = visible_among([ record ]).any?
 
-    def self.visible_among(records)
+    def self.visible_among(records, now: Time.current)
       kept = records.select { |record| (record.is_a?(Page) || record.is_a?(Post)) && !record.trashed? }
       posts = kept.select { |record| record.is_a?(Post) }
       canonical = posts.empty? ? {} : PublicSite::Paths.canonical_pages(posts) # public: rows (an address is the rows')
       chains = kept.filter_map do |record|
-        page = record.is_a?(Post) ? (canonical.fetch(record) if record.live?) : record
+        page = record.is_a?(Post) ? (canonical.fetch(record) if Publishing::State.of(record, now: now).live?) : record
         [ record, page.id ] if page
       end
       return [] if chains.empty?
 
-      hidden = PageHierarchy.where(descendant_id: chains.map(&:last)).where.not(ancestor_id: Page.published.select(:id)).distinct.pluck(:descendant_id).to_set # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
+      hidden = PageHierarchy.where(descendant_id: chains.map(&:last)).where.not(ancestor_id: Page.where(published_at: ..now).select(:id)).distinct.pluck(:descendant_id).to_set # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
       chains.reject { |_, page_id| hidden.include?(page_id) }.map(&:first)
     end
 

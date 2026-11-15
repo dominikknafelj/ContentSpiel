@@ -43,4 +43,17 @@ class SiteSearch::FakeTest < ActiveSupport::TestCase
     city = snippets.find { |snippet| snippet.text.start_with?("İstanbul") }
     assert_equal [ [ 9, 3 ] ], city.marks
   end
+
+  # "İ" downcases to "i" and a combining dot, which is no letter of WORD: a
+  # text downcased before it is split falls apart at the dot, so the words
+  # are split first and downcased after, for matching and marking alike.
+  test "a word whose downcase is longer is found and marked whole" do
+    backend.index([ contract_document(title: "City", body: "İstanbul art fair") ])
+
+    hits = backend.search(query("İstanbul"), deadline: deadline_in(1)).hits
+
+    assert_equal 1, hits.size
+    assert_equal [ [ 0, 8 ] ], hits.first.snippet.marks
+    assert_empty backend.search(query("stanbul"), deadline: deadline_in(1)).hits, "the dot splits no word"
+  end
 end

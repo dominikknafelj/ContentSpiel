@@ -42,7 +42,7 @@ module SiteSearch
 
       locale = locale.to_s
       rows = rows_of(hits, now)
-      visible = PublicSite::Resolver.visible_among(rows.values).to_set # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
+      visible = PublicSite::Resolver.visible_among(rows.values, now: now).to_set # public: rows (whether a record is visible is its tree and publish state, which no copy holds)
       views = views_of(rows.values.select { |row| visible.include?(row) }, now)
       urls = PublicSite::Urls.new.prefetch(views.values, locale)
       places = places_of(views.values.select { |view| view.is_a?(Page) }, locale, now)
