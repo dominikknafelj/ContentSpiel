@@ -1,2 +1,3 @@
+<%= render Admin::Ui::TypeStateComponent.new(content_type: record.content_type) if type_chip? %>
 <%= render Admin::Ui::StatusChipComponent.new(status: record.status, at: record.published_at, hide_live: true) %>
 <%= render Admin::Ui::UnpublishedChipComponent.new if changes? %>

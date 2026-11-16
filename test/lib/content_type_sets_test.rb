@@ -15,7 +15,6 @@ class ContentTypeSetsTest < ActiveSupport::TestCase
   DECLARED_READERS = {
     "app/models/access_control/permissions.rb" => "a grant scoped to a switched-off type stays live: it decides who may read, trash and purge its posts",
     "app/components/admin/mind_graph_screen/legend_component.rb" => "retired means undeclared",
-    "app/controllers/admin/posts_controller.rb" => "the posts list's type filter reads the declared set until it takes the types present from `Posts::List#types_present`",
     "app/services/settings/save.rb" => "the switch is normalised against the declared names",
     "db/seeds.rb" => "development switches every declared type on",
     "app/values/theme/contract.rb" => "a theme's contract is the code's, whatever a site switches on",

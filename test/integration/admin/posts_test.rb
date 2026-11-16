@@ -757,4 +757,22 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
     count
   end
+
+  test "the posts list marks a dormant post and offers its type in the filter only while a post holds it" do
+    switch_on_content_types("blog", "resume_entry")
+    create_post(title: "Role", content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    get admin_posts_path
+
+    assert_response :success
+    assert_select "select#type option", text: "Resume entry (switched off)"
+    assert_select "tr", text: /Role/ do
+      assert_select "[data-type-state=switched_off]", text: "Switched off"
+    end
+
+    get admin_posts_path(type: "resume_entry")
+    assert_select "select#type option[selected]", text: "Resume entry (switched off)"
+    assert_select "tr", text: /Role/
+  end
 end

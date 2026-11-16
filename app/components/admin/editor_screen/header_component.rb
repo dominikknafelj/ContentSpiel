@@ -143,6 +143,11 @@ module Admin
       # record the viewer cannot edit says "View only".
       def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(record))
 
+      # A post whose type the site has switched off: it opens view only, for
+      # that reason alone, which `SwitchedOffComponent` says in place of the
+      # hint below.
+      def dormant? = !page? && !record.type_switched_on?
+
       # Why a record that is readable cannot be changed -- one whole string per
       # case. The editing right is there but the record is published (or
       # scheduled) and the viewer cannot publish: `can_edit?`'s own rule

@@ -15,6 +15,9 @@ en:
         # post type the site has switched off keeps its choice, marked.
         content_type:
           switched_off: "%{label} (switched off)"
+          # Under the select, for a stored value the site has not switched on
+          # (switched off, or no longer declared): `%{type}` is its label.
+          list_empty: "This list shows nothing on the site while %{type} is switched off."
         code_field:
           count: "%{used} of %{limit} characters"
           over: "%{used} of %{limit} characters · %{over} over"

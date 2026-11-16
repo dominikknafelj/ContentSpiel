@@ -69,6 +69,7 @@ module DesignSystemEntries
     "Admin::Ui::TimeAgoComponent" => "StudioListTable",
     "Admin::Ui::ToastRegionComponent" => "Toast",
     "Admin::Ui::TranslationChipComponent" => "Badge",
+    "Admin::Ui::TypeStateComponent" => "StudioPostTypes",
     "Admin::Ui::TreeFindComponent" => "StudioTree",
     "Admin::Ui::TreeHideComponent" => "StudioTree",
     "Admin::Ui::TreeItemComponent" => "StudioTree",

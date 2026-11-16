@@ -25,10 +25,14 @@ module Admin
       # `filters` is a Hash of the active values (`q`, `type`, `tag`,
       # `translation`; blank when unset, and `translation` one of
       # `Posts::List::TRANSLATIONS`), `counts` the four scope numbers.
-      def initialize(scope:, counts:, content_types:, tags:, filters:, url_options: {}, locale: ::Locales.default)
+      # `content_types` are the switched-on types; `off_types` the names of the
+      # switched-off or undeclared types the viewer has posts of
+      # (`Posts::List#types_present`), offered after them as "Label (switched off)".
+      def initialize(scope:, counts:, content_types:, tags:, filters:, off_types: [], url_options: {}, locale: ::Locales.default)
         @scope = scope
         @counts = counts
         @content_types = content_types
+        @off_types = off_types
         @tags = tags
         @filters = filters
         @url_options = url_options
@@ -53,14 +57,18 @@ module Admin
         scopes.map { |name| { label: t(".scopes.#{name}"), value: name, id: "posts-scope-#{name}", current: scope == name, count: counts.fetch(name) } }
       end
 
-      # The types' labels, and the filter's own name when no registered type
-      # has it (a type unregistered since the address was made): the list is
-      # then filtered to nothing, and the select says by what, as
-      # `tag_options` does, rather than read as "All" over an empty list.
+      # The switched-on types' labels, then each switched-off type the viewer
+      # has posts of, marked in words (an `<option>` holds text alone), and the
+      # filter's own name when none of those has it (a type switched off with no
+      # posts, or unregistered since the address was made, which is named bare): the list is then
+      # filtered to nothing, and the select says by what, as `tag_options`
+      # does, rather than read as "All" over an empty list.
       def type_options
         options = content_types.map { |type| [ type.label, type.name ] }
         wanted = filters[:type]
-        wanted.present? && options.none? { |_, name| name == wanted } ? options + [ [ wanted, wanted ] ] : options
+        off = off_types.map(&:to_s)
+        off |= [ wanted ] if wanted.present? && options.none? { |_, name| name == wanted }
+        options + off.map { |name| [ (definition = ::ContentTypes.find(name)) ? t(".switched_off", label: definition.label) : name, name ] }
       end
 
       # The tags' names, and the filter's own name when no tag has it (a tag
@@ -78,7 +86,7 @@ module Admin
 
       private
 
-      attr_reader :scope, :counts, :content_types, :tags, :filters, :url_options, :locale
+      attr_reader :scope, :counts, :content_types, :off_types, :tags, :filters, :url_options, :locale
     end
   end
 end

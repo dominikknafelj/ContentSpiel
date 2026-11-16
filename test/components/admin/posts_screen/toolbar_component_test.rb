@@ -113,4 +113,18 @@ class Admin::PostsScreen::ToolbarComponentTest < ViewComponent::TestCase
     assert_equal Admin::Ui::SegmentedComponent::RADIO_SEGMENT_CLASS, page.find("label[for=posts-scope-drafts]")[:class]
     assert_selector "label[for=posts-scope-drafts] > input[type=radio][name=scope][value=drafts][checked].sr-only", visible: :all
   end
+
+  test "the filter offers a switched-off type only when it holds a post, marked, after the switched-on types" do
+    switch_on_content_types("blog")
+
+    render_toolbar(content_types: ContentTypes.switched_on, off_types: %w[resume_entry])
+    assert_equal [ "Blog", "Resume entry (switched off)" ], page.all("select#type option").map(&:text).reject { |text| text.blank? || text == "All" }
+    assert_no_selector "select#type optgroup"
+
+    render_toolbar(content_types: ContentTypes.switched_on)
+    assert_equal [ "Blog" ], page.all("select#type option").map(&:text).reject { |text| text.blank? || text == "All" }
+
+    render_toolbar(content_types: ContentTypes.switched_on, filters: { type: "now_update" })
+    assert_selector "select#type option[value=now_update][selected]", text: "Now update (switched off)"
+  end
 end

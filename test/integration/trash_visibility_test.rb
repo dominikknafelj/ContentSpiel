@@ -1432,4 +1432,14 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes indexed, [ "Page", @gone_page.id ]
     assert_not_includes indexed, [ "Post", @gone_post.id ]
   end
+
+  test "the posts list's type filter counts no trashed post" do
+    switch_on_content_types("blog", "resume_entry")
+    gone = create_post(title: "Gone role", content_type: "resume_entry")
+    gone.update!(trashed_at: Time.current)
+
+    scope = AccessControl.scope(users(:one), "posts.read", Post.all)
+
+    assert_equal %w[blog], Posts::List.new(scope, filters: {}, locale: "en").types_present
+  end
 end

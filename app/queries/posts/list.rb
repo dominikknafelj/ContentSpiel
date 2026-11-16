@@ -63,6 +63,14 @@ module Posts
       { "all" => all, "live" => live, "drafts" => drafts, "scheduled" => scheduled }
     end
 
+    # The content types the viewer has at least one kept, readable post of, in
+    # name order: one grouped statement over the viewer's scope (trashed posts
+    # are already out of it), under none of the list's filters, so the type
+    # filter can offer a switched-off type that holds posts.
+    def types_present
+      @posts.reorder(nil).distinct.pluck(:content_type).sort
+    end
+
     private
 
     def string(key)

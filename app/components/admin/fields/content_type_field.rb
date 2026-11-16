@@ -7,13 +7,10 @@ module Admin
     # on), not a fixed list, the same way
     # a post's own "content type" picker (spec §5.2) would.
     #
-    # A `SelectField` subclass, not a sibling `Base` subclass with its own
-    # copy of the same template: the two only ever differed in where their
-    # options come from (`field.options[:options]` vs `ContentTypes.switched_on`),
-    # so this overrides `option_pairs` alone and reuses `select_field
-    # .html.erb` via ViewComponent's own template-inheritance support (a
-    # subclass with no sidecar template of its own falls back to its
-    # superclass's).
+    # A `SelectField` subclass, not a sibling `Base` subclass: the two differ
+    # in where their options come from (`field.options[:options]` vs
+    # `ContentTypes.switched_on`) and in the warning under a stored value the
+    # site has not switched on (its own template, the select's plus that line).
     class ContentTypeField < SelectField
       # The stored name as it is, not a select's label lookup.
       def self.display(_field, value) = value.to_s
@@ -23,6 +20,23 @@ module Admin
       # The switched-on types, then the stored value when it is not one (a
       # switched-off type or a retired name), marked, so a save of the form
       # keeps what it holds instead of silently choosing another type.
+      # The stored value names a type the site has not switched on (switched
+      # off, or no longer declared): the list this filter makes shows nothing.
+      def switched_off?
+        stored = value.to_s
+        stored.present? && ::ContentTypes.switched_on_names.map(&:to_s).exclude?(stored)
+      end
+
+      def stored_label = ::ContentTypes.find(value.to_s)&.label || value.to_s
+
+      def list_empty_id = "#{input_id}-list-empty"
+
+      # The help line and, when shown, the empty-list notice.
+      def describedby = [ help_id, (list_empty_id if switched_off?) ].compact.join(" ").presence
+
+      # Navigation only: the link is offered to a holder of `settings.manage`.
+      def settings? = can?("settings.manage")
+
       def option_pairs
         pairs = ::ContentTypes.switched_on.map { |definition| [ definition.label, definition.name ] }
         stored = value.to_s

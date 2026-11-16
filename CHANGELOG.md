@@ -11,6 +11,7 @@
 - The theme contract's post lines are derived from each content type's declarations (`Theme::Contract.post_components`), in the order they were (the three lists, then the detail page); the built-in types' names are unchanged.
 - A new site starts with Blog alone; Resume entry and Now update are switched on in Settings. The public site reads the post types a site has switched on (`ContentTypes.switched_on`): a post of a switched-off type is kept, with no address, in no list, search or sitemap, offered no starter section, and opens view only. The search index is built once more after the upgrade, in the background, as a switch of post types asks for it.
 - A post of a switched-off type is left out of the dashboard's lists (Your drafts, Going live next, Waiting for you, Languages behind) and the Translations matrix; the New post dialog and a Post list block's type select offer the switched-on types, and the select keeps a stored switched-off choice, marked "(switched off)".
+- A post of a switched-off type is marked "Switched off" in the posts list (its Status cell, with "Not on the site" for its path), in the editor's header (above the form, a note says its type is switched off and, for a holder of `settings.manage`, links to Settings › Post types), and a Post list block filtered to a switched-off type says its list shows nothing on the site; the posts list's Type filter offers each switched-off type the viewer has posts of, marked "(switched off)". Added `Admin::Ui::TypeStateComponent(content_type:)`, the one "Switched off" chip.
 
 ### Removed
 
