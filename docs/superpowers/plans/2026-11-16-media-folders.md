@@ -23,7 +23,7 @@
 - The parameter is `folder`: absent or `"all"` is All media, `"none"` is Not in a folder, digits a folder's id. Every Media-screen link keeps it beside `q`, `filter` and `page` (`Admin::MediaController#list_query`).
 - Rights (owner's ruling, spec §20): folder writes need `media.manage`; a move needs each image's edit right (`Media::Ownership`), all or nothing; viewing and uploading into a folder need `media.upload`. No per-folder access.
 - No folder reaches the site: no content version bump, no usage row. Every write on `media_assets` around the callbacks carries `# version: none (a folder is never drawn on the site)`; a move never touches `updated_at`.
-- Tree writes take `LOCK TABLE media_folders IN SHARE ROW EXCLUSIVE MODE` first (`# sql:` on its line); a move's or an upload's target folder is read `FOR SHARE`; a delete locks the folder's row `FOR UPDATE` before moving anything.
+- Tree writes take `LOCK TABLE media_folders IN SHARE ROW EXCLUSIVE MODE` first (`# sql:` on its line); a move's or an upload's target folder is read `FOR KEY SHARE`; a delete locks the folder's row `FOR UPDATE` before moving anything.
 - Audit actions, exactly: `media_folder.created`, `media_folder.renamed`, `media_folder.moved`, `media_folder.deleted`, `media.moved` (counted). Each joins `Audit::Sentence::ACTIONS` and `Editing::Signals::SILENT`. The audit filter's subject type "Media folder".
 - Words are keys: `config/locales/admin/media_library.en.yml` for `Admin::MediaLibrary::*` components; the services' refusal sentences are literals of the services (as `Trash::Restore`'s are) quoted from the spec and the card: "Give the folder a name.", "Use at most 80 characters.", "A folder named “%{name}” is already here.", "A folder can't go inside itself.", "That would nest folders more than 4 levels deep.", "That folder is gone.", "%{count} of these images are not yours to move. Nothing was moved." (one: "1 of these images is not yours to move. Nothing was moved."), "Move at most 200 images at once.", "A site holds at most 1,000 folders.".
 - Every write from the browser goes through `app/javascript/saving/queue.js`. No Turbo morphing or page refresh.
@@ -126,7 +126,7 @@
   - `test "a subfolder whose name the parent holds takes the next free suffix and is recorded renamed"` ("Logos" beside "Logos" and "Logos 2" → "Logos 3").
   - `test "the image ids are kept for 200 or fewer and only counted above"`.
   - `test "a trashed image moves up with the rest and is restored into the parent"` (Review Focus 4: `Trash::Move`, delete, `Trash::Restore`, `folder_id == parent.id`).
-  - `test "a delete waits for a move into the folder and moves those images up too"` (Review Focus 1: two connections; the suite's two-connection helper, else a thread with its own `ActiveRecord::Base.connection_pool.with_connection` holding `FOR SHARE` on the folder while the delete runs; assert the moved image ends in the parent).
+  - `test "a delete waits for a move into the folder and moves those images up too"` (Review Focus 1: two connections; the suite's two-connection helper, else a thread with its own `ActiveRecord::Base.connection_pool.with_connection` holding `FOR KEY SHARE` on the folder while the delete runs; assert the moved image ends in the parent).
   - `test "the writes on media_assets bump no content version and leave updated_at alone"`.
   - `test "media.upload alone may not delete a folder"`.
 - [ ] **Step 2:** run → FAIL.
@@ -156,7 +156,7 @@
   - `sentence_test.rb`: `test "media.moved reads moved to a folder or out of every folder, and counted for the dashboard"`.
   - `media_folder_writers_test.rb`: `test "folder_id is written only by the folder services, the upload and the migration"` (grep `app/` and `lib/`, comments stripped as `dependency_direction_test.rb` strips them, for `folder_id:` and `folder:` assignments on `Media::Asset`; allowed: `move_images.rb`, `delete_folder.rb`, `upload.rb`).
 - [ ] **Step 2:** run → FAIL.
-- [ ] **Step 3: Implement:** the count check; `Media::Asset.kept.where(id:)` (missing → failure); each image's right through `Media::Ownership` (all, then refuse); the target `Media::Folder.lock("FOR SHARE").find_by(id:)`; one `update_all(folder_id:)` with its `# version: none` line; one `record_event("media.moved", subject: asset, field_changes: { "folder_id" => [old, new] }, metadata: { "folder_name" => folder&.name }, coalesce: false)` per image.
+- [ ] **Step 3: Implement:** the count check; `Media::Asset.kept.where(id:)` (missing → failure); each image's right through `Media::Ownership` (all, then refuse); the target `Media::Folder.lock("FOR KEY SHARE").find_by(id:)`; one `update_all(folder_id:)` with its `# version: none` line; one `record_event("media.moved", subject: asset, field_changes: { "folder_id" => [old, new] }, metadata: { "folder_name" => folder&.name }, coalesce: false)` per image.
 - [ ] **Step 4:** run Step 1's files, `test/lib/version_bump_test.rb`, the service contracts → PASS.
 - [ ] **Step 5: Commit** `feat: Media::MoveImages, the one writer of an image's folder`.
 
@@ -183,7 +183,7 @@
   - `media_test.rb`: `test "the grid lists a folder's own images and not its subfolders'"`; `test "an unknown folder is the 404 with Back to Media"`; `test "the picker answers All media for a folder that names nothing"` (Review Focus 5; the answer marks it `data-media-place-gone`, which Task 17's script reads to forget the place); `test "every link of the grid and the panel keeps folder"`; `test "a link to another place keeps q and filter and drops page"` (`Admin::MediaController#place_query(place)`, the one builder of a link to a place, which Tasks 11 to 17 call); `test "an upload answer carries the folder counts"`; `test "selected without folder opens the panel over All media as before"`.
   - `trash_visibility_test.rb`: `test "a trashed image is in no folder's listing or count, and comes back to its folder"`.
 - [ ] **Step 2:** run → FAIL.
-- [ ] **Step 3: Implement** the value, the query (`Media::Asset.kept.group(:folder_id).count`, `all` the sum), the search's narrowing (`place.narrow(@scope)` before `matching`), the upload's folder (read `FOR SHARE` in its transaction; gone is "That folder is gone." on `:file`), the controller's parse and `list_query`.
+- [ ] **Step 3: Implement** the value, the query (`Media::Asset.kept.group(:folder_id).count`, `all` the sum), the search's narrowing (`place.narrow(@scope)` before `matching`), the upload's folder (read `FOR KEY SHARE` in its transaction; gone is "That folder is gone." on `:file`), the controller's parse and `list_query`.
 - [ ] **Step 4:** run Step 1's files and `test/services/media/`, `test/integration/admin/media_assets_test.rb` → PASS.
 - [ ] **Step 5: Commit** `feat: the library's places, their counts and the upload target`.
 

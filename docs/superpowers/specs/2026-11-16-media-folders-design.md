@@ -202,9 +202,13 @@ through this service like the grid does (D9).
   selects what is drawn.
 - **Kept images only.** A trashed id is the "doesn't exist" failure, as in
   `Media::Choosing`.
-- **The target folder is locked `FOR SHARE`** for the transaction, so a delete
+- **The target folder is locked `FOR KEY SHARE`** for the transaction, so a delete
   of it waits for the move or the move sees it gone and fails with "That folder
   is gone." (the delete takes the tree's lock, §6.1, and then the folder's row).
+  `FOR KEY SHARE`, never `FOR SHARE`: a delete of the target's parent re-parents
+  the target (`FOR NO KEY UPDATE` on its row) after moving the parent's images,
+  which a `FOR SHARE` held by a move of those images would deadlock with;
+  `FOR KEY SHARE` still blocks the delete's `FOR UPDATE` and `DELETE`.
 - **It does not touch `updated_at` (call).** The write is one `update_all(folder_id:)`
   marked `# version: none (a folder is never drawn on the site)`
   (`test/lib/version_bump_test.rb`). The panel's autosave base is the image's
@@ -307,7 +311,7 @@ confirm dialog says what moves where (D4: "Its 34 images and 2 folders move to
 
 - **The order inside the transaction**: the tree's lock (§6.1), then the
   folder's own row `FOR UPDATE`, then the images, the subfolders and the row.
-  A move or an upload into the folder holds the row `FOR SHARE` (§5.1, §7), so
+  A move or an upload into the folder holds the row `FOR KEY SHARE` (§5.1, §7), so
   one waits for the other: a move that commits first has its images moved up
   with the rest, and one that comes after finds the folder gone. Without the
   row lock first, images moved in between the delete's update and its delete
@@ -345,7 +349,7 @@ is where it goes, not a right). The progress tile goes into the grid as today,
 and the folder's count moves with the answer (`Admin::MediaUploadResponses`
 answers the folder counts beside the segment counts). The picker's Upload does
 the same in the picker's place (§8). The folder named by an upload is read
-through the tree and locked `FOR SHARE` like a move's target; a folder deleted
+through the tree and locked `FOR KEY SHARE` like a move's target; a folder deleted
 meanwhile is the refusal "That folder is gone." on the file's tile, nothing
 stored. `media.uploaded`'s metadata gains `folder_id`.
 
