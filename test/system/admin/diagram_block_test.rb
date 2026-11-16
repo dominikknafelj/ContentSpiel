@@ -383,9 +383,18 @@ class Admin::DiagramBlockSystemTest < ApplicationSystemTestCase
     visit_editor(@page)
     await_frame_text(block, "Review")
 
-    page.execute_script("document.dispatchEvent(new Event('turbo:before-cache'))")
-    assert_equal 0, frames(block), "taken back before Turbo keeps a copy"
-    assert_no_selector "#{field_selector(block)} [data-admin--diagram--preview-target='kept']"
+    copy = page.evaluate_async_script(<<~JS, field_selector(block))
+      const [ card, done ] = [ arguments[0], arguments[arguments.length - 1] ]
+      document.dispatchEvent(new Event("turbo:before-cache"))
+      setTimeout(() => {
+        const kept = document.body.cloneNode(true)
+        done({ frames: kept.querySelectorAll(card + " iframe").length,
+               kept: [...kept.querySelectorAll(card + " [data-admin--diagram--preview-target='kept']")].filter((badge) => !badge.hidden).length })
+      }, 0)
+    JS
+    assert_equal 0, copy["frames"], "the copy Turbo keeps holds no frame"
+    assert_equal 0, copy["kept"], "nor the script's badge"
+    await_frame_text(block, "Review", message: "the card still showing builds its frame again after the copy")
 
     plain = create_page(title: "Plain", published: false)
     visit_editor(plain)

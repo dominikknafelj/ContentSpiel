@@ -20,6 +20,10 @@
 - The index rebuilds itself once after the upgrade (`Documents::REVISION` 2), with System status showing the progress. Title suggestions start when it is done.
 - The Search block's `limits:` sentence reads "No filter, and no sort; suggestions as one types with a script, none without; ten results to a page."
 
+### Fixed
+
+- Draw diagrams reached by a link inside CS Studio (System status's "Draw diagrams →") did nothing when Draw all was pressed: Turbo's copy of the page it had just drawn took its renderer frame back and nothing built it again. The screen, and the Diagram card in the same case, build their frame again once the copy is made.
+
 ### Breaking
 
 - ContentSpiel requires the Postgres extension `pg_trgm` and a database with encoding `UTF8` and a UTF-8 character type (not `C` or `POSIX`), besides Postgres 15 or later and `plpgsql` (built into every Postgres database). The four are one list, `docs/reference/hosting.md`, "Database requirements". The stack ContentSpiel ships (`postgres:17`, the site template's databases) meets all four, and the migration enables the extension itself. On a managed database, allow `pg_trgm` before upgrading. Where the migration cannot enable it, or the character type is `C`, the migration stops with a message naming the requirement, that section and the guide's "What ContentSpiel asks of its host"; a serving process whose database lost it does not start.
