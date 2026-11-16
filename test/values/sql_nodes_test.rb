@@ -59,6 +59,10 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_equal %(COUNT(*) FILTER (WHERE "pages"."published_at" IS NULL)), sql(SqlNodes.count_where(@pages[:published_at].eq(nil)))
   end
 
+  test "ordered_join joins values as text in an order of their own" do
+    assert_equal %(string_agg(CAST("pages"."id" AS text), ',' ORDER BY "pages"."id")), sql(SqlNodes.ordered_join(@pages[:id], ",", order: @pages[:id]))
+  end
+
   test "row is a row value, and two of them compare as a whole" do
     moment = Time.utc(2026, 10, 7, 12, 30, 15)
     older = SqlNodes.row(@events[:last_occurred_at], @events[:id]).lt(SqlNodes.row(moment, 42))

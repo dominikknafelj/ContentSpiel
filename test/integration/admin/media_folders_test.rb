@@ -248,4 +248,55 @@ class Admin::MediaFoldersTest < ActionDispatch::IntegrationTest
     assert_nil outer.reload.parent_id
     assert_includes response.body, "A folder can&#39;t go inside itself."
   end
+
+  # The column's part (`GET /media/folders`), which a tab fetches again when
+  # another changed the library (the card's D13).
+  def fetched_part = Nokogiri::HTML.fragment(response.body).at_css("##{Admin::MediaLibrary::FolderTreeComponent::PART_ID}")
+
+  test "the column's part is behind media.upload and lists kept counts" do
+    folder = Media::Folder.create!(name: "Client A")
+    create_media_asset.tap { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
+    create_media_asset.tap { |asset| asset.update_columns(folder_id: folder.id, trashed_at: Time.current) } # version: none (a test's own rows)
+
+    sign_in_as(users(:reader))
+    get "/cs-studio/media/folders", params: { folder: folder.id.to_s }
+    assert_response :forbidden
+
+    sign_in_as(uploader_without_manage)
+    get "/cs-studio/media/folders", params: { folder: folder.id.to_s, q: "x" }
+    assert_response :ok
+    part = fetched_part
+    assert part, "the answer is the column's part"
+    assert_equal folder.id.to_s, part["data-media-part-place"]
+    assert_equal Media::Place.new(:folder, folder.id).digest(Media::FolderTree.load), part["data-media-place-digest"]
+    assert_nil part["data-media-place-gone"]
+    assert_equal "1", part.at_css("[data-media-place-count='#{folder.id}']").text.strip
+    assert_equal "1", part.at_css("[data-media-place-count='all']").text.strip
+    # The rows keep the search, and a viewer without media.manage gets no "+".
+    assert_includes part.at_css("#media-place-row-#{folder.id}-link")["href"], "q=x"
+    assert_nil part.at_css("[data-admin--media--folder-dialog-parent-id-param]")
+
+    # The picker's places: its own ids, the same marks on its wrapper.
+    get "/cs-studio/media/folders", params: { folder: folder.id.to_s, picker: "1" }
+    assert_response :ok
+    picker = Nokogiri::HTML.fragment(response.body).at_css("#media-picker-places")
+    assert picker
+    assert_equal part["data-media-place-digest"], picker["data-media-place-digest"]
+    assert picker.at_css("#media-picker-folder-tree [data-media-place-count='#{folder.id}']")
+  end
+
+  test "the part says when the folder asked for is gone" do
+    sign_in_as(users(:one))
+    gone = Media::Folder.create!(name: "Gone").tap(&:destroy!).id
+
+    get "/cs-studio/media/folders", params: { folder: gone.to_s }
+    assert_response :ok
+    part = fetched_part
+    assert part.key?("data-media-place-gone")
+    assert_equal "all", part["data-media-part-place"]
+
+    get "/cs-studio/media/folders", params: { folder: "none" }
+    assert_not fetched_part.key?("data-media-place-gone")
+    assert_equal Media::Place::NONE.digest(Media::FolderTree.load), fetched_part["data-media-place-digest"]
+  end
 end

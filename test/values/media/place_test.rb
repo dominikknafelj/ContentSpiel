@@ -35,4 +35,41 @@ class Media::PlaceTest < ActiveSupport::TestCase
     assert_equal [ outside.id ], Media::Place::NONE.narrow(Media::Asset).ids
     assert_equal [ inside.id ], Media::Place.parse(@folder.id.to_s, tree: @tree).narrow(Media::Asset).ids
   end
+
+  test "a place's digest changes with a move in or out and a rename on its path, and not with a move elsewhere" do
+    child = Media::Folder.create!(name: "Shoot", parent: @folder)
+    other = Media::Folder.create!(name: "Other")
+    tree = -> { Media::FolderTree.load }
+    place = Media::Place.new(:folder, child.id)
+    digest = -> { place.digest(tree.call) }
+    image = create_media_asset
+    before = digest.call
+    assert_match(/\A\h{32}\z/, before)
+
+    # A move elsewhere, and an image trashed outside, leave it alone.
+    image.update_columns(folder_id: other.id) # version: none (a test's own rows)
+    assert_equal before, digest.call
+
+    image.update_columns(folder_id: child.id) # version: none (a test's own rows)
+    moved_in = digest.call
+    assert_not_equal before, moved_in
+
+    @folder.update_columns(name: "Client B") # version: none (a test's own rows)
+    renamed = digest.call
+    assert_not_equal moved_in, renamed
+
+    image.update_columns(folder_id: nil) # version: none (a test's own rows)
+    assert_not_equal renamed, digest.call
+    @folder.update_columns(name: "Client A") # version: none (a test's own rows)
+    assert_equal before, digest.call
+
+    # All media and Not in a folder follow their own images.
+    all = Media::Place::ALL.digest(tree.call)
+    none = Media::Place::NONE.digest(tree.call)
+    image.update_columns(folder_id: other.id) # version: none (a test's own rows)
+    assert_equal all, Media::Place::ALL.digest(tree.call)
+    assert_not_equal none, Media::Place::NONE.digest(tree.call)
+    image.update_columns(trashed_at: Time.current) # version: none (a test's own rows)
+    assert_not_equal all, Media::Place::ALL.digest(tree.call)
+  end
 end

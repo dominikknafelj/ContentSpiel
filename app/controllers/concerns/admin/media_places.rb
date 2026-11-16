@@ -33,13 +33,15 @@ module Admin
 
     # The Folders column as it stands after a write, `place` selected and
     # `go_to` the address the screen goes to next (`data-media-go`): the
-    # answers' part (`Admin::Answers::FolderTreePart`).
-    def folder_column_for(place, go_to: nil)
+    # answers' part (`Admin::Answers::FolderTreePart`), and the part a tab
+    # fetches again (`Admin::MediaFoldersController#index`, `gone`: the
+    # folder asked for is gone). It carries the place's digest.
+    def folder_column_for(place, go_to: nil, gone: false)
       tree = Media::FolderTree.load
       Admin::MediaLibrary::FolderTreeComponent.new(
         tree: tree, counts: Media::FolderCounts.call, place: place, query: shown_query,
         open_set: TreeOpenSet.parse(cookies[TreeOpenSet::MEDIA_COOKIE], readable_ids: tree.ids),
-        manage: can?("media.manage"), go_to: go_to
+        manage: can?("media.manage"), go_to: go_to, digest: place.digest(tree), gone: gone
       )
     end
 

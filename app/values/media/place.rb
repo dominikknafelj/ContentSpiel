@@ -42,6 +42,19 @@ class Media::Place
     scope.where(folder_id: folder)
   end
 
+  # What a tab that shows this place holds to learn, when the library
+  # changed elsewhere, whether what it shows changed (the card's D13): an MD5
+  # over the place's kept image ids in order and the names of the folders on
+  # its path, so a move in or out, a trash, or a rename above it changes it,
+  # and a move between two other places does not. One aggregate statement;
+  # `tree` is the folder tree the path is read from.
+  def digest(tree)
+    assets = Media::Asset.arel_table
+    names = folder ? tree.path(folder).map(&:name).to_json : ""
+    joined = SqlNodes.ordered_join(assets[:id], ",", order: assets[:id])
+    narrow(Media::Asset.kept).pick(SqlNodes.function("md5", SqlNodes.function("CONCAT", joined, "|", names)))
+  end
+
   def ==(other) = other.is_a?(Media::Place) && other.to_param == to_param
 
   alias_method :eql?, :==

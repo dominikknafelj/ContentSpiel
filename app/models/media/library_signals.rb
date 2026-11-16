@@ -13,7 +13,13 @@ module Media
 
     # reason: "folders" (a folder made, renamed, moved or deleted) or "moved" (images changed folder).
     def changed(reason:)
-      Live::Signals.later(STREAM, { kind: "library", reason: reason, origin: Live::Signals.origin }.compact)
+      Live::Signals.later(STREAM, { kind: "library", reason: reason, origin: origin }.compact)
     end
+
+    # The acting tab (`Current.editing_tab`, the header `X-Notes-Tab` that
+    # `Admin::BaseController` reads for every CS Studio request), so that tab
+    # does not fetch again what its own answer drew. Not `notes_tab`, which
+    # only the notes controllers set.
+    def origin = Current.editing_tab.to_s[Live::Signals::TAB]
   end
 end

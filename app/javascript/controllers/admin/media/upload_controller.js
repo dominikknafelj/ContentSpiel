@@ -85,8 +85,11 @@ export default class extends Controller {
     return fields
   }
 
+  // A finished upload: the counts follow it, and the place it went to is
+  // said with its digest now (`admin--media--live#uploaded`).
   uploaded({ json }) {
     updateCounts(json.counts, { folders: json.folder_counts, tree: document.getElementById("media-folder-tree") })
+    this.dispatch("uploaded", { detail: { place: json.place, digest: json.place_digest } })
   }
 
   announce(text) {

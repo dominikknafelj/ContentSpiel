@@ -65,11 +65,23 @@ module Admin
     # (`media-picker-…`), so it never meets the Media screen's column on a
     # page. Below 640px the same places are a select, "Folder", which
     # `admin--media--picker#place` follows; the picker's view lays the two
-    # out (the list beside the grid, the select above the toolbar).
+    # out (the list beside the grid, the select above the toolbar). The two
+    # stand in one wrapper, `#media-picker-places` (`PICKER_PART_ID`, drawn
+    # `display: contents`, so the frame's grid still places each), which a
+    # tab that heard of a change elsewhere replaces whole.
+    #
+    # `digest:` is the place's `Media::Place#digest` and `gone:` whether the
+    # folder that was asked for is gone (the place is then All media): both
+    # are drawn on the part (`data-media-place-digest`,
+    # `data-media-place-gone`, with the place as `data-media-part-place`) for
+    # `admin--media--live`, which compares the digest with the one the tab
+    # holds (the card's D13). A write's answer draws the digest too, so the
+    # acting tab holds the digest of what its own answer drew.
     class FolderTreeComponent < AdminComponent
       ID = "media-folder-tree"
       PICKER_ID = "media-picker-folder-tree"
       PART_ID = "media-folder-tree-part"
+      PICKER_PART_ID = "media-picker-places"
       MODES = %i[screen picker].freeze
 
       # The select's indent per level below the first, in no-break spaces: an
@@ -78,7 +90,7 @@ module Admin
 
       ROW = Admin::Ui::TreeItemComponent::CLASSES
 
-      def initialize(tree:, counts:, place:, query:, open_set:, manage:, mode: :screen, go_to: nil)
+      def initialize(tree:, counts:, place:, query:, open_set:, manage:, mode: :screen, go_to: nil, digest: nil, gone: false)
         raise ArgumentError, "unknown mode #{mode.inspect}: one of #{MODES.join(', ')}" unless MODES.include?(mode)
 
         @tree = tree
@@ -89,6 +101,8 @@ module Admin
         @open_set = picker? ? TreeOpenSet::EMPTY : open_set
         @manage = manage && !picker?
         @go_to = go_to
+        @digest = digest
+        @gone = gone
         @path_ids = place.folder ? tree.path(place.folder).map(&:id).excluding(place.folder).to_set : Set.new
       end
 
@@ -109,7 +123,14 @@ module Admin
 
       private
 
-      attr_reader :tree, :counts, :place, :query, :open_set, :manage, :mode, :go_to, :path_ids
+      attr_reader :tree, :counts, :place, :query, :open_set, :manage, :mode, :go_to, :path_ids, :digest, :gone
+
+      # The marks on the part for `admin--media--live` (none without a digest).
+      def part_data
+        return {} unless digest
+
+        { media_part_place: place.to_param, media_place_digest: digest, media_place_gone: ("" if gone) }.compact
+      end
 
       def picker? = mode == :picker
 

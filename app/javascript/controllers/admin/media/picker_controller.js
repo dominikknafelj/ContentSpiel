@@ -330,10 +330,12 @@ export default class extends Controller {
     this.uploads.add(files)
   }
 
-  // A finished upload: the counts follow it, and the first of the batch is the
-  // selection -- selected, not chosen: the editor confirms.
+  // A finished upload: the counts follow it, the place it went to is said
+  // with its digest now (`admin--media--live#uploaded`), and the first of the
+  // batch is the selection -- selected, not chosen: the editor confirms.
   uploaded({ json, tile }) {
     updateCounts(json.counts, { picker: true, folders: json.folder_counts, tree: this.frameTarget.querySelector("#media-picker-folder-tree") })
+    this.dispatch("digest", { detail: { place: json.place, digest: json.place_digest } })
     if (!this.selectNextUpload || !tile) return
 
     const raw = tile.querySelector("[data-admin--media--select-asset-param]")?.getAttribute("data-admin--media--select-asset-param")

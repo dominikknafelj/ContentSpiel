@@ -9,7 +9,9 @@ class Admin::Ui::MediaPickerComponentTest < ViewComponent::TestCase
     as(users(:one)) { render_inline Admin::Ui::MediaPickerComponent.new }
 
     dialog = page.find("dialog#media-picker", visible: :all)
-    assert_equal "admin--media--picker admin--media--select", dialog["data-controller"]
+    assert_equal "admin--media--picker admin--media--select admin--media--live", dialog["data-controller"]
+    assert_includes dialog["data-action"], "admin--media--picker:reset->admin--media--live#open"
+    assert_equal "/#{ContentSpiel::ADMIN_PATH}/media/folders", dialog["data-admin--media--live-url-value"]
     assert_includes dialog["data-action"], "media-picker:open@window->admin--media--picker#open"
     assert_includes dialog["data-action"], "close->admin--media--picker#closed"
     assert_includes dialog["data-action"], "cancel->admin--media--picker#cancel"

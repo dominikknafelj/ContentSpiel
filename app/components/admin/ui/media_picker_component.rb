@@ -91,7 +91,10 @@ module Admin
       # - `turbo:fetch-request-error` / `turbo:frame-missing`: a grid load that
       #   ended without a grid, so the next open asks again;
       # - the select controller's `chosen`, and the picker's own `reset`/`uploaded`
-      #   telling it to forget or to select a finished upload.
+      #   telling it to forget or to select a finished upload;
+      # - `admin--media--live`, which listens for changes made in other tabs
+      #   only while the picker is open (`reset` as it opens, `close`), and
+      #   holds the digest an upload's answer names (`digest`).
       ACTIONS = [
         "media-picker:open@window->admin--media--picker#open",
         "close->admin--media--picker#closed",
@@ -103,7 +106,10 @@ module Admin
         "turbo:frame-missing->admin--media--picker#gridFailed",
         "admin--media--picker:reset->admin--media--select#reset",
         "admin--media--picker:uploaded->admin--media--select#selectUploaded",
-        "admin--media--select:chosen->admin--media--picker#chosen"
+        "admin--media--select:chosen->admin--media--picker#chosen",
+        "admin--media--picker:reset->admin--media--live#open",
+        "close->admin--media--live#close",
+        "admin--media--picker:digest->admin--media--live#uploaded"
       ].join(" ").freeze
 
       def initialize(url_options: {})
@@ -115,6 +121,9 @@ module Admin
       def grid_url = helpers.admin_media_path(picker: 1, **url_options)
 
       def upload_url = helpers.admin_media_assets_path
+
+      # The places' part, fetched again when another tab changed the library.
+      def live_url = helpers.admin_media_folder_tree_path(**url_options)
 
       def accept = Media::Asset::ALLOWED_CONTENT_TYPES.join(",")
 

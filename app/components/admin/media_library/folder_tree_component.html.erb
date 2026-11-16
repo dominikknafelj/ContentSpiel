@@ -31,7 +31,8 @@
 <% if picker? %>
   <%# Two siblings, for the picker's grid of columns to place: the select
       above the toolbar below 640px, the list in its own 200px column from
-      640px. A select in no form, so no `name`. %>
+      640px. A select in no form, so no `name`. Their wrapper draws no box. %>
+  <%= tag.div id: PICKER_PART_ID, class: "contents", data: part_data do %>
   <div class="px-6 pt-4 sm:hidden">
     <%= label_tag "media-picker-place-select", t(".picker_select"), class: setup_label_class %>
     <%= tag.select select_options, id: "media-picker-place-select", class: "#{setup_select_class} mt-1",
@@ -39,10 +40,11 @@
   </div>
   <%= tag.nav tree_list, "aria-label": t(".heading"),
         class: "hidden min-h-0 overflow-y-auto border-r border-line bg-surface px-2 py-3 sm:block" %>
+  <% end %>
 <% else %>
   <%# The part a folder or move answer replaces whole, carrying the place the
       screen goes to next (`go_to`, read once by `admin--media--folders`). %>
-  <%= tag.div id: PART_ID, data: { media_go: go_to } do %>
+  <%= tag.div id: PART_ID, data: { media_go: go_to, **part_data } do %>
     <%= tree_list %>
     <% unless folders? %>
       <p class="px-1 text-small text-dim"><%= t(".empty") %></p>

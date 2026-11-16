@@ -4,6 +4,8 @@ require "test_helper"
 # library, one signal per folder write or move, sent after the commit, naming
 # nothing.
 class Media::LibrarySignalsTest < ActiveSupport::TestCase
+  include ActionCable::TestHelper
+
   TAB = "tab-12345678".freeze
 
   def sent = broadcasts(Media::LibrarySignals::STREAM).map { |payload| ActiveSupport::JSON.decode(payload) }
@@ -50,7 +52,7 @@ class Media::LibrarySignalsTest < ActiveSupport::TestCase
     Media::LibrarySignals.changed(reason: "folders")
     assert_equal [ %w[kind reason] ], sent.map { |payload| payload.keys.sort }
 
-    Current.set(notes_tab: TAB) { Media::LibrarySignals.changed(reason: "moved") }
+    Current.set(editing_tab: TAB) { Media::LibrarySignals.changed(reason: "moved") }
     assert_equal %w[kind origin reason], sent.last.keys.sort
     assert_equal TAB, sent.last["origin"]
 

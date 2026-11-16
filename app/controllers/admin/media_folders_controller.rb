@@ -16,15 +16,34 @@ module Admin
   # A move sent by the Move to… dialog (`dialog=move`, no name) is refused
   # in the dialog instead: its list drawn again with the sentences on top
   # (`Admin::Answers::MoveRefused`); a folder gone by then has no list.
+  #
+  # `index` is the column's part as it stands now, for a tab that heard that
+  # another changed the library (`admin--media--live`, the card's D13): read
+  # with the screen's own gate, `media.upload`, and the screen's words
+  # (`folder`, `q`, `filter`; `picker` for the picker's places).
   class MediaFoldersController < BaseController
     include MediaPlaces
 
-    before_action -> { forbidden! unless can?("media.manage") }
+    before_action -> { require_permission("media.upload") }, only: :index
+    before_action -> { forbidden! unless can?("media.manage") }, except: :index
     before_action :set_folder, only: %i[update destroy]
 
     # The services' sentence for a folder deleted meanwhile (`Media::SaveFolder`,
     # `Media::DeleteFolder`), said here for one already gone at the lookup.
     GONE = "That folder is gone.".freeze
+
+    # The part for the place `folder` names, its digest on it; a folder that
+    # is gone is All media, and the part says so (`data-media-place-gone`).
+    def index
+      tree = Media::FolderTree.load
+      place = Media::Place.parse(params[:folder], tree: tree)
+      gone = place.nil?
+      place ||= Media::Place::ALL
+      return render(folder_column_for(place, gone: gone), layout: false) unless params[:picker].present?
+
+      render Admin::MediaLibrary::FolderTreeComponent.new(tree: tree, counts: Media::FolderCounts.call, place: place, query: shown_query,
+        open_set: TreeOpenSet::EMPTY, manage: false, mode: :picker, digest: place.digest(tree), gone: gone), layout: false
+    end
 
     def create
       result = Media::SaveFolder.call(attributes: folder_attributes)

@@ -15,7 +15,11 @@ module Admin
   #   (every folder's direct images, those outside any folder, all); and
   # - `counts`: `Media::Search#counts` for the search the grid was showing
   #   (`q` rides along with the file; it respects the search, never the
-  #   segment) -- the same numbers the panel's autosave answer rewrites.
+  #   segment) -- the same numbers the panel's autosave answer rewrites; and
+  # - `place` and `place_digest`: the place the file was sent to and its
+  #   `Media::Place#digest` now, which the uploading tab holds from here on
+  #   (`admin--media--live`): its grid shows the new tile already, so a
+  #   later change elsewhere is not taken for a change of what it shows.
   #
   # The server's verdict is the only one: a refusal is `{ errors: [...] }` at
   # 403/422 and the tile it belongs to keeps that reason with a Dismiss button.
@@ -36,7 +40,9 @@ module Admin
         id: asset.id, title: asset.title, url: asset.display_url(min_width: 960),
         tile: view_context.render(tile),
         counts: media_counts,
-        folder_counts: Media::FolderCounts.call
+        folder_counts: Media::FolderCounts.call,
+        place: requested_place&.to_param,
+        place_digest: requested_place&.digest(Media::FolderTree.load)
       }
     end
 
