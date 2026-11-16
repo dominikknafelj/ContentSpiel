@@ -21,7 +21,9 @@ module Admin
     # A row with posts carries the line it says while its switch differs from
     # the stored state, server-drawn and `hidden`, shown by two `:has()` rules
     # (`.admin-post-types__leaving` / `__returning` in content-spiel.tailwind.css)
-    # and named in the switch's `aria-describedby`: no controller, no script.
+    # with no script. `admin--settings--post-types` adds the line to the
+    # switch's `aria-describedby` while the stylesheet shows it, and takes it
+    # back at disconnect and before Turbo's snapshot.
     # A stored name that is no longer declared draws no row; the service carries
     # it through every save.
     class PostTypesCardComponent < Admin::AdminComponent
@@ -64,10 +66,12 @@ module Admin
 
       def description(definition) = (t("admin.content_types.descriptions.#{definition.description}") if definition.description)
 
-      # The switch is described by its description alone. The changed-state
-      # lines are NOT named: a `hidden` element that `aria-describedby` names
-      # is still read, so a switch at rest would announce "leave the site when
-      # you save", which is false until the switch is changed.
+      # The server describes the switch by its description alone. The
+      # changed-state lines are NOT named here: a `hidden` element that
+      # `aria-describedby` names is still read, so a switch at rest would
+      # announce "leave the site when you save", which is false until the
+      # switch is changed. The card's controller names the line while it is
+      # shown.
       def describedby(definition)
         ("#{switch_id(definition)}-description" if definition.description)
       end

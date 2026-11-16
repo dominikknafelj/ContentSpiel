@@ -1,5 +1,5 @@
 <%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(section, self), id: "settings-post_types-card", intro: t(".intro")) do %>
-  <div class="px-4 pb-2" data-field-name="content_types" <%= tag.attributes(data: { save_bar_changed: values.saved_change("content_types") }) %>>
+  <div class="px-4 pb-2" data-field-name="content_types" data-controller="admin--settings--post-types" data-action="change->admin--settings--post-types#update turbo:before-cache@document->admin--settings--post-types#reset" <%= tag.attributes(data: { save_bar_changed: values.saved_change("content_types") }) %>>
     <%= hidden_field_tag FIELD, "", id: nil %>
     <% bands.each do |heading, definitions| %>
       <% if heading %><h3 class="-mx-4 bg-paper px-4 py-1.5 text-label text-meta"><%= heading %></h3><% end %>
@@ -7,7 +7,7 @@
         <% definitions.each do |definition| %>
           <div class="admin-post-types__row grid grid-cols-[36px_1fr_auto] gap-x-3 py-3" data-post-type="<%= definition.name %>" data-stored="<%= stored?(definition) ? "on" : "off" %>">
             <%= check_box_tag FIELD, definition.name.to_s, ticked?(definition), id: switch_id(definition), class: "cs-toggle mt-px", role: "switch",
-                  aria: { describedby: describedby(definition) } %>
+                  aria: { describedby: describedby(definition) }, data: { "admin--settings--post-types-target": "switch" } %>
             <div class="min-w-0">
               <label for="<%= switch_id(definition) %>" class="block cursor-pointer text-sm font-medium text-ink"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: definition.name) %></label>
               <% if (words = description(definition)) %>

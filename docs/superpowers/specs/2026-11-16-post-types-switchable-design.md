@@ -682,13 +682,25 @@ type on at upgrade, even with no posts of a type.
 - Turning on a type with posts: the neutral compact notice "Its 6 posts come
   back to the site when you save." (one: "Its 1 post comes back to the site when
   you save.").
-- Both server-drawn, `hidden` at rest, shown by CSS with **no controller**: the
-  row carries `data-stored="on|off"`, and the rules are
+- Both server-drawn, `hidden` at rest, shown by CSS with no script: the row
+  carries `data-stored="on|off"`, and the rules are
   `[data-stored="on"]:has(.cs-toggle:not(:checked)) .…__leaving` and
-  `[data-stored="off"]:has(.cs-toggle:checked) .…__returning`. A type with 0
-  posts draws neither. The lines are NOT in the switch's `aria-describedby`: an
-  element named there is announced even while it is hidden. A line that is
-  announced only while it shows needs a script (an open design question).
+  `[data-stored="off"]:has(.cs-toggle:checked) .…__returning`, `!important`
+  inside `@layer base` (Tailwind's preflight hides `[hidden]` with an
+  `!important` there, which beats one outside the layer). A type with 0 posts
+  draws neither. The server does NOT name the lines in the switch's
+  `aria-describedby`: an element named there is announced even while it is
+  hidden.
+- **The design's "no controller" gave way for the accessible description.** A
+  screen reader must hear the line the eye sees, and only while it shows, which
+  CSS cannot say. One small controller, `admin--settings--post-types`
+  (`app/javascript/controllers/admin/settings/post_types_controller.js`), keeps
+  each switch's `aria-describedby` at its description plus the row's line while
+  the stylesheet draws it, reading the line's state from the stylesheet rather
+  than deciding it again, and puts the server's value back at disconnect and at
+  `turbo:before-cache`. The look stays the CSS's and works without the script
+  (`test/system/admin/settings_post_types_test.rb` reads the description from
+  the browser's accessibility tree before and after a switch is moved).
 
 ### 16.4 D3, the posts list
 

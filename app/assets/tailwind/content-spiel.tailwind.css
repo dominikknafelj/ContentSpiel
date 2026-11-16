@@ -685,9 +685,15 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 /* Settings › Post types: a row says what an unsaved switch will do, with no
    script. The server draws both lines `hidden` and a row carries the switch's
    stored state (`data-stored`); a line shows while the switch differs from
-   it. `!important` because Tailwind's preflight hides `[hidden]` that way. */
-[data-stored="on"]:has(.cs-toggle:not(:checked)) .admin-post-types__leaving,
-[data-stored="off"]:has(.cs-toggle:checked) .admin-post-types__returning { display: block !important; }
+   it. Tailwind's preflight hides `[hidden]` with `!important` in `@layer base`,
+   and an important declaration of an earlier layer beats one of a later layer
+   or of none, so this rule is `!important` IN `@layer base`, where its
+   specificity wins. (`admin--settings--post-types` reads whether a line is
+   drawn, for the switch's description.) */
+@layer base {
+  [data-stored="on"]:has(.cs-toggle:not(:checked)) .admin-post-types__leaving,
+  [data-stored="off"]:has(.cs-toggle:checked) .admin-post-types__returning { display: block !important; }
+}
 
 /* Invalid field border, derived from the error slot's content. Autosave streams replace a field's error slot but never its input,
    so the border can't be a class set at render time: it would stay red after
