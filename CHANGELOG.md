@@ -4,19 +4,22 @@
 
 ### Added
 
-- Each post type is switched on or off in Settings (Settings › Post types: a switch per declared type, with its post count, saved with the save bar and found in ⌘K); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`.
+- Each post type is switched on or off in Settings (Settings › Post types: a switch per declared type, Resume entry and Now update together under "For a personal site", each with its post count, saved with the save bar and found in ⌘K); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`. `Admin::Ui::TypeStateComponent(content_type:)` is the one "Switched off" chip.
 
 ### Changed
 
+- A new site starts with Blog alone; an existing site keeps all three post types on at the upgrade. The search index is built once more after the upgrade, in the background, as a switch of post types asks for it.
+- A post of a switched-off post type is kept, with no address, in no list, search or sitemap, and offered no starter section; it opens view only, and its writes are refused with "<Type> is switched off. Switch it on in Settings to change this post." It is left out of the dashboard's lists (Your drafts, Going live next, Waiting for you, Languages behind) and the Translations matrix, and the New post dialog and a Post list block's type select offer the switched-on types (the select keeps a stored switched-off choice, marked "(switched off)"). The posts list, the Trash, ⌘K and the Mind graph still find it.
+- A switched-off post type is marked "Switched off" in the posts list (its Status cell, with "Not on the site" for its path, and the Type filter's "(switched off)" entries), in the editor (the header's chip and a note above the form that, for a holder of `settings.manage`, links to Settings › Post types), on a Post list block filtered to it (the card says the list shows nothing on the site), in the Mind graph (the hub's card and list row; no lists line to it) and in the Groups screen (neutral: a grant scoped to it is live, and the warn "no longer exists" wording stays for an undeclared type). CS Studio says "post type" where it said "content type".
 - The theme contract's post lines are derived from each content type's declarations (`Theme::Contract.post_components`), in the order they were (the three lists, then the detail page); the built-in types' names are unchanged.
-- A new site starts with Blog alone; Resume entry and Now update are switched on in Settings. The public site reads the post types a site has switched on (`ContentTypes.switched_on`): a post of a switched-off type is kept, with no address, in no list, search or sitemap, offered no starter section, and opens view only. The search index is built once more after the upgrade, in the background, as a switch of post types asks for it.
-- A post of a switched-off type is left out of the dashboard's lists (Your drafts, Going live next, Waiting for you, Languages behind) and the Translations matrix; the New post dialog and a Post list block's type select offer the switched-on types, and the select keeps a stored switched-off choice, marked "(switched off)".
-- A post of a switched-off type is marked "Switched off" in the posts list (its Status cell, with "Not on the site" for its path), in the editor's header (above the form, a note says its type is switched off and, for a holder of `settings.manage`, links to Settings › Post types), and a Post list block filtered to a switched-off type says its list shows nothing on the site; the posts list's Type filter offers each switched-off type the viewer has posts of, marked "(switched off)". Added `Admin::Ui::TypeStateComponent(content_type:)`, the one "Switched off" chip.
-- A switched-off post type is marked in the Groups screen (the scope editor's box and the permission row's chip read "Resume entry (switched off)", neutral: a grant scoped to it is live, and the warn "no longer exists" wording stays for an undeclared type) and in the Mind graph (the type hub's card carries the "Switched off" chip and a line saying its posts are kept and not on the site, and its list row carries the chip in place of the count). The Groups screen's words say "post type" for "content type".
 
 ### Removed
 
 - `Theme::Contract::POST_COMPONENTS`, now `Theme::Contract.post_components`, derived from each content type's declarations; `ContentTypeDefinition#starter`'s `sample:` keyword, now `t.sample`.
+
+### Migrations
+
+- `20261116090000_add_content_types_to_site_settings`: the column `site_settings.content_types`, the post types switched on (a new site: Blog); an existing site keeps all three on.
 
 ### For a gem or an outside caller
 
@@ -47,7 +50,6 @@
 
 ### Migrations
 
-- `20261116090000_add_content_types_to_site_settings`: the column `site_settings.content_types`, the post types switched on (a new site: Blog); an existing site keeps all three on.
 - `20261114120000_create_search_index`: the tables `search_entries` (the built-in search's index: one row per published copy and language, its copy's delete taking it along, a weighted `tsvector` with a GIN index and the plain text a snippet is cut from) and `search_index_states` (one row per search backend: the build's fingerprint, status and progress). It writes no row: the index is built in the background after the first boot, and System status's "Search" row shows its progress until it is ready; until then search finds nothing.
 
 ### For a gem or an outside caller
