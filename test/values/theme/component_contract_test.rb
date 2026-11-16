@@ -73,8 +73,10 @@ class Theme::ComponentContractTest < ActiveSupport::TestCase
     scopes = source.scan(/fixed_word\([^)]*?scope:\s*"([^"]+)"/).flatten.uniq
     text = source.dup
 
-    text.gsub!(/(?<![\w.])string\(:(\w+)/) do
-      scopes.one? ? found << "#{scopes.first}.#{$1}" : unknown << "string(:#{$1}) with #{scopes.size} scopes in its fixed_word"
+    # `pattern(:x)` is the Gallery's: the same word as `string(:x)`, read
+    # with its `%{…}` left in for the carousel's script.
+    text.gsub!(/(?<![\w.])(string|pattern)\(:(\w+)/) do
+      scopes.one? ? found << "#{scopes.first}.#{$2}" : unknown << "#{$1}(:#{$2}) with #{scopes.size} scopes in its fixed_word"
       ""
     end
     text.gsub!(/fixed_word\(:(\w+)[^)]*?scope:\s*"([^"]+)"/) { found << "#{$2}.#{$1}"; "" }
@@ -183,8 +185,25 @@ class Theme::ComponentContractTest < ActiveSupport::TestCase
     assert_equal %w[public.blocks.code.copy public.site.tagged].to_set, found
     assert_empty unknown
 
+    # pattern(:x) too, and neither is named where the file has no one scope.
+    found, unknown = words_read('pattern(:moved) string(:next) def string(key) = fixed_word(key, scope: "public.blocks.gallery", owner: "x")')
+    assert_equal %w[public.blocks.gallery.moved public.blocks.gallery.next].to_set, found
+    assert_empty unknown
+    _, unknown = words_read("pattern(:moved)")
+    assert_equal [ "pattern(:moved) with 0 scopes in its fixed_word" ], unknown
+
     failure = assert_raises(Minitest::Assertion) { assert_public_contract_declared(Class.new(ApplicationComponent) { def self.name = "PublicContractBareComponent" }) }
     assert_match "PublicContractBareComponent does not include Blocks::Contract", failure.message
+  end
+
+  # The Gallery's declaration, held before its line joins the ledger: its
+  # interface is the type's theme methods, and its nine words are the ones
+  # its files read through `string` and `pattern`.
+  test "the Gallery's contract is its line in the theme contract and its nine words" do
+    assert_public_interface(Blocks::GalleryComponent)
+    assert_public_words(Blocks::GalleryComponent)
+    assert_equal 9, Blocks::GalleryComponent.contract.words.size
+    assert_equal :reduced, Blocks::GalleryComponent.contract.motion
   end
 
   test "a public declaration's words are public keys, a prefix ending in .*" do

@@ -187,6 +187,25 @@
      accent's tint, under --th-ink and --th-meta at 4.5:1 and the accent's
      bar at 3:1 (test/integration/design_tokens_test.rb). */
   --th-search-active: var(--th-accent-tint);
+
+  /* The Gallery block's six colours (gallery block spec §8, SiteGallery),
+     from the base so a re-coloured base re-colours a gallery. They are
+     declared here and so computed on the page: a band that re-values
+     --th-ink or --th-surface does not reach the three a carousel's button
+     takes, which sit on the image whatever the band (sections.css gives a
+     band its own stage and dots). The stage, behind an image shown whole,
+     is the sunken ground; a button is the surface at 92% over the image,
+     its arrow and its 1px ring the ink (the shadow under it is depth only);
+     a dot at rest is a ring of --th-meta, the current one the ink.
+     test/integration/design_tokens_test.rb holds the arrow on its ground at
+     4.5:1, the ring on the ground at 3:1 and both dots at 3:1 on the page, a
+     tinted band and a strong band, in both schemes. */
+  --th-gallery-stage: var(--th-sunken);
+  --th-gallery-control: color-mix(in oklab, var(--th-surface) 92%, transparent);
+  --th-gallery-control-ink: var(--th-ink);
+  --th-gallery-control-edge: var(--th-ink);
+  --th-gallery-pick: var(--th-meta);
+  --th-gallery-pick-current: var(--th-ink);
 }
 
 [data-theme="dark"] {
@@ -308,6 +327,16 @@
   --th-search-mark-ink: var(--th-ink);
   /* The active suggestion's ground again: the dark accent's tint. */
   --th-search-active: var(--th-accent-tint);
+
+  /* The Gallery's six again, the same definitions over the dark base: the
+     button is a dark disc over the image (the dark surface), its arrow and
+     ring the light ink. */
+  --th-gallery-stage: var(--th-sunken);
+  --th-gallery-control: color-mix(in oklab, var(--th-surface) 92%, transparent);
+  --th-gallery-control-ink: var(--th-ink);
+  --th-gallery-control-edge: var(--th-ink);
+  --th-gallery-pick: var(--th-meta);
+  --th-gallery-pick-current: var(--th-ink);
 }
 
 :root {
@@ -332,6 +361,8 @@
   /* The Diagram block's face: Archivo, the face Mermaid measured every box
      in when the drawing was made (CS Studio's renderer frame draws in it). */
   --th-diagram-font: "Archivo", system-ui, sans-serif;
+  /* The gap between a gallery grid's images, the same in both schemes. */
+  --th-gallery-gap: var(--th-sp-3);
   /* The six dark series grounds of a diagram, the CMS's own
      (`Theme::Contract::OWN_TOKENS`), written once for the two places that
      draw on a dark ground in either scheme: the dark scheme's

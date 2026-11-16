@@ -17,10 +17,23 @@ en:
       tagged: "Tagged"
     blocks:
       # bin/rails generate block_type adds a type's scope below this line.
-      # The Gallery block's name for a screen reader where its label is
-      # blank, and the placeholder of the card's Label field.
+      # The Gallery block's words (`Blocks::GalleryComponent#string`): its
+      # name for a screen reader where its label is blank (and the
+      # placeholder of the card's Label field), the carousel's and a slide's
+      # roledescription, a slide's name, the track's and the buttons' names,
+      # a dot's name and the status. `position` and `moved` are also handed
+      # to the carousel's script uninterpolated (`#pattern`), which fills in
+      # `%{index}` and `%{count}` itself.
       gallery:
         label: "Image gallery"
+        carousel: "carousel"
+        slide: "slide"
+        position: "%{index} of %{count}"
+        track: "Images"
+        previous: "Previous image"
+        next: "Next image"
+        show: "Show image %{index}"
+        moved: "Image %{index} of %{count}"
       diagram: {}
       # The Table block's scroll box where the table has no caption to name it
       # (`app/components/blocks/table_component.html.erb`).

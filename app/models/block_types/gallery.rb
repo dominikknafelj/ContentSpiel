@@ -45,6 +45,7 @@ module BlockTypes
         t.field :texts, :media_texts, translated: true, of: :images, max: TEXT_LENGTH
         t.component Blocks::GalleryComponent
         t.theme_methods :block, :page, :layout, :ratio, :fit, :label, :items, :sizes, :string, :pattern
+        t.tokens themed: %w[gallery-stage gallery-control gallery-control-ink gallery-control-edge gallery-pick gallery-pick-current], fixed: %w[gallery-gap]
         t.stylesheet "gallery.css"
         t.summary ->(block, locale:) { Gallery.summary(block, locale: locale) }
         t.preview ->(block, locale:) { Gallery.preview(block, locale: locale) }

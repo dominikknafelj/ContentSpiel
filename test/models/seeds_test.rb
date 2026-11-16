@@ -91,14 +91,16 @@ class SeedsTest < ActiveSupport::TestCase
   # The showcase (db/seeds/showcase.rb) run on its own, on the suite's site
   # with its three languages: what each page holds, every page drawn once
   # published, and nothing written the second time.
-  test "the showcase draws every type at the top level and in every layout and band, every note kind, a long table, every list and a 404 link, and writes nothing the second time" do
+  test "the showcase draws every type at the top level (the Gallery as a carousel and a grid) and in every layout and band, every note kind, a long table, every list and a 404 link, and writes nothing the second time" do
     require Rails.root.join("db/seeds/showcase").to_s
     showcase = DevelopmentShowcase.call(root: root_page, image: create_media_asset)
     pages = Page.where(parent: showcase).index_by(&:slug)
     content = BlockTypes.all.reject { |definition| definition.capability?(:container) }.map(&:name).sort
     layouts = BlockTypes::Section::LAYOUTS.keys
 
-    assert_equal content, pages.fetch("every-block").content_blocks.where(section_id: nil).pluck(:block_type).sort
+    top = pages.fetch("every-block").content_blocks.where(section_id: nil)
+    assert_equal (content + [ "gallery" ]).sort, top.pluck(:block_type).sort, "every type, and the Gallery once more"
+    assert_equal %w[carousel grid], top.where(block_type: "gallery").order(:position).map { |gallery| gallery.settings["layout"] }
 
     BlockTypes::Section::BACKGROUNDS.each do |background|
       sections = pages.fetch("band-#{background}").content_blocks.where(block_type: "section", section_id: nil).to_a

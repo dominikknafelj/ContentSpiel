@@ -972,6 +972,88 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_no_match(/^\.content-block--diagram \{/, css)
   end
 
+  GALLERY_TOKENS = %w[--th-gallery-stage --th-gallery-control --th-gallery-control-ink --th-gallery-control-edge --th-gallery-pick --th-gallery-pick-current].freeze
+
+  test "the measuring mixes two colours in oklab, and paints one thinned in oklab over what is under it" do
+    tokens = { "--th-paper" => "#ffffff", "--th-ink" => "#000000",
+               "--th-half" => "color-mix(in oklab, var(--th-ink) 50%, var(--th-paper))",
+               "--th-veil" => "color-mix(in oklab, var(--th-paper) 25%, transparent)" }
+
+    # Worked by hand: black is L 0 and white L 1 in oklab, so half of each is
+    # L 0.5, and back in linear light 0.5^3 = 0.125 a channel (in srgb the
+    # same mix is 0.214). A quarter of white over black is the srgb veil's
+    # 0.25 encoded, 0.0508 linear.
+    resolve_colour(tokens, "--th-half").each { |channel| assert_in_delta 0.125, channel, 0.002, "half black, half white in oklab" }
+    resolve_colour(tokens, "--th-veil", under: [ 0.0, 0.0, 0.0 ]).each { |channel| assert_in_delta 0.0508, channel, 0.001, "a quarter of white over black" }
+    assert_raises(Minitest::Assertion) { resolve_colour(tokens, "--th-veil") }
+  end
+
+  # The Gallery's seven tokens (gallery block spec §8): six colours from the
+  # base in both schemes and the grid's gap. A carousel's button sits on the
+  # image, so no band re-values its three; a tinted band gives the dots'
+  # ring its dim, a strong band its stage and its two dots. In both schemes,
+  # on the page, a tinted band and a strong band: the arrow on the button's
+  # ground at 4.5:1 and the ring on it at 3:1, the ground painted over the
+  # place's own ground and over the arrow's colour (the worst an image under
+  # it can be), and each dot at 3:1 on the place. (2 x 2 + 2) x 3 x 2 = 36.
+  test "every gallery token is defined in both schemes and readable on the page, a tinted band and a strong band" do
+    assert_equal GALLERY_TOKENS.map { |name| name.delete_prefix("--th-") }, BlockTypes.fetch(:gallery).themed_tokens
+    assert_equal %w[gallery-gap], BlockTypes.fetch(:gallery).fixed_tokens
+    fixed = Rails.root.join("app/assets/tailwind/themes/default/tokens.css").read[/^:root \{(.*?)\}/m, 1]
+    assert_match(/--th-gallery-gap:\s*var\(--th-sp-3\);/, fixed, "the grid's gap, which Blocks::GalleryComponent::GRID_GAP is in pixels")
+    assert_match(/--th-sp-3:\s*#{Blocks::GalleryComponent::GRID_GAP}px;/, fixed)
+
+    theme_tokens.each do |theme, tokens|
+      GALLERY_TOKENS.each do |name|
+        value = tokens.fetch(name) { flunk("#{name} is not defined for #{theme}") }
+        assert_match(/\A(?:var\(--th-[\w-]+\)|color-mix\(in oklab, var\(--th-[\w-]+\) \d+%, transparent\))\z/, value, "#{theme} #{name} is #{value}")
+      end
+      assert_equal "var(--th-ink)", tokens.fetch("--th-gallery-control-edge"), "#{theme}: the ring is the ink, on the page and in either band"
+    end
+    assert_equal({ "--th-gallery-pick" => "var(--th-dim)" }, band_values("tinted").select { |name, _| name.start_with?("--th-gallery-") })
+    assert_equal %w[--th-gallery-pick --th-gallery-pick-current --th-gallery-stage], band_values("strong").keys.grep(/--th-gallery-/).sort,
+      "a strong band re-values the stage and the dots, never the button that sits on the image"
+
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      { "the page" => [ {}, "--th-paper" ], "a tinted band" => [ band_values("tinted"), "--th-band-tinted" ],
+        "a strong band" => [ band_values("strong"), "--th-band-strong" ] }.each do |place, (inside, around)|
+        outside = resolve_colour(tokens, around, inside: inside)
+        arrow = resolve_colour(tokens, "--th-gallery-control-ink", inside: inside)
+        edge = resolve_colour(tokens, "--th-gallery-control-edge", inside: inside)
+        { "the place's ground" => outside, "the arrow's colour" => arrow }.each do |under_name, under|
+          ground = resolve_colour(tokens, "--th-gallery-control", inside: inside, under: under)
+          { "the arrow" => [ arrow, 4.5 ], "the ring" => [ edge, 3.0 ] }.each do |what, (colour, least)|
+            ratio = contrast(ground, colour)
+            puts "gallery #{theme} #{place} #{what} over #{under_name}: #{ratio.round(2)}" if ENV["SHOW_RATIOS"]
+            assert_operator ratio, :>=, least, "#{what} on the button's ground over #{under_name} in #{place} (#{theme}) is #{ratio.round(2)}:1"
+            pairs += 1
+          end
+        end
+        %w[--th-gallery-pick --th-gallery-pick-current].each do |dot|
+          ratio = contrast(outside, resolve_colour(tokens, dot, inside: inside, under: outside))
+          puts "gallery #{theme} #{place} #{dot}: #{ratio.round(2)}" if ENV["SHOW_RATIOS"]
+          assert_operator ratio, :>=, 3.0, "#{dot} on #{place} (#{theme}) is #{ratio.round(2)}:1"
+          pairs += 1
+        end
+      end
+    end
+    assert_equal 36, pairs
+  end
+
+  test "the gallery's stylesheet is declared by the type, holds no colour of its own and draws with its tokens" do
+    assert_equal "gallery.css", BlockTypes.fetch(:gallery).stylesheet
+    css = Rails.root.join("app/assets/tailwind/themes/default/gallery.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_no_match(/#\h{3,8}\b|rgba?\(|hsla?\(|oklch\(|color-mix\(/, css, "every colour is a token")
+    (GALLERY_TOKENS + %w[--th-gallery-gap]).each { |name| assert_includes css, "var(#{name})", "gallery.css draws with #{name}" }
+    assert_includes css, "box-shadow: 0 0 0 1px var(--th-gallery-control-edge), var(--th-shadow-menu);"
+    assert_match(/@media \(prefers-reduced-motion: no-preference\) \{\s*\.content-block--gallery__track \{ scroll-behavior: smooth; \}/, css)
+    assert_equal 1, css.scan(/(?<![\w-])scroll-behavior/).size, "the track moves smoothly only without reduced motion"
+    assert_match(/@container \(min-width: 360px\)/, css)
+    assert_match(/@container \(min-width: 640px\)/, css)
+    assert_equal [ 360, 640 ], Blocks::GalleryComponent::GRID_COLUMNS.keys.drop(1)
+  end
+
   private
     def helpers = ActionController::Base.helpers
 

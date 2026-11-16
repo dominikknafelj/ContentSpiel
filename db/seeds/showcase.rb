@@ -1,6 +1,7 @@
 # The development site's showcase: pages under `/showcase` that
 # draw every registered block type, so a theme's templates and a public
-# change are seen where they break: every type at the top level; every type
+# change are seen where they break: every type at the top level, and the
+# Gallery once more as a grid; every type
 # in a section of every layout, in each of the three bands, and a band at
 # full width; every Note kind, titled and not, on the page and in a strong
 # band; a table long and wide enough to scroll; a list of each post type and
@@ -38,7 +39,12 @@ module DevelopmentShowcase
     images = sample_images
 
     top = page(showcase, "every-block", "Every block")
-    fill(top) { content_types.each { |definition| sample(top, definition, image:, form:, images:) } }
+    fill(top) do
+      content_types.each { |definition| sample(top, definition, image:, form:, images:) }
+      # The Gallery's sample is a carousel; once more as a grid, so both
+      # layouts are seen at the top level.
+      sample(top, BlockTypes.fetch("gallery"), images:, settings: { "layout" => "grid" })
+    end
 
     BANDS.each do |background|
       band = page(showcase, "band-#{background}", "Band: #{background}")
