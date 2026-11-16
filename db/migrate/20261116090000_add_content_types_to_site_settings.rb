@@ -5,7 +5,11 @@ class AddContentTypesToSiteSettings < ActiveRecord::Migration[8.1]
   def up
     add_column :site_settings, :content_types, :jsonb, default: [ "blog" ], null: false
 
+    # The connection's schema cache may hold the table's columns from before
+    # the add (another migration of the same run read them), which leaves the
+    # new jsonb column untyped and the Array unquotable: read them again.
     Class.new(ActiveRecord::Base) { self.table_name = "site_settings" }
+      .tap(&:reset_column_information)
       .update_all(content_types: %w[blog resume_entry now_update])
   end
 
