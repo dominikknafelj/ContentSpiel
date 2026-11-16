@@ -78,21 +78,38 @@ module Alerts
 
     # Owner changes and tokens made in the last two windows, one alert each.
     def per_event(since)
-      events = Audit::Event.of_actions(%w[user.owner_changed token.issued]).last_occurred_between(since..@now)
-        .includes(:user).order(:id)
-      rows = events.map { |event| event_alert(event) }
-      return 0 if rows.empty?
+      events = per_event_events(since).to_a
+      return 0 if events.empty?
 
+      people = User.where(id: events.flat_map { |event| [ event.user_id, (event.subject_id if event.subject_type == "User") ] }.compact).index_by(&:id)
+      rows = events.map { |event| event_alert(event, people) }
       Alerts::Alert.insert_all(rows, unique_by: :fingerprint).length
+    end
+
+    # The columns the per-event rules read, and not `snapshot`.
+    def per_event_events(since)
+      Audit::Event.of_actions(%w[user.owner_changed token.issued]).last_occurred_between(since..@now)
+        .select(:id, :action, :user_id, :subject_type, :subject_id, :subject_label, :metadata, :field_changes, :occurred_at, :last_occurred_at)
+        .order(:id)
+    end
+
+    # A subject that is a person is named as an actor is; any other label
+    # loses what follows an at sign, since the log's label for a nameless
+    # user is the whole address.
+    def subject_name(event, people)
+      person = people[event.subject_id] if event.subject_type == "User"
+      return PersonName.of(person) if person
+
+      event.subject_label&.split("@")&.first
     end
 
     # The actor as a note names a person: the name, else the part of the
     # address before the at sign, never the whole address; nil for the system.
-    def event_alert(event)
-      base = { "audit_event_id" => event.id, "actor_name" => (PersonName.of(event.user) if event.user) }
+    def event_alert(event, people)
+      base = { "audit_event_id" => event.id, "actor_name" => (PersonName.of(people[event.user_id]) if people[event.user_id]) }
       details, kind =
         if event.action == "user.owner_changed"
-          [ base.merge("subject_label" => event.subject_label, "now_owner" => Array(event.field_changes["owner"]).last == true), "owner_changed" ]
+          [ base.merge("subject_label" => subject_name(event, people), "now_owner" => Array(event.field_changes["owner"]).last == true), "owner_changed" ]
         else
           metadata = event.metadata.is_a?(Hash) ? event.metadata : {}
           [ base.merge("token_name" => metadata["name"], "group_name" => metadata["group"]), "token_issued" ]

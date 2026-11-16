@@ -127,4 +127,28 @@ class Alerts::RulesTest < ActiveSupport::TestCase
     assert_no_match(/203\.0\.113\.9|typed@victim/, json)
     assert_equal 4, Alerts::Alert.count
   end
+
+  test "a nameless subject user's address never reaches an alert" do
+    nameless = users(:two)
+    event("user.owner_changed", subject_type: "User", subject_id: nameless.id, subject_label: nameless.email_address, field_changes: { "owner" => [ false, true ] })
+    event("user.owner_changed", subject_label: "gone@example.com", field_changes: { "owner" => [ false, true ] })
+    apply
+    json = Alerts::Alert.all.map { |alert| alert.details.to_json }.join
+    assert_no_match(/example\.com/, json)
+    assert_equal %w[gone two], Alerts::Alert.all.map { |alert| alert.details["subject_label"] }.sort
+  end
+
+  test "a late scan in the next window still alerts on the previous window's failures" do
+    20.times { event("session.failed") }
+    late = WINDOW_START + 20.minutes
+    assert_equal 1, apply(now: late)
+    assert_equal WINDOW_START.iso8601, alert("sign_in_failures").details["window_start"]
+  end
+
+  test "a per-event alert at the two-window boundary is made, one just before it is not" do
+    inside = event("user.owner_changed", at: WINDOW_START - 15.minutes, field_changes: { "owner" => [ false, true ] })
+    event("user.owner_changed", at: WINDOW_START - 15.minutes - 1.second, field_changes: { "owner" => [ false, true ] })
+    apply
+    assert_equal [ "audit|#{inside.id}" ], Alerts::Alert.pluck(:fingerprint)
+  end
 end
