@@ -220,6 +220,20 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_select "#publishing-chip [data-publish-changes-offered]", count: 1
   end
 
+  test "Publish now with the later changes, pressed in the editor, shows them to a visitor at once" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as users(:one)
+    page = create_page(title: "Scheduled as this", published: false)
+    assert Pages::Save.call(page, attributes: { published_at: 2.days.from_now }).ok?
+    assert Pages::Save.call(page, translations: { "en" => { title: "Edited after scheduling" } }).ok?
+
+    post publish_admin_page_path(page, with_changes: "1")
+
+    assert_equal "Published now, with the changes saved since it was scheduled.", flash[:notice]
+    get path_of(page)
+    assert_select "h1", text: "Edited after scheduling"
+  end
+
   test "Publish now on a scheduled post with edits since says so too, and with no edits since says only Published" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_as users(:one)

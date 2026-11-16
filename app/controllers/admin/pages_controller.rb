@@ -265,8 +265,8 @@ module Admin
       return if refuse_instant_redirect(@page, to: admin_page_path(@page, **admin_url_options))
 
       was_scheduled = @page.status == "scheduled"
-      result = Pages::Save.call(@page, attributes: { published: true })
-      redirect_after result, success: (published_now_notice(@page, was_scheduled: was_scheduled) if result.ok?)
+      result = ::Publishing::PublishNow.call(@page, with_changes: params[:with_changes] == "1", shown_pending: shown_pending)
+      redirect_after result, success: (published_now_notice(@page, was_scheduled: was_scheduled, with_changes: result.value[:with_changes]) if result.ok?)
     end
 
     def unpublish

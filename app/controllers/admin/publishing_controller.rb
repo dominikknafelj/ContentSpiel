@@ -13,6 +13,7 @@ module Admin
     include RecordOfKind
     include EditingClaims
     include Scheduling
+    include PublishingState
 
     SCOPE = "admin.components.editor_screen.publishing".freeze
 
@@ -87,15 +88,6 @@ module Admin
     end
 
     def kind = @record.is_a?(Page) ? "page" : "post"
-
-    # The pending copy the dialog showed when the press was made (its id, nil
-    # for none): each dialog's form carries it in `pending`, filled from the
-    # answer it got when it opened, and the service refuses when it is no
-    # longer so (`Publishing::ShownSchedule`). A request without the field (a
-    # script) showed nothing and is not checked.
-    def shown_pending
-      params.key?(:pending) ? params[:pending].presence&.to_i : ::Publishing::ShownSchedule::NOT_ASKED
-    end
 
     def editor_path
       @record.is_a?(Page) ? admin_page_path(@record, **admin_url_options) : admin_post_path(@record, **admin_url_options)
