@@ -1052,6 +1052,11 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/@container \(min-width: 360px\)/, css)
     assert_match(/@container \(min-width: 640px\)/, css)
     assert_equal [ 360, 640 ], Blocks::GalleryComponent::GRID_COLUMNS.keys.drop(1)
+    # "Show whole images" beats the preview's inline background with
+    # `!important`, and only that: an image with no preview is the 28px
+    # empty mark (images.css), which a `contain` would blow up to the frame.
+    important = css.scan(/([^{}]+)\{[^{}]*!important[^{}]*\}/).flatten.map(&:strip)
+    assert_equal [ ".content-block--gallery--fit .content-block--gallery__frame img[style]" ], important
   end
 
   private

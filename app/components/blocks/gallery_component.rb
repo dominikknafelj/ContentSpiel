@@ -7,8 +7,9 @@ module Blocks
   # `items`, `sizes`, `string` and `pattern`.
   #
   # AN IMAGE THAT IS GONE IS SKIPPED. The list holds ids; an id that names no
-  # image (written around the services) or an image whose file is gone is
-  # not an item, and every position ("2 of 5", a slide's name, a dot) counts
+  # image, an image in the trash (both written around the services: a live
+  # gallery's usage rows keep its images from the trash) or an image whose
+  # file is gone is not an item, and every position ("2 of 5", a slide's name, a dot) counts
   # the items, never the ids. A gallery with no item draws nothing.
   #
   # THE TEXTS ARE TEXT. The label, a caption and an alt reach the page only
@@ -40,7 +41,7 @@ module Blocks
       limits: [
         "It holds at most 60 images, and the carousel draws a picker of dots for twelve or fewer; above that the position and the buttons alone.",
         "It has no enlarged view, never moves by itself and never wraps from the last image to the first.",
-        "An id that names no image, or an image whose file is gone, is skipped; a gallery with no image that can be drawn renders nothing."
+        "An id that names no image, an image in the trash or an image whose file is gone is skipped; a gallery with no image that can be drawn renders nothing."
       ]
     )
 
@@ -106,8 +107,8 @@ module Blocks
     # the first written along the site's fallback chain, image by image.
     def items
       @items ||= begin
-        ids = Array(block.settings_object&.images)
-        found = ids.empty? ? {} : Media::Asset.with_file.where(id: ids).index_by(&:id)
+        ids = Array(settings&.images)
+        found = ids.empty? ? {} : Media::Asset.kept.with_file.where(id: ids).index_by(&:id)
         drawn = ids.filter_map { |id| found[id] }.select { |asset| asset.file.attached? }
         texts = block.translated_settings.to_h.transform_values { |values| values.to_h["texts"].to_h }
         chain = Locales.fallback_chain(I18n.locale)

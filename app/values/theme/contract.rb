@@ -101,6 +101,16 @@ class Theme
         parts: %w[label kind where],
         states: %w[closed loading open empty limited unavailable],
         answer: %w[state status suggestions kind kind_label label where url marks]
+      }.freeze,
+      # The Gallery block's carousel (gallery block spec §7.5): its values
+      # are the two sentences it fills in, `%{index}` and `%{count}` left in
+      # by `pattern`; it clones no template and asks no endpoint.
+      "gallery-carousel" => {
+        targets: %w[controls track slide previous next position pick status],
+        values: %w[position moved],
+        parts: [],
+        states: %w[first middle last],
+        answer: []
       }.freeze
     }.freeze
 

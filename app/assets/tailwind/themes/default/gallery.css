@@ -38,9 +38,13 @@
    own `style` background, drawn `cover` (`Media::PictureComponent`): over
    the whole frame it would show round the sharp image once it has arrived.
    An inline style is beaten only by `!important`, so the preview is drawn
-   `contain` here, under the image and nowhere else. */
+   `contain` here, under the image and nowhere else: only an image that
+   carries that `style`, never the empty mark (`img[data-image-empty]`),
+   which images.css draws at its own size. */
 .content-block--gallery--fit .content-block--gallery__frame img {
   object-fit: contain;
+}
+.content-block--gallery--fit .content-block--gallery__frame img[style] {
   background-size: contain !important;
 }
 

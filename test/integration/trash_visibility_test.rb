@@ -1241,6 +1241,23 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section.content-section .content-section__column:nth-child(2) img", 1
   end
 
+  # A gallery's list holds ids, so an image trashed around the services
+  # (its usage rows keep a live gallery's own images from the trash) is
+  # still named in it: the public page draws the kept ones and counts only
+  # them (`Blocks::GalleryComponent#items`).
+  test "a gallery whose list names a trashed image draws the kept ones and counts only them" do
+    page = create_page(title: "Shore")
+    third = create_media_asset
+    page.content_blocks.create!(block_type: "gallery", position: 0, settings: { "layout" => "carousel", "images" => [ @kept_asset.id, @gone_asset.id, third.id ] })
+    publish_changes(page) # the block was written around the services, after the page went live
+
+    get "/shore"
+    assert_response :success
+    assert_select ".content-block--gallery__slide", 2
+    assert_select ".content-block--gallery__slide[aria-label=?]", "2 of 2"
+    assert_select ".content-block--gallery__position", "1 of 2"
+  end
+
   # Presence follows its record into the trash: a person
   # who has a record open when it is trashed leaves a row behind (it expires
   # by itself), and that row is shown in no door: the record's people are a

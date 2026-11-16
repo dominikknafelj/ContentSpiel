@@ -122,6 +122,31 @@ class Blocks::GalleryComponentTest < ActiveSupport::TestCase
     assert_no_selector ".content-block--gallery", visible: :all
   end
 
+  test "an image whose file is gone is skipped and the positions count what is drawn" do
+    one, two, three = images(3)
+    two.file.attachment.delete
+    block = gallery([ one, two, three ], layout: "carousel")
+    component = component(block)
+    render_inline component
+
+    assert_equal [ one, three ], component.send(:items).map { |item| item.picture[:asset] }
+    assert_equal [ "1 of 2", "2 of 2" ], page.all(".content-block--gallery__slide").map { |slide| slide[:"aria-label"] }
+  end
+
+  test "a trashed image is skipped" do
+    one, two = images(2)
+    two.update!(trashed_at: Time.current)
+    component = component(gallery([ one, two ]))
+    assert_equal [ one ], component.send(:items).map { |item| item.picture[:asset] }
+  end
+
+  test "the images are looked up at the same cost for one image and for many" do
+    one = gallery(images(1))
+    many = gallery(images(6))
+    component(gallery(images(1))).send(:items)
+    assert_equal count_statements { component(one).send(:items) }, count_statements { component(many).send(:items) }
+  end
+
   test "a language without texts falls back for the caption and takes the library's alt in its own language" do
     one, two = images(2)
     Mobility.with_locale(:de) { one.update!(alt: "Bibliothek eins") }
@@ -186,12 +211,15 @@ class Blocks::GalleryComponentTest < ActiveSupport::TestCase
     assert_equal "(min-width: 768px) 177px, (min-width: 480px) 50vw, 100vw", column.send(:sizes, per_row: columns)
     assert_equal Blocks::ImageComponent.sizes_for(in_column), column.send(:sizes, per_row: 1)
 
-    # Each width asks at least what its row draws: three 236px images and
-    # two gaps fill the 736px top-level block, two 177px images and a gap
-    # the 368px column, and below 768px a phone's one column is the
-    # viewport's width.
-    assert_operator 3 * 236 + 2 * 14, :>=, Blocks::SectionComponent::CONTENT_WIDTH
-    assert_operator 2 * 177 + 14, :>=, 368
+    # Each width asks at least what its row draws: three images and two
+    # gaps fill the 736px top-level block, two images and a gap the
+    # column's share of it, read from the `sizes` asked; below 768px a
+    # phone's one column is the viewport's width.
+    asked = ->(sizes) { sizes[/\(min-width: 768px\) (\d+)px/, 1].to_i }
+    gap = Blocks::GalleryComponent::GRID_GAP
+    assert_operator 3 * asked.(top.send(:sizes, per_row: columns)) + 2 * gap, :>=, Blocks::SectionComponent::CONTENT_WIDTH
+    share = asked.(Blocks::ImageComponent.sizes_for(in_column))
+    assert_operator 2 * asked.(column.send(:sizes, per_row: columns)) + gap, :>=, share
 
     grid = component(gallery(images(2)))
     render_inline grid

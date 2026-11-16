@@ -196,16 +196,6 @@ class Theme::ComponentContractTest < ActiveSupport::TestCase
     assert_match "PublicContractBareComponent does not include Blocks::Contract", failure.message
   end
 
-  # The Gallery's declaration, held before its line joins the ledger: its
-  # interface is the type's theme methods, and its nine words are the ones
-  # its files read through `string` and `pattern`.
-  test "the Gallery's contract is its line in the theme contract and its nine words" do
-    assert_public_interface(Blocks::GalleryComponent)
-    assert_public_words(Blocks::GalleryComponent)
-    assert_equal 9, Blocks::GalleryComponent.contract.words.size
-    assert_equal :reduced, Blocks::GalleryComponent.contract.motion
-  end
-
   test "a public declaration's words are public keys, a prefix ending in .*" do
     error = assert_raises(ArgumentError) do
       Class.new(ApplicationComponent) do

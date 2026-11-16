@@ -15,6 +15,11 @@ module ContractLedger
   COMPONENTS = {
     "blocks/rich_text_component" => %w[block page],
     "blocks/image_component" => %w[block page asset alt caption sizes],
+    # Release note (gallery): added the Gallery block's line, its six themed
+    # tokens and its fixed `gallery-gap` below, and the markup the
+    # `gallery-carousel` script reads (docs/reference/theming.md, "The
+    # Gallery block").
+    "blocks/gallery_component" => %w[block page layout ratio fit label items sizes string pattern],
     "blocks/code_component" => %w[block page lines code language language_label filename caption string],
     # Release note (diagram): added the Diagram block's line, its thirteen
     # themed tokens and its fixed font below (docs/reference/theming.md,
@@ -75,6 +80,9 @@ module ContractLedger
   # Release note (search 2): added the `search-suggest` script: its targets,
   # values, the option template's parts, its states and the keys of the
   # suggestions' JSON (docs/reference/theming.md, "Scripts").
+  # Release note (gallery): added the `gallery-carousel` script: its eight
+  # targets, its two values (sentences with `%{index}` and `%{count}`) and
+  # its three states; it clones no part and asks no endpoint.
   SCRIPTS = {
     "search-suggest" => {
       targets: %w[input listbox popup message option status loading],
@@ -82,6 +90,13 @@ module ContractLedger
       parts: %w[label kind where],
       states: %w[closed loading open empty limited unavailable],
       answer: %w[state status suggestions kind kind_label label where url marks]
+    },
+    "gallery-carousel" => {
+      targets: %w[controls track slide previous next position pick status],
+      values: %w[position moved],
+      parts: [],
+      states: %w[first middle last],
+      answer: []
     }
   }.freeze
 
@@ -96,6 +111,7 @@ module ContractLedger
     ok ok-ink ok-tint warn warn-ink warn-tint danger danger-ink danger-tint
     shadow-menu
     band-tinted band-strong on-band-strong on-band-strong-dim on-band-strong-accent
+    gallery-stage gallery-control gallery-control-ink gallery-control-edge gallery-pick gallery-pick-current
     syn-comment syn-keyword syn-string syn-constant syn-tag syn-attribute syn-embed
     diagram-ink diagram-fill diagram-line diagram-edge diagram-group diagram-note diagram-accent
     diagram-series-1 diagram-series-2 diagram-series-3 diagram-series-4 diagram-series-5 diagram-series-6
@@ -115,6 +131,7 @@ module ContractLedger
     track-mono track-wide
     sp-1 sp-2 sp-3 sp-4 sp-5 sp-6 sp-7
     radius radius-pill ease
+    gallery-gap
     diagram-font
   ].freeze
 
