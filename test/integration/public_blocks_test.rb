@@ -22,6 +22,30 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "figcaption", text: /Our studio/
   end
 
+  # A folder is an editors' tool (docs/reference/media.md, "Folders"): moving
+  # an image between folders changes nothing a page draws, its ETag or the
+  # content version.
+  test "an image's folder changes nothing a visitor is served" do
+    asset = create_media_asset
+    @root.content_blocks.create!(block_type: :image, position: 0, caption: "Our studio", alt: "A bright room", media_asset: asset)
+    folder = Media::Folder.create!(name: "Client A")
+
+    get "/"
+    body = response.body
+    etag = response.headers["ETag"]
+    version = PublicSite.content_version
+    assert_select "img[alt='A bright room']"
+
+    result = as(users(:one)) { Media::MoveImages.call(asset_ids: [ asset.id ], folder: folder) }
+    assert result.ok?, result.errors.to_sentence
+    assert_equal folder.id, asset.reload.folder_id
+
+    get "/"
+    assert_equal body, response.body
+    assert_equal etag, response.headers["ETag"]
+    assert_equal version, PublicSite.content_version
+  end
+
   # An image block's own `media_asset`
   # was one query per block (`Blocks::ImageComponent#asset` ->
   # `block.media_asset`) until `PublicPageRendering#preload_page_images`

@@ -2,7 +2,7 @@
 
 Status: built ("As built", the last section). The behaviour is settled here; the looks and the
 words are the design answers D1 to D14, the card StudioMediaFolders of the CMS
-Design System v242 (version `1794813077-09f4`,
+Design System v244 (version `1794828751-4e8a`; the answers were first given at v242,
 https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT), summarised in §17; where
 the card and this file differ on a word, the card wins, on behaviour this
 file does. The owner's rulings of 2026-11-16 are §20. An answer still marked
@@ -725,11 +725,12 @@ described where it lives, in `docs/reference/media.md`, "Folders".
   The delete locks its images by id too, in one ordered statement.
 - **`Media::FolderTree#inside?`** answers the "inside itself" question; the
   tree also answers `height`, `descendant_ids` and `size`.
-- **No test for the public version of a move beyond the service's:** the plan's
-  case in `test/integration/public_blocks_test.rb` was not written; the
-  guards are `test/lib/media_folder_writers_test.rb`, `test/lib/version_bump_test.rb`
-  and `test/services/media/move_images_test.rb`, "a move touches neither updated_at nor the
-  content version".
+- **A folder reaches no visitor.** `test/integration/public_blocks_test.rb`,
+  "an image's folder changes nothing a visitor is served", moves an image
+  a page draws into a folder and holds the response body, its ETag and the
+  content version equal; beside it `test/lib/media_folder_writers_test.rb`,
+  `test/lib/version_bump_test.rb` and `test/services/media/move_images_test.rb`,
+  "a move touches neither updated_at nor the content version".
 - **The rules with no guard** (§16) are in `CLAUDE.md`, "Rules a change can
   break silently" and "Cases a test lists by hand", and in `docs/reference/media.md`.
 - **Not built, as designed:** tags for images, permissions per folder (the
