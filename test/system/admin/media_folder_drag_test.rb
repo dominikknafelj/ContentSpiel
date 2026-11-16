@@ -200,6 +200,32 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     assert_selector "#media-folder-tree > li[data-tree-node] > #{row(@events)}"
   end
 
+  # A move's answer sends the content frame to the place shown again
+  # (`data-media-go`), and that visit can land while the next folder is
+  # still held: the library's controller is drawn again under the drag,
+  # which goes on and drops, and the new library's Sortables come after.
+  test "a folder's drag outlives the content drawn again under it" do
+    visit_screen "/cs-studio/media"
+    page.execute_script("document.getElementById('media-library').setAttribute('data-drawn-before', '')")
+
+    drag(handle(@events), row(@clients), release: false) do |mouse|
+      assert_selector "#{row(@clients)}.admin-tree-row--drop-into"
+      page.execute_script("Turbo.visit(location.href, { frame: 'content', action: 'advance' })")
+      assert_selector "#media-library:not([data-drawn-before])"
+      clients_at = center(row(@clients))
+      mouse.move(x: clients_at["x"] + 4, y: clients_at["y"])
+      assert_selector "#{row(@clients)}.admin-tree-row--drop-into"
+      # The new library makes the column's Sortables once the press ends.
+      assert_selector "#media-library[data-sortable=pending]"
+    end.up
+
+    assert_eventually(message: "Events moved into Clients") { @events.reload.parent_id == @clients.id }
+    assert_selector "li[data-tree-node]:has(> #{row(@clients)}) #{row(@events)}"
+    await_sortables
+    drag(handle(@events), row("all")) { assert_selector "#{row('all')}.admin-tree-row--drop-into" }
+    assert_eventually(message: "Events moved to the top") { @events.reload.parent_id.nil? }
+  end
+
   test "a row that cannot take the folder shows no target and says why" do
     deep_1 = Media::Folder.create!(name: "Archive")
     deep_2 = Media::Folder.create!(name: "2019", parent: deep_1)

@@ -15,6 +15,13 @@ const OPEN_ON_HOVER_MS = 600
 // The Folders column's tree (`Admin::MediaLibrary::FolderTreeComponent::ID`).
 const TREE_ID = "media-folder-tree"
 
+// A press on a folder's handle that outlived its controller: set while a
+// controller whose library left the page still holds it (`retire`), settled
+// when that press ends (`release`). The next library's controller makes the
+// column's Sortables only once it is settled, as two Sortables on one tree
+// would both answer the press.
+let heldColumn = null
+
 // What a row that cannot take a folder says, by reason.
 const REASONS = {
   this_folder: "components.media_library.drag.this_folder",
@@ -90,6 +97,17 @@ const REASONS = {
 // `data-filtered`, under which no handle is drawn; `tree-find:cleared` gives
 // both back. An image can still be dropped on a row the find shows.
 //
+// THE CONTENT DRAWN AGAIN UNDER A FOLDER'S DRAG does not end it. This
+// controller is on the library, inside the content frame, and the folder's
+// drag is in the column, outside it; the content is drawn again on its own
+// (a move's answer sends the frame to the place shown, `data-media-go` in
+// `admin--media--folders`), and may land while the handle is still pressed.
+// A controller disconnected during such a press keeps the column's
+// Sortables, its follower and its drop until the press ends (`retire`), and
+// only then lets go of them (`release`); the next library's controller makes
+// the Sortables after that, `data-sortable` "pending" meanwhile. The column
+// drawn again during that press ends the drag, as it ends any drag.
+//
 // Escape ends the drop for the rest of that drag (SortableJS has no Escape:
 // the ghost follows until the release, which then sends nothing), and is
 // taken: in selection mode it does not also leave the mode. Whatever a
@@ -114,8 +132,10 @@ export default class extends Controller {
 
     this.element.dataset.sortable = "pending"
     const token = this.loadToken = {}
-    loadSortable().then((Sortable) => {
-      // Disconnected (or connected again) before SortableJS arrived.
+    loadSortable().then(async (Sortable) => {
+      if (heldColumn) await heldColumn
+      // Disconnected (or connected again) before SortableJS arrived or the
+      // held press ended.
       if (this.loadToken !== token) return
 
       this.Sortable = Sortable
@@ -132,6 +152,28 @@ export default class extends Controller {
 
   disconnect() {
     this.loadToken = null
+    if (this.pressing) this.retire()
+    else this.teardown()
+  }
+
+  // Disconnected while a folder's handle is pressed: everything stays until
+  // the press ends. Not even the tiles' Sortable is destroyed now: a
+  // destroy ends whatever drag SortableJS holds, whichever Sortable holds it.
+  retire() {
+    this.retired = true
+    heldColumn = new Promise((resolve) => { this.settleHeld = resolve })
+  }
+
+  release() {
+    if (!this.retired) return
+
+    this.retired = false
+    this.teardown()
+    heldColumn = null
+    this.settleHeld()
+  }
+
+  teardown() {
     Object.entries(this.handlers).forEach(([name, handler]) => document.removeEventListener(name, handler))
     this.columnObserver?.disconnect()
     this.columnObserver = null
@@ -176,6 +218,13 @@ export default class extends Controller {
       draggable: "li[data-tree-node]",
       handle: "[data-media-drag-handle]",
       disabled: tree.hasAttribute("data-filtered"),
+      onChoose: () => { this.pressing = true },
+      // A retired controller lets go a turn later: SortableJS calls
+      // `onEnd`, which drops, after this.
+      onUnchoose: () => {
+        this.pressing = false
+        if (this.retired) setTimeout(() => this.release(), 0)
+      },
       onStart: (event) => this.startFolder(event.item),
       onEnd: () => this.drop()
     }))
@@ -195,9 +244,11 @@ export default class extends Controller {
     }
   }
 
+  // A Sortable destroyed during a press says no `onUnchoose`.
   destroyFolderSortables() {
     this.folderSortables.forEach((sortable) => sortable.destroy())
     this.folderSortables = []
+    this.pressing = false
   }
 
   // The column was drawn again: the tree is a new element, so its
@@ -205,6 +256,7 @@ export default class extends Controller {
   columnChanged() {
     const tree = document.getElementById(TREE_ID)
     if (tree === this.tree) return
+    if (this.retired) return this.release()
 
     if (this.drag) this.endDrag()
     this.destroyFolderSortables()
