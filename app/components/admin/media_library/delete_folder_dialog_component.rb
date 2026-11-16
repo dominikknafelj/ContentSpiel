@@ -49,10 +49,10 @@ module Admin
         if preview.target
           return words(:into_parent_both, images: images, folders: folders, parent: preview.target.name) if images && folders
 
-          words(:into_parent, things: images || folders, parent: preview.target.name)
-        elsif images && folders then words(:to_top_both, images: images, folders: folders)
-        elsif folders then words(:to_top_folders, folders: folders)
-        else words(:to_top_images, images: images)
+          words(:into_parent, count: images ? preview.image_count : preview.folder_count, things: images || folders, parent: preview.target.name)
+        elsif images && folders then words(:to_top_both, count: preview.folder_count, images: images, folders: folders)
+        elsif folders then words(:to_top_folders, count: preview.folder_count, folders: folders)
+        else words(:to_top_images, count: preview.image_count, images: images)
         end
       end
 

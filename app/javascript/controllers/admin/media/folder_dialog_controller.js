@@ -19,7 +19,9 @@ import { messages } from "i18n/messages"
 // the name, the line saying where and the place and search the screen shows
 // (from `#content`'s `data-media-place` and `data-media-query`, which the
 // answer's address keeps) are written again at each opening, and the last
-// refusal's sentences are taken away. A rename sends no parent at all (the
+// refusal's sentences are taken away. Every opening writes all of them, so
+// nothing an earlier opening, a refusal's redrawn form or a restored
+// snapshot left in the dialog is ever shown stale. A rename sends no parent at all (the
 // field is disabled), so it never moves the folder. The words are the
 // server's (`data-messages`), and a name reaches the page only through
 // `value` and `textContent`.

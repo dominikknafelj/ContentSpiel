@@ -6,13 +6,21 @@ module Admin
   # `media.manage` gates every action BEFORE any folder is looked up, so an id
   # that names nothing and one that exists answer alike ("not found, not
   # forbidden" would otherwise tell a person without the right which ids
-  # exist). `place` is the place the screen was showing (the `folder` words of
+  # exist). A folder that is gone by then (deleted in another tab) is no 404
+  # page, which a Turbo Stream request draws nothing for: it is refused with
+  # "That folder is gone." as the service's own race is, under the dialog's
+  # field for a rename and as an error toast for a delete or a move
+  # (`#gone`). `place` is the place the screen was showing (the `folder` words of
   # the listing), which the answer keeps or leaves.
   class MediaFoldersController < BaseController
     include MediaPlaces
 
     before_action -> { forbidden! unless can?("media.manage") }
     before_action :set_folder, only: %i[update destroy]
+
+    # The services' sentence for a folder deleted meanwhile (`Media::SaveFolder`,
+    # `Media::DeleteFolder`), said here for one already gone at the lookup.
+    GONE = "That folder is gone.".freeze
 
     def create
       result = Media::SaveFolder.call(attributes: folder_attributes)
@@ -38,7 +46,23 @@ module Admin
 
     private
 
-    def set_folder = @folder = Media::Folder.find(params[:id])
+    def set_folder
+      @folder = Media::Folder.find_by(id: params[:id])
+      gone unless @folder
+    end
+
+    # A rename draws its form again, the sentence under the field and the
+    # address it was sent to; a delete or a move says it in a toast.
+    def gone
+      refusal = Admin::Answers::FolderRefused.new(view: view_context)
+      return answer(refusal.toast(sentences: [ GONE ], status: :not_found)) unless action_name == "update" && sent_name?
+
+      form = Admin::MediaLibrary::FolderFormComponent.new(
+        tree: Media::FolderTree.load, folder: Media::Folder.new(id: params[:id].to_i), name: params.dig(:media_folder, :name).to_s,
+        errors: { base: [ GONE ] }, place: params[:place].to_s, query: shown_query
+      )
+      answer(refusal.answer(form: form, status: :not_found))
+    end
 
     # Only the keys that were sent: a rename sends no parent and a move no name.
     # A parent that is no number names a folder that is gone (id 0), as an

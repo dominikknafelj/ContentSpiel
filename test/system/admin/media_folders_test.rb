@@ -251,7 +251,7 @@ class Admin::MediaFoldersSystemTest < ApplicationSystemTestCase
     open_folder_menu "Delete folder…"
     within("dialog#media-folder-delete-dialog[open]") do
       assert_selector "h2", text: "Delete “Client A”?"
-      assert_text "Its 1 image move to “Clients”. Nothing else is deleted."
+      assert_text "Its 1 image moves to “Clients”. Nothing else is deleted."
       assert_text "This can't be undone."
     end
 

@@ -19,6 +19,8 @@ module Admin
     # it was asked for, which may name a folder deleted since: it is sent
     # again as it was, and with no folder of that id in `tree` the line
     # saying where is left out (the refusal says "That folder is gone.").
+    # A rename of a folder already gone is drawn with a folder that holds
+    # only its id (never saved): the same address, and no line saying where.
     #
     # `place`, `q` and `filter` are what the screen shows (a write's answer
     # keeps or leaves the place and keeps the search: `Admin::MediaPlaces`);
@@ -49,7 +51,7 @@ module Admin
 
       def url
         options = url_options.slice(:locale)
-        rename? ? helpers.admin_media_folder_path(folder, **options) : helpers.admin_media_folders_path(**options)
+        rename? ? helpers.admin_media_folder_path(folder.id, **options) : helpers.admin_media_folders_path(**options)
       end
 
       def form_method = rename? ? "patch" : "post"
@@ -61,6 +63,7 @@ module Admin
       # "At the top of the library", "Inside Clients / Client A", or nil for a
       # parent that is gone.
       def where
+        return if rename? && !folder.persisted?
         return t("admin.components.media_library.folder_dialog.top") if where_id.nil?
         return unless tree.find(where_id)
 

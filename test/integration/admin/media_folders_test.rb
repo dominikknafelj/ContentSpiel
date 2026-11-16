@@ -126,6 +126,41 @@ class Admin::MediaFoldersTest < ActionDispatch::IntegrationTest
     assert streams.find { |stream| stream["target"] == "toasts" }.at_css("template [role=alert]"), "an error toast"
   end
 
+  test "a rename of a folder another tab deleted first draws the form again with That folder is gone. under the field" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+    folder.destroy!
+
+    patch "/cs-studio/media_folders/#{folder.id}", params: { media_folder: { name: "Client B" }, place: folder.id.to_s, q: "logo" }, as: :turbo_stream
+
+    assert_response :not_found
+    form = form_stream.at_css("template form#media-folder-form")
+    assert_equal "/cs-studio/media_folders/#{folder.id}", form["action"]
+    assert_equal "patch", form.at_css("input[name=_method]")["value"]
+    assert_equal "Client B", form.at_css("input#media-folder-name")["value"]
+    assert_equal "That folder is gone.", form.at_css("#media-folder-name-errors [data-media-folder-error]").text
+    assert form.at_css("#media-folder-where")["hidden"], "no line says where a folder that is gone stands"
+    assert_equal "logo", form.at_css("input[name=q]")["value"]
+    assert_equal 0, Media::Folder.count
+  end
+
+  test "a delete or a move of a folder another tab deleted first says That folder is gone. in an error toast" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+    folder.destroy!
+
+    delete "/cs-studio/media_folders/#{folder.id}", params: { place: folder.id.to_s }, as: :turbo_stream
+    assert_response :not_found
+    assert_nil form_stream
+    assert_equal "That folder is gone.", toast_text
+    assert streams.find { |stream| stream["target"] == "toasts" }.at_css("template [role=alert]"), "an error toast"
+
+    patch "/cs-studio/media_folders/#{folder.id}", params: { media_folder: { parent_id: "" } }, as: :turbo_stream
+    assert_response :not_found
+    assert_nil form_stream
+    assert_equal "That folder is gone.", toast_text
+  end
+
   test "the Media screen draws New folder, the folder dialog and, in a folder, the delete confirm for media.manage only" do
     clients = Media::Folder.create!(name: "Clients")
     client_a = Media::Folder.create!(name: "Client A", parent: clients)
@@ -141,7 +176,7 @@ class Admin::MediaFoldersTest < ActionDispatch::IntegrationTest
     assert html.at_css("#content dialog#media-folder-dialog form#media-folder-form")
     delete_dialog = html.at_css("#content dialog#media-folder-delete-dialog")
     assert_equal "Delete “Client A”?", delete_dialog.at_css("h2").text
-    assert_equal "Its 1 image move to “Clients”. Nothing else is deleted.", delete_dialog.at_css("[data-media-folder-delete-body]").text
+    assert_equal "Its 1 image moves to “Clients”. Nothing else is deleted.", delete_dialog.at_css("[data-media-folder-delete-body]").text
     assert_equal "/cs-studio/media_folders/#{client_a.id}", delete_dialog.at_css("form#media-folder-delete-form")["action"]
 
     get "/cs-studio/media"

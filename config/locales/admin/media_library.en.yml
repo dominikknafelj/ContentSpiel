@@ -64,10 +64,20 @@ en:
             one: "%{count} folder"
             other: "%{count} folders"
           into_parent_both: "Its %{images} and %{folders} move to “%{parent}”. Nothing else is deleted."
-          into_parent: "Its %{things} move to “%{parent}”. Nothing else is deleted."
-          to_top_both: "Its %{folders} move to the top of the library, and its %{images} to Not in a folder. Nothing else is deleted."
-          to_top_folders: "Its %{folders} move to the top of the library. Nothing else is deleted."
-          to_top_images: "Its %{images} move to Not in a folder. Nothing else is deleted."
+          # One kind of thing moves: the verb agrees with its count.
+          into_parent:
+            one: "Its %{things} moves to “%{parent}”. Nothing else is deleted."
+            other: "Its %{things} move to “%{parent}”. Nothing else is deleted."
+          # The verb agrees with the folders' count, the sentence's subject.
+          to_top_both:
+            one: "Its %{folders} moves to the top of the library, and its %{images} to Not in a folder. Nothing else is deleted."
+            other: "Its %{folders} move to the top of the library, and its %{images} to Not in a folder. Nothing else is deleted."
+          to_top_folders:
+            one: "Its %{folders} moves to the top of the library. Nothing else is deleted."
+            other: "Its %{folders} move to the top of the library. Nothing else is deleted."
+          to_top_images:
+            one: "Its %{images} moves to Not in a folder. Nothing else is deleted."
+            other: "Its %{images} move to Not in a folder. Nothing else is deleted."
           empty: "It is empty."
           renamed: "“%{from}” becomes “%{to}”, because “%{parent}” already has a folder of that name."
           renamed_at_top: "“%{from}” becomes “%{to}”, because the top of the library already has a folder of that name."

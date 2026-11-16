@@ -36,7 +36,7 @@ class Admin::MediaLibrary::DeleteFolderDialogComponentTest < ViewComponent::Test
     trips = folder("Trips", clients)
     images(1, into: trips)
     dialog(trips)
-    assert_equal "Its 1 image move to “Clients”. Nothing else is deleted.", body
+    assert_equal "Its 1 image moves to “Clients”. Nothing else is deleted.", body
   end
 
   test "at the top it says the folders go to the top and the images to Not in a folder" do
@@ -51,7 +51,19 @@ class Admin::MediaLibrary::DeleteFolderDialogComponentTest < ViewComponent::Test
     events = folder("Events")
     folder("2026", events)
     dialog(events)
-    assert_equal "Its 1 folder move to the top of the library. Nothing else is deleted.", body
+    assert_equal "Its 1 folder moves to the top of the library. Nothing else is deleted.", body
+
+    folder("Venues", events)
+    dialog(events)
+    assert_equal "Its 2 folders move to the top of the library. Nothing else is deleted.", body
+    images(1, into: events)
+    dialog(events)
+    assert_equal "Its 2 folders move to the top of the library, and its 1 image to Not in a folder. Nothing else is deleted.", body
+
+    talks = folder("Talks")
+    images(1, into: talks)
+    dialog(talks)
+    assert_equal "Its 1 image moves to Not in a folder. Nothing else is deleted.", body
   end
 
   test "an empty folder says It is empty." do
