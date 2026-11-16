@@ -25,6 +25,20 @@ class Dashboard::WaitingForYouTest < ActiveSupport::TestCase
     assert rows.all? { |row| row.reasons.frozen? }
   end
 
+  test "a dormant post is in none of the dashboard's lists" do
+    dormant = create_post(title: "Dormant", content_type: "resume_entry")
+    kept = create_post(title: "Kept")
+    [ dormant, kept ].each { |post| mark(post, @base + 1.minute) }
+    [ dormant, kept ].each { |post| note(post, at: @base + 2.minutes) }
+    switch_on_content_types("blog")
+
+    %w[everything threads unpublished].each do |filter|
+      list = waiting(filter: filter)
+      assert_equal [ kept ], list.rows.map(&:record), filter
+      assert_equal 1, list.total, filter
+    end
+  end
+
   test "a discussed and unpublished record is one row carrying both reasons, and found under both filters" do
     page = create_page(title: "Both")
     note(page, at: @base + 1.minute)

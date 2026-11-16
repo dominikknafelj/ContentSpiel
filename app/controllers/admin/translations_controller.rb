@@ -201,7 +201,7 @@ module Admin
     def readable_relations
       relations = {}
       relations["page"] = admin_scope(Page.all) if can?("pages.read")
-      relations["post"] = admin_scope(Post.all) if can?("posts.read")
+      relations["post"] = admin_scope(Post.of_switched_on_types) if can?("posts.read")
       relations["media"] = Media::Asset.kept if can?("media.upload")
       relations
     end

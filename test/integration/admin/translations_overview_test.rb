@@ -72,6 +72,19 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select "[data-translation-summary] [data-locale=en]", count: 0
   end
 
+  test "the Translations matrix leaves out a dormant post" do
+    kept = outdated_post("Kept post")
+    dormant = create_post(title: "Dormant post", content_type: "resume_entry")
+    get "/cs-studio/translations"
+    assert_select row("post", dormant)
+
+    switch_on_content_types("blog")
+    get "/cs-studio/translations"
+
+    assert_select row("post", kept)
+    assert_select row("post", dormant), count: 0
+  end
+
   test "rows with an outdated language come first, newest change first, then missing-only rows by updated_at" do
     old_missing = create_post(title: "Old missing")
     old_missing.update_columns(updated_at: 5.days.ago)

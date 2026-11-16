@@ -107,11 +107,12 @@ module Dashboard
     private
 
     # Pages and posts the actor may read, each narrowed by the block (one
-    # relation per model, never loaded here).
+    # relation per model, never loaded here). A post of a switched-off type is
+    # dormant: nobody's next task, so no list here holds it.
     def page_and_post_relations(&narrow)
       [
         AccessControl.scope(@actor, "pages.read", Page.all, channel: @channel),
-        AccessControl.scope(@actor, "posts.read", Post.all, channel: @channel)
+        AccessControl.scope(@actor, "posts.read", Post.of_switched_on_types, channel: @channel)
       ].map(&narrow)
     end
 

@@ -18,9 +18,7 @@ class ContentTypeSetsTest < ActiveSupport::TestCase
     "app/controllers/admin/posts_controller.rb" => "the posts list's type filter reads the declared set until it takes the types present from `Posts::List#types_present`",
     "app/services/settings/save.rb" => "the switch is normalised against the declared names",
     "db/seeds.rb" => "development switches every declared type on",
-    "app/models/site_setting.rb" => "the at-least-one rule counts declared names",
-    "app/components/admin/editor_screen/new_post_form_component.rb" => "the New post dialog offers the declared types today",
-    "app/components/admin/fields/content_type_field.rb" => "the select offers the declared types today"
+    "app/models/site_setting.rb" => "the at-least-one rule counts declared names"
   }.freeze
 
   def self.files

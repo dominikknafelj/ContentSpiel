@@ -28,6 +28,9 @@ module Dashboard
   # deleted user is a nil among the authors and one in the count). Without it they are empty and zero,
   # and nothing is read: Waiting for you has no use for them.
   #
+  # `switched_on_only: true` leaves out the threads on a post of a switched-off
+  # type (the dashboard's Waiting for you); the Notes screen's rail keeps them.
+  #
   # `more_records` is how many records with open threads the viewer may read
   # lie beyond the rows: one statement, `record_keys`, asked only when it is
   # read.
@@ -42,12 +45,13 @@ module Dashboard
 
     Row = Data.define(:record, :kind, :title, :count, :at, :route, :last_author, :last_author_id, :authors, :author_count)
 
-    def initialize(actor:, channel: Current.channel, limit: 5, records: nil, with_authors: false)
+    def initialize(actor:, channel: Current.channel, limit: 5, records: nil, with_authors: false, switched_on_only: false)
       @actor = actor
       @channel = channel
       @limit = limit
       @records = records
       @with_authors = with_authors
+      @switched_on_only = switched_on_only
     end
 
     def rows
@@ -87,7 +91,15 @@ module Dashboard
     # Not `open` and not `load`: both are `Kernel`'s, in every object.
     def unresolved
       threads = Notes.readable_threads(@actor, channel: @channel).unresolved
+      threads = threads.and(not_on_dormant_posts) if @switched_on_only
       @records.nil? ? threads : threads.and(on_containers(@records.map { |record| [ record.class.base_class.name, record.id ] }))
+    end
+
+    # Every thread but those on a post of a switched-off type: the dashboard
+    # lists no dormant post, though its notes stay open on the Notes screen.
+    def not_on_dormant_posts
+      Notes::Thread.where.not(container_type: Post.name)
+        .or(Notes::Thread.where(container_type: Post.name, container_id: Post.of_switched_on_types.select(:id)))
     end
 
     # The threads on the `[type, id]` pairs: one hash condition per kind of

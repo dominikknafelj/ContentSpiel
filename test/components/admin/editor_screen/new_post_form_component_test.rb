@@ -44,6 +44,17 @@ class Admin::EditorScreen::NewPostFormComponentTest < ViewComponent::TestCase
     assert_selector "p.text-small", text: "Created as a draft in English. Everything can be changed in the editor."
   end
 
+  test "the dialog offers the switched-on types alone, and one type draws the one-type form" do
+    switch_on_content_types("blog", "now_update")
+    render_form
+    assert_equal %w[blog now_update], page.all("select#new-post-type option").map(&:value)
+
+    switch_on_content_types("now_update")
+    render_form
+    assert_no_selector "select#new-post-type"
+    assert_selector "input#new-post-type[value=now_update]", visible: :all
+  end
+
   test "with one creatable type there is no select: a hidden input carries the type and the note names it" do
     only_now_update_for_branch_editors
     render_form(users(:editor_branch))

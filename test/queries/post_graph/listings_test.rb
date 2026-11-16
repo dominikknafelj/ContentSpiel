@@ -46,6 +46,20 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
     assert_equal Set[Tag.find_by!(name: "ruby").id], result.tag_ids
   end
 
+  test "no listing line is drawn to a switched-off type's posts" do
+    by_type = create_page(title: "By type")
+    list_block(by_type, content_type: "resume_entry")
+    list_block(@page)
+    assert_equal [ @entry.id ], listings.posts_of(by_type.id)
+
+    switch_on_content_types("blog")
+    result = listings
+
+    assert_empty result.posts_of(by_type.id)
+    assert_not_includes result.posts_of(@page.id), @entry.id
+    assert_includes result.posts_of(@page.id), @ruby.id
+  end
+
   test "a block names its tag whatever the case and the spaces, and a name no tag has makes no line" do
     list_block(@page, tag: "  RUBY ")
     other = create_page(title: "Other")

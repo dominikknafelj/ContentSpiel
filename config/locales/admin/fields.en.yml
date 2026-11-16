@@ -11,6 +11,10 @@ en:
         # writes the line once and `admin--editor--code-limit` keeps it
         # current, and says it once, politely, when it appears and when the
         # text passes the limit.
+        # A Post list block's filter (`Admin::Fields::ContentTypeField`) naming a
+        # post type the site has switched off keeps its choice, marked.
+        content_type:
+          switched_off: "%{label} (switched off)"
         code_field:
           count: "%{used} of %{limit} characters"
           over: "%{used} of %{limit} characters · %{over} over"
