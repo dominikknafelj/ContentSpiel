@@ -1,14 +1,17 @@
 import { messages } from "i18n/messages"
 
-// THE OPEN SET: which branches of a page tree a person has opened or folded,
-// kept per browser in the cookie `cs_tree_open` and shared by both trees.
+// THE OPEN SET: which branches of a tree a person has opened or folded, kept
+// per browser in one cookie per tree, `cs_tree_open` (pages, both page trees)
+// and `cs_media_open` (library folders), each named by the tree it folds
+// (`data-tree-open-cookie`, one of `COOKIES`; a tree without it, or naming
+// another, reads nothing and writes nothing).
 // This module is its one writer (`admin_design_rules_test.rb`, "the open set
 // has one writer"); the server reads it (`TreeOpenSet`) and draws the folds
 // from the first paint, and the scripts only toggle them after.
 //
-// The format is `TreeOpenSet`'s: page ids joined by `.`, the newest first, a
+// The format is `TreeOpenSet`'s: ids joined by `.`, the newest first, a
 // bare id opened beyond the default and `-id` folded where the default would
-// show it open. Nothing but page ids is ever written, on the tree's
+// show it open. Nothing but the tree's ids is ever written, on the tree's
 // `data-tree-open-path` (the admin path) only, so a visitor's page is never
 // sent it; a tree without that attribute writes nothing.
 //
@@ -29,7 +32,7 @@ import { messages } from "i18n/messages"
 // element holding `aria-expanded` is the node itself when it is a
 // `[role="treeitem"]`, else its row's disclosure button.
 
-const COOKIE = "cs_tree_open"
+const COOKIES = ["cs_tree_open", "cs_media_open"]
 const LIMIT = 300
 const MAX_BYTES = 4096
 const YEAR = 31536000
@@ -49,31 +52,40 @@ function entriesOf(value) {
   })
 }
 
-function cookieValue() {
-  const pair = document.cookie.split("; ").find((each) => each.startsWith(`${COOKIE}=`))
-  return pair ? pair.slice(COOKIE.length + 1) : ""
+// The cookie `tree` names, or null.
+function cookieOf(tree) {
+  const name = tree?.dataset.treeOpenCookie
+  return COOKIES.includes(name) ? name : null
+}
+
+function cookieValue(tree) {
+  const name = cookieOf(tree)
+  if (!name) return ""
+  const pair = document.cookie.split("; ").find((each) => each.startsWith(`${name}=`))
+  return pair ? pair.slice(name.length + 1) : ""
 }
 
 function write(tree, entries) {
   const path = tree?.dataset.treeOpenPath
-  if (!path) return
+  const name = cookieOf(tree)
+  if (!path || !name) return
 
   const kept = entries.slice(0, LIMIT)
-  while (kept.join(".").length > MAX_BYTES - COOKIE.length - 1) kept.pop()
+  while (kept.join(".").length > MAX_BYTES - name.length - 1) kept.pop()
   const value = kept.join(".")
   const secure = window.location.protocol === "https:" ? "; Secure" : ""
   const age = value ? YEAR : 0
-  document.cookie = `${COOKIE}=${value}; path=${path}; max-age=${age}; SameSite=Lax${secure}`
+  document.cookie = `${name}=${value}; path=${path}; max-age=${age}; SameSite=Lax${secure}`
 }
 
-// `{ opened, folded }`, two Sets of bare page ids (strings), read from `seed`
-// (a value in the cookie's format: the mind graph's list draws its first
-// folds from the server's `data-tree-open`) when one is given, else from the
-// cookie.
-export function readOpenSet(seed = null) {
+// `{ opened, folded }`, two Sets of bare ids (strings), read from `seed` (a
+// value in the cookie's format: the mind graph's list draws its first folds
+// from the server's `data-tree-open`) when one is given, else from the
+// cookie `tree` names.
+export function readOpenSet(tree, seed = null) {
   const opened = new Set()
   const folded = new Set()
-  entriesOf(seed ?? cookieValue()).forEach((entry) => {
+  entriesOf(seed ?? cookieValue(tree)).forEach((entry) => {
     if (entry.startsWith("-")) folded.add(entry.slice(1))
     else opened.add(entry)
   })
@@ -84,7 +96,7 @@ export function readOpenSet(seed = null) {
 // against the cookie as it stands now, so a toggle in another tab is kept.
 export function setOpen(tree, id, open, { openByDefault = false } = {}) {
   const key = String(id)
-  const entries = entriesOf(cookieValue()).filter((entry) => entry.replace(/^-/, "") !== key)
+  const entries = entriesOf(cookieValue(tree)).filter((entry) => entry.replace(/^-/, "") !== key)
   if (open && !openByDefault) entries.unshift(key)
   if (!open && openByDefault) entries.unshift(`-${key}`)
   write(tree, entries)
@@ -94,7 +106,7 @@ export function setOpen(tree, id, open, { openByDefault = false } = {}) {
 // ancestor of the open page holds until the person goes to a page.
 export function forgetFolds(tree, ids) {
   const keys = new Set(Array.from(ids, String))
-  const entries = entriesOf(cookieValue())
+  const entries = entriesOf(cookieValue(tree))
   const kept = entries.filter((entry) => !(entry.startsWith("-") && keys.has(entry.slice(1))))
   if (kept.length !== entries.length) write(tree, kept)
 }

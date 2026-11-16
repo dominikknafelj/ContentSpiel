@@ -13,6 +13,18 @@ class TreeOpenSetTest < ActiveSupport::TestCase
     assert TreeOpenSet::EMPTY.open?(1, root: true, on_path: false), "the root is open by default"
   end
 
+  test "a folder cookie is read as a page cookie is, held to the readable ids, and a folder tree opens no root" do
+    assert_equal "cs_media_open", TreeOpenSet::MEDIA_COOKIE
+    assert_not_equal TreeOpenSet::COOKIE, TreeOpenSet::MEDIA_COOKIE
+
+    set = TreeOpenSet.parse("12.-7.99", readable_ids: [ 7, 12, 40 ])
+    assert_equal "12.-7", set.to_s, "a folder id the viewer cannot read is dropped"
+    assert set.open?(12, root: false, on_path: false)
+    assert set.open?(7, root: false, on_path: true), "the path to the selected folder is open"
+    assert_not set.open?(40, root: false, on_path: false), "a folder tree has no root, so nothing is open by default"
+    assert_not TreeOpenSet::EMPTY.open?(40, root: false, on_path: false)
+  end
+
   test "the path to the selected page is open whatever the folds say" do
     set = TreeOpenSet.parse("-7.-1", readable_ids: [ 1, 7 ])
 
