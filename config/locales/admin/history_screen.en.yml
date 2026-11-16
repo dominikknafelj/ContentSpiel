@@ -80,8 +80,8 @@ en:
             none: "Nothing is published."
           untitled: "Untitled"
           back:
-            one: "1 block that comes back has no notes: its notes stayed with the block that was removed."
-            other: "%{count} blocks that come back have no notes: their notes stayed with the blocks that were removed."
+            one: "%{count} block that comes back returns without notes: a block's notes close when it is removed."
+            other: "%{count} blocks that come back return without notes: a block's notes close when it is removed."
           # One block that goes, carrying `count` open notes.
           going_one:
             one: "1 block that goes carries 1 note; it closes with it."

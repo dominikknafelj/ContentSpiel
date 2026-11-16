@@ -51,7 +51,7 @@ class Admin::HistoryScreen::RestoreDialogComponentTest < ViewComponent::TestCase
     assert_selector "[data-publishing-overview] [data-change=removed]", text: "Added since"
     warn = page_lines("[data-restore-warnings]")
     assert_equal [
-      "1 block that comes back has no notes: its notes stayed with the block that was removed.",
+      "1 block that comes back returns without notes: a block's notes close when it is removed.",
       "1 block that goes carries 2 notes; they close with it.",
       "1 image is no longer in the library: its block comes back empty."
     ], warn
