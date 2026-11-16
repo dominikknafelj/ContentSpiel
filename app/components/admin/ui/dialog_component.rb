@@ -45,9 +45,9 @@ module Admin
       # A line of facts beside the title, in the header before Close (the image
       # viewer's "PNG · 1.2 MB · 800 × 600"). With it the title and the aside
       # share one `.admin-dialog__titles` element, the h2 first and the aside its
-      # next sibling, so the viewer's phone head can stack them in two lines; a
-      # dialog without it draws the header as it always did. It is never dropped
-      # on a phone, and `shrink-0` keeps it whole while a long title truncates.
+      # next sibling, so the viewer's phone head can stack them in two lines;
+      # without it the h2 stands alone in the header. It is never dropped on a
+      # phone, and `shrink-0` keeps it whole while a long title truncates.
       renders_one :title_aside
 
       # `open_on_load:` marks a dialog the server wants open as soon as the page

@@ -256,6 +256,7 @@ class Admin::ImageViewerSystemTest < ApplicationSystemTestCase
     assert_equal "1 of 1", position
     assert_no_selector part("previous")
     assert_no_selector part("next")
+    assert focused?("#{VIEWER} > header form[method=dialog] button"), "with no arrow drawn, the opening did not give the focus to Close"
     head = "#{VIEWER} h2#image-viewer-title"
     assert page.evaluate_script("(() => { const h2 = document.querySelector(#{head.to_json}); return h2.scrollWidth > h2.clientWidth && getComputedStyle(h2).textOverflow === 'ellipsis' })()"), "the long name does not truncate"
     assert_equal name, page.evaluate_script("document.querySelector(#{head.to_json}).textContent.trim()")
