@@ -58,6 +58,16 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     mouse
   end
 
+  # Whether the tree's own Sortable (the top-level folders') is disabled,
+  # asked of SortableJS itself (the module is cached, so this import is the
+  # page's own instance).
+  def folders_sortable_disabled?
+    page.evaluate_async_script(<<~JS)
+      const done = arguments[0]
+      import("sortablejs").then((module) => done(module.default.get(document.getElementById("media-folder-tree")).option("disabled")))
+    JS
+  end
+
   def count_of(place) = find("#{row(place)} [data-media-place-count]", visible: :all).text
 
   test "a tile dragged onto a folder moves, and the counts and the grid follow" do
@@ -110,12 +120,37 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     assert_equal "2", count_of(@events)
   end
 
+  test "Escape mid-drag in selection mode cancels the drop and keeps the selection" do
+    visit_screen "/cs-studio/media?folder=none&select=1"
+    find("#{tile(@logo)} > button").click
+    assert_selector "[data-admin--media--selection-target=count]", text: "1 selected"
+    # Selection mode's Escape presses Done: counted, so a press is seen
+    # before its visit could land.
+    page.execute_script("window.donePresses = 0; document.querySelector('[data-admin--media--selection-target=done]').addEventListener('click', () => window.donePresses++)")
+
+    drag("#{tile(@logo)} > button", row(@events)) do
+      assert_selector "#{row(@events)}.admin-tree-drop-target"
+      page.send_keys(:escape)
+      assert_no_selector target
+    end
+
+    assert_no_selector ".admin-media-drag-fallback", visible: :all
+    assert_no_selector ".admin-media-drag-ghost"
+    assert_equal 0, page.evaluate_script("window.donePresses")
+    assert_current_path(/select=1/)
+    assert_selector "[data-admin--media--selection-target=count]", text: "1 selected"
+    assert_selector "#{tile(@logo)} > button[aria-pressed=true]"
+    sleep 0.3 # sleep: nothing is expected to arrive; a move sent by mistake would answer within this
+    assert_nil @logo.reload.folder_id
+  end
+
   test "a drop on Not in a folder takes the image out of every folder" do
     @logo.update_columns(folder_id: @events.id) # version: none (a test's own rows)
     visit_screen "/cs-studio/media?folder=#{@events.id}"
 
-    # All media is no target for an image.
+    # All media is no target for an image, nor the place shown, where it stands.
     drag(tile(@logo), row("all"), release: false) { assert_no_selector target }.up
+    drag(tile(@logo), row(@events), release: false) { assert_no_selector target }.up
     assert_equal @events.id, @logo.reload.folder_id
 
     drag(tile(@logo), row("none")) { assert_selector "#{row('none')}.admin-tree-drop-target" }
@@ -240,6 +275,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     fill_in "Find a folder", with: "e"
     assert_selector "#media-folder-tree[data-filtered]"
     assert_equal "none", page.evaluate_script("getComputedStyle(document.querySelector(#{handle(@events).to_json})).display")
+    assert_equal true, folders_sortable_disabled?
 
     # A press where the handle would stand lifts nothing.
     at = center(row(@events))
@@ -256,6 +292,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
 
     find("#media-folder-tree-find, input[type=search][aria-controls=media-folder-tree]", match: :first).set("")
     assert_no_selector "#media-folder-tree[data-filtered]"
+    assert_equal false, folders_sortable_disabled?
     assert_equal "grid", page.evaluate_script("getComputedStyle(document.querySelector(#{handle(@events).to_json})).display")
   end
 

@@ -51,7 +51,8 @@ const REASONS = {
 // judges its drop row: by the row's height inside the tree's width (the
 // handle a drag holds stands in the gutter, outside its row), inside the
 // column's own box, and never a row in a folded branch. An image is taken by
-// a folder row or Not in a folder; a folder by a folder row (into it) or All
+// a folder row or Not in a folder, but not the place shown (where it
+// stands); a folder by a folder row (into it) or All
 // media (to the top), but not by the row of the folder it is in now (it
 // would go nowhere). A row that takes the drag carries the drop target's
 // class (`TreeItemComponent::CLASSES[:drop_target]`, the `drop` class). A
@@ -90,7 +91,8 @@ const REASONS = {
 // both back. An image can still be dropped on a row the find shows.
 //
 // Escape ends the drop for the rest of that drag (SortableJS has no Escape:
-// the ghost follows until the release, which then sends nothing). Whatever a
+// the ghost follows until the release, which then sends nothing), and is
+// taken: in selection mode it does not also leave the mode. Whatever a
 // drag writes (the ghost, the marks, the reason, the timer) goes at its end,
 // on `turbo:before-cache` and on disconnect.
 export default class extends Controller {
@@ -186,7 +188,8 @@ export default class extends Controller {
       fallbackOnBody: true,
       fallbackClass,
       fallbackTolerance: 3,
-      // The tile or row taken stays where it is, as it is.
+      // The tile or row taken stays where it is, as it is: the class has no
+      // style on purpose, only so SortableJS's defaults are not written.
       ghostClass: "admin-media-drag-source",
       chosenClass: "admin-media-drag-source"
     }
@@ -259,13 +262,18 @@ export default class extends Controller {
 
   follow() {
     this.pointerFollower = (event) => this.hover(event.clientX, event.clientY)
+    // Captured on `window`, before every listener on the document, and
+    // taken (`preventDefault`): Escape mid-drag cancels the drag and nothing
+    // else, so selection mode's Escape (`admin--media--selection#escape`,
+    // which leaves the mode) never hears it.
     this.escapeFollower = (event) => {
       if (event.key !== "Escape" || !this.drag) return
+      event.preventDefault()
       this.drag.cancelled = true
       this.setRow(null)
     }
     document.addEventListener("pointermove", this.pointerFollower)
-    document.addEventListener("keydown", this.escapeFollower)
+    window.addEventListener("keydown", this.escapeFollower, { capture: true })
   }
 
   hover(x, y) {
@@ -315,7 +323,9 @@ export default class extends Controller {
   // (none for a row that is simply no target).
   judge(row) {
     const place = row.dataset.mediaPlace
-    if (this.drag.kind === "images") return { take: place !== "all" }
+    // An image is taken by any place but All media and the place shown,
+    // where the dragged images already stand.
+    if (this.drag.kind === "images") return { take: place !== "all" && place !== this.shown().place }
     if (place === "none") return { take: false }
 
     const parent = place === "all" ? "" : place
@@ -500,7 +510,7 @@ export default class extends Controller {
     if (!this.pointerFollower) return
 
     document.removeEventListener("pointermove", this.pointerFollower)
-    document.removeEventListener("keydown", this.escapeFollower)
+    window.removeEventListener("keydown", this.escapeFollower, { capture: true })
     this.pointerFollower = null
     this.escapeFollower = null
   }
