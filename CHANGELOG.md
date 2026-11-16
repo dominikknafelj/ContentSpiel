@@ -26,6 +26,7 @@
 - Selecting several images on the Media screen: "Select" in the place heading enters selection mode (`select=1`; the panel closes), where a press, Space or Shift+click (a range) ticks tiles, and a bar sticky over the grid says how many are selected and offers "Select all" (what the page draws), "Clear", "Move to…" (the Move to… dialog for the selection) and "Done". Escape, Done or any visit leaves it.
 - Dragging onto the Folders column, with a fine pointer: an image tile (or, in selection mode, the whole selection from a ticked tile) dropped on a folder row or "Not in a folder", and a folder by its row's handle (`media.manage`) dropped on a folder row or "All media"; a folded row opens after a 600 ms rest, a row that cannot take the folder says why ("too deep", "this folder", "name taken"), and the move is said in the screen's polite status.
 - The image picker browses folders and opens where you last were.
+- The Media screen and the open picker follow changes made in another tab: the Folders column and its counts are redrawn in place, folds and focus kept, and when the images of the place shown changed a notice above the grid offers "Show changes" (`GET /media/folders`, the column's part with the place's digest, `Media::Place#digest`).
 
 ### Changed
 

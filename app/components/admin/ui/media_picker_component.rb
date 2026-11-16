@@ -93,8 +93,9 @@ module Admin
       # - the select controller's `chosen`, and the picker's own `reset`/`uploaded`
       #   telling it to forget or to select a finished upload;
       # - `admin--media--live`, which listens for changes made in other tabs
-      #   only while the picker is open (`reset` as it opens, `close`), and
-      #   holds the digest an upload's answer names (`digest`).
+      #   only while the picker is open (`reset` as it opens, `close`), holds
+      #   the digest an upload's answer names (`digest`), and takes its notice
+      #   back before Turbo's snapshot.
       ACTIONS = [
         "media-picker:open@window->admin--media--picker#open",
         "close->admin--media--picker#closed",
@@ -109,6 +110,7 @@ module Admin
         "admin--media--select:chosen->admin--media--picker#chosen",
         "admin--media--picker:reset->admin--media--live#open",
         "close->admin--media--live#close",
+        "turbo:before-cache@document->admin--media--live#reset",
         "admin--media--picker:digest->admin--media--live#uploaded"
       ].join(" ").freeze
 

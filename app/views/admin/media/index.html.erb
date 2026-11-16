@@ -80,7 +80,7 @@
               "admin--media--drag-folder-url-value": admin_media_folder_path("FOLDER_ID", **admin_url_options),
               "admin--media--drag-drop-class": Admin::Ui::TreeItemComponent::CLASSES[:drop_into],
               messages: drag_messages,
-              action: [ selection[:action], "turbo:before-fetch-request@document->admin--media--live#tag",
+              action: [ selection[:action], "turbo:before-cache@document->admin--media--live#reset",
                         "turbo:before-stream-render@document->admin--media--live#answeredWrite",
                         "admin--media--upload:uploaded->admin--media--live#uploaded" ].compact.join(" ") } do %>
 <%= render "admin/media/live_notice" %>

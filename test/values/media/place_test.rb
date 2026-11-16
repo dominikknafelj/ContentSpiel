@@ -49,6 +49,8 @@ class Media::PlaceTest < ActiveSupport::TestCase
     # A move elsewhere, and an image trashed outside, leave it alone.
     image.update_columns(folder_id: other.id) # version: none (a test's own rows)
     assert_equal before, digest.call
+    create_media_asset.update_columns(folder_id: other.id, trashed_at: Time.current) # version: none (a test's own rows)
+    assert_equal before, digest.call
 
     image.update_columns(folder_id: child.id) # version: none (a test's own rows)
     moved_in = digest.call

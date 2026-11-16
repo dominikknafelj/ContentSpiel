@@ -135,12 +135,14 @@ en:
           rename: "Rename…"
           move: "Move to…"
           delete: "Delete folder…"
-        # Selection mode's bar (`Admin::MediaLibrary::SelectionBarComponent`):
-        # `count` is also what its status says; `select_all` counts the tiles
-        # the page draws, and reads `all_selected` once all of them are.
+        # The notice `admin--media--live` puts above the grid when another tab
+        # changed the place shown.
         live:
           changed: "Images here changed since you opened this view."
           show: "Show changes"
+        # Selection mode's bar (`Admin::MediaLibrary::SelectionBarComponent`):
+        # `count` is also what its status says; `select_all` counts the tiles
+        # the page draws, and reads `all_selected` once all of them are.
         selection:
           count: "%{count} selected"
           select_all: "Select all %{count}"

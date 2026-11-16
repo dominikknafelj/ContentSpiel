@@ -25,10 +25,10 @@ let lastFetch = -Infinity
 // IT LISTENS to the library's one stream (`Media::LibraryChannel`, through
 // `live/connection`), whose signal says only THAT the folders changed or
 // images moved, and never which. A signal this tab caused (`origin` is its
-// `TAB`) is its own answer's, already drawn, and is not fetched for: this
-// tab's writes on the screen say which tab they are (`tag`, the header
-// `X-Notes-Tab`, which `Admin::BaseController` reads for every request; the
-// drag's own requests send it themselves).
+// `TAB`) is its own answer's, already drawn, and is not fetched for: every
+// write of this tab says which tab it is (`editing/requests` puts the tab
+// header on each Turbo request, and the drag's own requests send it), which
+// `Admin::BaseController` reads for every request.
 //
 // IT FETCHES THE PART, at most once per two seconds however many signals
 // came (one trailing fetch waits for the rest of the two seconds): the
@@ -186,13 +186,12 @@ export default class extends Controller {
     if (part) this.adopt(part.dataset.mediaPartPlace, part.dataset.mediaPlaceDigest)
   }
 
-  // `turbo:before-fetch-request` on the document: this tab's writes on the
-  // screen (a folder's, a move's) say which tab they are, so the signal they
-  // cause is not fetched for here.
-  tag(event) {
-    const { url, fetchOptions } = event.detail
-    if (!fetchOptions || String(fetchOptions.method || "GET").toUpperCase() === "GET") return
-    if (url?.pathname?.includes("/media")) fetchOptions.headers["X-Notes-Tab"] = TAB
+  // `turbo:before-cache` on the document: what this wrote into the page is
+  // taken back, so a page restored from Turbo's snapshot holds no notice
+  // that its fresh controller knows nothing of.
+  reset() {
+    this.gone = false
+    if (this.hasSlotTarget) this.slotTarget.replaceChildren()
   }
 
   // --- The fetch -------------------------------------------------------------

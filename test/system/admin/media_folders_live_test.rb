@@ -42,6 +42,19 @@ class Admin::MediaFoldersLiveSystemTest < ApplicationSystemTestCase
 
   def elsewhere(&) = as(users(:one), &)
 
+  # Counts this tab's fetches of the column's part (`GET /media/folders`)
+  # in `window.__partFetches`; every other request goes through untouched.
+  def count_part_fetches
+    page.execute_script(<<~JS)
+      window.__partFetches = 0
+      const real = window.fetch
+      window.fetch = (input, init) => {
+        if (String(input).includes("/media/folders")) window.__partFetches += 1
+        return real(input, init)
+      }
+    JS
+  end
+
   test "a folder made in one tab appears in the other without a reload, its folds and focus kept" do
     open_screen "/cs-studio/media?folder=#{@client_a.id}"
     assert_not page.evaluate_script("document.getElementById('media-folder-children-#{@clients.id}').hidden"), "the path is open"
@@ -112,14 +125,22 @@ class Admin::MediaFoldersLiveSystemTest < ApplicationSystemTestCase
       await_notes_live
     end
 
-    # This tab moves the image out of the place it shows.
+    # This tab moves the image out of the place it shows, counting its
+    # fetches of the column's part from here on.
+    count_part_fetches
     within("#media-panel-folder-#{@logo.id}") { press "Move to…" }
     within("dialog#media-move-dialog[open]") { choose "Events" }
     find("dialog#media-move-dialog[open] footer button", text: "Move here").click
     assert_no_selector "#media-asset-#{@logo.id}"
 
+    using_session(:colleague) { assert_selector NOTICE, count: 1, wait: 8 }
+    # The colleague heard the signal; this tab heard the same one, its own
+    # echo (`origin`), and fetches nothing for it.
+    sleep 1 # sleep: the echo reaches this tab about when the colleague's arrived; a fetch for it would start at once
+    assert_equal 0, page.evaluate_script("window.__partFetches")
+    assert_no_selector NOTICE
+
     using_session(:colleague) do
-      assert_selector NOTICE, count: 1, wait: 8
       # A second change of the place: still one notice.
       elsewhere { assert Media::MoveImages.call(asset_ids: [ @portrait.id ], folder: @client_a).ok? }
       assert_eventually(message: "the second change reaches the column") { find("#{row(@client_a.id)} [data-media-place-count]", visible: :all).text(:all).strip == "1" }
