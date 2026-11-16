@@ -1191,6 +1191,19 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal "Gone post", @gone_post.reload.title
   end
 
+  test "list_media_folders counts no trashed image" do
+    host! "127.0.0.1"
+    _token, raw = ApiToken.generate!(users(:one), group: access_control_groups(:admin))
+    folder = Media::Folder.create!(name: "Trips")
+    @kept_asset.update!(folder: folder)
+    @gone_asset.update!(folder: folder)
+
+    result = call_tool(raw, "list_media_folders_tool")
+
+    assert_equal false, result["isError"], text_of(result)
+    assert_equal [ 1 ], result["structuredContent"].map { |entry| entry["image_count"] }
+  end
+
   test "a page with a filled section is trashed, restored and purged with its blocks" do
     page = create_page(title: "Banded")
     section = page.content_blocks.create!(block_type: "section", position: 0)

@@ -61,12 +61,12 @@ class McpTest < ActionDispatch::IntegrationTest
   # asserts are the ones clients depend on, not the classes' own names.
   # `list_media_tool`/`get_media_tool` (media library Task 9) joined the
   # same registered set afterwards, pinned the same way.
-  test "a valid request lists all six tools" do
+  test "a valid request lists all seven tools" do
     mcp_post(jsonrpc: "2.0", id: 1, method: "tools/list")
 
     assert_response :success
     names = response.parsed_body["result"]["tools"].map { |tool| tool["name"] }
-    assert_equal %w[list_posts_tool get_post_tool create_post_tool update_post_tool list_media_tool get_media_tool].sort,
+    assert_equal %w[list_posts_tool get_post_tool create_post_tool update_post_tool list_media_tool get_media_tool list_media_folders_tool].sort,
       names.sort
   end
 
