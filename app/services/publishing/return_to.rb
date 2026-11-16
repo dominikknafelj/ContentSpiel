@@ -81,6 +81,15 @@ module Publishing
     # deleted since (a post's, left out; a list filter's, naming no tag).
     Outcome = Data.define(:images_missing, :tags_missing)
 
+    # What a return cannot put back: a tag is a reference, not content of
+    # the record, and one that was renamed or deleted since the copy was
+    # taken stays as it is now (TAGS above). Not a merged one: a merge
+    # rewrites the copies too and leaves nothing to say.
+    REMAINS = "A tag was renamed or deleted since this was published: that difference stays, as unpublished changes".freeze
+    # An image is a reference too: one deleted or moved to the trash since
+    # the copy was taken is left empty, never pointed at (IMAGES above).
+    IMAGES_GONE = "An image was deleted or moved to the trash since this was published: it is left empty, as unpublished changes".freeze
+
     PAGE_TRANSLATED = %w[title subtitle meta_title meta_description hero_alt].freeze
     POST_TRANSLATED = %w[title excerpt].freeze
     BLOCK_TRANSLATED = %w[caption alt].freeze
@@ -88,12 +97,40 @@ module Publishing
     private
 
     def return_to!(version)
-      @wrote = false
+      @wrote = @denied = false
       @tags_missing = 0
       @gone_images = Set.new
       @kept_images = kept_images(version)
       @record.is_a?(Page) ? return_page(version) : return_post(version)
       Outcome.new(images_missing: @gone_images.size, tags_missing: @tags_missing)
+    end
+
+    # The sentences for what stays different after the return, given the
+    # rows compared with the copy returned to: an image that went
+    # (`IMAGES_GONE`), and a tag (`REMAINS`) when one was deleted or when
+    # anything else still differs, which is a rename (a post's tags, a list
+    # block's filter): the return puts back all but those.
+    def left_behind(outcome, changes)
+      return [] if changes.none?
+
+      [ (IMAGES_GONE if outcome.images_missing.positive?),
+        (REMAINS if outcome.tags_missing.positive? || beyond_gone_images?(changes)) ].compact
+    end
+
+    # Whether the rows differ from the copy in more than the images that
+    # went: the hero the copy names and a block whose only difference is
+    # that its gone image is empty (made again without it, it stands for
+    # the copy's block, `Changes.stand_ins`) do not count.
+    def beyond_gone_images?(changes)
+      fields = changes.fields
+      fields -= %w[hero_media_asset_id] if gone_image?(changes.sides.first.fetch("fields", {})["hero_media_asset_id"])
+      return true if fields.any?
+
+      changes.blocks.any? do |entry|
+        was, now = changes.sides_of(entry)
+        !(entry.kind == :changed && gone_image?(was["media_asset_id"]) && now["media_asset_id"].nil? &&
+          Changes.same_content?(was.merge("media_asset_id" => nil), now))
+      end
     end
 
     # A step of the return: another service's result. Its record when it
@@ -104,6 +141,10 @@ module Publishing
       return result.record if result.ok?
 
       @errors = result.errors
+      # A refusal's `access.denied` was written inside the transaction this
+      # rollback takes away; `@denied` lets the caller record it again
+      # outside (`RestoreVersion`).
+      @denied = result.denied?
       raise ActiveRecord::Rollback
     end
 

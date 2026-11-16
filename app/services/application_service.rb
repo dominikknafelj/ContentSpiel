@@ -18,10 +18,15 @@ class ApplicationService
   # `refusal` names a failure whose reason has no field of its own to be read
   # in (`:switched_off`), so a screen with no slot for it says the sentence
   # itself; nil for every other result.
-  Result = Data.define(:record, :errors, :denied, :notice, :refusal) do
-    def initialize(record:, errors:, denied: false, notice: nil, refusal: nil) = super
+  #
+  # `value` is what a SUCCESS hands back beside its record when the caller
+  # needs more than the record to say what happened (a restore's version
+  # number, its counts, the time of a change still scheduled); nil for every
+  # other result.
+  Result = Data.define(:record, :errors, :denied, :notice, :refusal, :value) do
+    def initialize(record:, errors:, denied: false, notice: nil, refusal: nil, value: nil) = super
 
-    def self.success(record, notice: nil) = new(record:, errors: [], notice: notice)
+    def self.success(record, notice: nil, value: nil) = new(record:, errors: [], notice:, value:)
 
     # `errors` defaults to `record.errors.full_messages` (see
     # `ApplicationService#failure` below), which is only non-empty when the
@@ -133,7 +138,7 @@ class ApplicationService
     Current.set(actor: actor, &block)
   end
 
-  def success(record, notice: nil) = Result.success(record, notice: notice)
+  def success(record, notice: nil, value: nil) = Result.success(record, notice:, value:)
   def failure(record, errors = record.errors.full_messages) = Result.failure(record, errors)
 
   # The refusal of a write to a dormant post (one whose type the site has

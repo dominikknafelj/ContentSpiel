@@ -61,12 +61,13 @@ module Audit
       "taken_over" => [ "took over editing ", "" ],
       "changes_published" => [ "published changes to ", "" ],
       "changes_discarded" => [ "discarded the unpublished changes to ", "" ],
+      "version_restored" => [ "restored version %{number} of ", "" ],
       "scheduled_change_cancelled" => [ "cancelled the scheduled changes to ", "" ]
     }.freeze
 
     CONTENT_ACTIONS = {
-      "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over changes_published changes_discarded scheduled_change_cancelled],
-      "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over changes_published changes_discarded scheduled_change_cancelled],
+      "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over changes_published changes_discarded version_restored scheduled_change_cancelled],
+      "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over changes_published changes_discarded version_restored scheduled_change_cancelled],
       "media" => %w[uploaded updated trashed restored purged translation_confirmed],
       "settings" => %w[translation_confirmed]
     }.freeze
@@ -341,6 +342,8 @@ module Audit
         elsif verb == "changes_published" && (date = changes_scheduled_date)
           before = "scheduled changes to "
           after = " for #{date}"
+        elsif verb == "version_restored"
+          before = restored_version_verb(before)
         elsif verb == "taken_over" && handed_over?
           before = "handed over editing "
         elsif verb == "updated" && @action == "media.updated" && alt_only?
@@ -364,6 +367,14 @@ module Audit
 
         time = self.class.parse_time(was)
         time.present? && time > event.occurred_at
+      end
+
+      # "restored version 5 of ": the number the restore returned to. An
+      # event with no number to name (metadata that is not ours) says only
+      # that a version was restored.
+      def restored_version_verb(phrase)
+        number = Integer(self.class.metadata_of(event)["number"].to_s, 10, exception: false)
+        number ? format(phrase, number: number) : "restored a version of "
       end
 
       # A publish of changes that was given a time (`metadata["scheduled"]`):

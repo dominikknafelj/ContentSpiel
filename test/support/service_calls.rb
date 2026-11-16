@@ -452,6 +452,13 @@ module ServiceCalls
       { call: -> { Publishing::DiscardChanges.call(page) }, permission: "pages.edit", on: page }
     },
 
+    "Publishing::RestoreVersion" => lambda {
+      page = create_page(title: "Live")
+      Pages::Save.call(page, translations: { "en" => { title: "Edited" } })
+      Publishing::PublishChanges.call(page)
+      { call: -> { Publishing::RestoreVersion.call(page, number: 1) }, permission: "pages.edit", on: page }
+    },
+
     "Publishing::CancelScheduledChange" => lambda {
       page = create_page(title: "Live")
       Pages::Save.call(page, translations: { "en" => { title: "Edited" } })

@@ -35,14 +35,6 @@ module Publishing
     include ShownSchedule
 
     NOTHING = "There is nothing to discard".freeze
-    # What a discard cannot put back: a tag is a reference, not content of
-    # the record, and one that was renamed or deleted since the copy was
-    # taken stays as it is now (`ReturnTo`, TAGS). Not a merged one: a merge
-    # rewrites the copies too and leaves nothing to say.
-    REMAINS = "A tag was renamed or deleted since this was published: that difference stays, as unpublished changes".freeze
-    # An image is a reference too: one deleted or moved to the trash since
-    # the copy was taken is left empty, never pointed at (`ReturnTo`, IMAGES).
-    IMAGES_GONE = "An image was deleted or moved to the trash since this was published: it is left empty, as unpublished changes".freeze
 
     def initialize(record, shown_pending: NOT_ASKED, actor: Current.actor)
       @record = record
@@ -99,35 +91,6 @@ module Publishing
       return success(@record, notice: @left.join(". ").presence) if done
 
       failure(@record, @errors.presence || @left.presence || [ NOTHING ])
-    end
-
-    private
-
-    # The sentences for what stays different after the return: an image
-    # that went (`IMAGES_GONE`), and a tag (`REMAINS`) when one was deleted
-    # or when anything else still differs, which is a rename (a post's tags,
-    # a list block's filter): the return puts back all but those.
-    def left_behind(outcome, changes)
-      return [] if changes.none?
-
-      [ (IMAGES_GONE if outcome.images_missing.positive?),
-        (REMAINS if outcome.tags_missing.positive? || beyond_gone_images?(changes)) ].compact
-    end
-
-    # Whether the rows differ from the copy in more than the images that
-    # went: the hero the copy names and a block whose only difference is
-    # that its gone image is empty (made again without it, it stands for
-    # the copy's block, `Changes.stand_ins`) do not count.
-    def beyond_gone_images?(changes)
-      fields = changes.fields
-      fields -= %w[hero_media_asset_id] if gone_image?(changes.sides.first.fetch("fields", {})["hero_media_asset_id"])
-      return true if fields.any?
-
-      changes.blocks.any? do |entry|
-        was, now = changes.sides_of(entry)
-        !(entry.kind == :changed && gone_image?(was["media_asset_id"]) && now["media_asset_id"].nil? &&
-          Changes.same_content?(was.merge("media_asset_id" => nil), now))
-      end
     end
   end
 end
