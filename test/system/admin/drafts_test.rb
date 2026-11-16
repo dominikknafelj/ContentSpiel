@@ -253,6 +253,102 @@ class Admin::DraftsSystemTest < ApplicationSystemTestCase
     assert_includes block_text, "Z", "the save landed first"
   end
 
+  # -- Publish now on a scheduled record (D9) ----------------------------------------
+
+  # A page scheduled to go live in two days, holding one text block.
+  def scheduled_page(title, text)
+    as_me do
+      record = create_page(title: title, published: false)
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: record), attributes: { block_type: "rich_text" }, translations: { "en" => { body: rich_doc(text) } }).record
+      assert Pages::Save.call(record, attributes: { published_at: 2.days.from_now }).ok?
+      [ record.reload, block ]
+    end
+  end
+
+  def publish_now_dialog(record) = "dialog#publish-now-page-#{record.id}[open]"
+
+  test "Publish now on a scheduled page with changes since: the scheduled version goes live by default, and the later changes when chosen" do
+    launch, block = scheduled_page("Launch", "As scheduled")
+    visit_editor(launch)
+    await_notes_live
+
+    # The change since is a block's save still on the wire when the dialog
+    # opens: the dialog's read waits for it, so the choice it offers is made
+    # on what was typed.
+    delay_next("PATCH", "/content_blocks/#{block.id}")
+    find("#content_block_#{block.id} .ProseMirror").click
+    find("#content_block_#{block.id} .ProseMirror").send_keys("Z")
+    await_delayed
+
+    press "Publish now…"
+    within publish_now_dialog(launch) do
+      assert_text "Publish Launch now?"
+      assert_text "Checking for changes saved since…"
+      await_frames
+      assert_no_selector "[data-publish-now]"
+    end
+    send_delayed
+
+    within publish_now_dialog(launch) do
+      assert_selector "[data-publish-now=choice]", wait: 10
+      assert_no_text "Checking for changes saved since…"
+      assert_text "Changes were saved after it was scheduled for"
+      assert_selector "[role=radiogroup][aria-label='What goes live']"
+      assert_checked_field "Publish the scheduled version"
+      assert_button "Publish the scheduled version"
+
+      # The confirm says what goes live.
+      choose "Publish with the later changes"
+      assert_button "Publish with the later changes"
+      assert_no_button "Publish the scheduled version"
+
+      find("summary", text: "What changed since").click
+      assert_selector "[data-change=changed]", text: "Z"
+      press "Cancel"
+    end
+    assert_no_selector "dialog[open]"
+
+    # Opened again, the choice is the default again, and so is the confirm.
+    press "Publish now…"
+    within publish_now_dialog(launch) do
+      assert_selector "[data-publish-now=choice]"
+      assert_checked_field "Publish the scheduled version"
+      assert_button "Publish the scheduled version"
+      assert_no_button "Publish with the later changes"
+      press "Publish the scheduled version"
+    end
+
+    assert_text "Published as it was scheduled."
+    assert_equal "live", launch.reload.status
+    assert_not_includes Publishing.current(launch).blocks.sole["body"].to_s, "Z"
+    assert launch.unpublished_changes?, "what was typed since stays unpublished"
+    using_session(:visitor) do
+      visit PublicSite::Urls.new.path_for(launch, "en")
+      assert_text "As scheduled"
+      assert_no_text "As scheduledZ"
+    end
+
+    # The later changes, when chosen, go live with it.
+    later, = scheduled_page("Later", "Scheduled words")
+    as_me { assert Pages::Save.call(later, translations: { "en" => { title: "Later, retitled" } }).ok? }
+    visit_editor(later)
+    await_notes_live
+    press "Publish now…"
+    within publish_now_dialog(later) do
+      assert_selector "[data-publish-now=choice]", wait: 10
+      choose "Publish with the later changes"
+      press "Publish with the later changes"
+    end
+
+    assert_text "Published now, with the changes saved since it was scheduled."
+    assert_equal "live", later.reload.status
+    assert_not later.unpublished_changes?
+    using_session(:visitor) do
+      visit PublicSite::Urls.new.path_for(later, "en")
+      assert_text "Later, retitled"
+    end
+  end
+
   # -- the addresses a publish takes away -------------------------------------------
 
   test "the dialog names the post that will MOVE when the page is published, with its old and its new address, and a visitor is sent on from the old one" do
