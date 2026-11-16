@@ -5,7 +5,8 @@
 # Written through `ContentBlocks::Save`, as an editor's save is, from the
 # arguments `ContentModel::SampleBlock` makes of the sample (where each value
 # goes is said there; the development seed's showcase builds through it
-# too): `image: true` attaches a new library image, `form: true` makes a
+# too): `image: true` attaches a new library image, `images: n` makes n of them
+# for the type's media list, `form: true` makes a
 # visitor's form (one required short text, "Your name") and names it in the
 # block's `:form` field (the Form block's `form_id`).
 #
@@ -23,7 +24,7 @@ module BlockSamples
     definition = BlockTypes.fetch(type)
     sample = definition.sample or flunk("#{definition.name} declares no sample")
     attributes, translations = ContentModel::SampleBlock.arguments(definition, default: Locales.default, section: section,
-      media_asset_id: (create_media_asset.id if sample.image), form_id: (sample_form.id if sample.form))
+      media_asset_id: (create_media_asset.id if sample.image), media_asset_ids: Array.new(sample.images) { create_media_asset.id }, form_id: (sample_form.id if sample.form))
 
     result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: attributes, translations: translations)
     assert result.ok?, "the sample of #{definition.name} does not save: #{result.errors.to_sentence}"

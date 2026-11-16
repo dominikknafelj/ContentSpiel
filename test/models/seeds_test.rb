@@ -144,6 +144,38 @@ class SeedsTest < ActiveSupport::TestCase
     end
   end
 
+  test "the showcase makes the images a sample asks for, and a second run makes none" do
+    require Rails.root.join("db/seeds/showcase").to_s
+    saved = BlockTypes.all.dup
+    begin
+      BlockTypes.register("test_pictures") do |t|
+        TestTypes.declare(t)
+        t.label "Pictures"
+        t.field :images, :media_list
+        t.field :texts, :media_texts, of: :images, translated: true
+        t.component TestQuoteComponent
+        t.sample images: 3, translations: { "en" => { texts: { "1" => { "caption" => "One" } } } }, shows: [ "content-block" ]
+      end
+
+      hero = create_media_asset
+      assert_difference "Media::Asset.count", 3 do
+        DevelopmentShowcase.call(root: root_page, image: hero)
+      end
+      images = Media::Asset.where("title LIKE 'Showcase image %'").order(:title)
+      assert_equal [ "Showcase image 1", "Showcase image 2", "Showcase image 3" ], images.pluck(:title)
+      block = ContentBlock.where(block_type: "test_pictures").first
+      assert_equal images.pluck(:id), block.settings["images"]
+      assert_equal [ images.first.id.to_s ], block.settings_object(locale: "en").texts.keys
+
+      assert_no_difference [ "Media::Asset.count", "Page.count", "ContentBlock.count" ] do
+        DevelopmentShowcase.call(root: root_page, image: hero)
+      end
+    ensure
+      BlockTypes.reset!
+      saved.each { |definition| BlockTypes.registry_put(definition) }
+    end
+  end
+
   # A first production start: `db:prepare` loads the schema, which holds no
   # rows, and then this file. What every environment needs is above the line
   # that ends it outside development (`Groups::EnsureBuiltIns`).

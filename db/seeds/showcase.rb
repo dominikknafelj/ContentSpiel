@@ -24,25 +24,27 @@ module DevelopmentShowcase
   SLUG = "showcase".freeze
   TABLE_ROWS = 40
   FORM_NAME = "Showcase form".freeze
+  IMAGE_TITLE = "Showcase image".freeze
   # The bands a section has, in the order a person reads them.
   BANDS = BlockTypes::Section::BACKGROUNDS
 
   module_function
 
   # `root:` the homepage, `image:` a library image every block whose sample
-  # shows one draws. Answers the `/showcase` page.
+  # shows one draws (a sample that asks for `images:` gets its own, below). Answers the `/showcase` page.
   def call(root:, image:)
     showcase = page(root, SLUG, "Showcase")
     form = sample_form
+    images = sample_images
 
     top = page(showcase, "every-block", "Every block")
-    fill(top) { content_types.each { |definition| sample(top, definition, image:, form:) } }
+    fill(top) { content_types.each { |definition| sample(top, definition, image:, form:, images:) } }
 
     BANDS.each do |background|
       band = page(showcase, "band-#{background}", "Band: #{background}")
       fill(band) do
-        section_layouts.each { |layout| section(band, layout:, background:, width: "content", image:, form:) }
-        section(band, layout: "three", background:, width: "full", image:, form:)
+        section_layouts.each { |layout| section(band, layout:, background:, width: "content", image:, form:, images:) }
+        section(band, layout: "three", background:, width: "full", image:, form:, images:)
       end
     end
 
@@ -84,18 +86,19 @@ module DevelopmentShowcase
 
   # A section of `layout` holding one block of every content type, dealt
   # over its columns left to right.
-  def section(page, layout:, background:, width:, image:, form:)
+  def section(page, layout:, background:, width:, image:, form:, images:)
     band = save(page, block_type: "section", settings: { "layout" => layout, "background" => background, "width" => width })
     columns = BlockTypes::Section.weights(layout).size
     content_types.each_with_index do |definition, index|
-      sample(page, definition, image:, form:, section: band, column: (index % columns) + 1)
+      sample(page, definition, image:, form:, images:, section: band, column: (index % columns) + 1)
     end
   end
 
-  def sample(page, definition, image: nil, form: nil, settings: {}, section: nil, column: 1, locales: Locales.enabled)
+  def sample(page, definition, image: nil, form: nil, images: [], settings: {}, section: nil, column: 1, locales: Locales.enabled)
     attributes, translations = ContentModel::SampleBlock.arguments(definition, default: Locales.default, locales:,
       settings:, section:, column:,
-      media_asset_id: (image.id if definition.sample.image), form_id: (form.id if definition.sample.form))
+      media_asset_id: (image.id if definition.sample.image),
+      media_asset_ids: images.first(definition.sample.images).map(&:id), form_id: (form.id if definition.sample.form))
     save(page, attributes, translations)
   end
 
@@ -134,6 +137,45 @@ module DevelopmentShowcase
 
       result.record
     end
+  end
+
+  # The library images the samples ask for (`images: n`): as many as the
+  # largest ask, tinted PNGs from libvips titled "Showcase image N", the n
+  # first of them handed to a sample asking for n. Found again by that title
+  # on a later run, since `Media::Upload` never dedupes.
+  def sample_images
+    count = content_types.map { |definition| definition.sample.images }.max.to_i
+    (1..count).map do |number|
+      title = "#{IMAGE_TITLE} #{number}"
+      Media::Asset.find_by(title: title) || upload_image(title, number)
+    end
+  end
+
+  # A 1200 x 800 field of one colour, its hue stepped round the wheel by
+  # `number`, so neighbouring images of a gallery tell apart.
+  def upload_image(title, number)
+    red, green, blue = tint(number * 47 % 360)
+    png = Vips::Image.black(1200, 800).new_from_image([ red, green, blue ]).copy(interpretation: :srgb).cast(:uchar).write_to_buffer(".png")
+    Tempfile.create([ "showcase-image", ".png" ], binmode: true) do |file|
+      file.write(png)
+      file.rewind
+      upload = ActionDispatch::Http::UploadedFile.new(tempfile: file, filename: "#{title}.png", type: "image/png")
+      result = Media::Upload.call(file: upload)
+      raise "seeds: #{result.errors.to_sentence}" unless result.ok?
+
+      result.record
+    end
+  end
+
+  # A pale colour of `hue` degrees (saturation .45, value .85), as 8-bit RGB.
+  def tint(hue)
+    sector, remainder = (hue / 60.0).divmod(1)
+    high = 0.85
+    low = high * (1 - 0.45)
+    falling = high * (1 - 0.45 * remainder)
+    rising = high * (1 - 0.45 * (1 - remainder))
+    rgb = [ [ high, rising, low ], [ falling, high, low ], [ low, high, rising ], [ low, falling, high ], [ rising, low, high ], [ high, low, falling ] ].fetch(sector)
+    rgb.map { |channel| (channel * 255).round }
   end
 
   def long_table
