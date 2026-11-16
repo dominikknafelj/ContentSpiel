@@ -11,9 +11,11 @@ module Admin
     # reaches the site only with "Publish changes", so a live record has no
     # primary button until its rows differ from what is published (the
     # button is `Publishing::State`'s `publish_changes`) -- while a draft
-    # offers Publish and a scheduled record Publish now… (a dialog that asks what goes live, D9) plus Edit schedule…. Everything else (History, Activity, Schedule…,
-    # Cancel scheduled change…, Unpublish…, Move to trash…) sits in the ⋯ menu, the destructive item last
-    # and after a divider. Every item that opens a dialog ends with an
+    # offers Publish and a scheduled record Publish now… (a dialog that
+    # asks what goes live, D9) plus Edit schedule…. Everything else
+    # (History, Activity, Schedule…, Cancel scheduled change…, Unpublish…,
+    # Move to trash…) sits in the ⋯ menu, the destructive item last and
+    # after a divider. Every item that opens a dialog ends with an
     # ellipsis (the brand book: "an action that opens a dialog ends with
     # …"); History and Activity are links and have none. A dialog's own confirm button
     # names the act without one ("Unpublish", "Move to trash"): it does it.

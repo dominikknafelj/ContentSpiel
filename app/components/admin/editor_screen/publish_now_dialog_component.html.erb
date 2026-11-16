@@ -1,8 +1,10 @@
 <% if answer? %>
   <%# What is scheduled now, the `pending` the form sends back. In the choice it is said again inside the overview: the script reads the first. %>
   <%= render Admin::Ui::ChangesOverviewComponent.schedule_only(record: record) %>
-  <%= tag.div class: "space-y-4", data: { publishing_overview: "", publish_now: choice? ? "choice" : "plain" } do %>
-    <% if choice? %>
+  <%= tag.div class: "space-y-4", data: { publishing_overview: "", publish_now: gone? ? "gone" : (choice? ? "choice" : "plain") } do %>
+    <% if gone? %>
+      <p class="text-sm text-ink"><%= t(".gone.#{type}") %></p>
+    <% elsif choice? %>
       <p class="text-sm text-dim"><%= t(".changed_since", time: scheduled_time) %></p>
       <%= tag.div role: "radiogroup", aria: { label: t(".what_goes_live") }, class: "flex flex-col gap-2", data: { action: "change->admin--editor--publish-dialog#chose" } do %>
         <%= render choice_tile("0", "scheduled", checked: true) %>

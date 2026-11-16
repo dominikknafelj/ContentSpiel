@@ -408,6 +408,10 @@ en:
           failed: "Couldn’t check for changes saved since. Close this and open it again."
           # No changes saved since the schedule.
           instead: "It goes live now instead of at %{time}, as scheduled."
+          # Unscheduled elsewhere, or its time came, since the page was drawn: nothing to confirm.
+          gone:
+            page: "This page is no longer scheduled."
+            post: "This post is no longer scheduled."
           changed_since: "Changes were saved after it was scheduled for %{time}."
           # The radiogroup's name.
           what_goes_live: "What goes live"

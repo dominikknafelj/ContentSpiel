@@ -126,6 +126,9 @@ export default class extends Controller {
   chose() {
     if (!this.hasConfirmTarget) return
 
+    // No longer scheduled (the answer says so): nothing to confirm.
+    this.confirmTarget.hidden = Boolean(this.hasOverviewTarget && this.overviewTarget.querySelector("[data-publish-now=gone]"))
+
     const choice = this.element.querySelector("input[name=with_changes]:checked")?.value
     const key = { 0: "components.editor_screen.publish_now_dialog.choices.scheduled.title",
       1: "components.editor_screen.publish_now_dialog.choices.with_changes.title" }[choice] || "components.editor_screen.publish_now_dialog.confirm"

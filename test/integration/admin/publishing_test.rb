@@ -401,6 +401,28 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     assert_select "[data-publish-now=plain]", count: 0
   end
 
+  test "part=publish_now on a record unscheduled since the page was drawn, or whose time came, says it is no longer scheduled and offers nothing" do
+    scheduled = create_page(title: "Pricing", published: false)
+    assert Pages::Save.call(scheduled, attributes: { published_at: 2.days.from_now }).ok?
+    assert Pages::Save.call(scheduled, translations: { "en" => { title: "Pricing, edited" } }).ok?
+    assert Pages::Save.call(scheduled, attributes: { published: false }).ok?
+
+    post admin_publishing_changes_path(kind: "page", id: scheduled.id, part: "publish_now")
+
+    assert_response :success
+    assert_select "[data-publish-now=gone]", text: "This page is no longer scheduled."
+    assert_select "input[name=with_changes]", count: 0
+
+    record = create_post(title: "Went live", published: false)
+    assert Posts::Save.call(record, attributes: { published_at: 2.days.from_now }).ok?
+    record.update_columns(published_at: 1.minute.ago) # changes: none (a test moves the record's clock)
+
+    post admin_publishing_changes_path(kind: "post", id: record.id, part: "publish_now")
+
+    assert_response :success
+    assert_select "[data-publish-now=gone]", text: "This post is no longer scheduled."
+  end
+
   test "the Publish now dialog's two choices post to the record's publish: the scheduled version, or the rows" do
     scheduled = create_page(title: "Pricing", published: false)
     assert Pages::Save.call(scheduled, attributes: { published_at: 2.days.from_now }).ok?
