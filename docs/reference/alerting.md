@@ -65,7 +65,7 @@ A refused request of Rails' `rate_limit` instruments `rate_limit.action_controll
 
 ## System status
 
-The Alerts card lists the 10 newest alerts last seen within 7 days (`Alert.recent`; not counted in "n of m checks passed"), each with its kind chip, its sentence, how often, when last seen and its mail state; a security row links to the audit log. While mail is not ready and an alert exists, a notice says owners cannot be mailed. A site without mail therefore still sees its alerts. The card's look is the Design System's StudioAlerts (`docs/reference/design-system.md`); its sentences are the component's own keys in `config/locales/admin/system_status_screen.en.yml`, built from `Alert#sentence`.
+The Alerts card lists the 10 newest alerts last seen within 7 days (`Alert.recent`; not counted in "n of m checks passed"), each with its kind chip, its sentence, how often, when last seen and its mail state; a security row links to the audit log. While mail is not ready and an alert exists, a notice says owners cannot be mailed. A site without mail therefore still sees its alerts. The card's look is the Design System card StudioAlerts (the artifact, https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT, and the spec's section 6); its sentences are the component's own keys in `config/locales/admin/system_status_screen.en.yml`, built from `Alert#sentence`.
 
 ## In tests
 
