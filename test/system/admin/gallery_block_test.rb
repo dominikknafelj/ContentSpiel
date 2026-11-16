@@ -27,7 +27,11 @@ class Admin::GalleryBlockSystemTest < ApplicationSystemTestCase
 
   def stored(block) = block.reload.settings["images"]
 
-  def status(block) = find("#{card(block)} [data-admin--editor--gallery-target=status]")
+  # The moves' status is for a screen reader only (`sr-only`).
+  def status(block) = find("#{card(block)} [data-admin--editor--gallery-target=status]", visible: :all).text(:all)
+
+  # Every `admin--editor--gallery:moving` the page has heard, in order.
+  def moving_said = page.evaluate_script("window.__galleryMoving")
 
   def keyboard = page.driver.browser.keyboard
 
@@ -60,21 +64,25 @@ class Admin::GalleryBlockSystemTest < ApplicationSystemTestCase
     find("#block-#{block.id}-texts-#{harbour.id}-caption").set("The harbour at dusk")
     assert_eventually(message: "the caption was never saved") { block.reload.translated_settings.dig("en", "texts", harbour.id.to_s, "caption") == "The harbour at dusk" }
 
-    # The keyboard: Space picks Crowd up, Up moves it, Space drops it.
+    # The keyboard: Space picks Crowd up, Up moves it, Space drops it. The
+    # pick holds the editor's live list off (`moving`) until the drop.
+    page.execute_script("window.__galleryMoving = []; document.addEventListener('admin--editor--gallery:moving', (event) => window.__galleryMoving.push(event.detail.moving))")
     find(handle(crowd)).click
     keyboard.type(:space)
-    assert_equal "Picked up Crowd, image 3 of 3. Up and Down Arrow move it, Space drops it, Escape puts it back.", status(block).text
+    assert_equal [ true ], moving_said
+    assert_equal "Picked up Crowd, image 3 of 3. Up and Down Arrow move it, Space or Enter drops it, Escape puts it back.", status(block)
     keyboard.type(:up)
-    assert_equal "Moved to 2 of 3.", status(block).text
+    assert_equal "Moved to 2 of 3.", status(block)
     keyboard.type(:space)
-    assert_equal "Dropped at 2 of 3.", status(block).text
+    assert_equal "Dropped at 2 of 3.", status(block)
+    assert_equal [ true, false ], moving_said
     assert_eventually(message: "the keyboard move was never saved") { stored(block) == [ harbour.id, crowd.id, forest.id ] }
 
     # Escape puts a picked row back, and nothing is written.
     keyboard.type(:space)
     keyboard.type(:up)
     keyboard.type(:escape)
-    assert_equal "Cancelled. Crowd is back where it was.", status(block).text
+    assert_equal "Cancelled. Crowd is back where it was.", status(block)
     assert_equal [ harbour.id, crowd.id, forest.id ], shown_order(block)
 
     # The pointer: Forest dragged above Harbour.
@@ -159,5 +167,32 @@ class Admin::GalleryBlockSystemTest < ApplicationSystemTestCase
     assert_no_selector row(extra)
     assert_writes_settled
     assert_equal 60, stored(block).size
+
+    # A removal lifts the limit at once.
+    find("#{row(last)} button[aria-label='Remove Last']").click
+    within(card(block)) do
+      assert_text "59 of 60 images"
+      assert_no_text "A gallery holds at most 60 images. Remove one to add another."
+      assert_selector "button:not([aria-disabled]):not([aria-describedby])", text: "Add images"
+    end
+    assert_eventually(message: "the removal was never saved") { stored(block).size == 59 }
+  end
+
+  test "removing the last image with no right to add puts the focus on the Images section" do
+    group = access_control_groups(:branch_editors)
+    %w[pages.read pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    harbour = titled("Harbour")
+    block = gallery([ harbour.id ])
+    using_session(:branch) do
+      sign_in_via_form(users(:editor_branch))
+      visit_editor(@page)
+
+      within(card(block)) { assert_text "Adding images needs the right to upload to the library." }
+      find("#{row(harbour)} button[aria-label='Remove Harbour']").click
+      assert_no_selector row(harbour)
+      assert_equal "group", page.evaluate_script("document.activeElement.getAttribute('role')")
+      assert_text "No images yet. Add them from the library, in the order the site shows them."
+    end
+    assert_eventually(message: "the removal was never saved") { stored(block).nil? }
   end
 end

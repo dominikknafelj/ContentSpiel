@@ -1,4 +1,5 @@
-<%= tag.div class: "admin-gallery mt-1 border-t border-line pt-3", role: "group", aria: { labelledby: heading_id }, data: controller_data do %>
+<%# `tabindex="-1"`: where the focus goes when the last row is removed and nothing else is left to take it. %>
+<%= tag.div class: "admin-gallery mt-1 border-t border-line pt-3 focus:outline-none", role: "group", tabindex: "-1", aria: { labelledby: heading_id }, data: controller_data do %>
   <div class="mb-2 flex items-baseline gap-2">
     <h3 id="<%= heading_id %>" class="text-sm font-semibold text-ink"><%= t("#{WORDS}.images") %></h3>
     <% if heading_count %>
@@ -15,8 +16,8 @@
   <% if list_editable? %>
     <%# The row the script copies for an image the picker hands it (`MediaTextRowComponent`, `template: true`). %>
     <template data-admin--editor--gallery-target="template"><%= render template_row %></template>
-    <%# The keyboard moves' sentences, said politely and shown under the rows. Empty as the server draws it. %>
-    <p class="mt-2 text-small text-meta empty:hidden" role="status" data-admin--editor--gallery-target="status"></p>
+    <%# The keyboard moves' sentences, for a screen reader only (the lifted row is the visible cue). Empty as the server draws it. %>
+    <p class="sr-only" role="status" data-admin--editor--gallery-target="status"></p>
 
     <%# Under the rows: the add buttons and the count. Empty, the same part is the dashed box with the empty words (`data-empty`, which the script keeps). %>
     <%= tag.div class: "mt-2 flex flex-wrap items-center gap-2 data-empty:flex-col data-empty:rounded-tile data-empty:border data-empty:border-dashed data-empty:border-line-strong data-empty:p-5 data-empty:text-center",
@@ -27,6 +28,9 @@
           <%= add_button("add", "add") %>
           <%= add_button("addFolder", "add_folder", icon: :folder) if folders? %>
         </div>
+      <% else %>
+        <%# Without media.upload there is no picker on the page: the line says why there is nothing to add with. %>
+        <p class="text-small text-meta"><%= t("#{WORDS}.no_upload") %></p>
       <% end %>
       <% if count_line %>
         <%= tag.span count_line, class: "ml-auto text-small text-meta", hidden: empty?, data: { "admin--editor--gallery-target": "countLine" } %>

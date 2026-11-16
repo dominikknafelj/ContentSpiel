@@ -25,9 +25,15 @@ const ROW = '[data-admin--editor--gallery-target="row"]'
 // THE KEYBOARD MOVES, as the block list's (`editor/keyboard_moves.js`):
 // Space or Enter on a handle picks its row up, Up and Down move it, Space
 // (or Enter) drops it and Escape, or the focus leaving the handle, puts it
-// back. Each step is said in the polite `status`. Only a drop writes the
-// list. What a pick wrote into the page is taken back at `disconnect`, so
-// Turbo's snapshot never keeps a row out of its place.
+// back. Each step is said in the polite `status`, which only a screen reader
+// hears (the lifted row is what a person sees). Only a drop writes the list.
+// While a row is picked up or dragged the controller says
+// `admin--editor--gallery:moving` (true, then false), and the editor's live
+// part draws no list meanwhile (`admin--editing--live`), as for the block
+// list: a merge would put the row back under the person's hand. A card that
+// is replaced all the same (by an answer, or a merge the hold did not cover)
+// disconnects this controller, which puts a picked row back and says the
+// move is over.
 //
 // No list (`list` empty: a translation tab) means nothing to reorder or add:
 // only "Use library caption" works there. Held by someone else, `HeldFields`
@@ -63,8 +69,16 @@ export default class extends Controller {
         fallbackOnBody: true,
         fallbackClass: "admin-drag-fallback",
         fallbackTolerance: 3,
-        onStart: () => makeCloneInert(Sortable.ghost),
-        onEnd: (event) => { if (event.oldIndex !== event.newIndex) this.write() }
+        onStart: () => {
+          this.dragging = true
+          this.sayMoving()
+          makeCloneInert(Sortable.ghost)
+        },
+        onEnd: (event) => {
+          this.dragging = false
+          this.sayMoving()
+          if (event.oldIndex !== event.newIndex) this.write()
+        }
       })
       this.element.dataset.sortable = "ready"
     })
@@ -76,7 +90,18 @@ export default class extends Controller {
     this.loadToken = null
     this.sortable?.destroy()
     this.sortable = null
+    this.dragging = false
+    this.sayMoving()
     delete this.element.dataset.sortable
+  }
+
+  // Whether a row is in someone's hand (picked up or dragged), said once
+  // each time the answer changes.
+  sayMoving() {
+    const moving = Boolean(this.dragging || this.inHand)
+    if (moving === Boolean(this.saidMoving)) return
+    this.saidMoving = moving
+    this.dispatch("moving", { detail: { moving } })
   }
 
   // Add images.
@@ -120,11 +145,16 @@ export default class extends Controller {
     const rows = this.rowTargets
     const index = rows.indexOf(row)
     const next = rows[index + 1] || rows[index - 1]
-    if (this.inHand === row) this.inHand = null
+    if (this.inHand === row) {
+      this.inHand = null
+      this.sayMoving()
+    }
     row.remove()
     this.write()
-    const focus = next?.querySelector(".admin-gallery-row__remove") || this.addTargets.find((button) => !button.hidden)
-    focus?.focus()
+    // The next row's Remove, else Add images; with neither (the last row
+    // gone, no right to add), the Images section itself.
+    const focus = next?.querySelector(".admin-gallery-row__remove") || this.addTargets[0] || this.element
+    focus.focus()
   }
 
   key(event) {
@@ -179,6 +209,7 @@ export default class extends Controller {
   pickUp(row) {
     if (this.inHand && this.inHand !== row) this.cancel(this.inHand, { refocus: false })
     this.inHand = row
+    this.sayMoving()
     this.originNext = row.nextElementSibling
     this.orderBeforePick = this.ids().join(",")
     row.dataset.picked = "true"
@@ -212,6 +243,7 @@ export default class extends Controller {
   clearPicked(row) {
     delete row.dataset.picked
     this.inHand = null
+    this.sayMoving()
   }
 
   focusHandle(row) {
@@ -247,11 +279,17 @@ export default class extends Controller {
     row.dataset.assetId = String(item.id)
     row.dataset.title = title
     row.querySelector(".admin-gallery-row__handle")?.setAttribute("aria-label", this.t("components.fields.media_texts.move", { title }))
-    row.querySelector(".admin-gallery-row__remove")?.setAttribute("aria-label", this.t("components.fields.media_texts.remove", { title }))
+    const remove = row.querySelector(".admin-gallery-row__remove")
+    const removeLabel = this.t("components.fields.media_texts.remove", { title })
+    remove?.setAttribute("aria-label", removeLabel)
+    // The shared icon button's tooltip says its name too.
+    const tip = remove?.querySelector("[data-tooltip]")
+    if (tip) tip.textContent = removeLabel
 
     const thumbnail = row.querySelector('[data-admin--editor--gallery-target="thumbnail"]')
     if (thumbnail && item.url) thumbnail.src = item.url
-    if (thumbnail && item.preview) thumbnail.classList.add("blur-sm")
+    // A preview (`Media::Asset.preview_url?`, a data: address) is drawn blurred.
+    if (thumbnail && item.url?.startsWith("data:")) thumbnail.classList.add("blur-sm")
 
     const alt = row.querySelector(".admin-gallery-row__alt")
     if (alt) {

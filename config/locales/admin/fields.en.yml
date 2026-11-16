@@ -99,9 +99,10 @@ en:
           alt: Alt text
           use_library_caption: Use library caption
           no_library_alt: No alt text in the library
+          no_upload: Adding images needs the right to upload to the library.
           remove: "Remove %{title}"
           move: "Move %{title}"
-          picked_up: "Picked up %{title}, image %{position} of %{count}. Up and Down Arrow move it, Space drops it, Escape puts it back."
+          picked_up: "Picked up %{title}, image %{position} of %{count}. Up and Down Arrow move it, Space or Enter drops it, Escape puts it back."
           moved: "Moved to %{position} of %{count}."
           dropped: "Dropped at %{position} of %{count}."
           cancelled: "Cancelled. %{title} is back where it was."

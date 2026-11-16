@@ -340,7 +340,9 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     assert_selector "fieldset.admin-held textarea[name='block[settings][texts][#{image.id}][caption]'][readonly]"
     assert_selector "fieldset.admin-held input[name='block[settings][texts][#{image.id}][alt]'][readonly][value='Boats']"
     assert_selector "fieldset.admin-held input[type=hidden][name='block[settings][images]']:not([disabled])", visible: :all
-    assert held.css("fieldset.admin-held [data-admin--editor--gallery-target=row] button").all? { |button| button["disabled"] }, "the handle, Remove and Use library caption are disabled"
+    row_buttons = held.css("fieldset.admin-held [data-admin--editor--gallery-target=list] > [data-admin--editor--gallery-target=row] button")
+    assert_equal 3, row_buttons.size, "the row holds its handle, Use library caption and Remove"
+    assert_equal [ "disabled" ] * 3, row_buttons.map { |button| button["disabled"] }, "each of them is disabled"
     assert_no_selector "[data-controller~='admin--saving--autosave']"
     assert_empty held.css("[data-action]").flat_map { |node| node["data-action"].split }.grep(/admin--editor--gallery/), "no action of the rows' script is left"
     assert_empty ::BlockTypes.find("gallery").read_only_actions, "the Gallery declares no read-only action: its script only writes"

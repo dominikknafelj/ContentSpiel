@@ -43,7 +43,11 @@ class Admin::Fields::MediaTextsFieldTest < ViewComponent::TestCase
     assert_selector "input[name='block[settings][texts][#{harbour.id}][alt]'][value='Boats'][placeholder='Fishing boats at dusk']"
     assert_selector "input[name='block[settings][texts][#{forest.id}][alt]'][placeholder='A path through a forest']:not([value])"
     assert_selector "button[aria-label='Move forest-path.jpg']"
-    assert_selector "button[aria-label='Remove harbour-at-dusk.jpg']"
+    assert_selector "button.admin-gallery-row__remove[aria-label='Remove harbour-at-dusk.jpg'][data-controller~='admin--ui--tooltip']", text: "Remove harbour-at-dusk.jpg"
+    assert_equal Admin::Ui::ButtonComponent.classes(:tertiary, size: :small).split, page.find("button[aria-label='Remove harbour-at-dusk.jpg']")[:class].split - %w[admin-gallery-row__remove relative],
+      "Remove is the shared small tertiary icon button"
+    assert_selector "img.rounded-field[src='#{forest.thumbnail_url}']"
+    assert_selector "p.sr-only[role=status][data-admin--editor--gallery-target=status]", visible: :all
     assert_selector "img[src='#{forest.thumbnail_url}']"
     assert_selector "[data-controller='admin--editor--gallery'][data-admin--editor--gallery-list-value='block-#{block.id}-images']"
     assert_selector "[data-admin--editor--gallery-max-value='60']"
@@ -134,5 +138,27 @@ class Admin::Fields::MediaTextsFieldTest < ViewComponent::TestCase
     Media::Folder.create!(name: "Client A")
     render_rows(gallery([]))
     assert_selector "button", text: "Add a folder"
+  end
+
+  # Without media.upload the picker is not on the page: no add button, a
+  # line that says why, the count as usual, and the rows' Remove and handle
+  # (a reorder and a removal need no upload right).
+  test "without media.upload the card says adding needs the right to upload, and keeps Remove and the count" do
+    group = access_control_groups(:branch_editors)
+    %w[pages.read pages.edit].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    Media::Folder.create!(name: "Client A")
+    image = asset("pier.jpg")
+
+    render_rows(gallery([ image.id ]), user: users(:editor_branch))
+    assert_text "Adding images needs the right to upload to the library."
+    assert_text "1 of 60 images"
+    assert_no_selector "[data-admin--editor--gallery-target=add], [data-admin--editor--gallery-target=addFolder]"
+    assert_selector "button[aria-label='Remove pier.jpg']"
+    assert_selector "button[aria-label='Move pier.jpg']"
+
+    render_rows(gallery([]), user: users(:editor_branch))
+    assert_text "No images yet. Add them from the library, in the order the site shows them."
+    assert_text "Adding images needs the right to upload to the library."
+    assert_no_selector "button", text: "Add images"
   end
 end
