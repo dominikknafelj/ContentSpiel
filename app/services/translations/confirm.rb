@@ -33,8 +33,16 @@ module Translations
       return failure(@record, [ "Nothing to confirm" ]) unless confirmable?
 
       @record.class.transaction(requires_new: true) do
-        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
-        ContentTypes.hold!
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER"). The
+        # settings row's own confirm writes that row, so it takes it
+        # FOR UPDATE instead: a share upgraded by the write below would
+        # deadlock with a second confirm doing the same
+        # (`ContentSpiel::LockOrder`).
+        if @record.is_a?(SiteSetting)
+          @record.lock!
+        else
+          ContentTypes.hold!
+        end
         # A BLOCK'S CONFIRM TAKES ITS PAGE'S ROW FIRST, as every writer of a
         # page's blocks does (`ContentBlocks::Structure#lock_owner`,
         # `ContentBlocks::Save#call` has the rule and its history). Below,

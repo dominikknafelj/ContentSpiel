@@ -52,7 +52,23 @@ module ContentTypes
   # `FOR SHARE` while a `FOR UPDATE` waits, so a settings save in a busy
   # minute waits until no write transaction holds the row. Each hold lasts
   # one write's transaction, and the waiting save holds nothing a write
-  # needs.
+  # needs. The other way round, by design: every page, post and block write
+  # waits behind any settings or language save, site-wide, for as long as
+  # that save's transaction lasts (a language switched on rebuilds every
+  # address and search document under its lock: seconds on a large site);
+  # accepted while sites are small.
+  #
+  # A transaction takes the lock once (`HELD`): a `hold!` in a transaction
+  # that already holds the row, or in a savepoint of one, sends nothing.
+  # The memo is the Active Record transaction that took it, and counts while
+  # that transaction is open: every open transaction of a connection is the
+  # current one or one of its parents. A savepoint rolled back releases the
+  # lock in Postgres and closes its transaction with it; a savepoint
+  # released closes too, so its parent takes the lock again, which is a
+  # share it holds already. A transaction that holds the row is marked
+  # dirty, so Active Record never "restarts" it (`ROLLBACK AND CHAIN`, or a
+  # rollback to its savepoint, when a nested transaction that wrote nothing
+  # is rolled back), which would drop the lock and keep the memo.
   #
   # `Current.site` becomes the row read when it was written since the memo
   # was loaded (a switch committed since the request began); a memo with
@@ -65,10 +81,24 @@ module ContentTypes
     site = Current.site
     return nil if site.new_record? || site.has_changes_to_save?
 
-    held = SiteSetting.lock("FOR SHARE").find(site.id)
-    Current.site = held unless held.updated_at == site.updated_at
+    connection = SiteSetting.lease_connection
+    transaction = connection.current_transaction
+    return nil if HELD_LOCK.synchronize { HELD[connection] }&.open?
+
+    written_at = SiteSetting.where(id: site.id).lock("FOR SHARE").pick(:updated_at)
+    Current.site = SiteSetting.find(site.id) unless written_at == site.updated_at
+    if transaction.open? && transaction.joinable?
+      transaction.dirty!
+      HELD_LOCK.synchronize { HELD[connection] = transaction.user_transaction }
+    end
     nil
   end
+
+  # The Active Record transaction (`ActiveRecord::Transaction`) each
+  # connection took the hold in (`hold!`).
+  HELD = ObjectSpace::WeakKeyMap.new
+  HELD_LOCK = Mutex.new
+  private_constant :HELD, :HELD_LOCK
 
   # One component, one line of the theme contract (`Theme::Contract
   # .post_components` is keyed by the component's path): a type that declares
