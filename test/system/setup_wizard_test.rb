@@ -283,7 +283,7 @@ class SetupWizardTest < ApplicationSystemTestCase
     # as the one after "Create starter pages" does
     # (test/system/admin/tokens_related_posts_and_starter_pages_test.rb).
     assert_selector "h1", text: "Review", wait: 10
-    assert_text "Blog, Resume and Now pages"
+    assert_text "Blog, Resume, Now, with one sample post each"
     assert_text "claude-desktop (created)"
     assert_text "Not set up. Password resets and invites stay off until mail works."
     press "Finish setup"
