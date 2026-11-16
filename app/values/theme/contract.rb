@@ -21,7 +21,7 @@ class Theme
   # purpose. A content type joins the same way: its
   # `list_component` and `detail_component` declare `theme_methods:`, which
   # `post_components` reads from `ContentTypes.all`, the declared set, so the
-  # contract is the code's whatever a site switches on. `test/values/theme/contract_test.rb` fails for
+  # contract is the code's, whatever a site switches on. `test/values/theme/contract_test.rb` fails for
   # a component a type registry hands out that `components` does not hold,
   # and for a `--th-` token that tokens.css defines and no list names, each
   # with the missing entry in its message.

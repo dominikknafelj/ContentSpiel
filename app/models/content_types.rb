@@ -30,7 +30,7 @@ module ContentTypes
   # registered second would replace the first's line in silence.
   def self.admit!(definition)
     definition.component_lines.each do |component, methods|
-      other = all.find { |each| each.component_lines[component] && each.component_lines[component] != methods }
+      other = all.find { |registered| registered.component_lines[component] && registered.component_lines[component] != methods }
       next if other.nil?
 
       raise ArgumentError, "#{definition.name}: declares #{component.name} with the methods #{methods.inspect}, the type #{other.name.inspect} " \

@@ -16,7 +16,7 @@ class PostSamplesTest < ActionDispatch::IntegrationTest
     Nokogiri::HTML5(response.body).at_css("main").to_html
   end
 
-  test "every declared post type's sample is drawn on its detail page and in its list, with each of its shows texts" do
+  test "every declared post type's sample is drawn on its detail page and in its list: each shows text on one of the two, and each page draws one of the sample's own values" do
     with_test_types do
       assert_includes ContentTypes.names, "test/event"
 
@@ -30,7 +30,10 @@ class PostSamplesTest < ActionDispatch::IntegrationTest
         detail = main_of(PublicSite::Urls.new.path_for(posts_of_type.reload, "en"))
         list = main_of(PublicSite::Urls.new.path_for(listing.reload, "en"))
 
-        assert_includes detail, type.sample.title, "#{type.name}'s detail page draws its title"
+        sample = type.sample
+        own = [ sample.title, sample.excerpt, sample.body, *sample.fields.values.grep(String) ].compact_blank
+        assert own.any? { |value| detail.include?(value) }, "#{type.name}'s detail page draws none of its sample's own values"
+        assert own.any? { |value| list.include?(value) }, "#{type.name}'s list draws none of its sample's own values"
         type.sample.shows.each do |text|
           assert_includes detail + list, text, "#{type.name}'s sample shows #{text.inspect}, on neither its detail page nor its list"
         end

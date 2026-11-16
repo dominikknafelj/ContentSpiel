@@ -445,7 +445,7 @@ missing key).
   the type's sample, as an editor's save is; `sample_every_post_type ->
   Array<Post>` for every declared type (switched on for the test).
 - `test/integration/post_samples_test.rb`: "every declared post type's sample
-  is drawn on its detail page and in its list, with each of its shows texts".
+  is drawn on its detail page and in its list: each shows text on one of the two, and each page draws one of the sample's own values".
 - `test/integration/public_canary_test.rb` builds its posts with
   `sample_every_post_type` in place of its hand-written ones, so a fourth type
   is in the canary the day it is declared.
