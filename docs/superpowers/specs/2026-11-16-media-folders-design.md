@@ -1,6 +1,6 @@
 # Media folders: organising the library
 
-Status: designed, not built. The behaviour is settled here; the looks and the
+Status: built ("As built", the last section). The behaviour is settled here; the looks and the
 words are the design answers D1 to D14, the card StudioMediaFolders of the CMS
 Design System v242 (version `1794813077-09f4`,
 https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT), summarised in §17; where
@@ -690,3 +690,48 @@ the audit sentence:
   template (`app/views/admin/media/picker.html.erb`, `SCREEN_FILES`) and
   `test/support/design_system_entries.rb` (version `1794784635-1aa4`, which
   the plan's last task stamps `1794813077-09f4`).
+
+## 22. As built
+
+What differs from, or was settled beyond, the sections above. Behaviour is
+described where it lives, in `docs/reference/media.md`, "Folders".
+
+- **The card is v244** (`1794828751-4e8a`), not v242: `test/support/design_system_entries.rb`
+  is stamped with it and gains `StudioMediaFolders` only. The gallery's
+  entries come with the Gallery block's pull request.
+- **Dialog widths.** The folder dialogs and Move to… take `form_narrow` (460),
+  the delete confirm `ConfirmDialogComponent`'s own; none is `small` (§21).
+- **The drop look is its own class.** `Admin::Ui::TreeItemComponent::CLASSES[:drop_into]`
+  (`admin-tree-row--drop-into`) is the Folders column's; `.admin-tree-drop-target`
+  stays the Pages tree's only. A row that cannot take a folder carries
+  `data-media-drop-refused` with its reason.
+- **Two parts the plan did not name.** `GET /media/folders`
+  (`Admin::MediaFoldersController#index`) draws the Folders column's part, or
+  the picker's places, as it stands, with `Media::Place#digest`, which is how a
+  tab learns whether the grid it shows changed. `GET /media/move/new` draws the
+  Move to… list for images or a folder, and a move the dialog sent that is
+  refused draws that list again with the refusal on top (`Admin::Answers::MoveRefused`).
+- **The live signal's origin** is `Current.editing_tab` (the header
+  `X-Notes-Tab`, read for every CS Studio request), not `notes_tab`, so the
+  acting tab skips its own echo. The notice is taken back before Turbo
+  caches the page.
+- **The picker's place** is read after each load from a marker inside its
+  frame (`#media-picker-place`), not an attribute of the frame; a remembered
+  folder that is gone answers All media with `data-media-place-gone`, and the
+  script forgets it.
+- **`Media::MoveImages`** locks the target `FOR KEY SHARE` and the images
+  `FOR UPDATE` by id, the order `Media::DeleteFolder` shares, and refuses a
+  trashed or missing id with "An image you chose is gone. Nothing was moved."
+  The delete locks its images by id too, in one ordered statement.
+- **`Media::FolderTree#inside?`** answers the "inside itself" question; the
+  tree also answers `height`, `descendant_ids` and `size`.
+- **No test for the public version of a move beyond the service's:** the plan's
+  case in `test/integration/public_blocks_test.rb` was not written; the
+  guards are `test/lib/media_folder_writers_test.rb`, `test/lib/version_bump_test.rb`
+  and `test/services/media/move_images_test.rb`, "a move touches neither updated_at nor the
+  content version".
+- **The rules with no guard** (§16) are in `CLAUDE.md`, "Rules a change can
+  break silently" and "Cases a test lists by hand", and in `docs/reference/media.md`.
+- **Not built, as designed:** tags for images, permissions per folder (the
+  seam is `docs/roadmap.md`'s row), Move to trash and Download from a selection
+  (§5.3), a folder in the trash.

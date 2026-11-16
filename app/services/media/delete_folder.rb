@@ -7,7 +7,7 @@ module Media
   #
   # THE ORDER inside the transaction: the tree's lock (`Media::Folder.lock_tree!`),
   # then the folder's own row FOR UPDATE, then the images, the subfolders and
-  # the row. A move or upload into the folder holds its row FOR SHARE, so one
+  # the row. A move or upload into the folder holds its row FOR KEY SHARE, so one
   # waits for the other: a move that commits first has its images moved up with
   # the rest, one that comes after finds the folder gone. Without the row lock
   # first, an image moved in between this delete's update and its delete would
