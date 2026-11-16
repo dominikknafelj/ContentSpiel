@@ -4,6 +4,8 @@
 
 ### Added
 
+- Each post type is switched on or off in Settings (Settings › Post types: a switch per declared type, Resume entry and Now update together under "For a personal site", each with its post count, saved with the save bar and found in ⌘K; a switch moved and not yet saved says under it whether its posts will leave the site or come back, and a screen reader hears that line as the switch's description while it shows); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`.
+- MCP: `get_post`'s answer says `type_switched_on`.
 - Close matches for a typo, ranked below every exact match and said so ("No exact matches for … Close matches:").
 - "Did you mean …?", verified against the live site.
 - Japanese, Chinese, Thai and Korean pages found by the text they contain.
@@ -16,6 +18,11 @@
 
 ### Changed
 
+- A new site starts with Blog alone; an existing site keeps all three post types on at the upgrade. The search index is built once more after the upgrade, in the background, as a switch of post types asks for it.
+- A post of a switched-off post type is kept, with no address, in no list, search or sitemap, and offered no starter section; it opens view only, and its writes are refused with "<Type> is switched off. Switch it on in Settings to change this post." It is left out of the dashboard's lists (Your drafts, Going live next, Waiting for you, Languages behind) and the Translations matrix, and the New post dialog and a Post list block's type select offer the switched-on types (the select keeps a stored switched-off choice, marked "(switched off)"). The posts list, the Trash, ⌘K and the Mind graph still find it.
+- A switched-off post type is marked "Switched off" in the posts list (its Status cell, with "Not on the site" for its path, and the Type filter's "(switched off)" entries), in the editor (the header's chip and a note above the form that, for a holder of `settings.manage`, links to Settings › Post types), on a Post list block filtered to it (the card says the list shows nothing on the site), in the Mind graph (the hub's card and list row; no lists line to it) and in the Groups screen (neutral: a grant scoped to it is live, and the warn "no longer exists" wording stays for an undeclared type). CS Studio says "post type" where it said "content type".
+- MCP: `create_post` and `list_posts` offer only the switched-on post types, and `list_posts` no longer lists a switched-off type's posts.
+- The theme contract's post lines are derived from each content type's declarations (`Theme::Contract.post_components`), in the order they were (the three lists, then the detail page); the built-in types' names are unchanged.
 - A post's tags rank as its title (weight A; an outside engine sees the `tags` field at `:a`).
 - A page's meta title and the slugs are searched (B).
 - The index rebuilds itself once after the upgrade (`Documents::REVISION` 2), with System status showing the progress. Title suggestions start when it is done.
@@ -32,12 +39,19 @@
 - ContentSpiel requires the Postgres extension `pg_trgm` and a database with encoding `UTF8` and a UTF-8 character type (not `C` or `POSIX`), besides Postgres 15 or later and `plpgsql` (built into every Postgres database). The four are one list, `docs/reference/hosting.md`, "Database requirements". The stack ContentSpiel ships (`postgres:17`, the site template's databases) meets all four, and the migration enables the extension itself. On a managed database, allow `pg_trgm` before upgrading. Where the migration cannot enable it, or the character type is `C`, the migration stops with a message naming the requirement, that section and the guide's "What ContentSpiel asks of its host"; a serving process whose database lost it does not start.
 - The search backend contract's test has a case for what `search` always meant: a document is found only when it holds every word of the query. A gem's backend that passed 0.7.0's contract test by ORing the words (Solr's default `q.op`) now fails that case; set the default operator to AND.
 
+### Removed
+
+- `Theme::Contract::POST_COMPONENTS`, now `Theme::Contract.post_components`, derived from each content type's declarations; `ContentTypeDefinition#starter`'s `sample:` keyword, now `t.sample`.
+
 ### Migrations
 
 - `20261115120000_search_two`: enables `pg_trgm` and checks the character type (stopping with a message when either is missing); `search_entries.title` with its expression index; `search_words`, the site's words per language, with a trigram index. All of it is in `db/schema.rb`.
+- `20261116090000_add_content_types_to_site_settings`: the column `site_settings.content_types`, the post types switched on (a new site: Blog); an existing site keeps all three on.
 
 ### For a gem or an outside caller
 
+- `Admin::Ui::TypeStateComponent(content_type:)` is the one "Switched off" chip.
+- `t.list_component` and `t.detail_component` take `theme_methods:`; `t.sample`, `t.description` and `t.group` on a content type; `ContentTypes.switched_on`, `.switched_on_names` and `.switched_on?`.
 - The backend contract: `Query#close_matches`, `Hit#close`, `Results#correction` and `Results#close_outcome`, each with a default or read only by a backend, so a 0.7.0 backend passes unchanged, but for the every-word case under Breaking; the optional `suggest(suggest_query, deadline:)` (`SiteSearch::Backend::OPTIONAL_METHODS`), with `SuggestQuery`, `Suggestions` and `Suggestion`. `suggest` is not breaking: `METHODS` stays the six, a backend without it gives tags only, and the contract test's new cases pass for a 0.7.0 backend (the suggest cases run only for a backend that answers it). One new case spells out what `search` always meant: a document is found only when it holds every word of the query, since ContentSpiel checks a correction by such a search; an engine that ORs the words (Solr's default `q.op`) sets AND.
 - The theme contract: the Search block's `close_matches?`, `correction`, `correction_path` and `suggest_url`; a result's `tags` (each with `name` and `matched?`) and `close?`; sixteen new words under `public.blocks.search` (`close_matches`, `did_you_mean`, `tagged`, `tags_separator`, `matched_tag`, `matched_tag_before`, `matched_tag_after`, `suggestions`, `no_suggestions`, `suggestions_limited`, `suggestions_unavailable`, `suggestions_loading`, `suggestions_label`, `kind_page`, `kind_post`, `kind_tag`); the themed token `--th-search-active` (the active suggestion's ground, re-valued by a strong band); the helper `ThemeHelper#search_suggest_url`, for a theme's own header box; and the `search-suggest` script, its targets, values, option parts and states, and its endpoint's JSON keys. All are new names an older template does not call.
 - No new top-level name.

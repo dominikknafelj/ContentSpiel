@@ -84,6 +84,9 @@ module Publishing
     # whatever has to yield then yields, and the clash is reported.
     def self.take!(record, live_at: nil, by: nil, now: Time.current, shown: false)
       transaction do
+        # The switches before the record's row (`ContentTypes.hold!`): the
+        # address and the documents below follow a post type's switch.
+        ContentTypes.hold!
         row = record.class.lock.find(record.id)
         live_at = [ live_at || now, now ].max
         mine = of(row)
@@ -169,7 +172,11 @@ module Publishing
     # their records' times are read (a statement per record type), and the
     # rows to mark are locked as they are read again, so of two refreshes at
     # once the second waits and then finds nothing left to mark.
-    def self.settle!(now = Time.current)
+    #
+    # `before_marking` is called once, before the rows are locked, when some
+    # are to be marked: `PublicSite::Paths.refresh` holds the post types'
+    # switches there (`ContentTypes.hold!`), which come before a copy's row.
+    def self.settle!(now = Time.current, before_marking: nil)
       waiting = unscoped.where(settled_at: nil, live_at: ..now).pluck(:id, :record_type, :record_id)
       return [] if waiting.empty?
 
@@ -180,6 +187,7 @@ module Publishing
       ids = waiting.filter_map { |id, type, record_id| id unless times[[ type, record_id ]]&.>(now) }
       return [] if ids.empty?
 
+      before_marking&.call
       marked = unscoped.where(id: ids, settled_at: nil).order(:id).lock.pluck(:id, :record_type, :record_id)
       unscoped.where(id: marked.map(&:first)).update_all(settled_at: now) # version: none (a mark on a copy, not content: the refresh that follows bumps for an address that moves)
       marked.select { |_, type, record_id| times[[ type, record_id ]] }

@@ -504,6 +504,41 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
     assert_includes all[2].flatten, "card.tag_posts(2040,2,040)", "a figure is grouped as the messages' language groups it; the number itself only chooses the plural"
   end
 
+  test "card and list: a switched-off post type's hub says so with the shared chip, a retired type and a switched-on one do not" do
+    result = js_module("mind_graph/card", <<~JS, also: PARTS)
+      (() => {
+        const { container, card, parts } = #{CARD_SCRIPT}
+        const seen = [ { id: "type-off", kind: "type", name: "off", title: "Off", colour_index: 4, switched_on: false, count: 6, degree: 1 },
+                       { id: "type-none", kind: "type", name: "none", title: "None", colour_index: 5, switched_on: false, count: 0, degree: 1 },
+                       { id: "type-gone", kind: "type", name: "gone", title: "gone (retired)", colour_index: null, switched_on: false, count: 1, degree: 1 },
+                       { id: "type-on", kind: "type", name: "on", title: "On", colour_index: 3, switched_on: true, count: 2, degree: 1 } ].map((node) => {
+          card.show(node)
+          return [ container.querySelectorAll("[data-type-state]").length, container.querySelector("[data-type-state]")?.isEqualNode(parts.part("type-switched-off")) ?? "-",
+                   Array.from(container.querySelectorAll("p"), (line) => line.textContent) ]
+        })
+        container.remove()
+        return seen
+      })()
+    JS
+
+    assert_equal [ [ 1, true, [ "card.kept_posts(6,6)" ] ], [ 1, true, [ "card.kept_posts(0,0)" ] ], [ 0, "-", [ "card.tag_posts(1,1)" ] ], [ 0, "-", [ "card.tag_posts(2,2)" ] ] ], result
+
+    rows = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const { container, list, parts } = #{LIST_SCRIPT}
+        list.render([ { id: "type-off", kind: "type", title: "Off", degree: 1, count: 6, colour_index: 4, switched_on: false }, { id: "type-gone", kind: "type", title: "gone (retired)", degree: 1, count: 1, colour_index: null, switched_on: false },
+                      { id: "type-on", kind: "type", title: "On", degree: 1, count: 2, colour_index: 3, switched_on: true } ])
+        return [ "type-off", "type-gone", "type-on" ].map((id) => {
+          const item = list.row(id)
+          const end = item.firstElementChild.lastElementChild
+          return [ end.firstElementChild.isEqualNode(parts.part("type-switched-off")), end.textContent, item.getAttribute("aria-label") ]
+        })
+      })()
+    JS
+
+    assert_equal [ [ true, "Switched off", "list.select_type_off(Off,6,6)" ], [ false, "1", "list.select_type(gone (retired),1,1)" ], [ false, "2", "list.select_type(On,2,2)" ] ], rows
+  end
+
   # A post's card and a tag's, and the added post's, whose counts the page
   # does not know.
   test "card: a post's card keeps its order and its notes' type, an added post's leaves the counts out, and a tag's has no notes" do

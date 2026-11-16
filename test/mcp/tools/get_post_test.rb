@@ -10,6 +10,16 @@ class Mcp::Tools::GetPostTest < ActiveSupport::TestCase
     @user = User.create!(email_address: "agent@example.com", password: "password12345")
   end
 
+  test "get_post says whether the post's type is switched on" do
+    post = Post.create!(content_type: :resume_entry, title: "Role")
+
+    assert_equal true, JSON.parse(call_tool(id: post.id).content.first[:text])["type_switched_on"]
+
+    switch_on_content_types("blog")
+
+    assert_equal false, JSON.parse(call_tool(id: post.id).content.first[:text])["type_switched_on"]
+  end
+
   test "returns the full post, including body" do
     post = Post.create!(content_type: :blog, title: "A Blog Post", body: rich_doc("Full **content**"))
 

@@ -68,6 +68,23 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
     assert_includes feed(@me).going_live_next, resume
   end
 
+  test "a dormant post is in none of the dashboard's lists" do
+    draft = Current.set(actor: @me) { create_post(title: "Dormant draft", content_type: "resume_entry", published: false) }
+    soon = Current.set(actor: @me) { create_post(title: "Dormant soon", content_type: "resume_entry", published: false) }
+    soon.update_columns(published_at: 1.day.from_now)
+    changed = Current.set(actor: @me) { create_post(title: "Dormant changed", content_type: "resume_entry") }
+    changed.update_columns(unpublished_changes_at: Time.current)
+    kept = Current.set(actor: @me) { create_post(title: "Kept draft", published: false) }
+    assert_includes feed.drafts, draft
+
+    switch_on_content_types("blog")
+
+    assert_equal [ kept ], feed.drafts
+    assert_not_includes feed.going_live_next, soon
+    assert_not_includes feed.unpublished_changes, changed
+    assert_not_includes feed.unpublished_keys, [ "Post", changed.id ]
+  end
+
   test "trashed pages are never listed" do
     page = Current.set(actor: @me) { create_page(title: "Binned", published: false) }
     Current.set(actor: @me, channel: :admin) { assert Trash::Move.call(page).ok? }

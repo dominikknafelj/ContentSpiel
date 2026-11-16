@@ -275,4 +275,15 @@ class Publishing::ListingTest < ActiveSupport::TestCase
     assert_equal 1, loaded, "copies that list no posts were loaded"
     assert_operator Publishing::Version.where(record_type: "Page").count, :>, 10
   end
+
+  test "a block lists no post of a type that is switched off" do
+    block = ContentBlock.new(block_type: "post_list", settings: {})
+    switch_on_content_types("blog", "resume_entry")
+    post = create_post(title: "Role", content_type: "resume_entry")
+    assert Publishing::Listing.lists?(block, Publishing.published(post.reload))
+
+    switch_on_content_types("blog")
+
+    assert_not Publishing::Listing.lists?(block, Publishing.published(post.reload))
+  end
 end

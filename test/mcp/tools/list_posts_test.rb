@@ -25,6 +25,17 @@ class Mcp::Tools::ListPostsTest < ActiveSupport::TestCase
     assert_equal [ "A Blog Post", "A Resume Entry" ].sort, titles.sort
   end
 
+  test "list_posts lists only switched-on types' posts" do
+    Post.create!(content_type: :blog, title: "A Blog Post")
+    Post.create!(content_type: :resume_entry, title: "A Resume Entry")
+    switch_on_content_types("blog")
+
+    titles = JSON.parse(call_tool.content.first[:text]).map { |post| post["title"] }
+
+    assert_equal [ "A Blog Post" ], titles
+    assert_equal [ "blog" ], Mcp::Tools::ListPosts.input_schema_value.to_h[:properties][:content_type][:enum]
+  end
+
   test "filters by content_type" do
     Post.create!(content_type: :blog, title: "A Blog Post")
     Post.create!(content_type: :resume_entry, title: "A Resume Entry")

@@ -70,7 +70,7 @@ module PostGraph
       kept = weight.keys.sort_by { |id| [ -weight[id], -site.stamps[id].to_f, id ] }.first(@cap)
       builder = Builder.new(site: site, locale: @locale, url_for: @url_for)
       plan = builder.plan(post_ids: kept, relations: relations, tag_links: site.tag_links, tag_counts: site.tag_counts, min_tag_edges: MIN_TAGGED_POSTS,
-                          page_ids: site.pages.map(&:id), lists: site.listings.edges)
+                          page_ids: site.pages.map(&:id), lists: site.listings.edges, hubs: site.listings.edges.map(&:last) | site.listings.hubs)
       # Too many lines to read as one picture: the page is told where to open
       # instead (Home's local view), and nothing more is read. Without a
       # readable Home there is nowhere to open, and the whole graph it is.

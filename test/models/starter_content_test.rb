@@ -24,7 +24,25 @@ class StarterContentTest < ActiveSupport::TestCase
     assert_not StarterContent.added?(locale: "en")
   end
 
+  test "the starter sections are the switched-on types'" do
+    switch_on_content_types("blog")
+
+    assert_equal [ "Blog" ], StarterContent.sections.map { |section| section[:section][:title] }
+  end
+
   test "sections are the registered content types' own starter declarations, tagged with the type" do
     assert_equal %w[blog resume_entry now_update].sort, StarterContent.sections.map { |section| section[:content_type] }.sort
+  end
+
+  test "the starter post is the type's sample" do
+    StarterContents::Add.call(locale: "en")
+
+    ContentTypes.all.each do |type|
+      post = Post.find_by!(content_type: type.name)
+      assert_equal type.sample.title, post.title
+      assert_equal type.sample.excerpt.to_s, post.excerpt.to_s
+      given = type.sample.fields.stringify_keys.reject { |_name, value| value.blank? }
+      assert_equal given, post.metadata.slice(*given.keys)
+    end
   end
 end

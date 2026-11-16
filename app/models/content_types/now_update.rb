@@ -6,11 +6,14 @@ module ContentTypes
     def self.register
       ContentTypes.register :now_update do |t|
         t.label "Now update"
-        t.list_component Posts::NowListComponent
-        t.detail_component Posts::DetailComponent
+        t.description :now_update
+        t.group :personal_site
+        t.list_component Posts::NowListComponent, theme_methods: %w[posts page]
+        t.detail_component Posts::DetailComponent, theme_methods: %w[post]
 
-        t.starter section: { title: "Now", slug: "now" },
-          sample: { title: "What I'm doing now", body: "Share what you're focused on at the moment." }
+        t.sample title: "What I'm doing now", body: "Share what you're focused on at the moment.",
+                 shows: [ "What I'm doing now" ]
+        t.starter section: { title: "Now", slug: "now" }
       end
     end
   end

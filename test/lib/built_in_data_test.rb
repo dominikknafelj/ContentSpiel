@@ -53,7 +53,8 @@ class BuiltInDataTest < ActiveSupport::TestCase
     "20261005150000_create_public_site_versions" => { lazy: "the counter's row: no row reads as 0 and the first PublicSite.bump_version! upserts it" },
     "20261011120000_create_published_versions" => { derived: "a first copy of each page and post that was published" },
     "20261031120000_adopt_existing_image_variants" => { derived: "the widths images already had" },
-    "20261104090300_grant_forms_permissions_to_admin_group" => { built_in: "Groups::EnsureBuiltIns" }
+    "20261104090300_grant_forms_permissions_to_admin_group" => { built_in: "Groups::EnsureBuiltIns" },
+    "20261116090000_add_content_types_to_site_settings" => { lazy: "the post types an existing site keeps on; a new site's row takes the column's default, Blog alone" }
   }.freeze
 
   # What each `built_in:` migration gave a group, as it is written in the

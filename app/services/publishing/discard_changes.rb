@@ -85,6 +85,10 @@ module Publishing
     end
 
     def call
+      # A state, not a right: no `access.denied` (`ApplicationService#switched_off_refusal`).
+      dormant = switched_off_refusal(@record)
+      return dormant if dormant
+
       refused = AccessControl::OwnerRule.refusal(@record) { |key| authorize!(key, @record) }
       return denied(refused, @record) if refused
 

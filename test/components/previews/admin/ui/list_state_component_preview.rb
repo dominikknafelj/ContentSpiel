@@ -4,6 +4,9 @@ module Admin
     # changes draws nothing.
     class ListStateComponentPreview < ViewComponent::Preview
       Row = Struct.new(:status, :published_at, :unpublished_changes?)
+      SwitchedOffPost = Struct.new(:status, :published_at, :unpublished_changes?, :content_type) do
+        def type_switched_on? = false
+      end
 
       def draft = render(Admin::Ui::ListStateComponent.new(record: Row.new("draft", nil, false)))
 
@@ -12,6 +15,10 @@ module Admin
       def live = render(Admin::Ui::ListStateComponent.new(record: Row.new("live", 1.day.ago, false)))
 
       def live_with_changes = render(Admin::Ui::ListStateComponent.new(record: Row.new("live", 1.day.ago, true)))
+
+      # A post of a type the site has switched off: the type's chip first, then
+      # its own state.
+      def switched_off = render(Admin::Ui::ListStateComponent.new(record: SwitchedOffPost.new("draft", nil, false, "retired_type")))
 
       def scheduled_with_changes = render(Admin::Ui::ListStateComponent.new(record: Row.new("scheduled", 2.days.from_now, true)))
     end

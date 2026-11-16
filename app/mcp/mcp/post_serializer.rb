@@ -56,7 +56,10 @@ module Mcp
         # nil for a post nothing currently lists (spec §6.2) -- a client asking
         # for a post's URL is told there isn't one yet, rather than being handed
         # a guess built from the post's own attributes.
-        url: url(post, locale)
+        url: url(post, locale),
+        # False for a post kept whole whose type the site has switched off (or
+        # that is no longer declared): every write to it is refused.
+        type_switched_on: post.type_switched_on?
       }
     end
 

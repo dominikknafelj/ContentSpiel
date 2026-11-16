@@ -54,7 +54,7 @@
      "mail_security" => "settings-mail_security", "mail_sender_name" => "settings-mail_sender_name",
      "mail_sender_address" => "settings-mail_sender_address", "image_format" => "settings-image_format",
      "image_quality_webp" => "settings-image_quality_webp", "image_quality_avif" => "settings-image_quality_avif",
-     "image_widths" => "settings-image_widths", "image_max_upload_mb" => "settings-image_max_upload_mb" } %>
+     "image_widths" => "settings-image_widths", "content_types" => Admin::SettingsScreen::PostTypesCardComponent.first_switch_id, "image_max_upload_mb" => "settings-image_max_upload_mb" } %>
 
 <div class="admin-settings-layout">
   <div class="admin-settings-layout__grid">
@@ -87,6 +87,8 @@
           <% end %>
           <% if manage_languages %><%= render Admin::SettingsScreen::LanguagesCardComponent.new(site_setting: @site_setting, values: values) %><% end %>
           <% if manage_settings %>
+            <%= render Admin::SettingsScreen::PostTypesCardComponent.new(section: SettingsSections.find("post_types"), site_setting: stored, counts: post_type_counts,
+                  values: values, errors: (@errors.full_messages_for(:content_types) if @errors.respond_to?(:full_messages_for)).to_a) %>
             <%= render Admin::SettingsScreen::PublishingCardComponent.new(values: values,
                   errors: (@errors.full_messages_for(:trash_retention_days) if @errors.respond_to?(:full_messages_for)).to_a) %>
             <% field_errors = ->(name) { @errors.respond_to?(:full_messages_for) ? @errors.full_messages_for(name) : [] } %>

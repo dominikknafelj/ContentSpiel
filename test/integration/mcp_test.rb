@@ -83,6 +83,7 @@ class McpTest < ActionDispatch::IntegrationTest
     saved = ContentTypes.all.dup
     begin
       ContentTypes.register("test/type") { |t| t.label "Test type" }
+      switch_on_registered_types
 
       mcp_post(jsonrpc: "2.0", id: 2, method: "tools/list")
       tool = response.parsed_body["result"]["tools"].find { |t| t["name"] == "create_post_tool" }
@@ -104,6 +105,7 @@ class McpTest < ActionDispatch::IntegrationTest
     saved = ContentTypes.all.dup
     begin
       ContentTypes.register("test/type") { |t| t.label "Test type" }
+      switch_on_registered_types
 
       mcp_post(jsonrpc: "2.0", id: 2, method: "tools/list")
       tool = response.parsed_body["result"]["tools"].find { |t| t["name"] == "list_posts_tool" }

@@ -241,6 +241,12 @@ class Page < ApplicationRecord
   # fields -- can't have changed a URL, and syncing for it re-derived every
   # descendant and every listed post inside each autosave's transaction.
   after_save :sync_public_paths
+  # The settings row before the page's own, for a write around the services
+  # too (a console, a seed, a test): the sync above asks for it
+  # (`ContentTypes.hold!`, "THE ORDER"). Ahead of every other callback, and
+  # of a destroy's blocks.
+  before_save(prepend: true) { ContentTypes.hold! }
+  before_destroy(prepend: true) { ContentTypes.hold! }
   # A kept page destroyed directly (a console, a test; the application
   # destroys only trashed pages, which give no address): the posts it gave
   # an address to are found by the host their rows record, although the page

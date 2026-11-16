@@ -1,0 +1,41 @@
+<%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(section, self), id: "settings-post_types-card", intro: t(".intro")) do %>
+  <div class="px-4 pb-2" data-field-name="content_types" data-controller="admin--settings--post-types" data-action="change->admin--settings--post-types#update turbo:before-cache@document->admin--settings--post-types#reset" <%= tag.attributes(data: { save_bar_changed: values.saved_change("content_types") }) %>>
+    <%= hidden_field_tag FIELD, "", id: nil %>
+    <% bands.each do |heading, definitions| %>
+      <% if heading %><h3 class="-mx-4 bg-paper px-4 py-1.5 text-label text-meta"><%= heading %></h3><% end %>
+      <div class="divide-y divide-line">
+        <% definitions.each do |definition| %>
+          <div class="admin-post-types__row grid grid-cols-[36px_1fr_auto] gap-x-3 py-3" data-post-type="<%= definition.name %>" data-stored="<%= stored?(definition) ? "on" : "off" %>">
+            <%= check_box_tag FIELD, definition.name.to_s, ticked?(definition), id: switch_id(definition), class: "cs-toggle mt-px", role: "switch",
+                  aria: { describedby: describedby(definition) }, data: { "admin--settings--post-types-target": "switch" } %>
+            <div class="min-w-0">
+              <label for="<%= switch_id(definition) %>" class="block cursor-pointer text-sm font-medium text-ink"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: definition.name) %></label>
+              <% if (words = description(definition)) %>
+                <p id="<%= switch_id(definition) %>-description" class="text-small text-dim" data-description><%= words %></p>
+              <% end %>
+              <% if count(definition).positive? %>
+                <% if stored?(definition) %>
+                  <%= render(Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, id: "#{switch_id(definition)}-line", hidden: true,
+                        class: "admin-post-types__leaving mt-2", data: { leaving: true })) { t(".leaving", count: count(definition)) } %>
+                <% else %>
+                  <%= render(Admin::Ui::NoticeComponent.new(tone: :neutral, size: :compact, role: nil, id: "#{switch_id(definition)}-line", hidden: true,
+                        class: "admin-post-types__returning mt-2", data: { returning: true })) { t(".returning", count: count(definition)) } %>
+                <% end %>
+              <% end %>
+            </div>
+            <% if count(definition).positive? %>
+              <span class="text-right text-small text-meta" data-post-count><%= t(".count", count: count(definition)) %></span>
+            <% else %>
+              <span></span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+    <% if errors.any? %>
+      <div id="<%= errors_id %>" class="mt-2 text-small text-danger-ink" data-post-types-errors>
+        <% errors.each do |message| %><p><%= message %></p><% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

@@ -152,6 +152,12 @@ class SiteSearch::PostgresParityTest < ActiveSupport::TestCase
     assert_parity "a page unpublished and published again"
     assert_view_parity "a page unpublished and published again"
 
+    create_post(title: "Quay dispatch", content_type: "now_update")
+    ok Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry] })
+    assert_view_parity "a post type switched off"
+    ok Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry now_update] })
+    assert_parity "a post type switched on"
+
     update = create_post(title: "Tide table", content_type: "now_update")
     news = create_page(title: "News")
     ok ContentBlocks::Save.call(ContentBlock.new(owner: news), attributes: { block_type: "post_list", settings: { "content_type" => "now_update" } })

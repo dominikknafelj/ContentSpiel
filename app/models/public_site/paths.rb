@@ -193,8 +193,15 @@ module PublicSite
     # are: the due copies, the subtree's ids, the list blocks as published,
     # and per touched page `sync_subtree`'s, per batch of posts
     # `write_posts`'.
-    def refresh(pages: [], posts: [], everything: false, now: Time.current)
+    def refresh(pages: [], posts: [], everything: false, report_taken: false, now: Time.current)
       PublicPath.transaction do
+        # The switches are held (`ContentTypes.hold!`) before any address is
+        # written or any due copy is marked: a post's address follows its
+        # type's switch, and a switch's own refresh marks due copies too. A
+        # refresh of nothing holds them only when something is due, so it
+        # stays one statement.
+        asked = everything || !(pages.is_a?(Array) && pages.empty?) || !(posts.is_a?(Array) && posts.empty?)
+        ContentTypes.hold! if asked
         # FIRST, so that no derivation acts on a picture the clock has made
         # stale: the copies that began to show with no write
         # (`Publishing::Version.settle!` marks them, once: a change whose
@@ -203,13 +210,13 @@ module PublicSite
         # is the whole of "it went live by the clock". There is no window
         # and no sweep. A pass of its own, ahead of the caller's: the caller
         # is answered what ITS records made yield.
-        due = Publishing::Version.settle!(now)
+        due = Publishing::Version.settle!(now, before_marking: (-> { ContentTypes.hold! } unless asked))
         of = ->(type) { due.filter_map { |_, record_type, id| id if record_type == type.polymorphic_name } }
         settled = due.empty? ? [] : refresh_touched(of.call(Page), of.call(Post), now)
 
         post_ids = posts.is_a?(ActiveRecord::Relation) ? posts.select(:id) : ids_of(posts)
         yields = everything ? refresh_all(now) : refresh_touched(ids_of(pages), post_ids, now)
-        report_clash(due, settled + yields, now)
+        report_clash(due, settled + yields, now, unheld: report_taken)
         yields
       end
     end
@@ -241,11 +248,13 @@ module PublicSite
     # the addresses they wanted and nothing of anyone's content. A record
     # met again that stood without an address before is not reported again,
     # and a refresh that is rolled back (a refused publish, `foresee`)
-    # reports nothing.
-    def report_clash(due, yields, now)
+    # reports nothing. `report_taken: true` is for a caller whose records were
+    # asked for an address they never had (a post type switched on): a yield
+    # of those records is the clash, though no row was lost.
+    def report_clash(due, yields, now, unheld: false)
       mine = due.map { |_, type, id| [ type, id ] }
       clashes = yields.select do |change|
-        change.record.published_at&.<=(now) && (change.row_id || mine.include?([ change.record.class.polymorphic_name, change.record.id ]))
+        change.record.published_at&.<=(now) && (unheld || change.row_id || mine.include?([ change.record.class.polymorphic_name, change.record.id ]))
       end
       return if clashes.empty?
 
@@ -326,7 +335,7 @@ module PublicSite
       addressed = PublicPath.current.where(record_type: Post.polymorphic_name)
       hosted = Post.where(id: addressed.where(listed_on_id: below).select(:record_id))
       listable = posts_listed_by(candidates.select { |block| below.include?(block.owner.id) })
-      unhoused = posts_listed_by(candidates).kept.where(content_type: ContentTypes.names).where.not(id: addressed.select(:record_id))
+      unhoused = posts_listed_by(candidates).kept.of_switched_on_types.where.not(id: addressed.select(:record_id))
       [ touched, hosted, listable, unhoused ].reduce(:or)
     end
 
@@ -366,6 +375,8 @@ module PublicSite
     # too.
     def rebuild!
       PublicPath.transaction do
+        # The settings row before the rows it deletes (`ContentTypes.hold!`).
+        ContentTypes.hold!
         PublicPath.delete_all
         PublicSite.bump_version!
         refresh(everything: true)
@@ -399,9 +410,9 @@ module PublicSite
       case record
       when Page then page_path(record, locale, above)
       when Post
-        if record.definition.nil?
+        if !record.type_switched_on?
           Rails.logger.warn("[public_paths] Post##{record.id} gets no #{locale} URL: " \
-            "#{record.content_type.inspect} isn't a registered content type")
+            "#{record.content_type.inspect} isn't a switched-on content type")
           nil
         else
           post_path(record, locale, above)

@@ -14,6 +14,11 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
   # call that sends its documents raise, as an engine that stops answering
   # half way. By the record and not by the count, since the fixtures' pages
   # are sent too, in an order of their own.
+  #
+  # `on_index` stands for another process's write while the build runs: it
+  # runs on this connection, inside the build's transaction for a record,
+  # and is followed as a transaction of its own (`ContentSpiel::LockOrder
+  # .aside`), as it would be on its own connection.
   class Wrapped
     attr_reader :indexed
 
@@ -26,7 +31,7 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
 
     def index(documents)
       @indexed += 1
-      @on_index&.call(@indexed)
+      ContentSpiel::LockOrder.aside(ActiveRecord::Base.connection) { @on_index.call(@indexed) } if @on_index
       raise IOError, "http://engine/update?secret" if @raise_on && documents.any? { |document| document.record_id == @raise_on.id }
 
       @backend.index(documents)
@@ -94,6 +99,30 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
     clear_enqueued_jobs
     SiteSearch::IndexCheckJob.perform_now
     assert_no_enqueued_jobs only: SiteSearch::ReindexJob
+  end
+
+  test "switching a post type off and on again takes its posts out of the index and puts them back" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    everything = create_page(title: "Everything", parent: root)
+    ok = ContentBlocks::Save.call(ContentBlock.new(owner: everything), attributes: { block_type: "post_list", settings: {} })
+    assert ok.ok?, ok.errors.to_sentence
+    publish_changes(everything)
+    post = create_post(title: "Foghorn", content_type: "resume_entry")
+    SiteSearch::Rebuild.new.call
+    assert_equal [ [ "Post", post.id ] ], found("foghorn")
+
+    assert Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog now_update] }, actor: nil).ok?
+    assert SiteSearch::IndexState.empty_or_stale?("postgres"), "a switch makes a ready index stale"
+    perform_enqueued_jobs(only: SiteSearch::ReindexJob)
+    assert_empty found("foghorn")
+    # A copy that came into force while the type was off was indexed with no
+    # documents.
+    entries_of(post).delete_all
+
+    assert Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry now_update] }, actor: nil).ok?
+    perform_enqueued_jobs(only: SiteSearch::ReindexJob)
+
+    assert_equal [ [ "Post", post.id ] ], found("foghorn")
   end
 
   test "a fallback change makes the index stale and the job rebuilds it" do

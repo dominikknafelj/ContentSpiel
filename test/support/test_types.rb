@@ -62,6 +62,7 @@ module TestTypes
   end
 
   def with_test_types
+    switched_on_before = SiteSetting.instance.content_types
     BlockTypes.register "test/quote" do |t|
       t.label "Quote"
       t.field :text, :string, required: true, translated: true
@@ -85,14 +86,20 @@ module TestTypes
 
     ContentTypes.register "test/event" do |t|
       t.label "Event"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :venue, :string
       t.field :speakers, :groups, of: "test/speaker"
+      t.sample title: "A test event", fields: { venue: "Town hall" }, shows: [ "A test event" ]
     end
 
+    switch_on_registered_types
     yield
   ensure
     Rails.application.reloader.prepare!
+    # The switch is put back as it was: `test/event` is gone from the registry,
+    # and a name the site holds that nothing declares is no state a test means to leave.
+    SiteSetting.instance.update_column(:content_types, switched_on_before)
+    Current.site = nil
   end
 end

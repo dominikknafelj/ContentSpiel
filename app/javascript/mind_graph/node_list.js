@@ -204,6 +204,7 @@
 // row's `data-tree-id` is the open set's bare page id for a page and the
 // node's id for any other, so the two never meet.
 import { dotClass, TAG_MARK } from "mind_graph/card"
+import { switchedOff } from "mind_graph/graph_data"
 import { recordId } from "mind_graph/ids"
 import { renderResults } from "mind_graph/search_results"
 import { markCanvas, paintMarks } from "mind_graph/swatches"
@@ -495,12 +496,13 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // pill hangs off.
   const row = (node, { level, notInView = false, addable = true, opens = false, path = null } = {}) => {
     const item = nodeItem(node, level, { opens, flat: node.kind === "post" && !opens })
-    item.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: placed(stated(node), path), count: figure(node), figure: number(figure(node)) }))
+    item.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(switchedOff(node) ? "mind_graph.script.list.select_type_off" : NAMES[node.kind], { title: placed(stated(node), path), count: figure(node), figure: number(figure(node)) }))
     if (node.kind === "page" && node.home) item.dataset.treeRoot = ""
     // At the row's end: the figure, or the words of a row that is not in view.
     const notShown = () => element("span", "text-label text-meta", text.t("mind_graph.script.list.not_in_view"))
     const trailing = element("span", classes.trailing)
-    trailing.append(notInView ? notShown() : element("span", classes.count, number(figure(node))))
+    // A switched-off post type's chip stands where its count would: it says more than the count does.
+    trailing.append(notInView ? notShown() : switchedOff(node) ? parts.part("type-switched-off") : element("span", classes.count, number(figure(node))))
     rowIn(item).append(markBox(markFor(node)), titled(node, path), trailing)
     if (notInView) {
       item.dataset.notInView = ""

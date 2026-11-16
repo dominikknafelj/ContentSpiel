@@ -1,0 +1,9 @@
+<%= render Admin::Ui::NoticeComponent.new(tone: :neutral, class: "mt-3", data: { switched_off_notice: true }) do %>
+  <%= t(".body", type: type) %>
+  <% if settings? %>
+    <%= t(".change") %>
+    <%= link_to t(".open_settings"), settings_path, class: "font-medium underline hover:no-underline", data: { turbo_frame: "_top" } %>
+  <% else %>
+    <%= t(".ask") %>
+  <% end %>
+<% end %>

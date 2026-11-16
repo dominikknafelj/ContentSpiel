@@ -56,4 +56,14 @@ class Posts::ListTest < ActiveSupport::TestCase
     assert_not_includes titles(list("scope" => "drafts")), "Draft"
     assert_equal({ "all" => 3, "live" => 1, "drafts" => 1, "scheduled" => 1 }, list.counts)
   end
+
+  test "types_present names the types the viewer has kept posts of, under none of the list's filters" do
+    switch_on_content_types("blog", "resume_entry", "now_update")
+    as(@me) { create_post(title: "Role", content_type: "resume_entry") }
+    trashed = as(@me) { create_post(title: "Now", content_type: "now_update") }
+    trashed.update!(trashed_at: Time.current)
+
+    assert_equal %w[blog resume_entry], list.types_present
+    assert_equal %w[blog resume_entry], list("scope" => "drafts", "type" => "now_update", "q" => "zzz").types_present
+  end
 end

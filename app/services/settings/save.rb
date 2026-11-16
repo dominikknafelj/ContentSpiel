@@ -73,6 +73,23 @@ module Settings
   # the screen showed for it leaves it nil: only a choice the owner changed
   # is written, and a site keeps following the default until then.
   #
+  # THE POST TYPES A SITE SWITCHES ON (`content_types`, docs/reference/
+  # settings-languages-ai.md) are a plain `attributes` key too, the posted
+  # list of names, and a site part (`settings.manage`). The stored list is the
+  # posted names that are declared, in registration order, then every stored
+  # name that is not declared (a removed gem's type is carried, never dropped
+  # by a save); a posted name that is not declared switches nothing on.
+  # Posting only the hidden empty value is no choice: the model refuses a list
+  # with no declared type, as a field error, and the row stays as it was. When
+  # the switched-on set of declared types moved, the posts of each type that
+  # moved have their addresses refreshed (a switched-off type's posts lose
+  # theirs, a switched-on one's come back from their slugs), the search index
+  # is built again after the commit, and each type has its own event,
+  # `content_type.switched_on` or `content_type.switched_off`, naming it and
+  # its label. A switch is said once: `"content_types"` is not in
+  # `settings.updated`'s changes. An address another post took meanwhile is
+  # the clash `PublicSite::Paths` reports; the save stands.
+  #
   # Recorded as `settings.updated`, and only when something actually changed.
   class Save < ApplicationService
     TRANSLATED = %i[title tagline].freeze
@@ -119,6 +136,11 @@ module Settings
       # Kept out of `assign_attributes` too -- see `#write_mail_login`. Only
       # the keys given are written: a login half set by the host posts the
       # other half alone.
+      # Kept out of `assign_attributes` as well: the posted list is normalised
+      # against the locked row (`#assign_content_types`).
+      @content_types_given = @attributes.key?(:content_types)
+      @content_types = Array(@attributes.delete(:content_types)).map(&:to_s)
+
       @mail_login = @attributes.slice(*MAIL_LOGIN).transform_values { |value| value.to_s.strip.presence }
       @attributes = @attributes.except(*MAIL_LOGIN)
 
@@ -132,6 +154,18 @@ module Settings
     end
 
     def call
+      result = nil
+      result = save
+    ensure
+      # `switch_content_types` points `Current.site` at the saved row for the
+      # address refresh; a save that rolled back (or raised) must not leave it
+      # on a row that was never stored.
+      Current.site = @site_before if @site_before && !result&.ok?
+    end
+
+    private
+
+    def save
       # Every right is checked BEFORE anything is assigned or written, so a
       # refusal leaves nothing behind and records the single `access.denied`.
       if site_part? && !authorize!("settings.manage", @site)
@@ -208,12 +242,13 @@ module Settings
           # The settings event is built from THIS save's changes, before the
           # languages write below saves the row a second time (which replaces
           # `saved_changes`).
-          changes = Audit::Snapshot.field_changes_for(@site)
+          changes = Audit::Snapshot.field_changes_for(@site).except("content_types")
           changes["logo"] = [ nil, @site.logo.attached? ? @site.logo.filename.to_s : nil ] if logo_changing
           changes["AI key"] = ai_key_change if ai_key_change
           # "Mail login", like "AI key": matches no `filter_parameters` entry.
           changes["Mail login"] = mail_login_change if mail_login_change
           record_event("settings.updated", subject: @site, field_changes: changes) if changes.any?
+          switch_content_types
         end
 
         if @languages
@@ -254,8 +289,6 @@ module Settings
       @site.reload
       failure(@site, [ self.class.no_encryption_keys ])
     end
-
-    private
 
     # The AI API key (translation helpers spec §6.2), written straight to
     # its column after the main save (inside the same transaction, so a
@@ -328,7 +361,7 @@ module Settings
     # Whether the call carries site fields (or nothing at all, which has
     # always meant a settings save); false for a call that is only `languages:`.
     def site_part?
-      @languages.nil? || @attributes.any? || @ai_key_given || @mail_login.any? || @translations.any?
+      @languages.nil? || @attributes.any? || @content_types_given || @ai_key_given || @mail_login.any? || @translations.any?
     end
 
     # Whether the call needs `languages.manage`: the order (`languages:`), the
@@ -349,9 +382,43 @@ module Settings
         @attributes = @attributes.except(:passkey_policy)
       end
       @site.assign_attributes(@attributes)
+      assign_content_types if @content_types_given
 
       @translations.each do |locale, values|
         Mobility.with_locale(locale) { @site.assign_attributes(values.to_h.symbolize_keys.slice(*TRANSLATED)) }
+      end
+    end
+
+    # The posted list against the locked row (see the class comment). Assigned
+    # with the other fields, so one save validates the whole row and a refusal
+    # (no declared type left on) writes nothing at all.
+    def assign_content_types
+      declared = ::ContentTypes.names.map(&:to_s)
+      @types_before = @site.content_types
+      carried = @types_before - declared
+      @site.content_types = declared.select { |name| @content_types.include?(name) } + carried
+    end
+
+    # After the save, in its transaction: the declared types whose switch
+    # moved have their posts' addresses refreshed (`Paths` reads the switch
+    # through `Current.site`, which must be the row just saved, not a copy the
+    # caller loaded earlier), the index is rebuilt after the commit, and each
+    # type is recorded.
+    def switch_content_types
+      return unless @content_types_given && @site.saved_change_to_content_types?
+
+      declared = ::ContentTypes.names.map(&:to_s)
+      after = @site.content_types
+      moved = declared.select { |name| @types_before.include?(name) != after.include?(name) }
+      return if moved.empty?
+
+      @site_before = Current.site
+      Current.site = @site
+      PublicSite::Paths.refresh(posts: Post.where(content_type: moved), report_taken: true)
+      SiteSearch::Indexing.content_types_changed
+      moved.each do |name|
+        metadata = { "name" => name, "label" => ::ContentTypes.fetch(name).label }
+        record_event(after.include?(name) ? "content_type.switched_on" : "content_type.switched_off", subject: @site, metadata: metadata)
       end
     end
   end

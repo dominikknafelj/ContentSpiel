@@ -194,6 +194,11 @@ en:
         unpublished_chip:
           label: "Unpublished changes"
 
+        # A post type the site has switched off (or no code declares): the one
+        # word every caller draws, through `Admin::Ui::TypeStateComponent`.
+        type_state:
+          switched_off: "Switched off"
+
         # One translation vocabulary in CS Studio: Missing, Outdated,
         # Translated. The outdated tooltip keeps its sentence, since it names
         # the language to compare with.

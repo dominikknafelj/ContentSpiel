@@ -4,18 +4,19 @@ module ContentBlocks
   module Structure
     private
 
-    # The owner's row lock, taken first (decision D14). Two structural writes
-    # on one page then run one after the other, each seeing what the other
-    # committed: without it a fold to two columns and an add into column
-    # three, started together, both pass their checks and leave a block in a
-    # column the section no longer has. `pick`, not `owner.lock!`: the
-    # caller's page object, with whatever it has preloaded, is left alone.
+    # The owner's row lock, taken first (decision D14), after the settings
+    # row. Two structural writes on one page then run one after the other,
+    # each seeing what the other committed: without it a fold to two columns
+    # and an add into column three, started together, both pass their checks
+    # and leave a block in a column the section no longer has. `pick`, not
+    # `owner.lock!`: the caller's page object, with whatever it has
+    # preloaded, is left alone.
     #
     # Every `ContentBlocks::Save`, `Destroy`, `Reorder` and `Duplicate`
-    # takes it, as the first statement of its transaction, whatever the
-    # block: the page's row, then block rows, is the order of locks for a
-    # page's blocks (`ContentBlocks::Save#call` has the deadlock a second
-    # order made, and the list of writers that keep it: these four;
+    # takes it, as the first lock of its transaction, whatever the block:
+    # the settings row, then the page's row, then block rows, is the order of
+    # locks for a page's blocks (`ContentBlocks::Save#call` has the deadlock
+    # a second order made, and the list of writers that keep it: these four;
     # `Translations::Confirm`, which includes this module for a block's
     # field, because it writes the block's row and then the page's
     # `translation_states` rows; and `Tags::Merge` and `Trash::Purge`,
@@ -23,9 +24,14 @@ module ContentBlocks
     # Asking again inside the same transaction -- a duplicate's saves and
     # its reorder do -- is one short query for a lock already held.
     #
-    # An owner that isn't saved yet has no row to lock, and nobody else can
-    # be writing its blocks: nil, and no query.
+    # THE SETTINGS ROW FIRST (`ContentTypes.hold!`): `Locales::Enable` holds
+    # it and then writes every page and post row, and a block's write that
+    # reaches the page's addresses (a list block's) asks for it; taken after
+    # the page's row, it would wait for Enable while Enable waits for the
+    # page. It is held for an owner not saved yet too, which has no row of
+    # its own to lock (nobody else can be writing its blocks).
     def lock_owner(owner)
+      ContentTypes.hold!
       return unless owner.persisted?
 
       owner.class.where(id: owner.id).lock.pick(:id)

@@ -522,4 +522,42 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
   def without_public_host(&)
     with_site_address(nil, &)
   end
+
+  test "a dormant post's editor says its type is switched off, with the Settings link for settings.manage alone" do
+    switch_on_content_types("blog", "resume_entry")
+    post = create_post(title: "Role", content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    render_header(post)
+    assert_selector "[data-view-only]", text: "View only"
+    assert_selector "[data-type-state=switched_off]", text: "Switched off"
+    notice = page.find("[data-switched-off-notice][role=note]")
+    assert_equal "Resume entry is switched off. Its posts are kept, and are not on the site. Switch it on to change this post. Open Post types settings →", notice.text.squish
+    assert_selector "[data-switched-off-notice] a[href$='#post_types']", text: "Open Post types settings →"
+    assert_no_selector "[data-view-only-hint]"
+    assert_no_text "needs the right to publish"
+    assert_no_text "Not listed on any page yet"
+
+    render_header(post, actor: users(:author))
+    assert_equal "Resume entry is switched off. Its posts are kept, and are not on the site. Someone who manages Settings can switch it on.", page.find("[data-switched-off-notice]").text.squish
+    assert_no_selector "[data-switched-off-notice] a"
+  end
+
+  test "a post of a switched-on type has no switched-off chip or notice" do
+    render_header(create_post(title: "Live"))
+
+    assert_no_selector "[data-type-state]"
+    assert_no_selector "[data-switched-off-notice]"
+  end
+
+  test "a live dormant post that an unfiltered list would list draws no No address chip" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    Page.create!(parent: root, title: "Everything", published_at: 1.day.ago).content_blocks.create!(block_type: :post_list, position: 0, settings: {})
+    switch_on_content_types("blog", "resume_entry")
+    post = create_post(title: "Role", content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    render_header(post.reload)
+    assert_no_selector "[data-no-address]"
+  end
 end

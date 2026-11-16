@@ -19,7 +19,7 @@ module Admin
       parts << t("#{TOOLBAR}.scopes.#{scope}") unless scope == "all"
       if filters[:type].present?
         type = content_types.find { |candidate| candidate.name == filters[:type] }
-        parts << posts_filter_part(:type, type ? type.label : filters[:type])
+        parts << posts_filter_part(:type, type ? type.label : (::ContentTypes.find(filters[:type])&.label || filters[:type]))
       end
       parts << posts_filter_part(:tag, filters[:tag]) if filters[:tag].present?
       parts << posts_filter_part(:translation, t("#{TOOLBAR}.translations.#{filters[:translation]}")) if filters[:translation].present?

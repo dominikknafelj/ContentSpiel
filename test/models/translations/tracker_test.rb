@@ -292,6 +292,8 @@ class Translations::TrackerTest < ActiveSupport::TestCase
       t.field :source, :string
     end
 
+    switch_on_registered_types
+
     with_locales(%w[en de], default: "en") do
       post = Posts::Save.call(Post.new, attributes: { content_type: "test/interview", fields: { quote: "To be", source: "Hamlet" } },
         translations: { "en" => { title: "Quote" } }).record
@@ -484,6 +486,7 @@ class Translations::TrackerTest < ActiveSupport::TestCase
       t.label "Interview"
       t.field :quote, :string, translated: true
     end
+    switch_on_registered_types
     with_locales(%w[en de], default: "en") do
       post = Posts::Save.call(Post.new, attributes: { content_type: "test/interview", fields: { quote: "To be" } },
         translations: { "en" => { title: "Quote" } }).record

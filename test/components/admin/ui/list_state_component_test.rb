@@ -39,4 +39,27 @@ class Admin::Ui::ListStateComponentTest < ViewComponent::TestCase
     html = render_inline(Admin::Ui::ListStateComponent.new(record: record)).to_html
     assert_equal [ status, unpublished ].map { |h| h.gsub(/\s+/, " ").strip }.join(" "), html.gsub(/\s+/, " ").strip
   end
+
+  test "a post of a switched-off type leads with the type's chip, then its own state; a live one shows the chip alone" do
+    switch_on_content_types("blog")
+    draft = create_post(title: "Resume", content_type: "blog", published: false)
+    draft.update_columns(content_type: "resume_entry")
+    live = create_post(title: "Live resume", content_type: "blog")
+    live.update_columns(content_type: "resume_entry")
+
+    html = render_inline(Admin::Ui::ListStateComponent.new(record: draft))
+    assert_selector "[data-type-state=switched_off]", text: "Switched off"
+    assert_selector ".admin-status-chip[data-status=draft]"
+    assert_operator html.to_html.index("Switched off"), :<, html.to_html.index("Draft")
+
+    render_inline Admin::Ui::ListStateComponent.new(record: live)
+    assert_selector "[data-type-state=switched_off]", count: 1
+    assert_no_selector ".admin-status-chip"
+  end
+
+  test "a post of a switched-on type draws no type chip" do
+    render_inline Admin::Ui::ListStateComponent.new(record: create_post(title: "Draft", published: false))
+
+    assert_no_selector "[data-type-state]"
+  end
 end

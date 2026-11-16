@@ -197,6 +197,13 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You changed the languages", read(sentence_for(Audit::Event.new(base.merge(action: "language.configured"))))
   end
 
+  test "a post type switched on and off reads with its label" do
+    base = { channel: "admin", user_id: @me.id, occurred_at: Time.current, last_occurred_at: Time.current, metadata: { "name" => "resume_entry", "label" => "Resume entry" } }
+    assert_equal "You switched on the post type Resume entry", read(sentence_for(Audit::Event.new(base.merge(action: "content_type.switched_on"))))
+    assert_equal "You switched off the post type Resume entry", read(sentence_for(Audit::Event.new(base.merge(action: "content_type.switched_off"))))
+    assert_equal "You switched on a post type", read(sentence_for(Audit::Event.new(base.merge(action: "content_type.switched_on", metadata: {}))))
+  end
+
   test "a failed sign-in has no actor and never echoes the attempted address" do
     failed = event("session.failed", channel: "admin", metadata: { "email_address" => "someone@example.com" }, ip: "203.0.113.4")
     sentence = sentence_for(failed)

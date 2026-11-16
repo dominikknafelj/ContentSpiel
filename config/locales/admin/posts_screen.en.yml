@@ -27,6 +27,9 @@ en:
           # The filter panel's legend, shown where the panel stands in the rail.
           filters: "Filters"
           type: "Type"
+          # A type the site has switched off that the viewer has posts of, as an
+          # option (text alone fits there).
+          switched_off: "%{label} (switched off)"
           tag: "Tag"
           translation: "Translation"
           # The blank choice of a select, under its label: every type, any tag,
@@ -38,3 +41,7 @@ en:
             needs: "Needs translation"
             outdated: "Outdated"
             complete: "Complete"
+        # `Admin::PostsScreen::TableComponent`.
+        table:
+          # The path line of a post whose type is switched off: it has no address.
+          not_on_site: "Not on the site"

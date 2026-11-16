@@ -55,6 +55,7 @@ module Jump
     SETTINGS_TITLES = {
       "site" => "Settings › Site",
       "languages" => "Settings › Languages",
+      "post_types" => "Settings › Post types",
       "publishing" => "Settings › Publishing",
       "forms" => "Settings › Forms",
       "ai" => "Settings › AI translation",

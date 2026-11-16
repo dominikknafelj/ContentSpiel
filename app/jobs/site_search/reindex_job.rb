@@ -18,7 +18,7 @@ module SiteSearch
   # go. So a job that built enqueues itself once more, always, for
   # `AGAIN_AFTER` later: a job scheduled for later takes the semaphore when
   # it becomes ready, by which time this one has let it go, and it reads
-  # the fingerprint then. It builds again if the languages moved, and
+  # the fingerprint then. It builds again if the languages or the switched-on post types moved, and
   # otherwise finds the row ready and does nothing (and enqueues nothing).
   #
   # A build that another holds (`search:reindex`, `Rebuild::Busy`) is tried

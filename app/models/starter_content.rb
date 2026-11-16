@@ -26,8 +26,8 @@
 # site.
 #
 # The sections themselves are no longer a hardcoded table here (open-types
-# spec §6): each registered content type declares its own section/sample via
-# `starter` (`ContentTypeDefinition#starter_data`), so a plugin's content
+# spec §6): each registered content type declares its section via `starter`
+# and its post via `sample` (`ContentTypeDefinition#starter_data`), so a plugin's content
 # type gets starter content the same way a built-in does, with nothing to
 # edit in this module.
 module StarterContent
@@ -57,7 +57,7 @@ module StarterContent
   # itself (a content type already knows its own name; nothing else reading
   # `starter_data` needs it repeated).
   def sections
-    ContentTypes.all.filter_map { |type| type.starter_data&.merge(content_type: type.name) }
+    ContentTypes.switched_on.filter_map { |type| type.starter_data&.merge(content_type: type.name) }
   end
 
   # Kept records only: a starter section or sample post in the trash is
@@ -87,7 +87,7 @@ module StarterContent
 
   # The JSON document (tiptap spec §3.1) for a starter body written as
   # Markdown -- `WELCOME_MARKDOWN` here, or a content type's own
-  # `starter sample: { body: ... }`. Conversion warnings are a bug in that
+  # `sample body:`. Conversion warnings are a bug in that
   # fixed text, not something to degrade around, so they raise like a
   # failed `Result` does (`raise!` below).
   def document(markdown)

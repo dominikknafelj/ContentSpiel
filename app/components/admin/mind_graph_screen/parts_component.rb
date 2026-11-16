@@ -1,7 +1,7 @@
 module Admin
   module MindGraphScreen
     # The pieces of CS Studio the graph's scripts put into the list and the
-    # card: the status chips, the unpublished chip, an icon chip per kind of
+    # card: the status chips, the unpublished chip, the switched-off post type's chip, an icon chip per kind of
     # node, the card's Close, and the tree row's own glyphs (`TREE_GLYPHS`).
     # Each is the shared component's own markup, or the tree's glyph partial,
     # rendered here once into a `<template data-mind-graph-parts>` inside the
@@ -15,7 +15,7 @@ module Admin
     # put into. A template's content is no part of the document: the page's
     # text, its Tab order and the controller's `reset` never meet it.
     class PartsComponent < AdminComponent
-      NAMES = %w[status-live status-draft status-scheduled unpublished icon-page icon-post icon-tag icon-type close tree-disclosure tree-page-mark tree-home-mark].freeze
+      NAMES = %w[status-live status-draft status-scheduled unpublished type-switched-off icon-page icon-post icon-tag icon-type close tree-disclosure tree-page-mark tree-home-mark].freeze
 
       # The tree row's glyphs (`admin/shared/_tree_glyph`), which the list's
       # rows put in their disclosure and mark boxes, as Pages' rows draw them.
@@ -38,6 +38,9 @@ module Admin
         case name
         when "status-live", "status-draft", "status-scheduled" then Admin::Ui::StatusChipComponent.new(status: name.delete_prefix("status-"))
         when "unpublished" then Admin::Ui::UnpublishedChipComponent.new
+        # `Admin::Ui::TypeStateComponent` draws nothing for a switched-on type, so
+        # the template holds the chip it draws for an off one, with its word.
+        when "type-switched-off" then Admin::Ui::StateChipComponent.new(tone: :off, label: I18n.t("admin.components.ui.type_state.switched_off"), data: { type_state: "switched_off" })
         when "close" then Admin::Ui::ButtonComponent.new(label: close_label, icon: :x, variant: :tertiary, size: :small, data: { mind_graph_card_close: "" })
         else
           icon, family = ICONS.fetch(name)

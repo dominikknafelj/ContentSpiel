@@ -258,12 +258,13 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     end
     ContentTypes.register "test/snippet" do |t|
       t.label "Snippet"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :source, :code, max: 100
       t.field :note, :string
       t.field :samples, :groups, of: "test/sample"
     end
+    switch_on_registered_types
     saved = Posts::Save.call(attributes: { content_type: "test/snippet", fields: { source: "a = 1", note: "n", samples: [ { name: "s", listing: "b = 2" } ] } },
       translations: { "en" => { title: "Snippet" } })
     assert saved.ok?, saved.errors.to_sentence

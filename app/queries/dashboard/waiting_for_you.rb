@@ -88,7 +88,7 @@ module Dashboard
 
     private
 
-    def open_threads = @open_threads ||= OpenThreads.new(actor: @actor, channel: @channel, limit: @limit)
+    def open_threads = @open_threads ||= OpenThreads.new(actor: @actor, channel: @channel, limit: @limit, switched_on_only: true)
 
     def feed = @feed ||= Feed.new(actor: @actor, channel: @channel)
 
@@ -110,7 +110,7 @@ module Dashboard
       bare = entries.reject { |entry| entry[:thread] }
       return entries if bare.empty?
 
-      found = OpenThreads.new(actor: @actor, channel: @channel, limit: bare.size, records: bare.map { |entry| entry[:record] }).rows.index_by { |row| key(row.record) }
+      found = OpenThreads.new(actor: @actor, channel: @channel, limit: bare.size, switched_on_only: true, records: bare.map { |entry| entry[:record] }).rows.index_by { |row| key(row.record) }
       bare.each { |entry| entry[:thread] = found[key(entry[:record])] }
       entries
     end

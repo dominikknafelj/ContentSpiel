@@ -52,7 +52,7 @@ module Admin
       def choices
         @choices ||= begin
           prefix = PublicSite::Urls.new.prefix(locale)
-          types = ContentTypes.all.select { |type| can?("posts.create", Post.new(content_type: type.name)) }
+          types = ::ContentTypes.switched_on.select { |type| can?("posts.create", Post.new(content_type: type.name)) }
           posts = types.to_h { |type| [ type, Post.new(content_type: type.name) ] }
           pages = PublicSite::Paths.canonical_pages(posts.values)
           # One query for every listing page's stored path, not one per page.

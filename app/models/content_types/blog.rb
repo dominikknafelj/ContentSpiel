@@ -5,15 +5,16 @@ module ContentTypes
     def self.register
       ContentTypes.register :blog do |t|
         t.label "Blog"
-        t.list_component Posts::BlogListComponent
-        t.detail_component Posts::DetailComponent
+        t.description :blog
+        t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+        t.detail_component Posts::DetailComponent, theme_methods: %w[post]
 
-        # Moved from the old `StarterContent::SECTIONS` entry verbatim: the
-        # section page this type's sample post seeds into, and the sample
-        # itself (`db/seeds.rb` / the setup wizard, via `Posts::Save`).
-        t.starter section: { title: "Blog", slug: "blog" },
-          sample: { title: "Hello, world", excerpt: "The first post on this site.",
-                     body: "This is a sample blog post. Edit or delete it in the admin." }
+        # The sample is the starter content's post (`db/seeds.rb` / the setup
+        # wizard, via `Posts::Save`) and the shared tests' post.
+        t.sample title: "Hello, world", excerpt: "The first post on this site.",
+                 body: "This is a sample blog post. Edit or delete it in the admin.",
+                 shows: [ "Hello, world" ]
+        t.starter section: { title: "Blog", slug: "blog" }
       end
     end
   end

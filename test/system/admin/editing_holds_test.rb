@@ -637,10 +637,11 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     with_test_types do
       ContentTypes.register "test/flagged" do |t|
         t.label "Flagged"
-        t.list_component Posts::BlogListComponent
-        t.detail_component Posts::DetailComponent
+        t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+        t.detail_component Posts::DetailComponent, theme_methods: %w[post]
         t.field :featured, :boolean
       end
+      switch_on_registered_types
       post = create_post(title: "Launch", content_type: "test/flagged", published: false)
       visit_editor(post)
       await_notes_live

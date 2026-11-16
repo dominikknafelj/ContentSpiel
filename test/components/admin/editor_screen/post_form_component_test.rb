@@ -97,11 +97,12 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
   test "on a translation tab a post type's code field is read-only under the line that links to the post's default tab, and is named by its label" do
     ContentTypes.register "test/snippet" do |t|
       t.label "Snippet"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :source, :code, max: 100, label: "Source code"
     end
     with_locales(%w[en de], default: "en") do
+      switch_on_registered_types
       saved = Posts::Save.call(attributes: { content_type: "test/snippet", fields: { source: "  a = 1" } }, translations: { "en" => { title: "Snippet" } })
       assert saved.ok?, saved.errors.to_sentence
 
@@ -152,11 +153,12 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
   test "a type's own fields stand in the settings panel; a translation tab draws the same rail; the form-only answer is the form alone" do
     ContentTypes.register "test/event" do |t|
       t.label "Event"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :venue, :string
     end
     with_locales(%w[en de], default: "en") do
+      switch_on_registered_types
       saved = Posts::Save.call(attributes: { content_type: "test/event" }, translations: { "en" => { title: "Gig" } })
       assert saved.ok?, saved.errors.to_sentence
 

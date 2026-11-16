@@ -75,6 +75,8 @@ module Trash
       # before a caller's outer transaction saw it, leaving the branch
       # members' `update_all` in place under a still-trashed root.
       @record.class.transaction(requires_new: true) do
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
+        ContentTypes.hold!
         branch_ids = page? ? restore_branch_members : []
         page? && @parent ? move_under_new_parent : keep_rank
         free_slugs

@@ -32,7 +32,7 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
     editor("posts.edit", scope: { "content_types" => [ "blog" ], "own" => true })
 
     assert_selector "#scope-probe[data-scope-editor][data-open='false']"
-    assert_selector "legend", text: "Content types · none ticked = all"
+    assert_selector "legend", text: "Post types · none ticked = all"
     AccessControl::Permissions.content_type_choices.each do |name|
       assert_selector "input[type=checkbox][name='group[grants][posts.edit][content_types][]'][value='#{name}']"
     end
@@ -42,6 +42,19 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
     assert_text "Only posts the user wrote."
     assert_no_selector ".admin-branch-picker"
     assert_no_selector "[data-removed-type]"
+  end
+
+  test "a switched-off type is offered with its mark and a grant scoped to it stays live" do
+    switch_on_content_types("blog")
+
+    editor("posts.edit", scope: { "content_types" => %w[resume_entry] })
+
+    box = "input[name='group[grants][posts.edit][content_types][]'][value='resume_entry']"
+    assert_selector "#{box}[checked][data-chip-label='Resume entry (switched off)']"
+    assert_text "Resume entry (switched off)"
+    assert_no_selector "[data-removed-type]"
+    assert_no_text "this type no longer exists"
+    assert_selector "input[name='group[grants][posts.edit][content_types][]'][value='blog']:not([checked])[data-chip-label='Blog']"
   end
 
   test "open: says so, and another form name is used throughout" do

@@ -34,7 +34,7 @@ module Mcp
       # `input_schema(...)` (the class macro every other tool uses) sets
       # `@input_schema_value` once, when this file is first loaded -- fine
       # for `Locales::SUPPORTED`, a fixed constant, but `content_type`'s enum
-      # has to be `ContentTypes.names` *at read time*, not at load time: the
+      # has to be `ContentTypes.switched_on_names` *at read time*, not at load time: the
       # registry is only populated once `to_prepare` runs, and it can grow
       # further afterwards (a plugin, or a test registering a type). The mcp
       # gem itself re-reads this on every `tools/list` and before every call
@@ -45,7 +45,7 @@ module Mcp
       def self.input_schema_value
         MCP::Tool::InputSchema.new(
           properties: {
-            content_type: { type: "string", enum: ContentTypes.names },
+            content_type: { type: "string", enum: ContentTypes.switched_on_names },
             title: { type: "string" },
             body: { type: "string", description: Mcp::MarkdownBody::DESCRIPTION },
             excerpt: { type: "string" },

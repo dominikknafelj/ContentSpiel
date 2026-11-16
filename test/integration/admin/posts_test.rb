@@ -195,10 +195,11 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     with_test_types do
       ContentTypes.register "test/required_company" do |t|
         t.label "Required company"
-        t.list_component Posts::BlogListComponent
-        t.detail_component Posts::DetailComponent
+        t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+        t.detail_component Posts::DetailComponent, theme_methods: %w[post]
         t.field :company, :string, required: true
       end
+      switch_on_registered_types
       post_record = Post.create!(content_type: "test/required_company", title: "Role", metadata: { "company" => "Acme" })
       patch "/cs-studio/posts/#{post_record.id}",
         params: { post: { fields: { company: "" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
@@ -541,6 +542,50 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_select_in_stream "post-related_post_ids-errors", /don.t exist/
   end
 
+  test "an autosave of a post whose type was switched off meanwhile is refused with the sentence and writes nothing" do
+    switch_on_content_types("blog", "resume_entry")
+    post_record = create_post(title: "Role", content_type: "resume_entry")
+    base = post_record.updated_at.iso8601(6)
+    switch_on_content_types("blog")
+    events = Audit::Event.count
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { post: { title: "Typed" }, base_updated_at: base }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Resume entry is switched off. Switch it on in Settings to change this post."
+    assert_equal "Role", post_record.reload.title
+    assert_equal events, Audit::Event.count
+  end
+
+  test "only the switched-off refusal says its sentence in the toast; another refusal with no field error keeps the plain one" do
+    post_record = create_post(title: "Role")
+    other = ApplicationService::Result.failure(post_record, [ "That address is taken." ])
+
+    original = Posts::Save.method(:call)
+    Posts::Save.define_singleton_method(:call) { |*, **| other }
+    begin
+      patch "/cs-studio/posts/#{post_record.id}", params: { post: { title: "Typed" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+    ensure
+      Posts::Save.define_singleton_method(:call, original)
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#toast-post", text: /Couldn.t save your changes\./
+    assert_not_includes response.body, "That address is taken."
+  end
+
+  test "a dormant post's editor is view only and offers no publishing action" do
+    switch_on_content_types("blog", "resume_entry")
+    post_record = create_post(title: "Role", content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    get admin_post_path(post_record)
+
+    assert_response :success
+    assert_select "form[data-controller~='admin--saving--autosave']", count: 0
+    assert_select "button", text: /\A\s*(Publish|Unpublish|Publish changes|Schedule)/, count: 0
+  end
+
   # Review Focus 4: a read-only user's forged autosave PATCH -- the editor
   # never sends one for them (Task 7), but the service refuses it anyway,
   # changes nothing, and however often it's repeated logs one coalesced
@@ -636,12 +681,13 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     with_test_types do
       ContentTypes.register "test/mixed" do |t|
         t.label "Mixed"
-        t.list_component Posts::BlogListComponent
-        t.detail_component Posts::DetailComponent
+        t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+        t.detail_component Posts::DetailComponent, theme_methods: %w[post]
         t.field :blurb, :string, translated: true
         t.field :venue, :string
         t.field :capacity, :integer
       end
+      switch_on_registered_types
       yield
     end
   end
@@ -710,5 +756,23 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
     ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
     count
+  end
+
+  test "the posts list marks a dormant post and offers its type in the filter only while a post holds it" do
+    switch_on_content_types("blog", "resume_entry")
+    create_post(title: "Role", content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    get admin_posts_path
+
+    assert_response :success
+    assert_select "select#type option", text: "Resume entry (switched off)"
+    assert_select "tr", text: /Role/ do
+      assert_select "[data-type-state=switched_off]", text: "Switched off"
+    end
+
+    get admin_posts_path(type: "resume_entry")
+    assert_select "select#type option[selected]", text: "Resume entry (switched off)"
+    assert_select "tr", text: /Role/
   end
 end

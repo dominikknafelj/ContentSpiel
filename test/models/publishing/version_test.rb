@@ -234,15 +234,16 @@ class Publishing::VersionTest < ActiveSupport::TestCase
     assert_equal "Old", Mobility.with_locale(:en) { stale.title }, "the caller's object is not changed under it"
   end
 
-  test "the first statement of a copy locks the record's row, then nothing is read before it" do
+  test "a copy holds the post types' switches, then locks the record's row, and nothing is read before them" do
     page = create_page(title: "Locked")
     post = create_post(title: "Locked too")
 
     [ page, post ].each do |record|
       statements = capture_sql { Publishing::Version.transaction { Publishing::Version.take!(record) } }
-      first = statements.reject { |sql| sql.match?(/\A\s*(BEGIN|COMMIT|SAVEPOINT|RELEASE)/i) }.first
+      hold, first = statements.reject { |sql| sql.match?(/\A\s*(BEGIN|COMMIT|SAVEPOINT|RELEASE)/i) }.first(2)
       table = record.class.table_name
 
+      assert_match(/FROM "site_settings" WHERE .* FOR SHARE/, hold, record.class.name)
       assert_match(/FROM "#{table}" WHERE "#{table}"\."id" = \$1 LIMIT \$2 FOR UPDATE/, first, record.class.name)
     end
   end

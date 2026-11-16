@@ -51,7 +51,7 @@ module Admin
     # and words in both (`#chips` / `rewriteChips`), and the same class
     # strings, which the script takes from the matrix (`.chip_classes`). A
     # chip is a neutral badge (a type's with its dot as the badge's mark), a
-    # removed type's a warn badge, and "All pages" / "All content types" plain
+    # removed type's a warn badge, and "All pages" / "All post types" plain
     # dim words.
     #
     # NO SCRIPT: the scope editor is rendered open and "Edit scope" is held back
@@ -144,7 +144,7 @@ module Admin
       end
 
       def type_items
-        items = live_types.map { |name| Chip.new(label: ContentTypes.find(name)&.label || name.humanize, kind: :plain, dot: dot_class(name)) } # i18n-ok: a type with no definition shows its stored name, as the scope editor's box does
+        items = live_types.map { |name| Chip.new(label: type_label(name), kind: :plain, dot: dot_class(name)) } # i18n-ok: a type with no definition shows its stored name, as the scope editor's box does
         items << Chip.new(label: t(".chips.own_only"), kind: :plain, dot: nil) if permission.scopes.include?(:own) && scope["own"] == true
         items
       end
@@ -156,6 +156,13 @@ module Admin
         roots = states.select { |_id, state| state.state == :chosen && tree.readable?(_id) }.keys
         items = roots.map { |id| Chip.new(label: t(".chips.under", title: tree.title(id)), kind: :plain, dot: nil) }
         items + tree.unreadable(stored_page_ids).map { Chip.new(label: t(".chips.unreadable"), kind: :plain, dot: nil) }
+      end
+
+      # A switched-off type's chip stays neutral (its grant is live) and says so
+      # in words, as the scope editor's box does.
+      def type_label(name)
+        label = ContentTypes.find(name)&.label || name.humanize # i18n-ok: a type with no definition shows its stored name
+        ::ContentTypes.switched_on?(name) ? label : t("admin.components.groups_screen.permission_matrix.switched_off_type", name: label)
       end
 
       def dot_class(name)

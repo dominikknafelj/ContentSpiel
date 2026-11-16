@@ -303,7 +303,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
                    { source: page_id(by_type), target: "type-resume_entry", kind: "lists" } ].sort_by(&:to_s), lines.sort_by(&:to_s)
     assert_equal [ "type-resume_entry", "all-posts" ], result[:types].map { |type| type[:id] }, "All posts is last"
     assert_equal({ id: "type-resume_entry", name: "resume_entry", label: ContentTypes.fetch("resume_entry").label,
-                   colour_index: ContentTypes.fetch("resume_entry").colour_index, count: 0, degree: 1 }, result[:types].first)
+                   colour_index: ContentTypes.fetch("resume_entry").colour_index, switched_on: true, count: 0, degree: 1 }, result[:types].first)
     assert_equal({ id: "all-posts", name: nil, label: nil, colour_index: nil, count: 1, degree: 1 }, result[:types].last)
   end
 
@@ -365,7 +365,39 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
   test "a retired type a block names is a type node with no colour" do
     list_block(create_page(title: "Old"), content_type: "gone/thing")
 
-    assert_equal [ { id: "type-gone/thing", name: "gone/thing", label: "gone/thing", colour_index: nil, count: 0, degree: 1 } ], graph[:types]
+    assert_equal [ { id: "type-gone/thing", name: "gone/thing", label: "gone/thing", colour_index: nil, switched_on: false, count: 0, degree: 0 } ], graph[:types]
+  end
+
+  test "a switched-off type's hub says so, and an undeclared one stays retired" do
+    create_post(title: "Kept", content_type: "resume_entry")
+    switch_on_content_types("blog")
+    page = create_page(title: "Lists")
+    list_block(page, content_type: "blog")
+    list_block(page, content_type: "resume_entry")
+    list_block(page, content_type: "gone/thing")
+
+    types = graph[:types].index_by { |type| type[:id] }
+
+    assert_equal true, types.fetch("type-blog")[:switched_on]
+    off = types.fetch("type-resume_entry")
+    assert_equal [ false, 1 ], off.values_at(:switched_on, :count), "its posts are kept and counted"
+    assert_equal ContentTypes.fetch("resume_entry").colour_index, off[:colour_index], "the hub keeps its hue"
+    retired = types.fetch("type-gone/thing")
+    assert_nil retired[:colour_index], "an undeclared type has no slot, which is how the card knows it is retired"
+  end
+
+  test "a list block filtered to a switched-off type draws its hub but no lists line, and switched on it draws both" do
+    page = create_page(title: "Lists")
+    list_block(page, content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    off = graph
+    assert_equal [ "type-resume_entry" ], off[:types].map { |type| type[:id] }
+    assert_empty off[:edges].select { |edge| edge[:kind] == "lists" }
+    assert_equal 0, off[:types].first[:degree]
+
+    switch_on_content_types("blog", "resume_entry")
+    assert_equal [ "type-resume_entry" ], graph[:edges].select { |edge| edge[:kind] == "lists" }.map { |edge| edge[:target] }
   end
 
   # Design answer H2: the order the list's "Post types" group shows.

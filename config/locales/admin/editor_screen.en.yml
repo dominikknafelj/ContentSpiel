@@ -470,6 +470,15 @@ en:
           cancel: "Cancel"
           confirm: "Change address"
           changed: "Address changed"
+        # `Admin::EditorScreen::SwitchedOffComponent`: the note above a dormant
+        # post's form, in place of the view-only hint.
+        switched_off:
+          body: "%{type} is switched off. Its posts are kept, and are not on the site."
+          # For a holder of `settings.manage`, before the link.
+          change: "Switch it on to change this post."
+          # For anyone else.
+          ask: "Someone who manages Settings can switch it on."
+          open_settings: "Open Post types settings →"
         # The rest of the header's strings are in `notes.en.yml` or not
         # converted yet.
         header:

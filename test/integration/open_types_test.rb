@@ -28,6 +28,7 @@ class OpenTypesTest < ActionDispatch::IntegrationTest
 
   test "a new content type gets canonical URLs, MCP schema entries and typed validation" do
     with_test_types do
+      switch_on_content_types("blog", "test/event")
       listing = create_page(title: "Events")
       block_result = ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "test/event" } })
       assert block_result.ok?, block_result.errors.to_sentence
@@ -59,13 +60,14 @@ class OpenTypesTest < ActionDispatch::IntegrationTest
     FieldGroups.register("test/host") { |c| c.field :name, :string, required: true, label: "Full name" }
     ContentTypes.register "test/talk" do |t|
       t.label "Talk"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :room, :string, required: true, label: "Meeting room"
       t.field :hosts, :groups, of: "test/host", label: "Speakers"
       t.field :chair, :group, of: "test/host"
     end
 
+    switch_on_registered_types
     bad = Posts::Save.call(attributes: { content_type: "test/talk", fields: { hosts: [ { name: "" } ], chair: { name: "" } } }, translations: { "en" => { title: "Bad" } })
 
     assert_not bad.ok?

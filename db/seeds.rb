@@ -116,6 +116,10 @@ if Page.none? && Post.none?
     enabled = Locales::Enable.call(code)
     raise "seeds: #{enabled.errors.to_sentence}" unless enabled.ok?
   end
+
+  # A new site starts with Blog alone; the demo has the other post types too.
+  switched = Settings::Save.call(SiteSetting.instance, attributes: { content_types: ContentTypes.names }, actor: nil)
+  raise "seeds: #{switched.errors.to_sentence}" unless switched.ok?
 end
 
 # Bodies are rich-text JSON documents (tiptap spec §3.1/§5 "Writers of
@@ -224,8 +228,9 @@ DevelopmentShowcase.call(root: root, image: root.reload.hero_media_asset)
 # was taken when it was published, before its blocks and hero were added
 # above: publish what the seed built. Only a record whose one copy is the
 # first (a second run of the seed finds more and adds none), through the same
-# trusted actor the services above ran as.
-[ *Page.where.not(published_at: nil), *Post.where.not(published_at: nil) ].each do |record|
+# trusted actor the services above ran as. A post of a type the site has
+# switched off is dormant and refused every write.
+[ *Page.where.not(published_at: nil), *Post.of_switched_on_types.where.not(published_at: nil) ].each do |record|
   next unless Publishing::Version.of(record).count == 1
 
   published = Publishing::PublishChanges.call(record)

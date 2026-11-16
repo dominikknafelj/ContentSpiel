@@ -34,6 +34,16 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
     assert_equal "/de#{PublicSite::Paths.current_path(page, "de")}", docs.find { |each| each.language == "de" }.url
   end
 
+  test "a dormant post's copy gives no document" do
+    post = create_post(title: "Gone dark", content_type: "now_update")
+    version = Publishing.current(post)
+    assert_not_empty SiteSearch::Documents.for(version, now: Time.current)
+
+    switch_on_content_types("blog")
+
+    assert_empty SiteSearch::Documents.for(version, now: Time.current)
+  end
+
   def document_of(record, locale) = SiteSearch::Documents.for(Publishing.current(record), now: Time.current).find { |each| each.language == locale }
 
   test "the title is A, the summary B, the blocks C, code D" do
@@ -82,11 +92,12 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
     saved = ContentTypes.all.dup
     ContentTypes.register("test/report") do |t|
       t.label "Report"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :standfirst, :text, translated: true
       t.field :venue, :string
     end
+    switch_on_content_types("blog", "test/report")
     post = create_post(title: "Spring report", content_type: "test/report", tags: %w[Weather Tides])
     assert Posts::Save.call(post, translations: { "en" => { excerpt: "A short look back", body: rich_doc("The rain was heavy.") } },
                                   attributes: { fields: { "standfirst" => "Rain came early", "venue" => "Untranslated hall" } }).ok?

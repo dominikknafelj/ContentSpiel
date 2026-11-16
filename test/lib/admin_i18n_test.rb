@@ -171,6 +171,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/ai_card_component.html.erb
     app/components/admin/settings_screen/ai_key_component.rb
     app/components/admin/settings_screen/ai_key_component.html.erb
+    app/components/admin/settings_screen/post_types_card_component.rb
+    app/components/admin/settings_screen/post_types_card_component.html.erb
     app/components/admin/settings_screen/forms_card_component.rb
     app/components/admin/settings_screen/forms_card_component.html.erb
     app/components/admin/settings_screen/images_card_component.rb

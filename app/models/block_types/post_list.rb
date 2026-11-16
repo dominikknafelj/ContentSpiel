@@ -51,12 +51,12 @@ module BlockTypes
     # compiles to `content_type IS NULL` and the block silently lists nothing
     # at all.
     #
-    # "Every content type" still means "every *registered* content type"
-    # (spec §4.2: "a post of an unknown type has no public URL") -- a post
-    # whose stored `content_type` names a removed plugin or a typo has no
-    # `definition` and so no schema to render its listing row against, let
-    # alone a canonical URL for `post_url_path` to link to. Always scoping to
-    # `ContentTypes.names`, not just when `settings.content_type` is blank,
+    # "Every content type" still means "every *switched-on* content type": a
+    # post of a type the site has switched off, or whose stored `content_type`
+    # names a removed plugin or a typo, has no public URL (spec §4.2) and no
+    # schema to render its listing row against. A filter naming a switched-off
+    # type therefore lists nothing. Always scoping to the switched-on set,
+    # not just when `settings.content_type` is blank,
     # is what keeps a *filtered* listing consistent with the same rule: a
     # filter naming a real type can never accidentally let a stale-typed post
     # through some other path.
@@ -64,7 +64,7 @@ module BlockTypes
       # Never a trashed post (trash spec §5.2), in preview or not: it has
       # no URL to link to, and a listing is exactly where it would leak.
       scope = include_unpublished ? Post.kept : Post.published.kept
-      scope = scope.where(content_type: ContentTypes.names)
+      scope = scope.of_switched_on_types
       content_type = settings.content_type
       scope = scope.where(content_type: content_type) if content_type.present?
 
@@ -86,7 +86,7 @@ module BlockTypes
     # listing, a post's address and the graph cannot come to disagree about
     # which page lists which post. Still in lockstep with `listed_posts`.
     def self.matches?(settings, content_type:, tag_names:)
-      return false if ContentTypes.find(content_type).nil?
+      return false unless ContentTypes.switched_on?(content_type)
       return false if settings.content_type.present? && settings.content_type.to_s != content_type.to_s
 
       tag = settings.tag.to_s.strip

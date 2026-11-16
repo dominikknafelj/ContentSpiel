@@ -90,6 +90,8 @@ module Pages
       # savepoint, so the FK refusal rescued below can't leave a caller's
       # transaction aborted.
       saved = Page.transaction(requires_new: true) do
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
+        ContentTypes.hold!
         was_unpublished = @page.published_at_in_database.nil?
         assign
         refused = refusal_after_assign

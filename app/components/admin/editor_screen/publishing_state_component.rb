@@ -52,7 +52,7 @@ module Admin
 
       def no_address? = ::Publishing::Addressless.record?(record)
 
-      def may_publish? = can?("#{type}s.publish", record)
+      def may_publish? = can_publish_record?(record)
 
       # What editing a published or scheduled record needs (`AccessControl::OwnerRule`).
       def may_discard? = can_edit?(record)

@@ -1235,6 +1235,22 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_not block.translated_settings.key?("de")
   end
 
+  test "a list block filtered to a switched-off type keeps its filter through a save" do
+    block = ContentBlocks::Save.call(@page.content_blocks.new, attributes: { block_type: "post_list", settings: { content_type: "resume_entry", limit: 3 } }).record
+    switch_on_content_types("blog")
+
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "select option[value=resume_entry][selected]", text: /switched off/
+
+    patch "/cs-studio/pages/#{@page.id}/content_blocks/#{block.id}",
+      params: { block: { settings: { content_type: "resume_entry", limit: 4 } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    block.reload
+    assert_equal "resume_entry", block.settings["content_type"]
+    assert_equal 4, block.settings["limit"]
+  end
+
   test "duplicating a section streams one card holding the copies of its blocks" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
     @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)

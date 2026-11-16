@@ -1,0 +1,12 @@
+<%= select_tag input_name, options_for_select(option_pairs, value), id: input_id, class: setup_select_class, include_blank: blank_choice, required: field.required?,
+      aria: { describedby: describedby } %>
+<% if switched_off? %>
+  <%# A warning, not an alert: nothing failed, the block just draws nothing for a visitor; the select's description reads it where it stands. %>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, id: list_empty_id, class: "mt-2") do %>
+    <%= t("admin.components.fields.content_type.list_empty", type: stored_label) %>
+    <% if settings? %>
+      <%= link_to t("admin.components.editor_screen.switched_off.open_settings"), helpers.admin_settings_path(anchor: "post_types"),
+            class: "font-medium underline hover:no-underline", data: { turbo_frame: "_top" } %>
+    <% end %>
+  <% end %>
+<% end %>

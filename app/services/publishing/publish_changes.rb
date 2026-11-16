@@ -21,6 +21,10 @@ module Publishing
     end
 
     def call
+      # A state, not a right: no `access.denied` (`ApplicationService#switched_off_refusal`).
+      dormant = switched_off_refusal(@record)
+      return dormant if dormant
+
       key = "#{prefix}s.publish"
       return denied(key, @record) unless authorize!(key, @record)
 
@@ -28,7 +32,13 @@ module Publishing
       @nothing = false
       @moved = false
       @record.class.transaction(requires_new: true) do
-        # The page's row first, as every write that reads its blocks does.
+        # The switches first (`ContentTypes.hold!`), and the refusal asked
+        # again against them, so a post type switched off since the question
+        # above takes no copy; then the page's row, as every write that reads
+        # its blocks does.
+        ContentTypes.hold!
+        next if (dormant = switched_off_refusal(@record))
+
         lock_owner(@record)
         next if @record.class.where(id: @record.id).pick(:published_at).nil?
         # What the dialog said about a schedule is no longer so (`ShownSchedule`).
@@ -50,6 +60,8 @@ module Publishing
         record_event("#{prefix}.changes_published", subject: @record, coalesce: false,
           metadata: { "number" => version.number, "live_at" => version.live_at.iso8601, "scheduled" => version.live_at > now })
       end
+
+      return dormant if dormant
 
       # The result does not say which of the two happened; the controller
       # tells by the baseline's number before and after.

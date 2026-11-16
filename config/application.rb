@@ -50,6 +50,10 @@ require_relative "../lib/telemetry/work_sampler"
 require_relative "../lib/content_spiel/diagram_font_cors"
 require_relative "../lib/content_spiel/suggest_gate"
 
+# And this one because config/initializers/lock_order.rb hands it to a
+# `sql.active_record` subscriber for the life of the process.
+require_relative "../lib/content_spiel/lock_order"
+
 module ContentSpiel
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.

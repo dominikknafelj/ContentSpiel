@@ -16,8 +16,9 @@ see [`docs/reference/`](docs/reference/), in this repository, below.
   - sections with columns.
 
   The same tree drives the navigation, the addresses and the sitemap.
-- **Posts** of types you define, with tags, related posts and a Mind graph that
-  draws how pages, posts and tags connect.
+- **Posts** of three built-in types, Blog and the optional Resume entry and Now
+  update, each switched on in Settings, with tags, related posts and a Mind graph
+  that draws how pages, posts and tags connect.
 - **Drafts and publishing.** Content saves as you type; a live page changes
   only when someone publishes, at once or at a scheduled time.
 - **Languages.** Every text is translated into the languages switched on in

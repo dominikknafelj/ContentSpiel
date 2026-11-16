@@ -217,4 +217,21 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     assert_selector "[data-unpublished-changes]", count: 30
     assert_equal small, large
   end
+
+  test "a dormant post's row is marked switched off and its path line says it is not on the site" do
+    switch_on_content_types("blog", "resume_entry")
+    dormant = create_post(title: "Role", content_type: "resume_entry")
+    kept = create_post(title: "Kept")
+    switch_on_content_types("blog")
+
+    render_table([ dormant, kept ], paths: { dormant.id => "/blog/role", kept.id => "/blog/kept" })
+
+    row = page.find("tr", text: "Role")
+    row.assert_selector "[data-type-state=switched_off]", text: "Switched off"
+    row.assert_text "Not on the site"
+    row.assert_no_text "/blog/role"
+    other = page.find("tr", text: "Kept")
+    other.assert_no_selector "[data-type-state]"
+    other.assert_text "/blog/kept"
+  end
 end

@@ -86,6 +86,19 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
   def resolve(path, scope: :published) = PublicSite::Resolver.new(scope: scope).call(locale: "en", path: path)
 
+  test "a post of a switched-off type gets no address, and an unhoused one is not housed" do
+    blog = listing(@root, "Everything", nil)
+    update = create_post(title: "Update", content_type: "now_update")
+    assert PublicPath.current.where(record: update).exists?
+
+    switch_on_content_types("blog")
+
+    assert_not PublicPath.current.where(record: update).exists?
+
+    PublicSite::Paths.refresh(pages: [ blog ])
+    assert_not PublicPath.current.where(record: update).exists?, "a page's refresh does not house a dormant post"
+  end
+
   test "a post lives under the first listing page in tree order" do
     blog = listing(@root, "Blog", "blog")
     listing(@root, "Archive", "blog")
@@ -827,6 +840,17 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
       ok! Locales::Configure.call([ { "code" => "es" }, { "code" => "de" }, { "code" => "en", "fallbacks" => [ "de" ] } ])
       assert_parity "reordering languages and changing a fallback"
+
+      # -- post types ------------------------------------------------------------
+      dispatch = ok! Posts::Save.call(attributes: { content_type: "now_update", published: true }, translations: { "en" => { title: "Dispatch" } })
+      assert current(dispatch)
+      ok! Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry] })
+      assert_nil current(dispatch), "a switched-off type's post has no address"
+      assert_parity "switching a post type off"
+
+      ok! Settings::Save.call(SiteSetting.instance, attributes: { content_types: %w[blog resume_entry now_update] })
+      assert current(dispatch)
+      assert_parity "switching a post type on"
 
       # -- discarding, and cancelling a scheduled change (Task 7) -----------------
       # A live page's list block changed and removed in its rows, a post's

@@ -222,7 +222,7 @@ class Translations::ConfirmTest < ActiveSupport::TestCase
   # takes the page's row first, as every other writer of a page's blocks
   # does. Statement order only, as in `ContentBlocks::SaveTest`: no
   # two-connection test.
-  test "confirming a block's field locks the page's row first, before the block's row and the page's state rows" do
+  test "confirming a block's field locks the page's row first, after the settings row, before the block's row and the page's state rows" do
     block = outdated_block
 
     statements = capture_sql { assert confirm(block, "body").ok? }
@@ -235,7 +235,8 @@ class Translations::ConfirmTest < ActiveSupport::TestCase
     assert_operator write, :<, states
     assert_equal 1, statements.count { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
     first_in_transaction = statements.index { |sql| sql.match?(/SAVEPOINT|BEGIN/) } + 1
-    assert_equal first_in_transaction, lock, "the lock is the transaction's first statement"
+    assert_match(/FROM "site_settings".*FOR SHARE/m, statements[first_in_transaction], "the settings row is the transaction's first lock")
+    assert statements[(first_in_transaction + 1)...lock].all? { |sql| sql.include?('FROM "site_settings"') }, "the page's row is the next lock"
   end
 
   # Their own row is the first they write, and nothing writes it after rows

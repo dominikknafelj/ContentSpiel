@@ -12,6 +12,7 @@ en:
         sections:
           site: "Site"
           languages: "Languages"
+          post_types: "Post types"
           publishing: "Publishing"
           forms: "Forms"
           ai: "AI translation"
@@ -158,6 +159,20 @@ en:
           not_connected: "Not connected"
         ai_test_result:
           time: "%{milliseconds} ms"
+        # The Post types card (`PostTypesCardComponent`): `count` is a row's
+        # kept posts, `leaving` and `returning` the line a row says while its
+        # switch differs from the stored one.
+        post_types_card:
+          intro: "The kinds of post this site has. Switching a type off takes its posts off the site and keeps them."
+          count:
+            one: "1 post"
+            other: "%{count} posts"
+          leaving:
+            one: "Its 1 post leaves the site when you save. It is kept, and comes back when you switch it on again."
+            other: "Its %{count} posts leave the site when you save. They are kept, and come back when you switch it on again."
+          returning:
+            one: "Its 1 post comes back to the site when you save."
+            other: "Its %{count} posts come back to the site when you save."
         forms_card:
           keep_label: "Keep submissions for"
           days: "days."

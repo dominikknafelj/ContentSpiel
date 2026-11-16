@@ -64,6 +64,30 @@ class SeedsTest < ActiveSupport::TestCase
     end
   end
 
+  test "the development seed switches every built-in post type on, on a new database only" do
+    original_env = Rails.env
+    begin
+      development_env = ActiveSupport::StringInquirer.new("development")
+      Rails.singleton_class.alias_method :_original_env, :env
+      Rails.singleton_class.define_method(:env) { development_env }
+
+      site_settings(:default).update_columns(locales: [ { "code" => "en" } ], content_types: %w[blog])
+      Current.site = nil
+      TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
+      assert_equal %w[blog resume_entry now_update], SiteSetting.instance.reload.content_types
+
+      # A site with content keeps its choice.
+      site_settings(:default).reload.update_columns(content_types: %w[blog])
+      Current.site = nil
+      TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
+      assert_equal %w[blog], SiteSetting.instance.reload.content_types
+    ensure
+      Rails.singleton_class.remove_method :env
+      Rails.singleton_class.alias_method :env, :_original_env
+      Rails.singleton_class.remove_method :_original_env
+    end
+  end
+
   # The showcase (db/seeds/showcase.rb) run on its own, on the suite's site
   # with its three languages: what each page holds, every page drawn once
   # published, and nothing written the second time.

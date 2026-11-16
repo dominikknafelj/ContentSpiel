@@ -86,6 +86,7 @@
     <% end %>
     <% unless page? %>
       <%= render Admin::Ui::ContentTypeDotComponent.new(content_type: record.content_type) %>
+      <%= render Admin::Ui::TypeStateComponent.new(content_type: record.content_type) %>
     <% end %>
   </div>
 
@@ -107,7 +108,7 @@
   <% elsif !page? && waiting_lister %>
     <%# A list block for this post exists and waits to be published with its page (drafts plan, task 7). %>
     <p class="mt-1 text-[13px] text-dim" data-waiting-lister><%= waiting_lister_line %></p>
-  <% elsif !page? %>
+  <% elsif !page? && !dormant? %>
     <p class="mt-1 text-[13px] text-dim">Not listed on any page yet — add a post list block for this type</p>
   <% end %>
 
@@ -128,7 +129,9 @@
   </div>
 
   <%# Why the editor is read-only, in one whole sentence per case. %>
-  <% unless editable? %>
+  <% if dormant? %>
+    <%= render Admin::EditorScreen::SwitchedOffComponent.new(record: record, url_options: url_options) %>
+  <% elsif !editable? %>
     <p data-view-only-hint class="mt-3 text-[13px] text-dim"><%= view_only_hint %></p>
   <% end %>
 

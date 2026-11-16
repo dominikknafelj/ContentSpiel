@@ -56,6 +56,8 @@ module Tags
       problem = nil
       pages = posts = []
       merged = Tag.transaction do
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
+        ContentTypes.hold!
         # Both rows locked, in id order, so two merges running the other way round
         # (A into B, B into A) queue up instead of deadlocking, and a tag deleted
         # in another tab since this one loaded it is a plain failure here rather

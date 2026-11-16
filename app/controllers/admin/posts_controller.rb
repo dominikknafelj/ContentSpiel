@@ -30,10 +30,13 @@ module Admin
     # The list's filters and its reads are `Posts::List`'s. The Tag select
     # offers the tags on the posts the viewer may read, kept ones only.
     def index
-      @content_types = ContentTypes.all
       @tags = Tag.on_posts(admin_scope(Post.all)).order(:name)
       filters = list_filters
       list = posts_list(filters)
+      # The filter offers the switched-on types, then each switched-off or
+      # undeclared type the viewer has a post of (marked by the toolbar).
+      @content_types = ContentTypes.switched_on
+      @types_present_off = list.types_present - @content_types.map { |type| type.name.to_s }
       @scope = list.scope_name
       # What the filter form shows and "No matches" names: the address's
       # String values, and only a translation state the list filters by.

@@ -43,7 +43,7 @@ module Dashboard
     def readable
       {
         "page" => AccessControl.scope(@actor, "pages.read", Page.all, channel: @channel),
-        "post" => AccessControl.scope(@actor, "posts.read", Post.all, channel: @channel),
+        "post" => AccessControl.scope(@actor, "posts.read", Post.of_switched_on_types, channel: @channel),
         "media" => (Media::Asset.kept if AccessControl.holds?(@actor, "media.upload", channel: @channel))
       }.compact.select { |type, _| type == "media" || AccessControl.holds?(@actor, "#{type}s.read", channel: @channel) }
     end

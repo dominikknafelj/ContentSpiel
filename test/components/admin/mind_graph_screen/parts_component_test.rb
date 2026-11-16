@@ -9,6 +9,7 @@ class Admin::MindGraphScreen::PartsComponentTest < ViewComponent::TestCase
     "status-draft" => -> { Admin::Ui::StatusChipComponent.new(status: "draft") },
     "status-scheduled" => -> { Admin::Ui::StatusChipComponent.new(status: "scheduled") },
     "unpublished" => -> { Admin::Ui::UnpublishedChipComponent.new },
+    "type-switched-off" => -> { Admin::Ui::StateChipComponent.new(tone: :off, label: "Switched off", data: { type_state: "switched_off" }) },
     "icon-page" => -> { Admin::Ui::IconChipComponent.new(icon: :pages, family: :structure, size: :small) },
     "icon-post" => -> { Admin::Ui::IconChipComponent.new(icon: :posts, family: :lists, size: :small) },
     "icon-tag" => -> { Admin::Ui::IconChipComponent.new(icon: :tags, family: :lists, size: :small) },
@@ -16,17 +17,18 @@ class Admin::MindGraphScreen::PartsComponentTest < ViewComponent::TestCase
     "close" => -> { Admin::Ui::ButtonComponent.new(label: "Close", icon: :x, variant: :tertiary, size: :small, data: { mind_graph_card_close: "" }) }
   }.freeze
 
-  test "the parts are one template holding the three status chips, the unpublished chip, an icon chip per kind, Close as the shared icon button and the tree row's glyphs" do
+  test "the parts are one template holding the three status chips, the unpublished chip, the switched-off post type's state chip, an icon chip per kind, Close as the shared icon button and the tree row's glyphs" do
     templates = parts_templates
     assert_equal 1, templates.size
     names = templates.first.css("> span[data-part]").map { |part| part["data-part"] }
-    assert_equal %w[status-live status-draft status-scheduled unpublished icon-page icon-post icon-tag icon-type close tree-disclosure tree-page-mark tree-home-mark], names
+    assert_equal %w[status-live status-draft status-scheduled unpublished type-switched-off icon-page icon-post icon-tag icon-type close tree-disclosure tree-page-mark tree-home-mark], names
     assert_equal names, Admin::MindGraphScreen::PartsComponent::NAMES
     part = ->(name) { templates.first.css("> span[data-part='#{name}'] > *").tap { |found| assert_equal 1, found.size, "#{name} holds one element" }.first }
     assert_classes part.("status-live"), %w[admin-status-chip bg-live], status: "live"
     assert_classes part.("status-draft"), %w[admin-status-chip border-field-line], status: "draft"
     assert_classes part.("status-scheduled"), %w[admin-status-chip bg-scheduled], status: "scheduled"
     assert part.("unpublished").key?("data-unpublished-changes")
+    assert_equal [ "off", "switched_off", "Switched off" ], [ part.("type-switched-off")["data-state-tone"], part.("type-switched-off")["data-type-state"], part.("type-switched-off").text.strip ]
     assert_classes part.("icon-page"), %w[bg-ic-structure-bg size-5.5]
     %w[icon-post icon-tag icon-type].each { |name| assert_classes part.(name), %w[bg-ic-lists-bg size-5.5] }
     %w[icon-page icon-post icon-tag icon-type].each { |name| assert_equal "true", part.(name)["aria-hidden"], name }

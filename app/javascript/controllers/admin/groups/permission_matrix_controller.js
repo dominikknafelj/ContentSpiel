@@ -15,7 +15,7 @@ import { messages } from "i18n/messages"
 //   shows the buttons of the ticked rows.
 // - Rewrites the scope CHIPS from the ticked boxes after every change in an
 //   editor. The rules are `PermissionRowComponent#chips`' (and its class
-//   strings, above), spelled again here: "All content types" / "All pages" for
+//   strings, above), spelled again here: "All post types" / "All pages" for
 //   no restriction, a badge with the type's dot as its mark per chosen type,
 //   "Own only", "Under <page>" per branch root ("A page you can't open" per kept
 //   one), at most three and then "+N", and a warn badge per removed content

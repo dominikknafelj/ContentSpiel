@@ -17,6 +17,8 @@ module SiteSearch
   #   the languages change                `Locales::Enable`, `Disable`, `Configure`,       `languages_changed`
   #                                       `MakeDefault`, when the enabled set or a
   #                                       fallback chain moved (`IndexState.languages`)
+  #   a post type is switched on or off   `Settings::Save`, when the switched-on           `content_types_changed`
+  #                                       declared set moved
   #
   # THE BUILT-IN (`Backends.inline?`) is written here, in the caller's
   # transaction, so its entries stand or fall with the copy. It needs only
@@ -38,6 +40,12 @@ module SiteSearch
   # idempotent jobs and nothing more. An enqueue that raises (the queue's
   # database unreachable) is reported, never raised: the write it follows
   # has committed, and its answer is not a 500.
+  #
+  # THE SWITCHES: a dormant post has no documents (`Documents`), so every
+  # write of the built-in's entries first holds the post types' switches to
+  # its transaction's commit (`ContentTypes.hold!`), and a switch-off
+  # committing beside it cannot leave a document its rebuild has already
+  # passed by.
   #
   # An outside engine's document `url` can be stale: a subpage's after its
   # parent's slug changes, a listed post's after its listing page is
@@ -62,6 +70,7 @@ module SiteSearch
           older = Publishing::Version.where(record_type: version.record_type, record_id: version.record_id).where.not(id: version.id).ids
           backend.remove(record_type: version.record_type, record_id: version.record_id, copy_ids: older) if older.any?
         end
+        ContentTypes.hold!
         backend.index(Documents.for(version, now: now))
       else
         enqueue_sync(version.record_type, version.record_id) { Publishing::Version.exists?(version.id) }
@@ -91,6 +100,7 @@ module SiteSearch
       copies = Publishing::Version.where(id: copy_ids).to_a
       copies.group_by { |copy| [ copy.record_type, copy.record_id ] }.each do |(record_type, record_id), rewritten|
         if inline?
+          ContentTypes.hold!
           now = Time.current
           record = rewritten.first.record
           shown = [ Publishing.current(record, now: now), Publishing.pending(record, now: now) ].compact.map(&:id)
@@ -143,7 +153,9 @@ module SiteSearch
     # the build (spec §6.5). Until it has run, a language just enabled finds
     # nothing and the others answer from their old fallback text. An
     # enqueue that raises is reported, never raised, as `enqueue_sync`'s.
-    def languages_changed
+    def languages_changed = rebuild_after_commit
+
+    def rebuild_after_commit
       ActiveRecord.after_all_transactions_commit do
         ReindexJob.perform_later(Backends.current_name)
       rescue StandardError => error
@@ -151,6 +163,14 @@ module SiteSearch
       end
       nil
     end
+
+    # A post type switched on or off moves which posts have documents at
+    # all (a dormant post has no address, so none), for every post of the
+    # type at once: the index is built again, after the outermost commit,
+    # as `languages_changed` does it and for the same reason. The job builds
+    # only when the index is stale, which a switch makes it through the
+    # switched-on types in `IndexState.fingerprint`.
+    def content_types_changed = rebuild_after_commit
 
     def backend = Backends.current
 
@@ -217,6 +237,7 @@ module SiteSearch
     # The built-in's documents of what `record` shows now and is scheduled
     # to show, indexed again in one pass.
     def reindex_shown(record)
+      ContentTypes.hold!
       backend.index(Documents.for_record(record, now: Time.current))
     end
 
