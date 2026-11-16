@@ -337,4 +337,18 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
     assert_response :forbidden
   end
+
+  test "the Alerts card lists a recent alert and is no part of the checks' count" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+
+    assert_response :success
+    assert_select "h2", text: "Alerts"
+    assert_select "p", text: "The last 7 days, newest first. Not part of the checks."
+    assert_select "#system-alerts li", text: /RuntimeError.*app\/models\/page\.rb:120/m
+    results = Setup::SystemCheck.run(remote_ip: "127.0.0.1").reject(&:off?)
+    assert_select "p", text: /\A#{results.count(&:ok?)} of #{results.size} checks? passed/
+    assert_select "#system-checks #system-alerts", count: 0
+  end
 end

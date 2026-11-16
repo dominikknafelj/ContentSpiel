@@ -14,6 +14,8 @@ module Admin
         mail_settings_link: can?("settings.manage"), image_settings_link: can?("settings.manage"),
         forms_link: holds_any?(%w[forms.manage form_submissions.view]))
       @content_results = content_results
+      @alerts = ::Alerts::Alert.recent
+      @mail_ready = MailSettings.current.ready?
     end
 
     private

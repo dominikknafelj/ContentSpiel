@@ -45,4 +45,10 @@
       </div>
     </section>
   <% end %>
+
+  <%# The Alerts card: recent errors and security findings, after Content and
+      like it no part of the checks' count. The Mail settings link only for a
+      holder of `settings.manage`, as in the check rows above. %>
+  <%= render Admin::SystemStatusScreen::AlertsComponent.new(alerts: @alerts, mail_ready: @mail_ready,
+        settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage"))) %>
 </div>
