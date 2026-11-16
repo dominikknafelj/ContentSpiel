@@ -40,7 +40,7 @@ class Admin::Ui::ChangesOverviewComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "the names detail draws the publish dialog's overview as before" do
+  test "the default detail is :names: the same markup as asking for it, the dialog's overview with no words" do
     edit
     reserve(@changed, @pricing, @dana, "tab-bbbbbbbb")
     plain = overview.to_html
@@ -351,6 +351,25 @@ class Admin::Ui::ChangesOverviewComponentTest < ViewComponent::TestCase
     assert_selector "h3", text: "Post fields"
     assert_selector "[data-diff-field]", text: "Tags"
     assert_selector "[data-diff-field] ins", text: "two"
+  end
+
+  test "a removed block's row stands where it stood, between the blocks of the later side" do
+    edit
+    diffs
+
+    assert_equal %w[changed removed added], page.all("[data-change]").map { |row| row["data-change"] }
+    assert_selector "[data-change=removed]", text: "Two"
+  end
+
+  test "a block changed only in another language is no difference in this one, and shows its words in that one" do
+    assert ContentBlocks::Save.call(@changed, translations: { "de" => { body: rich_doc("Eins") } }).ok?
+    diffs
+    assert_selector "p", text: "No differences."
+    assert_no_selector "[data-change]"
+
+    diffs(locale: "de")
+    assert_no_text "No differences."
+    assert_selector "[data-change=changed] [data-diff] ins", text: "Eins"
   end
 
   test "no differences says so" do

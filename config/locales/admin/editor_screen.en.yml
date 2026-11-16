@@ -425,8 +425,6 @@ en:
           discard_confirm: "Discard changes"
           cancel_scheduled_title: "Cancel the scheduled change?"
           cancel_scheduled_body: "The changes scheduled for %{time} will not be published then. They stay in the editor as unpublished changes."
-          # The cancel dialog, opened after someone else cancelled or published the change.
-          cancel_scheduled_gone: "No change is scheduled any more."
           cancel_scheduled_keep: "Keep it scheduled"
           cancel_scheduled_confirm: "Cancel scheduled change"
         # A published or scheduled page's address, changed at once through its

@@ -46,6 +46,7 @@ module Admin
           untitled held.page held.post lost_addresses.heading lost_addresses.body.page lost_addresses.body.post lost_addresses.hidden
           moved_addresses.body.page moved_addresses.body.post moved_addresses.change moved_addresses.own.page moved_addresses.own.post
           moved_addresses.no_redirect moved_addresses.hidden own_address.page own_address.post
+          schedule.kept schedule.discard schedule.cancel schedule.cancel_gone
           diffs.fields.page diffs.fields.post diffs.none diffs.formatting diffs.too_long diffs.moved_to diffs.opaque
         ],
         slots: [],
@@ -55,7 +56,6 @@ module Admin
 
       DETAILS = %i[names diffs].freeze
       KINDS = %i[changed added removed moved].freeze
-      DIALOG = "admin.components.editor_screen.publish_changes_dialog".freeze
       SUMMARY_LENGTH = 80
       Lost = Data.define(:record, :path, :locales)
       Moved = Data.define(:record, :path, :to, :locales, :redirects)
@@ -90,11 +90,11 @@ module Admin
       # Empty attributes when nothing is scheduled.
       def schedule_facts
         pending = ::Publishing.pending(record)
-        return { publishing_schedule: "", pending_id: "", cancel_line: t("#{DIALOG}.cancel_scheduled_gone") } unless pending
+        return { publishing_schedule: "", pending_id: "", cancel_line: t(".schedule.cancel_gone") } unless pending
 
         time = I18n.l(pending.live_at.in_time_zone(Current.site.effective_time_zone), format: :"admin.datetime")
-        { publishing_schedule: "", pending_id: pending.id, kept_label: t("#{DIALOG}.kept", time: time),
-          discard_line: t("#{DIALOG}.discard_scheduled", time: time), cancel_line: t("#{DIALOG}.cancel_scheduled_body", time: time) }
+        { publishing_schedule: "", pending_id: pending.id, kept_label: t(".schedule.kept", time: time),
+          discard_line: t(".schedule.discard", time: time), cancel_line: t(".schedule.cancel", time: time) }
       end
 
       def none? = changes.none?
@@ -190,12 +190,20 @@ module Admin
 
       # Every changed block in reading order (the copy's order on the later
       # side, a removed block where it stood), each with its words in this
-      # language, or nil for an added or removed block, which has no second
-      # side to compare.
+      # language, or nil for an added, removed or moved block, which has no
+      # words to compare. A changed block is shown when it differs in THIS
+      # language or in what every language shares (its type, its image, its
+      # untranslated settings); one changed only in another language is left
+      # out, so that a comparison with nothing in this language says so. A
+      # field follows the same rule through `differs?`: a shared column reads
+      # the same value in every language.
       def block_rows
-        @block_rows ||= changes.blocks.sort_by { |change| ordering(change) }.map do |change|
-          entry = ::Publishing::TextDiff.block(changes, change, locale: locale) if change.kind == :changed
-          [ change, entry && differs?(entry) ? entry : nil ]
+        @block_rows ||= changes.blocks.sort_by { |change| ordering(change) }.filter_map do |change|
+          next [ change, nil ] unless change.kind == :changed
+
+          entry = ::Publishing::TextDiff.block(changes, change, locale: locale)
+          words = differs?(entry)
+          [ change, words ? entry : nil ] if words || shared_change?(change)
         end
       end
 
@@ -244,6 +252,13 @@ module Admin
       # Whether an entry's sides differ in this language: a field changed only
       # in another reads the same words on both sides here.
       def differs?(entry) = entry.before != entry.after
+
+      # A content column every language shares differs between the block's
+      # two sides (`Changes::BLOCK_CONTENT` less the translated ones).
+      def shared_change?(change)
+        was, now = changes.sides_of(change)
+        (::Publishing::Changes::BLOCK_CONTENT - ::Publishing::Changes::BLOCK_TRANSLATED).any? { |name| was[name] != now[name] }
+      end
 
       def part_label(label) = label.is_a?(Symbol) ? t(label, scope: "admin.publishing.text_diff.parts") : label
 

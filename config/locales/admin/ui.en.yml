@@ -278,6 +278,16 @@ en:
           own_address:
             page: "This page would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
             post: "This post would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
+          # What is scheduled now, in every answer of the publish dialog's
+          # request (`schedule_facts`): the sentences the publish, discard and
+          # cancel dialogs' scripts write in, each whole with its time. The
+          # dialogs draw the same words on load from their own keys.
+          schedule:
+            kept: "At the scheduled time (%{time})"
+            discard: "The changes scheduled for %{time} are discarded as well."
+            cancel: "The changes scheduled for %{time} will not be published then. They stay in the editor as unpublished changes."
+            # The cancel dialog, opened after someone else cancelled or published the change.
+            cancel_gone: "No change is scheduled any more."
           # The History screen's comparison, in one language.
           diffs:
             fields:
