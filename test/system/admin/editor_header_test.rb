@@ -24,11 +24,13 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     assert_selector "li[data-page-id='#{@draft.id}'] .admin-tree-mark[data-status=draft]", wait: 5
 
     # Keyboard: focus the ⋯ button, Enter opens the menu on its first item,
-    # ArrowDown reaches "Schedule…" (after Activity), Escape closes it and
+    # ArrowDown twice (History, then Activity) reaches "Schedule…", Escape closes it and
     # hands focus back to the button.
     page.execute_script("document.querySelector(\"#{header} button[aria-label='More actions']\").focus()")
     page.driver.browser.keyboard.type(:Enter)
     assert_selector "#{header} [role=menu]"
+    assert_equal "History", page.evaluate_script("document.activeElement.textContent.trim()")
+    page.driver.browser.keyboard.type(:Down)
     assert_equal "Activity", page.evaluate_script("document.activeElement.textContent.trim()")
     page.driver.browser.keyboard.type(:Down)
     assert_equal "Schedule…", page.evaluate_script("document.activeElement.textContent.trim()")
