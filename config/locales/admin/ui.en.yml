@@ -336,9 +336,11 @@ en:
           label:
             pages: "Find a page"
             nodes: "Find a page, post or tag"
+            folders: "Find a folder"
           placeholder:
             pages: "Find a page"
             nodes: "Find a page, post or tag"
+            folders: "Find a folder"
           count:
             pages:
               one: "1 page matches"
@@ -346,9 +348,13 @@ en:
             nodes:
               one: "1 match"
               other: "%{count} matches"
+            folders:
+              one: "1 folder matches"
+              other: "%{count} folders match"
           none:
             pages: "No pages match"
             nodes: "Nothing matches"
+            folders: "No folders match"
           # Said under the count while the tree is narrowed, where its rows move.
           no_moving: "Clear the search to move pages"
           clear: "Clear"

@@ -82,3 +82,10 @@ en:
             button: "List ▾"
             divider: "List width"
             divider_tooltip: "List width %{width}px. Arrow keys to resize."
+          media:
+            hide: "Hide folders"
+            show: "Show folders"
+            open: "Open folders"
+            button: "Folders"
+            divider: "Folders width"
+            divider_tooltip: "Folders width %{width}px. Arrow keys to resize."
