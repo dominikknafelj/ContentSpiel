@@ -3,3 +3,6 @@ Built: ApplicationService#switched_off_refusal (422 failure, before authorize!, 
 Side effects fixed: db/seeds.rb publishes only switched-on posts; tests that register ad-hoc post types call new helper switch_on_registered_types (content_helper; with_test_types calls it); bulk_test denial uses a normal post (a dormant post now fails rather than is denied, since the refusal precedes the right); settings_save_test creates the post before switching off.
 Tests: full non-browser suite 9574 runs, 0 failures; rubocop clean on changed .rb. New: switched_off_refusal_test, access_control_helper_test, posts_test x2, MCP x3.
 Concerns: refusal precedes permission, so a user without rights on a dormant post sees the sentence (Bulk counts it failed, not refused).
+
+## Fix round 1
+Result gained `refusal` (nil by default); switched_off_refusal sets `:switched_off` and takes `record:` so Posts::Save's failure carries @post, not the probe. The autosave toast says the sentence only for `refusal == :switched_off`; other refusals keep "Couldn't save your changes."; comment kept true. New posts_test checks a plain refusal's toast is unchanged. Ran test/controllers/admin, test/integration/admin, test/services/posts, test/services/publishing (1793 runs, 0 failures before the test rewrite; posts_test, services/posts, mcp_test re-run green after); rubocop clean.

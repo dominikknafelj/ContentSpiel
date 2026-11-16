@@ -557,6 +557,23 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal events, Audit::Event.count
   end
 
+  test "only the switched-off refusal says its sentence in the toast; another refusal with no field error keeps the plain one" do
+    post_record = create_post(title: "Role")
+    other = ApplicationService::Result.failure(post_record, [ "That address is taken." ])
+
+    original = Posts::Save.method(:call)
+    Posts::Save.define_singleton_method(:call) { |*, **| other }
+    begin
+      patch "/cs-studio/posts/#{post_record.id}", params: { post: { title: "Typed" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+    ensure
+      Posts::Save.define_singleton_method(:call, original)
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#toast-post", text: /Couldn.t save your changes\./
+    assert_not_includes response.body, "That address is taken."
+  end
+
   test "a dormant post's editor is view only and offers no publishing action" do
     switch_on_content_types("blog", "resume_entry")
     post_record = create_post(title: "Role", content_type: "resume_entry")

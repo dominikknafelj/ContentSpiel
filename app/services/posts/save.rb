@@ -92,7 +92,7 @@ module Posts
       # declared at all, which the model's validation reports.
       dormant = switched_off_refusal(@post) if @post.persisted?
       asked = @attributes[:content_type]
-      dormant ||= switched_off_refusal(probe(asked)) if asked.present? && (@post.persisted? || ContentTypes.find(asked))
+      dormant ||= switched_off_refusal(probe(asked), record: @post) if asked.present? && (@post.persisted? || ContentTypes.find(asked))
       return dormant if dormant
 
       if publish_only?

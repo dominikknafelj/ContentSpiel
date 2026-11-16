@@ -14,8 +14,12 @@ class ApplicationService
   # `notice` is one sentence a SUCCESS has to say beyond "done" (a discard
   # that could not put everything back): nil for every other result. It is
   # not an error: `ok?` does not read it.
-  Result = Data.define(:record, :errors, :denied, :notice) do
-    def initialize(record:, errors:, denied: false, notice: nil) = super
+  #
+  # `refusal` names a failure whose reason has no field of its own to be read
+  # in (`:switched_off`), so a screen with no slot for it says the sentence
+  # itself; nil for every other result.
+  Result = Data.define(:record, :errors, :denied, :notice, :refusal) do
+    def initialize(record:, errors:, denied: false, notice: nil, refusal: nil) = super
 
     def self.success(record, notice: nil) = new(record:, errors: [], notice: notice)
 
@@ -138,12 +142,14 @@ class ApplicationService
   # recorded as `access.denied`: it is a state of the site, not a missing right,
   # and it holds for an owner too. The sentence names the type by its label, or
   # by its stored name when the type is undeclared.
-  def switched_off_refusal(post)
+  # `record:` is what the failure carries when `post` is only a probe of the
+  # type a save asks for.
+  def switched_off_refusal(post, record: post)
     return nil unless post.is_a?(Post)
     return nil if post.type_switched_on?
 
     label = post.definition&.label || post.content_type
-    Result.failure(post, [ I18n.t("admin.posts.switched_off", type: label, raise: true) ])
+    Result.new(record: record, errors: [ I18n.t("admin.posts.switched_off", type: label, raise: true) ], refusal: :switched_off)
   end
 
   # The refusal of a key under a language that a save would drop (#147), or nil

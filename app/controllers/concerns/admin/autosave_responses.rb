@@ -60,7 +60,8 @@ module Admin
       # A failed save also raises an error toast (handoff §10): the status
       # line and the per-field slots can be scrolled out of sight, and an
       # error toast stays until dismissed. It only restates that the save
-      # didn't happen -- the reasons stay in the field slots, never here.
+      # didn't happen -- the reasons stay in the field slots, never here but for
+      # the refusal that has no slot (below).
       #
       # Precisely because it never auto-hides, it is one toast per form, not
       # one per failed attempt: it carries a stable id, a failure removes the
@@ -71,11 +72,10 @@ module Admin
       toast_id = "toast-#{error_prefix}"
       streams << turbo_stream.remove(toast_id)
       unless result.ok?
-        # A refusal no field owns (the record carries no error of its own: a post
-        # whose type was switched off) has no slot to read its reason in, so the
-        # toast says it.
+        # The reasons stay in the field slots; the one refusal with no slot to
+        # read it in, a post whose type was switched off, says its sentence.
         message = if result.denied? then "You don't have permission to make this change."
-        elsif result.record.respond_to?(:errors) && result.record.errors.empty? then result.errors.first
+        elsif result.refusal == :switched_off then result.errors.first
         else "Couldn't save your changes."
         end
         streams << toast_stream(message, kind: :error, id: toast_id)
