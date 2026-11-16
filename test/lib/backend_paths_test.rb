@@ -39,6 +39,7 @@ class BackendPathsTest < ActiveSupport::TestCase
     "GET /:locale(/*path)" => "the public site's pages, under a language",
     "GET /*path" => "the public site's pages",
     "POST /forms/:form_id" => "a visitor's send of a form",
+    "POST /search/suggestions" => "a visitor's suggestions while typing in a search field",
     "GET /up(.:format)" => HEALTH_CHECK,
     "GET /rails/active_storage/blobs/redirect/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,
     "GET /rails/active_storage/blobs/proxy/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,

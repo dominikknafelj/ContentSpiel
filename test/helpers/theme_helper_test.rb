@@ -405,4 +405,18 @@ class ThemeHelperTest < ActionView::TestCase
     assert_nil search_page
     assert_includes Theme::Contract::HELPERS, "search_page"
   end
+
+  test "search_suggest_url is the suggestions' path with a search page, nil without one or in the preview, and is on the contract" do
+    assert_nil search_suggest_url, "no search page"
+
+    page = create_page(title: "Find")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "search" }).ok?
+    publish_changes(page)
+    remove_instance_variable(:@search_page)
+    assert_equal "/search/suggestions", search_suggest_url
+
+    @public_urls = PublicSite::Urls.new(preview: true)
+    assert_nil search_suggest_url, "the preview"
+    assert_includes Theme::Contract::HELPERS, "search_suggest_url"
+  end
 end

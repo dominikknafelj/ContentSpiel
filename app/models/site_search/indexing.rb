@@ -25,7 +25,9 @@ module SiteSearch
   # the copies: its query reads each record's state, address and clock as it
   # searches (spec §6.3), and its foreign key's cascade takes a withdrawn or
   # purged copy's entries with the copy. So it is asked something for a copy
-  # taken and a copy rewritten, and nothing for the other events.
+  # taken and a copy rewritten, and nothing for the other events; a withdrawn
+  # copy and a purge enqueue `SiteSearch::PruneWordsJob` after the commit,
+  # for the words of the entries the cascade took (`Postgres::Vocabulary`).
   #
   # AN OUTSIDE BACKEND is never called inside a write, which would hold the
   # write open on the network: every event becomes a `SiteSearch::SyncJob`
@@ -46,6 +48,8 @@ module SiteSearch
   # `public_paths`, which keeps the results honest.
   module Indexing
     RECORDS = %w[Page Post].freeze
+    PRUNE_ASKED = :site_search_prune_asked
+    PRUNE_RUN = :site_search_prune_run
 
     module_function
 
@@ -67,11 +71,16 @@ module SiteSearch
       nil
     end
 
-    # The built-in's entries went with the copies (the cascade).
+    # The built-in's entries went with the copies (the cascade); their words
+    # go with the prune after the commit.
     def copies_withdrawn(record, copy_ids:)
-      return nil if inline? || copy_ids.empty?
+      return nil if copy_ids.empty?
 
-      enqueue_sync(record.class.polymorphic_name, record.id) { !Publishing::Version.exists?(id: copy_ids) }
+      if inline?
+        enqueue_prune
+      else
+        enqueue_sync(record.class.polymorphic_name, record.id) { !Publishing::Version.exists?(id: copy_ids) }
+      end
       nil
     end
 
@@ -98,8 +107,19 @@ module SiteSearch
 
     # A page's own subpages go and come with it (the trash, a draft parent),
     # so an outside backend's job reads each of them too.
-    def record_changed(record)
-      return nil if inline?
+    #
+    # `slug: true` for a write that changed the record's slug, which is
+    # immediate and in no copy (`docs/reference/publishing.md`) while its
+    # words are in the record's documents (`Documents`, the summary): the
+    # built-in rebuilds the record's own documents from the copies it shows
+    # now or is scheduled to show, in the caller's transaction and after the
+    # address was refreshed. A subpage's documents keep their words: they
+    # are its own slug's, wherever its parent is.
+    def record_changed(record, slug: false)
+      if inline?
+        reindex_shown(record) if slug
+        return nil
+      end
 
       type = record.class.polymorphic_name
       ids = record.is_a?(Page) ? record.self_and_descendant_ids : [ record.id ]
@@ -107,10 +127,14 @@ module SiteSearch
       nil
     end
 
+    # As a withdrawn copy: the cascade took the built-in's entries, the
+    # prune takes their words.
     def record_purged(record_type, record_id)
-      return nil if inline?
-
-      enqueue_sync(record_type, record_id) { true }
+      if inline?
+        enqueue_prune
+      else
+        enqueue_sync(record_type, record_id) { true }
+      end
       nil
     end
 
@@ -154,7 +178,60 @@ module SiteSearch
     end
     private_class_method :enqueue_sync
 
+    # One prune for a whole run of purges that each commit on their own
+    # (`Trash::Empty`, `Trash::PurgeExpiredJob`): inside the block a purge's
+    # commit only marks a prune due, and leaving the outermost block
+    # enqueues one when one was marked, after the work and whether the block
+    # finished or raised (what was purged before the error is gone too).
+    # Nested blocks are one run; the mark is the thread's
+    # (`ActiveSupport::IsolatedExecutionState`). Answers the block's value.
+    def one_prune
+      state = ActiveSupport::IsolatedExecutionState
+      return yield if state[PRUNE_RUN]
+
+      state[PRUNE_RUN] = { due: false }
+      begin
+        yield
+      ensure
+        due = state[PRUNE_RUN][:due]
+        state[PRUNE_RUN] = nil
+        enqueue_prune if due
+      end
+    end
+
+    # After the outermost commit, as `enqueue_sync`: a rolled-back purge
+    # prunes nothing, and an enqueue that raises is reported, never raised.
+    # One per transaction, however many records it purged (a page's
+    # branch): the transaction that asked is remembered until the callback
+    # runs, and one finished without it (rolled back) is open no more, so
+    # the next asks again. Purges that commit one by one are one run only
+    # inside `one_prune`, whose block the callback marks instead.
+    def enqueue_prune
+      state = ActiveSupport::IsolatedExecutionState
+      transaction = ActiveRecord::Base.current_transaction
+      return if transaction.open? && state[PRUNE_ASKED].equal?(transaction)
+
+      state[PRUNE_ASKED] = transaction
+      ActiveRecord.after_all_transactions_commit do
+        state[PRUNE_ASKED] = nil
+        if (run = state[PRUNE_RUN])
+          run[:due] = true
+        else
+          PruneWordsJob.perform_later
+        end
+      rescue StandardError => error
+        Reports.report(backend: Backends.current_name, error: error)
+      end
+    end
+    private_class_method :enqueue_prune
+
     def stands?(record_type, record_id) = RECORDS.include?(record_type) && record_type.constantize.exists?(record_id)
-    private_class_method :backend, :inline?, :stands?
+    # The built-in's documents of what `record` shows now and is scheduled
+    # to show, indexed again in one pass.
+    def reindex_shown(record)
+      backend.index(Documents.for_record(record, now: Time.current))
+    end
+
+    private_class_method :backend, :inline?, :stands?, :reindex_shown
   end
 end

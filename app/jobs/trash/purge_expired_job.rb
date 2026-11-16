@@ -19,6 +19,9 @@ module Trash
   # stale, already-destroyed record. `each_root` re-finds each root at its
   # turn and skips it if it's already gone, which is exactly what keeps
   # that stale record from producing a second, bogus `page.purged` event.
+  #
+  # The search's vocabulary is pruned once for the sweep
+  # (`SiteSearch::Indexing.one_prune`), not once per purge.
   class PurgeExpiredJob < ApplicationJob
     queue_as :default
 
@@ -27,15 +30,21 @@ module Trash
       return if days.zero?
 
       Current.set(actor: nil, channel: :system) do
-        Trash.each_root(trashed_before: days.days.ago) do |record|
-          result = Purge.call(record, actor: nil)
-          Rails.logger.info("[trash] kept #{record.class.name}##{record.id}: #{result.errors.to_sentence}") unless result.ok?
-        rescue StandardError => e
-          # An exception `Purge` didn't turn into a failure itself has
-          # rolled back that item's own savepoint; log it and carry on with
-          # the next one (trash spec §4.4).
-          Rails.logger.error("[trash] couldn't purge #{record.class.name}##{record.id}: #{e.class}: #{e.message}")
-        end
+        SiteSearch::Indexing.one_prune { purge_expired(days) }
+      end
+    end
+
+    private
+
+    def purge_expired(days)
+      Trash.each_root(trashed_before: days.days.ago) do |record|
+        result = Purge.call(record, actor: nil)
+        Rails.logger.info("[trash] kept #{record.class.name}##{record.id}: #{result.errors.to_sentence}") unless result.ok?
+      rescue StandardError => e
+        # An exception `Purge` didn't turn into a failure itself has
+        # rolled back that item's own savepoint; log it and carry on with
+        # the next one (trash spec §4.4).
+        Rails.logger.error("[trash] couldn't purge #{record.class.name}##{record.id}: #{e.class}: #{e.message}")
       end
     end
   end

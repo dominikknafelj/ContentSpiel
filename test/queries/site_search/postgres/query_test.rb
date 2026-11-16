@@ -76,7 +76,7 @@ class SiteSearch::Postgres::QueryTest < ActiveSupport::TestCase
   end
 
   test "a scheduled change is found by its old words before its time and by its new words after it" do
-    page = create_page(title: "Albatross")
+    page = create_page(title: "Albatross", translations: { "en" => { title: "Albatross", slug: "seabird" } })
     assert Pages::Save.call(page, translations: { "en" => { title: "Pelican" } }).ok?
     live_at = 1.day.from_now.change(usec: 0)
     publish_changes(page, at: live_at)
@@ -116,8 +116,10 @@ class SiteSearch::Postgres::QueryTest < ActiveSupport::TestCase
       expected = text == '"unclosed' ? 1 : 0
       assert_equal expected, results.total, text
     end
-    [ "-", "or", "the", '""' ].each do |text|
-      assert_equal SiteSearch::Results.new(hits: [], total: 0), search(text), text
+    # A query of syntax is no plain words, so the close pass skips it; a
+    # stop word has nothing to correct.
+    { "-" => "skipped", "or" => "skipped", "the" => nil, '""' => "skipped" }.each do |text, close_outcome|
+      assert_equal SiteSearch::Results.new(hits: [], total: 0, close_outcome: close_outcome), search(text), text
     end
   end
 

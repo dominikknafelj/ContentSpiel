@@ -754,4 +754,17 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "概要です"
   end
+
+  # The suggestions' endpoint is a POST (search 2 spec §4.1), and every route
+  # of the page tree a GET, so it takes no page's address.
+  test "a page whose slug is search keeps its address, and a GET of /search/suggestions is the page tree's" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    search = create_page(title: "Search")
+    get "/search"; assert_response :ok
+    get "/search/suggestions"; assert_response :not_found
+    assert_equal "PagesController", controller.class.name
+    create_page(title: "Suggestions", parent: search)
+    get "/search/suggestions"; assert_response :ok
+    assert_includes response.body, "Suggestions"
+  end
 end

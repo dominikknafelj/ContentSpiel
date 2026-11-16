@@ -13,6 +13,7 @@
 ActiveRecord::Schema[8.1].define(version: 2026_11_16_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+  enable_extension "pg_trgm"
 
   create_table "access_control_grants", force: :cascade do |t|
     t.bigint "group_id", null: false
@@ -515,6 +516,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_090000) do
     t.tsvector "document", null: false
     t.text "text", null: false
     t.datetime "created_at", null: false
+    t.text "title", default: "", null: false
+    t.index "to_tsvector('simple'::regconfig, title)", name: "index_search_entries_on_title_words", using: :gin
     t.index ["document"], name: "index_search_entries_on_document", using: :gin
     t.index ["published_version_id", "locale"], name: "index_search_entries_on_published_version_id_and_locale", unique: true
     t.index ["record_type", "record_id", "locale", "live_at"], name: "idx_on_record_type_record_id_locale_live_at_58a55f020d"
@@ -530,6 +533,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_090000) do
     t.datetime "started_at"
     t.datetime "finished_at"
     t.index ["backend"], name: "index_search_index_states_on_backend", unique: true
+  end
+
+  create_table "search_words", force: :cascade do |t|
+    t.string "locale", null: false
+    t.string "word", null: false
+    t.index ["locale", "word"], name: "index_search_words_on_locale_and_word", unique: true
+    t.index ["word"], name: "index_search_words_on_word_trigrams", opclass: :gin_trgm_ops, using: :gin
   end
 
   create_table "sessions", force: :cascade do |t|

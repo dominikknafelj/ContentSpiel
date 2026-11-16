@@ -1,6 +1,8 @@
 require "test_helper"
 
 class Trash::EmptyTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup { Current.actor = users(:one) }
 
   test "empties pages, then posts, then images, skipping what can't go" do
@@ -72,6 +74,18 @@ class Trash::EmptyTest < ActiveSupport::TestCase
     assert_not Post.exists?(fine.id)
     event = Audit::Event.find_by!(action: "trash.emptied")
     assert_equal({ "purged" => 1, "skipped" => 1 }, event.metadata)
+  end
+
+  # Each purge commits on its own, so the run itself is the one prune of the
+  # search's vocabulary (`SiteSearch::Indexing.one_prune`).
+  test "emptying a trash of three roots enqueues one prune of the search's words, after the run" do
+    roots = [ create_page(title: "Gone one"), create_page(title: "Gone two"), create_post(title: "Gone three") ]
+    roots.each { |record| assert Trash::Move.call(record).ok? }
+    clear_enqueued_jobs
+
+    assert_enqueued_jobs 1, only: SiteSearch::PruneWordsJob do
+      assert Trash::Empty.call.ok?
+    end
   end
 
   test "needs trash.empty" do

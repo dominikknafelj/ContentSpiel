@@ -34,9 +34,27 @@ module SiteSearch
 
     # The languages `simple` splits on spaces they do not write between
     # words (Japanese, Chinese, Thai) or between the words of a phrase
-    # (Korean): a query finds a page only by a whole run of text. System
-    # status says so while one is switched on (spec §10).
+    # (Korean), so a whole run of text alone matches: they are searched by
+    # the text a page contains (`Contains`), with no vocabulary, no close
+    # pass and no correction. System status says so while one is switched
+    # on (spec §10).
     LIMITED = %w[ja ko th zh].freeze
+
+    # The close pass (search 2 spec §3.3, `Close`): it runs when the exact
+    # pass found fewer than `CLOSE_BELOW` hits, so with 1 only when it found
+    # nothing, and a page is all exact or all close; it and the contains
+    # pass (`Contains`) get `CLOSE_SHARE` seconds of the deadline at most.
+    # A query word of `CLOSE_WORD_LENGTH` characters or more is corrected,
+    # up to `MAX_CLOSE_WORDS` of them, each to the `CANDIDATES` words of the
+    # vocabulary at least `SIMILARITY` like it, `pg_trgm`'s own default:
+    # measured, deploymnet/deployment is 0.47, serch/search 0.44,
+    # recieve/receive 0.33, so 0.4 would lose "recieve".
+    CLOSE_BELOW = 1
+    CLOSE_SHARE = 1
+    SIMILARITY = 0.3
+    CANDIDATES = 3
+    MAX_CLOSE_WORDS = 6
+    CLOSE_WORD_LENGTH = 4
 
     # The snippet's marks as `ts_headline` writes them (spec §6.4): two
     # characters `SiteSearch::Documents` takes out of every stored text, so
@@ -44,7 +62,15 @@ module SiteSearch
     START_MARK = "\u{E000}".freeze
     STOP_MARK = "\u{E001}".freeze
 
-    COLUMNS = %i[published_version_id record_type record_id locale config live_at document text created_at].freeze
+    # Moves when what the built-in stores of a document changes for the same
+    # document (a column, a rule of what it keeps beside the tsvector), so an
+    # index stored by older rules is stale (`IndexState.fingerprint`), as
+    # `Documents::REVISION` does for the documents themselves.
+    REVISION = 1
+
+    # `title` is the title field's plain text, which the suggestions read
+    # by its `simple` words (`index_search_entries_on_title_words`).
+    COLUMNS = %i[published_version_id record_type record_id locale config live_at document text created_at title].freeze
 
     def self.config_for(code) = CONFIGS.fetch(code.to_s, "simple")
 
@@ -67,13 +93,18 @@ module SiteSearch
     end
 
     # Each document's entry replaced: the rows of its copy and language
-    # deleted, the new ones inserted, in one transaction.
+    # deleted, the new ones inserted, and their words added to the
+    # vocabulary (`Vocabulary`), in one transaction. Every writer of the
+    # entries comes through here, so the vocabulary holds every word some
+    # entry holds by `document @@ plainto_tsquery(config, word)` (no stopword
+    # does); a word of an entry gone stays until a prune.
     def index(documents)
       return nil if documents.empty?
 
       Entry.transaction do
         Entry.where([ :published_version_id, :locale ] => documents.map { |document| [ document.copy_id, document.language ] }).delete_all # version: none (the search index is no part of a page: results are never cached, §8.1)
         Entry.connection.insert(insert_of(documents)) # version: none (the search index is no part of a page: results are never cached, §8.1)
+        Vocabulary.write(documents)
       end
       nil
     end
@@ -93,10 +124,15 @@ module SiteSearch
 
     def clear
       Entry.delete_all # version: none (the search index is no part of a page: results are never cached, §8.1)
+      Word.delete_all # version: none (the vocabulary is no part of a page)
       nil
     end
 
     def search(query, deadline:) = Query.new(query, deadline: deadline).results
+
+    # The titles a visitor sees now whose words begin with the prefix's
+    # (`Suggest`), from `search_entries.title`.
+    def suggest(suggest_query, deadline:) = Suggestions.new(items: Suggest.new(suggest_query, deadline: deadline).items)
 
     # The database is the site's own: when it is down, nothing of the site
     # answers, search least of all.
@@ -124,9 +160,11 @@ module SiteSearch
     def row_of(document, now)
       config = self.class.config_for(document.language)
       [ document.copy_id, document.record_type, document.record_id, document.language, config,
-        SqlNodes.cast(document.live_at, "timestamp"), vector_of(document, config), document.text, SqlNodes.cast(now, "timestamp") ]
+        SqlNodes.cast(document.live_at, "timestamp"), vector_of(document, config), document.text, SqlNodes.cast(now, "timestamp"), title_of(document) ]
         .map { |value| SqlNodes.quoted(value) }
     end
+
+    def title_of(document) = document.fields.find { |field| field.name == "title" }&.text.to_s
 
     # `setweight(to_tsvector(config, title), 'A') || setweight(…, 'B') || …`:
     # every field with the document's configuration and its own weight. A

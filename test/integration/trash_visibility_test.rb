@@ -302,6 +302,49 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A tag's listing page is where a tag suggestion goes (`SiteSearch::TagPage`):
+  # a trashed page keeps its copy, list block and all, and is never it.
+  test "a tag's listing page is never a trashed page" do
+    tag = Tag.create!(name: "seabirds")
+    listing = ->(title) do
+      page = create_page(title: title)
+      assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "tag" => tag.name } }).ok?
+      publish_changes(page)
+    end
+    kept = listing.("Kept listing")
+    gone = listing.("Gone listing")
+    assert Pages::Move.call(gone.reload, parent: root_page, position: 0).ok?
+    tag_page = -> { SiteSearch::TagPage.for([ tag.id ], locale: "en", now: Time.current)[tag.id]&.id }
+    assert_equal gone.id, tag_page.call, "the first in reading order while it is kept"
+
+    gone.reload.update!(trashed_at: Time.current)
+    assert_equal kept.id, tag_page.call
+    kept.reload.update!(trashed_at: Time.current)
+    assert_nil tag_page.call
+  end
+
+  # The suggestions while typing are a list over pages, posts and tags: the
+  # built-in's titles leave a trashed record out, an outside engine's stale
+  # one is dropped by the re-check, and a tag is offered only while a kept
+  # post carries it (`SiteSearch::TagSuggestions`).
+  test "the site's suggestions never offer a trashed page or post, nor a tag only a trashed post carries" do
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: @kept_page), attributes: { block_type: "search" }).ok?
+    publish_changes(@kept_page)
+    create_post(title: "Shared one", tags: %w[sharedtag])
+    create_post(title: "Gone tagged", tags: %w[gonetag sharedtag]).update!(trashed_at: Time.current)
+    labels = ->(text) { SiteSearch.suggest(text: text, language: "en", now: Time.current).items.map(&:label) }
+
+    assert_equal [ "Kept page", "Kept post" ], labels.("kept").sort
+    assert_empty labels.("gone")
+    assert_equal [ "Shared one", "sharedtag" ], labels.("shared")
+
+    fake = SiteSearch::Fake.new
+    [ @gone_page, @gone_post ].each do |record|
+      fake.index(SiteSearch::Documents.for(Publishing::Version.of(record).order(:id).last, now: Time.current))
+    end
+    fake.installed { assert_empty labels.("gone") }
+  end
+
   # --- CS Studio --------------------------------------------------------------
 
   test "CS Studio 404s a trashed page, post and image by id, and autosave can't revive one" do
@@ -1441,5 +1484,20 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     scope = AccessControl.scope(users(:one), "posts.read", Post.all)
 
     assert_equal %w[blog], Posts::List.new(scope, filters: {}, locale: "en").types_present
+  end
+
+  # The vocabulary is a list the close matches read: a purge's words go
+  # with the prune job enqueued after its commit (`SiteSearch::PruneWordsJob`).
+  test "the vocabulary forgets a purged record's words after the prune job" do
+    post = create_post(title: "Purgeableword")
+    assert SiteSearch::Word.exists?(locale: "en", word: "purgeableword")
+
+    perform_enqueued_jobs do
+      assert Trash::Move.call(post.reload).ok?
+      assert Trash::Purge.call(post.reload).ok?
+    end
+
+    assert_not SiteSearch::Word.exists?(word: "purgeableword")
+    assert SiteSearch::Word.exists?(locale: "en", word: "kept"), "a kept post's words stay"
   end
 end

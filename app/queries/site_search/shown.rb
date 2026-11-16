@@ -26,8 +26,12 @@ module SiteSearch
     # ancestors' titles from the homepage down, as published (nil for a post
     # and for the homepage); `date` a post's `published_at`, the moment the
     # site's `post_date` writes (nil for a page); `snippet` the backend's
-    # `SiteSearch::Snippet`, plain text and ranges.
-    Item = Data.define(:kind, :record, :title, :url_path, :where, :date, :snippet)
+    # `SiteSearch::Snippet`, plain text and ranges; `tags` a post's tag
+    # names as its copy in force holds them, in the copy's order (`[]` for a
+    # page: a renamed tag keeps its old name until the post is published
+    # again, as on the post's own page); `close` whether the backend found
+    # it as a close match (`Hit#close`).
+    Item = Data.define(:kind, :record, :title, :url_path, :where, :date, :snippet, :tags, :close)
 
     MODELS = { "Page" => Page, "Post" => Post }.freeze
     KINDS = { "Page" => :page, "Post" => :post }.freeze
@@ -89,7 +93,8 @@ module SiteSearch
     def item_of(hit, view, path, places, locale)
       page = view.is_a?(Page)
       Item.new(kind: KINDS.fetch(hit.record_type), record: view, title: Locales.read(view, :title, locale: locale), url_path: path,
-        where: (places[view.id].presence if page), date: (view.published_at unless page), snippet: hit.snippet)
+        where: (places[view.id].presence if page), date: (view.published_at unless page), snippet: hit.snippet,
+        tags: page ? [] : view.tags.map(&:name), close: hit.close == true)
     end
 
     private_class_method :rows_of, :views_of, :places_of, :item_of

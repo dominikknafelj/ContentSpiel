@@ -39,7 +39,7 @@ gem "openid_connect", "~> 2.3"
 # webauthn asks only for openssl >= 2.2, which would take openssl 4, a major version above the 3.3 Ruby 3.4 ships,
 # under Active Record encryption, MessageEncryptor and Net::HTTP alike: held to the 3.x line. It compiles in the
 # image's build stage, whose libpq-dev brings libssl-dev.
-gem "openssl", "~> 3.3"
+gem "openssl", "~> 4.0"
 
 # The registrable domain of the site's host (`PublicSuffix.domain`), a passkey's relying party id. Named here, not only
 # reached through addressable, because the passkey relying party calls it directly.
@@ -143,11 +143,11 @@ gem "opentelemetry-exporter-otlp", "~> 0.37"
 
 # The official Ruby SDK for MCP servers (design spec section 10) --
 # [https://github.com/modelcontextprotocol/ruby-sdk].
-gem "mcp", "~> 1.9"
+gem "mcp", "~> 1.10"
 
 gem "rack-attack", "~> 6.8"
 
-gem "view_component", "~> 4.23"
+gem "view_component", "~> 4.24"
 
 # Colours the Code block's source on the server. A visitor's request runs
 # it, so it is a dependency of its own and not only Lookbook's, a

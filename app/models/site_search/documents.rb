@@ -7,8 +7,9 @@ module SiteSearch
   # shows. Never the rows: words typed and not published are in no document.
   #
   # The fields, always all of them for the record's kind, blank or not:
-  # `title` (A); `summary` (B), a page's subtitle and meta description, a
-  # post's excerpt; `tags` (B, a post's), the tag names its copy shows;
+  # `title` (A); `tags` (A, a post's), the tag names its copy shows;
+  # `summary` (B), a page's subtitle, meta title, meta description and slug
+  # words, a post's excerpt and slug words;
   # `body` (C), a post's rich text and its type's translated string and
   # text fields, then every block's text in the copy's reading order
   # (`BlockTypeDefinition#search_text`); `code` (D), the Code blocks' code.
@@ -16,7 +17,7 @@ module SiteSearch
     # Moves when what a document holds for the same copy changes (a field,
     # a reader, a block type's text), so a backend can tell an index made
     # by older rules (spec §6.6).
-    REVISION = 1
+    REVISION = 2
 
     MARKERS = /[\u{E000}\u{E001}]/
     CONTROL = /[[:cntrl:]]/
@@ -71,19 +72,32 @@ module SiteSearch
       blocks = view.is_a?(Page) ? view.content_blocks.to_a : []
       fields = [
         Field.new(name: "title", weight: :a, text: plain(Locales.read(view, :title, locale: locale))),
-        Field.new(name: "summary", weight: :b, text: joined(summary_of(view, locale)))
+        Field.new(name: "summary", weight: :b, text: joined(summary_of(view, locale) << slug_words(view, locale)))
       ]
-      fields << Field.new(name: "tags", weight: :b, text: joined(view.tags.map(&:name))) if view.is_a?(Post)
+      fields << Field.new(name: "tags", weight: :a, text: joined(view.tags.map(&:name))) if view.is_a?(Post)
       fields << Field.new(name: "body", weight: :c, text: joined(post_text(view, locale) + block_texts(blocks, :body, locale)))
       fields << Field.new(name: "code", weight: :d, text: joined(block_texts(blocks, :code, locale), markup: false))
     end
     private_class_method :fields_of
 
     def summary_of(view, locale)
-      names = view.is_a?(Page) ? %i[subtitle meta_description] : %i[excerpt]
+      names = view.is_a?(Page) ? %i[subtitle meta_title meta_description] : %i[excerpt]
       names.map { |name| Locales.read(view, name, locale: locale) }
     end
     private_class_method :summary_of
+
+    # The record's own slug in `locale`, as stored and with no fallback,
+    # its hyphens as spaces: the parts of `zero-downtime-deploys`, which
+    # Postgres's parser would read as one hyphenated compound. Never the
+    # address's last segment: an address also moves with writes that are no
+    # slug's (a list published after its posts gives them one), and those
+    # re-index nothing, while every write of a slug re-indexes its record
+    # (`Indexing.record_changed(record, slug: true)`). The homepage's slug
+    # is "" and gives nothing.
+    def slug_words(view, locale)
+      view.read_attribute(:slug).to_h[locale.to_s].to_s.tr("-", " ")
+    end
+    private_class_method :slug_words
 
     # A post's body and the translated prose of its type's fields (a type
     # answers `translatable` for prose, the string and the text: not a code,

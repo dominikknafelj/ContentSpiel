@@ -45,6 +45,16 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
 
   def state(name = "postgres") = SiteSearch::IndexState.for(name)
 
+  # The built-in's fingerprint as it reads with `Documents::REVISION` at
+  # `revision`: the fingerprint of an index built by older rules.
+  def fingerprint_with(revision:)
+    was = SiteSearch::Documents::REVISION
+    silence_warnings { SiteSearch::Documents.const_set(:REVISION, revision) }
+    SiteSearch::IndexState.fingerprint("postgres")
+  ensure
+    silence_warnings { SiteSearch::Documents.const_set(:REVISION, was) }
+  end
+
   def with_fake
     fake = SiteSearch::Fake.new
     SiteSearch::Backends.register "test/fake", label: "Fake", backend: -> { fake }
@@ -111,7 +121,7 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
   end
 
   test "a fallback change makes the index stale and the job rebuilds it" do
-    page = create_page(title: "Lighthouse", translations: { "de" => { title: "Leuchtturm" } })
+    page = create_page(title: "Lighthouse", translations: { "en" => { title: "Lighthouse", slug: "tower" }, "de" => { title: "Leuchtturm", slug: "turm" }, "es" => { slug: "torre" } })
     SiteSearch::Rebuild.new.call
     assert_equal [ [ "Page", page.id ] ], found("lighthouse", language: "es")
     clear_enqueued_jobs
@@ -127,6 +137,31 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
     assert_equal [ [ "Page", page.id ] ], found("leuchtturm", language: "es")
     assert_empty found("lighthouse", language: "es")
     assert_not SiteSearch::IndexState.empty_or_stale?("postgres")
+  end
+
+  test "REVISION 2 makes a REVISION 1 index stale and the build rewrites it" do
+    page = create_page(title: "Lighthouse", translations: { "en" => { title: "Lighthouse", slug: "beacon-tower" } })
+    SiteSearch::Rebuild.new.call
+    state.ready!(fingerprint_with(revision: 1), languages: Locales.enabled, done: state.done)
+    SiteSearch::Entry.where(record_type: "Page", record_id: page.id).delete_all # version: none (a test stands in for an index built before the slug was a document's word)
+    clear_enqueued_jobs
+
+    assert_equal 2, SiteSearch::Documents::REVISION
+    assert SiteSearch::IndexState.empty_or_stale?("postgres")
+    perform_enqueued_jobs { SiteSearch::IndexCheckJob.perform_now }
+
+    assert_equal SiteSearch::IndexState.fingerprint("postgres"), state.fingerprint
+    assert_not SiteSearch::IndexState.empty_or_stale?("postgres")
+    assert_equal [ [ "Page", page.id ] ], found("beacon")
+  end
+
+  test "the built-in's fingerprint holds Postgres::REVISION" do
+    was = SiteSearch::Postgres::REVISION
+    before = SiteSearch::IndexState.fingerprint("postgres")
+    silence_warnings { SiteSearch::Postgres.const_set(:REVISION, was + 1) }
+    assert_not_equal before, SiteSearch::IndexState.fingerprint("postgres")
+  ensure
+    silence_warnings { SiteSearch::Postgres.const_set(:REVISION, was) }
   end
 
   test "a new SEARCH_BACKEND finds its index empty and builds it" do
@@ -218,7 +253,7 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
 
   test "a copy taken during the build keeps its documents" do
     first = create_page(title: "Lighthouse")
-    later = create_page(title: "Foghorn")
+    later = create_page(title: "Foghorn", translations: { "en" => { title: "Foghorn", slug: "signal" } })
     publish_later = lambda do |count|
       next unless count == 1
 

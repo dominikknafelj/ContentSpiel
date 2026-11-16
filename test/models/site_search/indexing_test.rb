@@ -16,7 +16,7 @@ class SiteSearch::IndexingTest < ActiveSupport::TestCase
   end
 
   test "a copy taken in force is indexed in its transaction and the record's older entries go" do
-    page = create_page(title: "Lighthouse")
+    page = create_page(title: "Lighthouse", translations: { "en" => { title: "Lighthouse", slug: "beacon" } })
     first = Publishing.current(page)
     assert_equal [ first.id ], copy_ids_of(page)
     assert_equal Locales.enabled.sort, entries_of(page).pluck(:locale).sort

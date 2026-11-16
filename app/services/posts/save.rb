@@ -118,6 +118,7 @@ module Posts
         raise ActiveRecord::Rollback if unknown_keys
 
         moved_in_time = @post.published_at_changed?
+        slug_moved = @post.changes_to_save.key?("slug")
         (@post.save && tags_valid? && assign_related_posts) || raise(ActiveRecord::Rollback)
         touch_for_join_rows(related_before)
         # A post is touched for its tags only when nothing else of it changed;
@@ -130,9 +131,10 @@ module Posts
         # The post's stored translation state (`translation_states`).
         Translations::StateIndex.refresh(@post)
         keep_address(was_unpublished, related_before)
-        # Unpublished or moved to another time: what the search shows of the
-        # post moves with no copy (a copy taken is indexed by itself).
-        SiteSearch::Indexing.record_changed(@post) if moved_in_time && !(was_unpublished && @post.published_at.present?)
+        # Unpublished, moved to another time or given another slug (which is
+        # immediate, and a word of its documents): what the search shows of
+        # the post moves with no copy (a copy taken is indexed by itself).
+        SiteSearch::Indexing.record_changed(@post, slug: slug_moved) if (moved_in_time || slug_moved) && !(was_unpublished && @post.published_at.present?)
         record_events(related_before)
         true
       end
