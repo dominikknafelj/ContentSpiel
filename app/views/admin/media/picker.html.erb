@@ -22,7 +22,13 @@
     The marker carries the place's digest (`Media::Place#digest`), and the
     grid's column a slot above the grid, for the notice of
     `admin--media--live` on the dialog when another tab changed the place
-    while the picker is open (the card's D13). %>
+    while the picker is open (the card's D13).
+
+    In a folder's place, the folder's row above the grid (the card
+    StudioGallery, D4): its mark, name and own kept images, and the button
+    that adds its images to a gallery. Drawn `hidden`: only a multiple
+    opening shows it, once `admin--media--picker` has asked its address
+    (`GET /media_folders/:id/images`) and some image is new. %>
 <turbo-frame id="media-picker-grid">
   <% place_name = @place.all? ? t(".place_all") : @place.none? ? t(".place_none") : @folder_tree.find(@place.folder).name %>
   <%= tag.div id: "media-picker-place", hidden: true, data: { media_place: @place.to_param, media_place_name: place_name, media_place_gone: @place_gone ? "" : nil,
@@ -35,6 +41,17 @@
     <%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], url_options: admin_url_options, picker: true, place: (@place.to_param unless @place.all?)) %>
 
     <div data-admin--media--live-target="slot"></div>
+    <% if @place.folder %>
+      <% folder_count = @folder_counts[:folders].fetch(@place.folder, 0) %>
+      <%= tag.div id: "media-picker-folder", hidden: true, class: "mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-2 text-sm text-ink",
+                  data: { url: admin_media_folder_images_path(@place.folder, **admin_url_options) } do %>
+        <%= render "admin/shared/icon", name: :folder, size: "size-4" %>
+        <strong class="min-w-0 truncate font-semibold"><%= place_name %></strong>
+        <span class="text-small text-meta"><%= t("admin.components.ui.media_picker.folder_count", count: folder_count) %></span>
+        <%= render Admin::Ui::ButtonComponent.new(label: t("admin.components.ui.media_picker.add_folder", count: folder_count), variant: :secondary, size: :small, type: "button",
+              class: "ms-auto", data: { media_folder_add: true, action: "admin--media--picker#addFolder" }) %>
+      <% end %>
+    <% end %>
     <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :picker, :folder).merge("page" => page)) } %>
     <% if @pagination.out_of_range? %>
       <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>

@@ -29,7 +29,9 @@ module Admin
     # "In the gallery" and never chosen again) and, optionally, `focus:
     # "places"`; it reads "Add images", numbers each tile in the order it was
     # chosen, and answers `{ items: [...] }`, each item one image's keys, in
-    # that order. Its two marks are drawn here once, as templates
+    # that order. In a folder's place it offers the folder's images not yet
+    # in the gallery, oldest first, after what is chosen
+    # (`GET /media_folders/:id/images`). Its two marks are drawn here once, as templates
     # `admin--media--select` clones into a tile.
     #
     # The grid is `Admin::MediaController#index` itself (`picker=1`), loaded into
@@ -68,7 +70,7 @@ module Admin
         interface: %i[url_options],
         limits: [
           "It is drawn once, by the admin layout, and only for someone with media.upload; a field opens it with media-picker:open and never draws a picker of its own.",
-          "It hands back one image, or several in the order chosen when the opener asks for several.",
+          "It hands back one image, or several in the order chosen when the opener asks for several; there, in a folder's place, a whole folder's new images, oldest first, after the ones chosen.",
           "What it lists is the Media screen's own listing (picker=1), loaded into its frame each time it opens; the toolbar and the tiles are Admin::MediaLibrary's.",
           "It browses the library's places and opens at the last one shown, per browser."
         ],
@@ -78,7 +80,8 @@ module Admin
           multiple: [ "test/system/admin/media_picker_test.rb",
                       "a multiple opening reads Add images, toggles tiles numbered in the order chosen, keeps the order across searches and places, and hands back items" ]
         },
-        keys: %w[title upload upload_into upload_nowhere close file none selected cancel use title_multiple add_count takes_none takes full in_gallery chosen ordinal],
+        keys: %w[title upload upload_into upload_nowhere close file none selected cancel use title_multiple add_count takes_none takes full in_gallery chosen ordinal
+                  folder_count add_folder add_folder_first],
         slots: [],
         controller: "admin--media--picker",
         keyboard: [ "test/system/admin/media_picker_test.rb",
@@ -92,8 +95,9 @@ module Admin
       FOOTER_MESSAGES = %w[components.ui.media_picker.none components.ui.media_picker.selected].freeze
 
       # What a multiple opening says instead (the title and the primary,
-      # which a single opening then puts back), and a chosen tile's name.
-      MULTIPLE_MESSAGES = %w[title title_multiple use add_count takes_none takes full chosen ordinal]
+      # which a single opening then puts back), a chosen tile's name, and a
+      # folder's button.
+      MULTIPLE_MESSAGES = %w[title title_multiple use add_count takes_none takes full chosen ordinal add_folder add_folder_first]
                           .map { |key| "components.ui.media_picker.#{key}" }.freeze
 
       # The words before Upload, which `admin--media--picker` writes for each
@@ -112,6 +116,8 @@ module Admin
       #   ended without a grid, so the next open asks again;
       # - the select controller's `chosen`, and the picker's own `reset`/`uploaded`
       #   telling it to forget or to select a finished upload;
+      # - the select controller's `changed`, a multiple opening's choice as it
+      #   stands, which the folder's row counts without;
       # - `admin--media--live`, which listens for changes made in other tabs
       #   only while the picker is open (`reset` as it opens, `close`), holds
       #   the digest an upload's answer names (`digest`), and takes its notice
@@ -129,6 +135,7 @@ module Admin
         "admin--media--picker:reset->admin--media--select#reset",
         "admin--media--picker:uploaded->admin--media--select#selectUploaded",
         "admin--media--select:chosen->admin--media--picker#chosen",
+        "admin--media--select:changed->admin--media--picker#choiceChanged",
         "admin--media--picker:reset->admin--media--live#open",
         "close->admin--media--live#close",
         "turbo:before-cache@document->admin--media--live#reset",

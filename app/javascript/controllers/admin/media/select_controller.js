@@ -31,7 +31,8 @@ import { messages } from "i18n/messages"
 // repeats are refused, since each would be a click, so it toggles once. Every
 // finished upload joins the list, in the order it finished, while the gallery
 // takes more. The primary reads "Add 3 images" and confirms the list:
-// `chosen` carries `{ items: [payload, ...] }`. The dialog's `close` resets
+// `chosen` carries `{ items: [payload, ...] }`. Every change of the list (and
+// the opening's empty one) is said as `changed`, `{ items }`. The dialog's `close` resets
 // it all, so neither the next opening nor Turbo's snapshot keeps a mark.
 //
 // The selection is the payload held HERE, not a mark in the DOM: searching or
@@ -112,6 +113,7 @@ export default class extends Controller {
     this.total = this.multiple ? this.present.size + opening.max : 0
     this.order = []
     this.setSelected(null)
+    this.changed()
   }
 
   // A finished upload: the picker selects the first one of a batch. In a
@@ -151,6 +153,13 @@ export default class extends Controller {
 
     this.mark()
     this.say()
+    this.changed()
+  }
+
+  // A multiple opening's choice as it now stands, for the picker's folder
+  // row, which counts the folder's images without the ones chosen.
+  changed() {
+    if (this.multiple) this.dispatch("changed", { detail: { items: [ ...this.order ] } })
   }
 
   // The 1-based place of an image in the list, or 0.

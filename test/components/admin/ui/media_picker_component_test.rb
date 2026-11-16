@@ -121,6 +121,10 @@ class Admin::Ui::MediaPickerComponentTest < ViewComponent::TestCase
       Admin::Ui::MediaPickerComponent.contract.accessibility)
 
     limits = Admin::Ui::MediaPickerComponent.contract.limits
-    assert_includes limits, "It hands back one image, or several in the order chosen when the opener asks for several."
+    assert_includes limits, "It hands back one image, or several in the order chosen when the opener asks for several; there, in a folder's place, a whole folder's new images, oldest first, after the ones chosen."
+    # A folder's button, written by the script for each answer.
+    assert_equal({ "one" => "Add the 1 new image in this folder", "other" => "Add all %{count} new images in this folder" }, words.fetch("components.ui.media_picker.add_folder"))
+    assert_equal "Add the first %{count} of %{total} new images", words.fetch("components.ui.media_picker.add_folder_first")
+    assert_includes page.find("dialog", visible: :all)["data-action"], "admin--media--select:changed->admin--media--picker#choiceChanged"
   end
 end

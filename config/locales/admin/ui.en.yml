@@ -279,6 +279,17 @@ en:
             two: "%{count}nd"
             few: "%{count}rd"
             other: "%{count}th"
+          # In a folder's place, the row above the grid of a multiple
+          # opening: the folder's own kept images, and its button, counting
+          # the folder's images not yet in the gallery nor chosen; past what
+          # the gallery takes, the oldest that fit.
+          folder_count:
+            one: "1 image"
+            other: "%{count} images"
+          add_folder:
+            one: "Add the 1 new image in this folder"
+            other: "Add all %{count} new images in this folder"
+          add_folder_first: "Add the first %{count} of %{total} new images"
 
         pagination:
           nav_label: "Pagination"

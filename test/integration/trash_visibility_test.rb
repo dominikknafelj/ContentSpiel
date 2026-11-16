@@ -485,7 +485,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "p", text: /No results for/
   end
 
-  test "a trashed image is in no folder's listing or count, and comes back to its folder" do
+  test "a trashed image is in no folder's listing, count or images, and comes back to its folder" do
     folder = Media::Folder.create!(name: "Client A")
     [ @kept_asset, @gone_asset ].each { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
     place = Media::Place.parse(folder.id.to_s, tree: Media::FolderTree.load)
@@ -499,6 +499,9 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "#media-asset-#{@kept_asset.id}"
     assert_select "#media-asset-#{@gone_asset.id}", count: 0
     assert_select "#media-count-all", text: "1"
+    # The picker's "Add all … new images in this folder" (gallery spec §10.6).
+    get "/cs-studio/media_folders/#{folder.id}/images"
+    assert_equal({ "total" => 1, "ids" => [ @kept_asset.id ] }, JSON.parse(response.body).then { |json| { "total" => json["total"], "ids" => json["items"].map { |item| item["id"] } } })
 
     as(users(:one)) { assert Trash::Restore.call(@gone_asset.reload).ok? }
 

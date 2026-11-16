@@ -13,6 +13,12 @@ class Admin::GalleryBlockSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
   end
 
+  # The place the picker remembers is per browser, and the browser is shared
+  # with the tests that follow.
+  teardown do
+    page.execute_script("try { localStorage.removeItem('cs.media.picker.place') } catch {}")
+  end
+
   def titled(title) = create_media_asset.tap { |asset| asset.update!(title: title) }
 
   def gallery(ids = []) = @page.content_blocks.create!(block_type: "gallery", position: 0, settings: { "images" => ids })
@@ -194,5 +200,98 @@ class Admin::GalleryBlockSystemTest < ApplicationSystemTestCase
       assert_text "No images yet. Add them from the library, in the order the site shows them."
     end
     assert_eventually(message: "the removal was never saved") { stored(block).nil? }
+  end
+
+  # `count` images in a new folder, oldest first, titled "Shot 01" and on.
+  def folder_of(name, count)
+    folder = Media::Folder.create!(name: name)
+    images = Array.new(count) { |n| titled(format("Shot %02d", n + 1)) }
+    Media::Asset.where(id: images.map(&:id)).update_all(folder_id: folder.id) # version: none (a test's own rows)
+    [ folder, images ]
+  end
+
+  # In the open picker, the folder's place, from its row in the places.
+  def go_to_folder(folder)
+    within("dialog[open]") { find("#media-picker-place-row-#{folder.id} a").click }
+    assert_selector "#media-picker-place[data-media-place='#{folder.id}']", visible: :all
+  end
+
+  # The folder's row, after the picker has asked what the folder adds.
+  def folder_row_answered(total)
+    assert_selector "#media-picker-folder[data-media-folder-total='#{total}']", visible: :all
+  end
+
+  test "a whole folder is added in upload order, skipping images already there, up to the limit" do
+    folder, shots = folder_of("Client A", 34)
+    there = [ shots[4], shots[10], shots[20] ]
+    block = gallery(there.map(&:id))
+    gone = Media::Asset.maximum(:id).to_i + 1000
+    # Forty-five images that are gone and the same three: the gallery takes 12.
+    full = @page.content_blocks.create!(block_type: "gallery", position: 1, settings: { "images" => (1..45).map { |n| gone + n } + there.map(&:id) })
+    visit_editor(@page)
+
+    within(card(block)) { click_on "Add a folder" }
+    go_to_folder(folder)
+    folder_row_answered(31)
+    within("#media-picker-folder") do
+      assert_text "Client A"
+      assert_text "34 images"
+      click_on "Add all 31 new images in this folder"
+    end
+    refute_selector "dialog[open]"
+    added = shots - there
+    assert_equal there.map(&:id) + added.map(&:id), shown_order(block)
+    assert_eventually(message: "the folder was never saved") { stored(block) == there.map(&:id) + added.map(&:id) }
+
+    # Past what the gallery takes: the oldest that fit, after a tile chosen
+    # first, which the count then leaves out.
+    within(card(full)) { click_on "Add images" }
+    assert_selector "#media-picker-place[data-media-place='#{folder.id}']", visible: :all
+    folder_row_answered(31)
+    within("#media-picker-folder") { assert_button "Add the first 12 of 31 new images" }
+    within("dialog[open]") { click_on "Shot 34" }
+    folder_row_answered(30)
+    within("#media-picker-folder") { click_on "Add the first 11 of 30 new images" }
+    refute_selector "dialog[open]"
+    expected = there.map(&:id) + [ shots[33].id ] + (added - [ shots[33] ]).first(11).map(&:id)
+    assert_equal expected, shown_order(full).last(15)
+    within(card(full)) { assert_text "60 of 60 images" }
+    assert_eventually(message: "the limit's folder was never saved") { stored(full)&.size == 60 && stored(full).last(15) == expected }
+  end
+
+  test "the folder's row stands only in a multiple opening at a folder with new images" do
+    done, done_shots = folder_of("Done", 2)
+    fresh, = folder_of("Fresh", 1)
+    block = gallery(done_shots.map(&:id))
+    image = @page.content_blocks.create!(block_type: "image", position: 1)
+    visit_editor(@page)
+
+    # All media, then a folder whose images are all in the gallery.
+    within(card(block)) { click_on "Add images" }
+    within("dialog[open]") do
+      assert_selector "#media-picker-place[data-media-place='all']", visible: :all
+      assert_no_selector "#media-picker-folder", visible: :all
+    end
+    go_to_folder(done)
+    folder_row_answered(0)
+    assert_no_selector "#media-picker-folder"
+
+    go_to_folder(fresh)
+    folder_row_answered(1)
+    within("#media-picker-folder") do
+      assert_text "Fresh"
+      assert_text "1 image"
+      assert_button "Add the 1 new image in this folder"
+    end
+    within("dialog[open]") { click_on "Cancel" }
+    refute_selector "dialog[open]"
+
+    # A single opening at the same folder draws the row and never shows it.
+    within("##{Admin::EditorScreen::BlockCardComponent.error_prefix(image)}-image-section") { click_on "Choose image" }
+    assert_selector "#media-picker-place[data-media-place='#{fresh.id}']", visible: :all
+    assert_selector "#media-picker-folder", visible: :hidden
+    await_frames
+    assert_no_selector "#media-picker-folder"
+    assert_no_selector "#media-picker-folder[data-media-folder-total]", visible: :all
   end
 end

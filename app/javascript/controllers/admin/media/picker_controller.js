@@ -51,6 +51,18 @@ function forget() {
 // title, alt, caption }, ...] }` in the order chosen. Every other opening is
 // a single one, and its title and primary are put back.
 //
+// A WHOLE FOLDER (StudioGallery D4, gallery spec §10.4): in a folder's place
+// of a multiple opening, after each load of the frame and each change of the
+// choice (`admin--media--select:changed`), the folder's row
+// (`#media-picker-folder`, drawn hidden) asks its address what the folder
+// adds: `limit` what the gallery takes after the choice, `except` the ids in
+// the gallery and the ones chosen. It says "Add all 31 new images in this
+// folder", or "Add the first 12 of 31 new images" past that, and is shown
+// while some image is new (`data-media-folder-total` holds the count asked
+// last). Its press hands back the choice, then the folder's images, oldest
+// first, and closes. Only the last question's answer is drawn; a failed one
+// leaves the row hidden, and the grid is still there to choose from.
+//
 // `picked` is dispatched from the dialog's `close` handler, not straight
 // from `#choose`: closing a modal dialog restores focus asynchronously, so
 // dispatching first would let that restore land *after* whatever focus the
@@ -83,6 +95,10 @@ export default class extends Controller {
   connect() {
     this.opener = null
     this.multiple = false
+    this.opening = null
+    this.chosenItems = []
+    this.folderItems = []
+    this.folderRequest = null
     this.pending = null
     this.escapeCleared = false
     this.gridPending = false
@@ -101,6 +117,7 @@ export default class extends Controller {
 
   disconnect() {
     this.uploads?.abort()
+    this.folderRequest?.abort()
   }
 
   open(event) {
@@ -115,7 +132,10 @@ export default class extends Controller {
     this.uploads.abort()
     this.statusTarget.textContent = ""
     this.titleTarget.textContent = messages(this.element).t(multiple ? "components.ui.media_picker.title_multiple" : "components.ui.media_picker.title")
-    this.dispatch("reset", { detail: multiple ? this.severalOpening(event.detail) : {} })
+    this.opening = multiple ? this.severalOpening(event.detail) : null
+    this.chosenItems = []
+    this.folderItems = []
+    this.dispatch("reset", { detail: this.opening || {} })
     this.focusOnLoad = multiple && event.detail.focus === "places" ? "places" : "search"
     this.loadGrid()
     if (!this.element.open) this.element.showModal()
@@ -174,6 +194,7 @@ export default class extends Controller {
     this.gridPending = false
     this.uploads.reattach()
     this.showPlace()
+    this.askFolder()
     if (!this.focusOnLoad) return
 
     const focus = this.focusOnLoad
@@ -253,6 +274,81 @@ export default class extends Controller {
     this.frameTarget.src = new URL(href, window.location.href).toString()
   }
 
+  // --- A whole folder --------------------------------------------------------
+
+  // `admin--media--select`'s choice as it stands: the folder's row asks again
+  // without it.
+  choiceChanged(event) {
+    if (!this.multiple) return
+
+    this.chosenItems = Array.isArray(event.detail?.items) ? event.detail.items : []
+    this.askFolder()
+  }
+
+  // What the folder shown adds to the gallery, asked of its row's address.
+  // A question still under way is dropped: only the last is drawn.
+  askFolder() {
+    this.folderRequest?.abort()
+    this.folderRequest = null
+    const row = this.frameTarget.querySelector("#media-picker-folder")
+    if (!row || !this.multiple || !this.opening) return
+
+    const room = this.opening.max - this.chosenItems.length
+    if (room <= 0) {
+      row.hidden = true
+      return
+    }
+
+    const address = new URL(row.dataset.url, window.location.href)
+    address.searchParams.set("limit", String(room))
+    address.searchParams.set("except", [ ...this.opening.present, ...this.chosenItems.map((item) => item.id) ].join(","))
+    const request = new AbortController()
+    this.folderRequest = request
+    fetch(address, { headers: { Accept: "application/json" }, credentials: "same-origin", signal: request.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((answer) => {
+        if (request !== this.folderRequest || !row.isConnected) return
+
+        this.folderRequest = null
+        this.showFolder(row, answer)
+      })
+      // Dropped for a later question, or the network failed: the row stays
+      // as it is, hidden on a frame's first answer.
+      .catch(() => {})
+  }
+
+  showFolder(row, answer) {
+    const total = Number.isInteger(answer?.total) ? answer.total : 0
+    this.folderItems = Array.isArray(answer?.items) ? answer.items.filter((item) => Number.isInteger(item?.id)) : []
+    const count = this.folderItems.length
+    const words = messages(this.element)
+    const button = row.querySelector("[data-media-folder-add]")
+    if (button) {
+      button.textContent = total > count
+        ? words.t("components.ui.media_picker.add_folder_first", { count, total })
+        : words.t("components.ui.media_picker.add_folder", { count: total })
+    }
+    row.dataset.mediaFolderTotal = String(total)
+    row.hidden = count === 0
+  }
+
+  // The folder's button: the choice in its order, then the folder's images
+  // the last answer named, up to what the gallery takes.
+  addFolder() {
+    if (!this.multiple || !this.opening) return
+
+    const items = [ ...this.chosenItems ]
+    const ids = new Set(items.map((item) => item.id))
+    for (const item of this.folderItems) {
+      if (items.length >= this.opening.max) break
+      if (ids.has(item.id)) continue
+
+      items.push(item)
+      ids.add(item.id)
+    }
+    this.choose({ items })
+  }
+
   // What an upload sends beside its file: the search shown (the counts it
   // answers are of it) and the place, whose folder the file goes into.
   uploadFields() {
@@ -313,6 +409,11 @@ export default class extends Controller {
     // module's "Unused" filter, where it can be deleted (cleanup is manual
     // only, global constraints).
     this.uploads.abort()
+    this.folderRequest?.abort()
+    this.folderRequest = null
+    this.folderItems = []
+    this.chosenItems = []
+    this.opening = null
     const opener = this.opener
     const detail = this.pending
     this.opener = null
