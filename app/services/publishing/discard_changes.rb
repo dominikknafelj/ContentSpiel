@@ -103,21 +103,31 @@ module Publishing
 
     private
 
-    # The sentences for what stays different after the return. With no image
-    # missing every difference left is a tag's (the return puts back all
-    # else); with one, a tag's sentence joins only where a tag still
-    # differs: the post's tags, or a block whose settings or listed tag do
-    # (an image left empty differs in `media_asset_id` alone, and a block
-    # made again without its image stands as one removed and one added).
+    # The sentences for what stays different after the return: an image
+    # that went (`IMAGES_GONE`), and a tag (`REMAINS`) when one was deleted
+    # or when anything else still differs, which is a rename (a post's tags,
+    # a list block's filter): the return puts back all but those.
     def left_behind(outcome, changes)
       return [] if changes.none?
-      return [ REMAINS ] if outcome.images_missing.zero?
 
-      tags = changes.fields.include?("tags") || changes.blocks.any? do |entry|
+      [ (IMAGES_GONE if outcome.images_missing.positive?),
+        (REMAINS if outcome.tags_missing.positive? || beyond_gone_images?(changes)) ].compact
+    end
+
+    # Whether the rows differ from the copy in more than the images that
+    # went: the hero the copy names and a block whose only difference is
+    # that its gone image is empty (made again without it, it stands for
+    # the copy's block, `Changes.stand_ins`) do not count.
+    def beyond_gone_images?(changes)
+      fields = changes.fields
+      fields -= %w[hero_media_asset_id] if gone_image?(changes.sides.first.fetch("fields", {})["hero_media_asset_id"])
+      return true if fields.any?
+
+      changes.blocks.any? do |entry|
         was, now = changes.sides_of(entry)
-        was && now && was.values_at("settings", "listed_tag_id") != now.values_at("settings", "listed_tag_id")
+        !(entry.kind == :changed && gone_image?(was["media_asset_id"]) && now["media_asset_id"].nil? &&
+          Changes.same_content?(was.merge("media_asset_id" => nil), now))
       end
-      [ IMAGES_GONE, (REMAINS if tags) ].compact
     end
   end
 end

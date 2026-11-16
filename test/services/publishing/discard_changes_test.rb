@@ -546,6 +546,70 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal "alpha", list.reload.settings["tag"]
   end
 
+  test "an image named twice that went is counted once" do
+    gone = create_media_asset
+    assert Pages::Save.call(@page, attributes: { hero_media_asset_id: gone.id }).ok?
+    add(nil, block_type: "image", media_asset_id: gone.id)
+    publish_changes(@page)
+    gone.update_columns(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+
+    assert_equal Publishing::ReturnTo::Outcome.new(images_missing: 1, tags_missing: 0), ReturnToCopy.call(@page.reload)
+  end
+
+  test "a gone image is written empty where the row has another image since" do
+    gone = create_media_asset
+    other = create_media_asset
+    image = add(nil, block_type: "image", media_asset_id: gone.id)
+    publish_changes(@page)
+    assert ContentBlocks::Save.call(image.reload, attributes: { media_asset_id: other.id }).ok?
+    gone.update_columns(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+
+    result = Publishing::DiscardChanges.call(@page.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_nil image.reload.media_asset_id
+    assert_equal Publishing::DiscardChanges::IMAGES_GONE, result.notice
+  end
+
+  test "a block made again without its gone image is that block: a second discard keeps it and its notes" do
+    gone = create_media_asset
+    image = add(nil, block_type: "image", media_asset_id: gone.id)
+    publish_changes(@page)
+    assert ContentBlocks::Destroy.call(image).ok?
+    Media::Asset.where(id: gone.id).update_all(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+    first = Publishing::DiscardChanges.call(@page.reload)
+    assert first.ok?, first.errors.to_sentence
+    back = @page.content_blocks.find_by!(block_type: "image")
+    assert_nil back.media_asset_id
+    assert_equal [ :changed ], Publishing::Changes.of(@page.reload).blocks.map(&:kind), "the overview pairs it with the copy's block"
+    as(users(:two)) { assert Notes::Start.call(back, body: "A note").ok? }
+    assert ContentBlocks::Save.call(@first.reload, translations: { "en" => { body: rich_doc("Typed") } }).ok?
+
+    second = Publishing::DiscardChanges.call(@page.reload)
+
+    assert second.ok?, second.errors.to_sentence
+    assert ContentBlock.exists?(back.id), "kept, not made once more"
+    assert_equal [ back ], Notes::Thread.all.map(&:subject)
+    assert_equal Publishing::DiscardChanges::IMAGES_GONE, second.notice
+  end
+
+  test "a renamed tag and a gone image are both said" do
+    list = add(nil, block_type: "post_list", settings: { "content_type" => "blog", "tag" => "alpha" })
+    live_post(%w[alpha])
+    gone = create_media_asset
+    add(nil, block_type: "image", media_asset_id: gone.id)
+    publish_changes(@page)
+    assert Tags::Rename.call(Tag.find_by!(name: "alpha"), name: "alphas").ok?
+    assert ContentBlocks::Save.call(@first.reload, translations: { "en" => { body: rich_doc("Typed") } }).ok?
+    gone.update_columns(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+
+    result = Publishing::DiscardChanges.call(@page.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal "alphas", list.reload.settings["tag"]
+    assert_equal [ Publishing::DiscardChanges::IMAGES_GONE, Publishing::DiscardChanges::REMAINS ].join(". "), result.notice
+  end
+
   test "a discard that fails half way leaves the rows as they were" do
     add("Added")
     assert ContentBlocks::Destroy.call(@first).ok?

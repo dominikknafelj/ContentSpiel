@@ -56,8 +56,9 @@ module Publishing
   # rewritten where it differs and keeps its id (its notes, its holder). One
   # the rows lost is created again as a NEW block: its notes went with it
   # when it was deleted. (A block created again by an EARLIER return has
-  # another id than the copy's block and is that block all the same:
-  # `Changes.stand_ins` pairs the two, here and in the overview.) One the
+  # another id than the copy's block and is that block all the same, also
+  # when it was made without an image that went: `Changes.stand_ins` pairs
+  # the two, here and in the overview.) One the
   # copy does not have is deleted, with its notes (`ContentBlocks::Destroy`).
   # Then every container gets its blocks back in the copy's order.
   #
@@ -75,9 +76,9 @@ module Publishing
   # the transaction already holds, and then block rows (the lock order of
   # every block write, `ContentSpiel::LockOrder`).
   module ReturnTo
-    # What could not be brought back, as counts: references to library
-    # images that are gone or in the trash (left empty), and tags deleted
-    # since (a post's, left out; a list filter's, naming no tag).
+    # What could not be brought back, as counts: library images that are
+    # gone or in the trash (each once, left empty wherever named), and tags
+    # deleted since (a post's, left out; a list filter's, naming no tag).
     Outcome = Data.define(:images_missing, :tags_missing)
 
     PAGE_TRANSLATED = %w[title subtitle meta_title meta_description hero_alt].freeze
@@ -88,10 +89,11 @@ module Publishing
 
     def return_to!(version)
       @wrote = false
-      @images_missing = @tags_missing = 0
+      @tags_missing = 0
+      @gone_images = Set.new
       @kept_images = kept_images(version)
       @record.is_a?(Page) ? return_page(version) : return_post(version)
-      Outcome.new(images_missing: @images_missing, tags_missing: @tags_missing)
+      Outcome.new(images_missing: @gone_images.size, tags_missing: @tags_missing)
     end
 
     # A step of the return: another service's result. Its record when it
@@ -105,20 +107,26 @@ module Publishing
       raise ActiveRecord::Rollback
     end
 
-    # The library images the copy names (the hero, every image block's) that
-    # may be written back, in one statement.
+    # The kept library images among those the copy names (the hero, every
+    # image block's) and those the record's blocks name now, in one
+    # statement: the first say what may be written back, both together are
+    # what `Changes.stand_ins` pairs blocks by.
     def kept_images(version)
       ids = version.blocks.map { |block| block["media_asset_id"] }
       ids << version.snapshot.fetch("fields", {})["hero_media_asset_id"]
-      ids = ids.compact.uniq
-      ids.empty? ? Set.new : Media::Asset.kept.where(id: ids).pluck(:id).to_set
+      kept = Media::Asset.kept
+      kept.where(id: ids.compact.uniq).or(kept.where(id: ContentBlock.where(owner: @record).select(:media_asset_id))).pluck(:id).to_set
     end
 
-    # The copy's image id when it may be written back, else nil, counted.
-    def image_back(id)
-      return id if id.nil? || @kept_images.include?(id)
+    # Whether a copy's image id names an image that is gone or in the trash.
+    def gone_image?(id) = !id.nil? && !@kept_images.include?(id)
 
-      @images_missing += 1
+    # The copy's image id when it may be written back, else nil; each gone
+    # image is counted once, however many places named it.
+    def image_back(id)
+      return id unless gone_image?(id)
+
+      @gone_images << id
       nil
     end
 
@@ -184,7 +192,7 @@ module Publishing
       # A block an earlier return created again stands for the copy's block
       # it is the same as (`Changes.stand_ins`): it is kept, not deleted and
       # created once more.
-      stands_for = Changes.stand_ins(copied, Snapshot.of(@record).fetch("blocks", []))
+      stands_for = Changes.stand_ins(copied, Snapshot.of(@record).fetch("blocks", []), kept_images: @kept_images)
       extras = ContentBlock.where(owner: @record).where.not(id: copy_ids + stands_for.keys).to_a
       extras.reject(&:container?).each { |block| step ContentBlocks::Destroy.call(block, actor: actor) }
       extras.select(&:container?).each { |block| step ContentBlocks::Destroy.call(block.reload, keep_blocks: true, actor: actor) }

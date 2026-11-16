@@ -111,24 +111,47 @@ module Publishing
     # column of the same container, a section itself being judged this way
     # first), each once, in reading order.
     #
+    # AN IMAGE THAT WENT IS NO IMAGE. A return writes a block whose library
+    # image is gone or in the trash with none (`Publishing::ReturnTo`), so
+    # here an image id that is not a kept library image reads as nil on both
+    # sides: the block made again without it stands for the copy's block,
+    # and the next return keeps it, and its notes, instead of making it once
+    # more. `kept_images` is the set of kept ids among both sides' (the
+    # return hands in the one it read; read here in one statement when not).
+    #
     # `{ the row's id => the copy's id }` for such pairs, from the two sides
     # in the form a copy stores blocks in. For `changed_blocks` and for the
-    # discard, which must agree on which block is which.
-    def self.stand_ins(was, now)
+    # return, which must agree on which block is which.
+    def self.stand_ins(was, now, kept_images: nil)
       known = now.map { |block| block["id"] }.to_set
       lost = was.reject { |block| known.include?(block["id"]) }
       return {} if lost.empty?
 
+      kept_images ||= kept_images_among(was + now)
+      lost = lost.map { |block| without_gone_image(block, kept_images) }
       copied = was.map { |block| block["id"] }.to_set
       stands_for = {}
       # Top-level blocks (the sections among them) before the blocks inside.
       now.reject { |block| copied.include?(block["id"]) }.partition { |block| block["section_id"].nil? }.flatten.each do |block|
         place = [ stands_for.fetch(block["section_id"], block["section_id"]), block["section_column"] ]
-        twin = lost.find { |old| old.values_at("section_id", "section_column") == place && same_content?(old, block) } or next
+        twin = lost.find { |old| old.values_at("section_id", "section_column") == place && same_content?(old, without_gone_image(block, kept_images)) } or next
         lost.delete(twin)
         stands_for[block["id"]] = twin["id"]
       end
       stands_for
+    end
+
+    # The kept library images (`Media::Asset.kept`) among the blocks' image
+    # ids, in one statement.
+    def self.kept_images_among(blocks)
+      ids = blocks.filter_map { |block| block["media_asset_id"] }.uniq
+      ids.empty? ? Set.new : Media::Asset.kept.where(id: ids).pluck(:id).to_set
+    end
+
+    # The stored block with an image that is not kept read as none.
+    def self.without_gone_image(block, kept_images)
+      id = block["media_asset_id"]
+      id.nil? || kept_images.include?(id) ? block : block.merge("media_asset_id" => nil)
     end
 
     def self.same_content?(one, other)
