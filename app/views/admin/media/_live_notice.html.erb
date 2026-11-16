@@ -1,0 +1,13 @@
+<%# The notice `admin--media--live` puts above the grid, once, when another
+    tab changed the place shown (the card's D13): a compact neutral status
+    with "Show changes", which reloads the place's frame and takes it away.
+    Drawn by the Media screen and by the picker's frame. %>
+<template data-admin--media--live-target="notice">
+  <%= render Admin::Ui::NoticeComponent.new(tone: :neutral, size: :compact, role: :status, class: "mb-3", data: { media_live_notice: true }) do %>
+    <span class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <span><%= t("admin.components.media_library.live.changed") %></span>
+      <%= render Admin::Ui::ButtonComponent.new(label: t("admin.components.media_library.live.show"), variant: :tertiary, size: :small,
+            data: { action: "admin--media--live#show" }) %>
+    </span>
+  <% end %>
+</template>

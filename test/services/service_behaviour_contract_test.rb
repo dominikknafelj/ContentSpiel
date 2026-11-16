@@ -49,7 +49,7 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
   # (and a factory in test/support/service_calls.rb).
   EXPECTED_SERVICES = %w[
     AI::Translate ApiTokens::Issue ApiTokens::Revoke ContentBlocks::Destroy ContentBlocks::Duplicate ContentBlocks::Reorder
-    ContentBlocks::Save Editing::TakeOver Forms::DeleteSubmissions Forms::Resend Forms::Save Forms::Submit Groups::Destroy Groups::EnsureBuiltIns Groups::Save Invitations::Accept Invitations::AcceptWithSso Invitations::Invite Invitations::Resend Invitations::Withdraw Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Regenerate Media::Save
+    ContentBlocks::Save Editing::TakeOver Forms::DeleteSubmissions Forms::Resend Forms::Save Forms::Submit Groups::Destroy Groups::EnsureBuiltIns Groups::Save Invitations::Accept Invitations::AcceptWithSso Invitations::Invite Invitations::Resend Invitations::Withdraw Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::DeleteFolder Media::MoveImages Media::Regenerate Media::Save Media::SaveFolder
     Media::Upload Notes::DeleteMessage Notes::EditMessage Notes::MarkRead Notes::Pin Notes::React Notes::Remove Notes::Reopen Notes::Reply
     Notes::Resolve Notes::SetFollowing Notes::Start Notes::Unpin Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Publishing::CancelScheduledChange Publishing::DiscardChanges Publishing::PublishChanges Publishing::PublishNow Publishing::RestoreVersion SignIn::RecoveryCodes::Generate SignIn::Sessions::End SignIn::Sessions::EndAll SignIn::Sessions::EndOthers Settings::Save SignIn::Passkeys::Add SignIn::Passkeys::Remove SignIn::Passkeys::Rename
     SignIn::Sso::Admit SignIn::Sso::Link SignIn::Sso::Unlink

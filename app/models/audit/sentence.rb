@@ -48,7 +48,7 @@ module Audit
     # to ...", "You uploaded 12 images"). `Dashboard::Activity` collapses a run
     # of exactly these into one row (layout points spec, decision 11); any
     # other action told with a count is a mistake and `build` refuses it.
-    COUNTED = %w[block.created block.updated media.uploaded].freeze
+    COUNTED = %w[block.created block.updated media.uploaded media.moved].freeze
 
     # Verb phrase "before <subject> after" for the actions every record kind
     # shares (`page.published`, `media.trashed`, ...).
@@ -68,7 +68,7 @@ module Audit
     CONTENT_ACTIONS = {
       "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over changes_published changes_discarded version_restored scheduled_change_cancelled],
       "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over changes_published changes_discarded version_restored scheduled_change_cancelled],
-      "media" => %w[uploaded updated trashed restored purged translation_confirmed],
+      "media" => %w[uploaded updated moved trashed restored purged translation_confirmed],
       "settings" => %w[translation_confirmed]
     }.freeze
 
@@ -87,6 +87,10 @@ module Audit
       "group.deleted" => [ "deleted the group ", "" ],
       "token.issued" => [ "created the API token ", "" ], "token.revoked" => [ "revoked the API token ", "" ],
       "settings.updated" => [ "edited ", "" ],
+      # A library folder: its subject is the folder, named as it was then. A
+      # rename and a move read their before and after (`folder_parts`).
+      "media_folder.created" => [ "created the folder ", "" ], "media_folder.renamed" => [ "renamed the folder ", "" ],
+      "media_folder.moved" => [ "moved the folder ", "" ], "media_folder.deleted" => [ "deleted the folder ", "" ],
       # Forms: a form is named as one, with its name.
       "form.created" => [ "created the form ", "" ], "form.updated" => [ "changed the form ", "" ],
       "form.trashed" => [ "moved the form ", " to the trash" ], "form.restored" => [ "restored the form ", "" ],
@@ -301,6 +305,7 @@ module Audit
         elsif SPECIAL_ACTIONS.include?(@action) then special_parts
         elsif NOTE_VERBS.key?(@action) then subject_parts(*NOTE_VERBS[@action])
         elsif SUBMISSION_ACTIONS.include?(@action) then submission_parts
+        elsif %w[media_folder.renamed media_folder.moved].include?(@action) then folder_parts
         elsif OTHER_VERBS.key?(@action) then subject_parts(*OTHER_VERBS[@action])
         elsif CONTENT_ACTIONS[prefix]&.include?(verb) || derived_schedule?(prefix, verb) then content_parts(verb)
         else generic_parts
@@ -333,6 +338,7 @@ module Audit
 
       def content_parts(verb)
         return [ text("uploaded "), Part.new(:collection, "#{@number} images") ] if @count > 1 && @action == "media.uploaded"
+        return image_moved_parts if @action == "media.moved"
 
         before, after = CONTENT_VERBS.fetch(verb)
         if verb == "scheduled" && (date = scheduled_date)
@@ -443,6 +449,36 @@ module Audit
       # in the metadata's ids, never in the sentence.
       def handed_over?
         event.metadata.is_a?(Hash) && event.metadata["answered"] == true
+      end
+
+      # "renamed the folder “Old” to “New”": the old name is the change's own, the
+      # new one the subject's. "moved the folder “Trips” into “2026”", or "to
+      # the top" when the event names no parent (the parent's name is kept in
+      # the event: it may be renamed or deleted since).
+      def folder_parts
+        label = subject_label
+        return subject_parts(OTHER_VERBS.fetch(@action).first) unless label
+
+        if @action == "media_folder.renamed"
+          old = Array(event.field_changes.is_a?(Hash) ? event.field_changes["name"] : nil).first
+          return subject_parts(OTHER_VERBS.fetch(@action).first) if old.blank?
+
+          [ text("renamed the folder “#{old}” to "), Part.new(:subject, label) ]
+        else
+          parent = self.class.metadata_of(event)["parent"].presence
+          [ text("moved the folder "), Part.new(:subject, label), text(parent ? " into “#{parent}”" : " to the top") ]
+        end
+      end
+
+      # "moved “sunset.jpg” to “Client A”", or "out of every folder"; counted,
+      # "moved 12 images to “Client A”". The folder's name is the event's own,
+      # kept as it was then; a counted run is worded by its newest event.
+      def image_moved_parts
+        folder = self.class.metadata_of(event)["folder_name"].presence
+        where = folder ? " to “#{folder}”" : " out of every folder"
+        return [ text("moved "), Part.new(:collection, "#{@number} images"), text(where) ] if @count > 1
+
+        subject_parts("moved ", where)
       end
 
       def submission_parts
@@ -659,6 +695,7 @@ module Audit
         @pages = readable(Page, "pages.read", ids("Page") + owner_ids("Page"))
         @posts = readable(Post, "posts.read", ids("Post") + owner_ids("Post"))
         @media = media_ids
+        @folders = existing(Media::Folder, "media.upload", ids("Media::Folder"))
         @users = existing(User, "users.manage", ids("User"))
         @groups = existing(AccessControl::Group, "groups.manage", ids("AccessControl::Group"))
         @settings = holds?("settings.manage")
@@ -672,6 +709,10 @@ module Audit
         when "ContentBlock" then owner_target(event)
         when "Page", "Post" then Target.new(event.subject_label, (Sentence.route_for(records(type)[event.subject_id]) if records(type)[event.subject_id]))
         when "Media::Asset" then Target.new(event.subject_label, (Route.new(:admin_media_path, [], { selected: event.subject_id }) if @media.include?(event.subject_id)))
+        when "Media::Folder"
+          # A deleted folder's sentence has no link, and neither has a folder that is gone.
+          open = event.action != "media_folder.deleted" && @folders.include?(event.subject_id)
+          Target.new(event.subject_label, (Route.new(:admin_media_path, [], { folder: event.subject_id }) if open))
         when "User" then Target.new(event.subject_label, (Route.new(:edit_admin_user_path, [ event.subject_id ], {}) if @users.include?(event.subject_id)))
         when "AccessControl::Group" then Target.new(event.subject_label, (Route.new(:edit_admin_group_path, [ event.subject_id ], {}) if @groups.include?(event.subject_id)))
         when "SiteSetting" then Target.new(event.subject_label, (Route.new(:admin_settings_path, [], {}) if @settings))

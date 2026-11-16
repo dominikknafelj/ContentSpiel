@@ -162,7 +162,17 @@ Rails.application.routes.draw do
       # (`admin_medium_path`) -- the plain, if slightly odd-looking, Rails
       # default for this one English word, left as-is rather than overridden
       # with an `:as` this app has no other resource needing.
+      # The Folders column's part as it stands, for a tab that heard of a
+      # change elsewhere (`Admin::MediaFoldersController#index`); before
+      # `resources :media`, whose `show` would take "folders" for an id.
+      get "media/folders", to: "media_folders#index", as: :media_folder_tree
       resources :media, only: %i[index show create update destroy]
+      # The Folders column's writes and the move of images into a folder
+      # (`Media::SaveFolder`, `DeleteFolder`, `MoveImages`).
+      resources :media_folders, only: %i[create update destroy]
+      post "media/move", to: "media_moves#create", as: :media_move
+      # The Move to… dialog's list for images or a folder (its frame's answer).
+      get "media/move/new", to: "media_moves#new", as: :new_media_move
       # "Download original": the library
       # image's original file, for a holder of `media.upload` alone. Active
       # Storage's own blob routes refuse it to everyone

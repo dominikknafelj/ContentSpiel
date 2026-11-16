@@ -1,8 +1,9 @@
 <ul class="admin-media-grid <%= grid_class %>">
   <% assets.each do |asset| %>
-    <%= render Admin::MediaLibrary::TileComponent.new(asset: asset, url: (show_path(asset) unless pick?), unused: !used_ids.include?(asset.id),
+    <%= render Admin::MediaLibrary::TileComponent.new(asset: asset, url: tile_url(asset), unused: !used_ids.include?(asset.id),
           selected: selected?(asset), pick: pick?, locale: locale,
-          open_notes: note_counts.fetch(asset.id, 0), notes_unread: note_unread.include?(asset.id)) %>
+          open_notes: note_counts.fetch(asset.id, 0), notes_unread: note_unread.include?(asset.id),
+          folder_path: folder_path(asset), folder_name: folder_name_of(asset), select: select?) %>
   <% end %>
 </ul>
 <% if assets.empty? %>
@@ -13,6 +14,11 @@
           <%= link_to t(".empty.clear"), clear_filters_path, class: setup_secondary_link_class, data: clear_filters_data %>
         <% end %>
       <% end %>
+    <% elsif empty_folder? %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty_folder.title"),
+            description: safe_join([ t(".empty_folder.body", name: folder_name), (holds_text if subfolders.any?) ].compact, " ")) %>
+    <% elsif empty_none? %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty_none")) %>
     <% else %>
       <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty.title"), description: pick? ? t(".empty.picker_description") : t(".empty.description")) %>
     <% end %>

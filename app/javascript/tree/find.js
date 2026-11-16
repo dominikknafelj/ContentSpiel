@@ -152,7 +152,7 @@ export function filterTree(tree, query, { locale } = {}) {
     }
   })
 
-  const set = readOpenSet()
+  const set = readOpenSet(tree)
   nodes.forEach((node) => {
     if (!shown.has(node)) {
       node.hidden = true
@@ -176,7 +176,7 @@ export function filterTree(tree, query, { locale } = {}) {
 // reads the path from the nodes' `data-tree-on-path`).
 export function clearFilter(tree) {
   takeBack(tree)
-  const set = readOpenSet()
+  const set = readOpenSet(tree)
   tree.querySelectorAll("[data-tree-node]").forEach((node) => {
     node.removeAttribute("data-filter-open")
     setFolded(node, !openByRule(node, set))

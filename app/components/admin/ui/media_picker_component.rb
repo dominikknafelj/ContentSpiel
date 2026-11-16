@@ -34,7 +34,11 @@ module Admin
     # on this same element). Uploads (`Admin::MediaAssetsController#create`,
     # `Media::Upload`) show as progress tiles at the start of the grid; the first
     # one to finish is selected, and a refused one keeps its tile with the
-    # server's reason and Dismiss (`media/upload_tiles.js`). No browser dialogs
+    # server's reason and Dismiss (`media/upload_tiles.js`). Beside the grid
+    # stand the library's places, read-only (the card StudioMediaFolders, D12;
+    # `Admin::MediaLibrary::FolderTreeComponent`, `mode: :picker`): the frame
+    # opens at the place it showed last in this browser, an upload goes into
+    # the place shown, and "Uploads go into …" before Upload says where. No browser dialogs
     # anywhere; Escape clears a typed search first and a second one closes the
     # dialog, the ×, Cancel and a press that both begins and ends on the backdrop
     # close it too, and focus goes back to the opener.
@@ -57,11 +61,12 @@ module Admin
         limits: [
           "It is drawn once, by the admin layout, and only for someone with media.upload; a field opens it with media-picker:open and never draws a picker of its own.",
           "It hands back one image: several cannot be chosen.",
-          "What it lists is the Media screen's own listing (picker=1), loaded into its frame each time it opens; the toolbar and the tiles are Admin::MediaLibrary's."
+          "What it lists is the Media screen's own listing (picker=1), loaded into its frame each time it opens; the toolbar and the tiles are Admin::MediaLibrary's.",
+          "It browses the library's places and opens at the last one shown, per browser."
         ],
         states: %i[rest],
         script_states: { open: [ "test/system/admin/media_picker_test.rb", "choosing: a click only selects, Use image fills the field, a double click picks at once" ] },
-        keys: %w[title upload close file none selected cancel use],
+        keys: %w[title upload upload_into upload_nowhere close file none selected cancel use],
         slots: [],
         controller: "admin--media--picker",
         keyboard: [ "test/system/admin/media_picker_test.rb", "the keyboard reaches a tile by Tab from the search field, Space selects it and a second Enter on it confirms" ]
@@ -73,6 +78,10 @@ module Admin
       # beside the upload tiles'.
       FOOTER_MESSAGES = %w[components.ui.media_picker.none components.ui.media_picker.selected].freeze
 
+      # The words before Upload, which `admin--media--picker` writes for each
+      # place the frame shows.
+      PLACE_MESSAGES = %w[components.ui.media_picker.upload_into components.ui.media_picker.upload_nowhere].freeze
+
       # The picker's wiring, one place (all on the dialog element):
       # - `media-picker:open@window` / `close`: the opener contract above;
       # - `cancel`: native Escape, which a typed search turns into "clear it";
@@ -82,7 +91,11 @@ module Admin
       # - `turbo:fetch-request-error` / `turbo:frame-missing`: a grid load that
       #   ended without a grid, so the next open asks again;
       # - the select controller's `chosen`, and the picker's own `reset`/`uploaded`
-      #   telling it to forget or to select a finished upload.
+      #   telling it to forget or to select a finished upload;
+      # - `admin--media--live`, which listens for changes made in other tabs
+      #   only while the picker is open (`reset` as it opens, `close`), holds
+      #   the digest an upload's answer names (`digest`), and takes its notice
+      #   back before Turbo's snapshot.
       ACTIONS = [
         "media-picker:open@window->admin--media--picker#open",
         "close->admin--media--picker#closed",
@@ -94,7 +107,11 @@ module Admin
         "turbo:frame-missing->admin--media--picker#gridFailed",
         "admin--media--picker:reset->admin--media--select#reset",
         "admin--media--picker:uploaded->admin--media--select#selectUploaded",
-        "admin--media--select:chosen->admin--media--picker#chosen"
+        "admin--media--select:chosen->admin--media--picker#chosen",
+        "admin--media--picker:reset->admin--media--live#open",
+        "close->admin--media--live#close",
+        "turbo:before-cache@document->admin--media--live#reset",
+        "admin--media--picker:digest->admin--media--live#uploaded"
       ].join(" ").freeze
 
       def initialize(url_options: {})
@@ -106,6 +123,9 @@ module Admin
       def grid_url = helpers.admin_media_path(picker: 1, **url_options)
 
       def upload_url = helpers.admin_media_assets_path
+
+      # The places' part, fetched again when another tab changed the library.
+      def live_url = helpers.admin_media_folder_tree_path(**url_options)
 
       def accept = Media::Asset::ALLOWED_CONTENT_TYPES.join(",")
 

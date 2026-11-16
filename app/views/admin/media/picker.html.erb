@@ -8,19 +8,43 @@
     names it among the keys to keep), so every later request comes back here, not to
     the full Media module page. The toolbar is the Media screen's own
     (`Admin::MediaLibrary::ToolbarComponent`, `picker: true`), the tiles the grid's
-    (`pick: true`). %>
-<turbo-frame id="media-picker-grid">
-  <%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], url_options: admin_url_options, picker: true) %>
+    (`pick: true`). The place this answer is of, and whether a `folder` that named
+    nothing was answered as All media, is one hidden element INSIDE the frame
+    (`#media-picker-place`): Turbo moves only a response frame's children into the
+    live frame, never its attributes, so the picker's script reads the place, its
+    name and `data-media-place-gone` (to forget a remembered place) from there.
 
-  <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :picker).merge("page" => page)) } %>
-  <% if @pagination.out_of_range? %>
-    <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
-  <% else %>
-    <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options, pick: true, locale: admin_locale) %>
-    <% if @pagination.total_pages > 1 %>
-      <div class="mt-4 rounded-card bg-surface shadow-1">
-        <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) %>
-      </div>
+    The frame's body is the picker's two columns (the card's D12), laid out
+    by the live frame's own classes (`MediaPickerComponent`): the places
+    (`FolderTreeComponent`, `mode: :picker`: a select below 640px, a 200px
+    list from 640px), then the grid's column, which scrolls on its own.
+
+    The marker carries the place's digest (`Media::Place#digest`), and the
+    grid's column a slot above the grid, for the notice of
+    `admin--media--live` on the dialog when another tab changed the place
+    while the picker is open (the card's D13). %>
+<turbo-frame id="media-picker-grid">
+  <% place_name = @place.all? ? t(".place_all") : @place.none? ? t(".place_none") : @folder_tree.find(@place.folder).name %>
+  <%= tag.div id: "media-picker-place", hidden: true, data: { media_place: @place.to_param, media_place_name: place_name, media_place_gone: @place_gone ? "" : nil,
+                                                          media_place_digest: @place.digest(@folder_tree) } %>
+  <%= render "admin/media/live_notice" %>
+  <%= render Admin::MediaLibrary::FolderTreeComponent.new(tree: @folder_tree, counts: @folder_counts, place: @place, query: @place_query,
+        open_set: TreeOpenSet::EMPTY, manage: false, mode: :picker) %>
+
+  <div class="min-h-0 overflow-y-auto px-6 py-4 sm:px-5">
+    <%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], url_options: admin_url_options, picker: true, place: (@place.to_param unless @place.all?)) %>
+
+    <div data-admin--media--live-target="slot"></div>
+    <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :picker, :folder).merge("page" => page)) } %>
+    <% if @pagination.out_of_range? %>
+      <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
+    <% else %>
+      <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options, pick: true, locale: admin_locale) %>
+      <% if @pagination.total_pages > 1 %>
+        <div class="mt-4 rounded-card bg-surface shadow-1">
+          <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) %>
+        </div>
+      <% end %>
     <% end %>
-  <% end %>
+  </div>
 </turbo-frame>

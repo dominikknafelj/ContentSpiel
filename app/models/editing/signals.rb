@@ -52,10 +52,13 @@ module Editing
       "ai.translated" => "it writes nothing: the suggestions go to the tab that asked",
       "media.uploaded" => "library images are not live in this step (spec section 9)",
       "media.updated" => "library images are not live in this step (spec section 9)",
+      "media.moved" => "library images and folders have no live editor: a move is no edit of an image's text",
       "media.trashed" => "library images are not live in this step (spec section 9)",
       "media.restored" => "library images are not live in this step (spec section 9)",
       "media.purged" => "library images are not live in this step (spec section 9)",
       "media.translation_confirmed" => "library images are not live in this step (spec section 9)",
+      **%w[media_folder.created media_folder.renamed media_folder.moved media_folder.deleted]
+        .index_with { "library folders have no live editor: a folder is a place for images, never content an editor has open" },
       "settings.translation_confirmed" => "site settings are saved explicitly and have no live editor",
       "settings.updated" => "site settings are saved explicitly and have no live editor",
       "page.taken_over" => "a take-over sends its own holder signal (Editing::TakeOver)",

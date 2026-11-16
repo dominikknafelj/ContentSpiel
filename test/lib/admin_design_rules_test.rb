@@ -1364,7 +1364,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       "admin-dashboard" => [ ".admin-dashboard__grid", ".admin-dashboard__head,\n  .admin-dashboard__notice" ],
       "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ],
       "admin-settings" => [ ".admin-settings-layout__grid" ],
-      "admin-media" => [ ".admin-media-library__head", ".admin-media-library__grid" ] }.each do |container, selectors|
+      "admin-media" => [ ".admin-media-library__head,\n  .admin-media-selection-bar", ".admin-media-library__grid" ] }.each do |container, selectors|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).first
       selectors.each do |selector|
         rule = docked[/(?:\A|[};])\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/, 1]
@@ -2075,16 +2075,18 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal TREE_STATE_WRITERS.sort, writers.sort, "the tree's width state on <html> has two writers, the head script and admin--shell--tree-width"
   end
 
-  # THE OPEN SET HAS ONE WRITER. The cookie `cs_tree_open` is written by
+  # THE OPEN SET HAS ONE WRITER, for both of its two cookies: `cs_tree_open`
+  # (pages) and `cs_media_open` (library folders). Each is written by
   # `tree/open_set.js` alone and read on the server by `TreeOpenSet` alone,
-  # which names it (`TreeOpenSet::COOKIE`); no script beside it touches
-  # `document.cookie`, and no Ruby writes or deletes a cookie named by either.
+  # which names it (`TreeOpenSet::COOKIE`, `TreeOpenSet::MEDIA_COOKIE`); no
+  # script beside it touches `document.cookie`, and no Ruby writes or deletes
+  # a cookie named by either.
   # Comments are stripped first. Not seen: a theme's or a gem's script, a
   # cookie written through a name bound elsewhere, `document["cookie"]`, and
   # the Cookie Store API (`cookieStore`).
   OPEN_SET_WRITER = "app/javascript/tree/open_set.js"
   OPEN_SET_READER = "app/values/tree_open_set.rb"
-  OPEN_SET_NAMES = /cs_tree_open|TreeOpenSet::COOKIE/
+  OPEN_SET_NAMES = /cs_tree_open|cs_media_open|TreeOpenSet::(?:MEDIA_)?COOKIE/
   COOKIE_WRITE = /\bcookies\b(?:\s*\.\s*\w+)*\s*\[[^\]]*\]\s*=(?![=~>])|\bcookies\b(?:\s*\.\s*\w+)*\s*\.\s*delete\b/
 
   # `{ path => text }` -> the paths whose text breaks the rule above.
@@ -2092,8 +2094,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     sources.filter_map do |path, raw|
       text = uncommented(raw, path)
       if path.end_with?(".js")
-        path if path != OPEN_SET_WRITER && text.match?(/\bdocument\s*\.\s*cookie\b|cs_tree_open/)
-      elsif path != OPEN_SET_READER && (text.include?("cs_tree_open") || text.each_line.any? { |line| line.match?(OPEN_SET_NAMES) && line.match?(COOKIE_WRITE) })
+        path if path != OPEN_SET_WRITER && text.match?(/\bdocument\s*\.\s*cookie\b|cs_(?:tree|media)_open/)
+      elsif path != OPEN_SET_READER && (text.include?("cs_tree_open") || text.include?("cs_media_open") || text.each_line.any? { |line| line.match?(OPEN_SET_NAMES) && line.match?(COOKIE_WRITE) })
         path
       end
     end
@@ -2108,6 +2110,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty self.class.open_set_offences(sources), "cs_tree_open is written by tree/open_set.js alone, and named in Ruby by TreeOpenSet alone"
     assert_match(/document\.cookie\s*=/, self.class.without_comments(Rails.root.join(OPEN_SET_WRITER).to_s), "the writer writes the cookie")
     assert_includes File.read(Rails.root.join(OPEN_SET_READER)), %(COOKIE = "cs_tree_open")
+    assert_includes File.read(Rails.root.join(OPEN_SET_READER)), %(MEDIA_COOKIE = "cs_media_open")
     assert sources.any? { |path, text| path.end_with?("authentication.rb") && text.match?(COOKIE_WRITE) }, "the session cookie's write is in the sources read, and not matched"
   end
 
@@ -2118,13 +2121,16 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "app/controllers/x.rb" ], self.class.open_set_offences("app/controllers/x.rb" => %(cookies.permanent[TreeOpenSet::COOKIE] = { value: "1" }\n))
     assert_equal [ "app/controllers/x.rb" ], self.class.open_set_offences("app/controllers/x.rb" => %(cookies.delete(TreeOpenSet::COOKIE)\n))
     assert_equal [ "app/controllers/x.rb" ], self.class.open_set_offences("app/controllers/x.rb" => %(raw = "cs_tree_open"\n))
+    assert_equal [ "app/javascript/other.js" ], self.class.open_set_offences("app/javascript/other.js" => %(const name = "cs_media_open"\n))
+    assert_equal [ "app/controllers/x.rb" ], self.class.open_set_offences("app/controllers/x.rb" => %(cookies[TreeOpenSet::MEDIA_COOKIE] = "1"\n))
 
     assert_empty self.class.open_set_offences(
       "app/javascript/tree/open_set.js" => %(document.cookie = `cs_tree_open=1`\n),
       "app/javascript/other.js" => %(// document.cookie is open_set.js's\n),
       "app/controllers/concerns/authentication.rb" => %(cookies.signed.permanent[:session_id] = { value: 1 }\ncookies.delete(:session_id)\n),
       "app/controllers/x.rb" => %(open_cookie: cookies[TreeOpenSet::COOKIE]\n# cookies[TreeOpenSet::COOKIE] = "1"\n),
-      "app/views/x.html.erb" => %(<%= render Tree.new(open_cookie: cookies[TreeOpenSet::COOKIE]) %>\n<%# cookies.delete(TreeOpenSet::COOKIE) %>\n)
+      "app/views/x.html.erb" => %(<%= render Tree.new(open_cookie: cookies[TreeOpenSet::COOKIE]) %>\n<%# cookies.delete(TreeOpenSet::COOKIE) %>\n),
+      "app/views/y.html.erb" => %(data-tree-open-cookie="<%= TreeOpenSet::MEDIA_COOKIE %>"\n)
     )
   end
 

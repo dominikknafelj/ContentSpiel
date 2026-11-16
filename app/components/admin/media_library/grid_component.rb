@@ -27,6 +27,10 @@ module Admin
     # tile is then a button that selects it for the picker
     # (`TileComponent`'s own comment) instead of a link to the panel -- one
     # grid, one search/pagination endpoint, two ways of acting on a tile.
+    # `select: true` is the Media screen's selection mode (`select=1`): each
+    # tile a button that `admin--media--selection` ticks (`TileComponent`'s
+    # own comment), and no link to the panel, which is closed.
+    #
     # `locale` is the editing language the picked asset's default alt/caption
     # are read in, which the fields the picker fills show as placeholders.
     #
@@ -36,7 +40,12 @@ module Admin
     # and takes the empty state away once it has. Its words are
     # `admin.components.media_library.grid.empty.*`.
     class GridComponent < Admin::AdminComponent
-      def initialize(assets:, url_options: {}, pick: false, locale: ::Locales.default, selected_id: nil, link_params: {})
+      def initialize(assets:, url_options: {}, pick: false, locale: ::Locales.default, selected_id: nil, link_params: {},
+                     place: ::Media::Place::ALL, tree: nil, subfolders: [], select: false)
+        @select = select
+        @place = place
+        @tree = tree
+        @subfolders = subfolders
         @assets = assets
         @url_options = url_options
         @pick = pick
@@ -46,6 +55,39 @@ module Admin
       end
 
       def pick? = @pick
+
+      def select? = @select
+
+      # A tile's link to its panel; none for a button (the picker's, a selection's).
+      def tile_url(asset) = (show_path(asset) unless pick? || select?)
+
+      # An empty place that is no search's empty answer: a folder (it takes
+      # the upload into it and names the folders it holds) or Not in a folder.
+      # Nothing in the picker, whose places are read-only.
+      def empty_folder? = !pick? && !filtered? && place.folder.present? && tree
+      def empty_none? = !pick? && !filtered? && place.none?
+
+      def folder_name = tree.find(place.folder).name
+
+      # Its subfolders are links to their places, never tiles.
+      def holds_text
+        links = subfolders.map { |node| link_to(node.name, helpers.admin_media_path(folder: node.id, **url_options.slice(:locale)), class: "text-accent", data: { turbo_frame: "content", turbo_action: "advance" }) }
+        t(".empty_folder.holds_html", count: links.size, links: safe_join(links, t(".empty_folder.separator")))
+      end
+
+      # The folder a tile names under a search in All media, its whole path
+      # ("Clients / Client A"); nothing without a search, in a folder's own
+      # place (it is the folder) or for an image in no folder.
+      def folder_path(asset)
+        return unless tree && place.all? && searching? && asset.folder_id
+
+        tree.path_name(asset.folder_id).presence
+      end
+
+      # The folder's own name beside its path, which may itself hold " / ".
+      def folder_name_of(asset) = (tree.find(asset.folder_id).name if folder_path(asset))
+
+      def searching? = helpers.params[:q].is_a?(String) && helpers.params[:q].present?
 
       # A search or a segment is active, so an empty grid means "nothing
       # matches", not "nothing uploaded yet". The segment is judged as
@@ -91,13 +133,15 @@ module Admin
 
       def note_marks = @note_marks ||= pick? ? [ {}, Set.new ] : helpers.media_note_marks(assets.map(&:id))
 
+      # The picker's grid stands beside its list of places (the card's D12):
+      # four columns from 1024px, three from 768px, two below.
       def grid_class
-        pick? ? "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6" : "grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-3"
+        pick? ? "grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4" : "grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-3"
       end
 
       private
 
-      attr_reader :assets, :url_options, :locale, :selected_id, :link_params
+      attr_reader :assets, :url_options, :locale, :selected_id, :link_params, :place, :tree, :subfolders
     end
   end
 end

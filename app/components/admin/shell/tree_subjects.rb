@@ -1,6 +1,7 @@
 module Admin
   module Shell
-    # What the tree column holds, by the name a screen gives it with
+    # What the tree column holds (the Pages tree, the mind graph's list or the
+    # Media screen's Folders), by the name a screen gives it with
     # `content_for :tree_label` (`Admin::ShellHelper#admin_tree_subject`;
     # "pages" when a screen gives none). The subject picks the words of
     # everything the shell draws for the column: the fold buttons, the
@@ -9,14 +10,16 @@ module Admin
     # screen hands over a name and never its own words. `fill:` says the
     # column's content fills it from top to bottom (`.admin-shell__tree--fill`):
     # the mind graph's list, whose region takes what the head and the find
-    # field leave. The Pages tree is as tall as its rows.
+    # field leave. The Pages tree and the Media screen's Folders column are as
+    # tall as their rows.
     #
     # An unknown subject raises: a misspelt name would otherwise draw a
     # column whose buttons read a key that is not there.
     module TreeSubjects
       ALL = {
         "pages" => { fill: false },
-        "mind_graph" => { fill: true }
+        "mind_graph" => { fill: true },
+        "media" => { fill: false }
       }.freeze
 
       # The words a subject has, one key each under its family.

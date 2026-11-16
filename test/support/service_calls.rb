@@ -326,6 +326,19 @@ module ServiceCalls
       { call: -> { Locales::MakeDefault.call("de") }, permission: "languages.manage", on: Current.site.reload }
     },
 
+    # Deletes a folder: its images move up, the row goes, one audit event.
+    "Media::DeleteFolder" => lambda {
+      folder = Media::Folder.create!(name: "Trips")
+      { call: -> { Media::DeleteFolder.call(folder) }, permission: "media.manage", on: folder }
+    },
+
+    # Moves an image into a folder: the folder column and an audit event per image.
+    "Media::MoveImages" => lambda {
+      asset = create_media_asset
+      folder = Media::Folder.create!(name: "Trips")
+      { call: -> { Media::MoveImages.call(asset_ids: [ asset.id ], folder: folder) }, permission: "media.manage", on: asset }
+    },
+
     "Media::Regenerate" => lambda {
       create_media_asset
       { call: -> { Media::Regenerate.call }, permission: "settings.manage", on: Current.site.reload,
@@ -336,6 +349,12 @@ module ServiceCalls
       asset = create_media_asset
       { call: -> { Media::Save.call(asset, attributes: { title: "Renamed" }, translations: { "en" => { alt: "Alt" } }) },
         permission: "media.manage", on: asset }
+    },
+
+    # Renames a folder: the folder row and an audit event.
+    "Media::SaveFolder" => lambda {
+      folder = Media::Folder.create!(name: "Trips")
+      { call: -> { Media::SaveFolder.call(folder, attributes: { name: "Journeys" }) }, permission: "media.manage", on: folder }
     },
 
     "Media::Upload" => lambda {
@@ -831,6 +850,11 @@ module ServiceCalls
       "creating" => lambda {
         { call: -> { Forms::Save.call(Forms::Form.new, attributes: { name: "New form" }, fields: [], destinations: [ { kind: "mail", settings: { recipients: "office@example.com" }, secrets: {} } ]) },
           permission: "forms.manage", on: Forms::Form }
+      }
+    },
+    "Media::SaveFolder" => {
+      "creating" => lambda {
+        { call: -> { Media::SaveFolder.call(attributes: { name: "New folder" }) }, permission: "media.manage", on: Media::Folder }
       }
     },
     "Groups::Save" => {

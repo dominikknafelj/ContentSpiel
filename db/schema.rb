@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_16_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_16_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -251,11 +251,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_090000) do
     t.string "renditions_fingerprint"
     t.datetime "renditions_failed_at"
     t.string "renditions_error"
+    t.bigint "folder_id"
     t.index ["created_by_id"], name: "index_media_assets_on_created_by_id"
+    t.index ["folder_id"], name: "index_media_assets_on_folder_id"
     t.index ["id"], name: "index_media_assets_backfill_due", where: "((trashed_at IS NULL) AND (renditions_failed_at IS NULL) AND ((preview IS NULL) OR (width IS NULL) OR ((renditions_fingerprint)::text = 'adopted'::text)))"
     t.index ["renditions_fingerprint"], name: "index_media_assets_on_renditions_fingerprint"
     t.index ["trashed_at"], name: "index_media_assets_on_trashed_at"
     t.index ["trashed_by_id"], name: "index_media_assets_on_trashed_by_id"
+  end
+
+  create_table "media_folders", force: :cascade do |t|
+    t.string "name", null: false
+    t.bigint "parent_id"
+    t.bigint "created_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "parent_id, lower((name)::text)", name: "index_media_folders_on_parent_and_name", unique: true, nulls_not_distinct: true
+    t.index ["created_by_id"], name: "index_media_folders_on_created_by_id"
   end
 
   create_table "media_library_migrated_assets", id: false, force: :cascade do |t|
@@ -667,7 +679,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_090000) do
   add_foreign_key "invitation_groups", "invitations", on_delete: :cascade
   add_foreign_key "invitations", "users", column: "inviter_id", on_delete: :nullify
   add_foreign_key "invitations", "users", on_delete: :nullify
+  add_foreign_key "media_assets", "media_folders", column: "folder_id", on_delete: :nullify
   add_foreign_key "media_assets", "users", column: "trashed_by_id", on_delete: :nullify
+  add_foreign_key "media_folders", "media_folders", column: "parent_id"
+  add_foreign_key "media_folders", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "media_usages", "media_assets"
   add_foreign_key "note_deliveries", "note_messages", column: "message_id", on_delete: :cascade
   add_foreign_key "note_deliveries", "note_threads", column: "thread_id", on_delete: :cascade

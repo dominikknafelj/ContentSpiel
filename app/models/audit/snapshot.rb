@@ -224,6 +224,7 @@ module Audit
       when AccessControl::Group, Tag then record.name
       when ContentBlock then "#{record.block_type.to_s.humanize} block ##{record.id}"
       when Media::Asset then record.title.presence || "Image ##{record.id}"
+      when Media::Folder then record.name
       when ApiToken then record.name.presence || "API token ##{record.id}"
       when SiteSetting then "Site settings"
       when Forms::Form then record.name
@@ -321,6 +322,8 @@ module Audit
           "content_type" => record.content_type, "byte_size" => record.byte_size,
           "width" => record.width, "height" => record.height, "created_by_id" => record.created_by_id
         }
+      when Media::Folder
+        { "id" => record.id, "name" => record.name, "parent_id" => record.parent_id }
       when Forms::Form
         # The form's own columns (its fields, texts and keeping), and its
         # destinations by kind and settings with the NAMES of the secrets

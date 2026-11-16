@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Added
+
+- `Media::MoveImages.call(asset_ids:, folder:)` moves library images into a folder or out of every folder, and is the one writer of an image's folder after an upload. Each image needs its own edit right and one image refused refuses the move ("2 of these images are not yours to move. Nothing was moved."); at most 200 images a move; a move touches neither `updated_at` nor the site's content version. Each image that moved is recorded as `media.moved` (counted on the dashboard: "moved 12 images to “Client A”").
+- The Media screen and the picker list a place: `folder` is `all` (or absent), `none` (images in no folder) or a folder's id, and a folder lists its own images, not its subfolders'; an unknown folder is the 404 on the screen and All media in the picker. The segment counts are the place's. An upload takes `folder` (`POST /media` and `POST /media_assets`) and lands in it, `media.uploaded` records its `folder_id`, and the answer carries `folder_counts` beside `counts`; an upload to a folder deleted meanwhile is refused ("That folder is gone.") and stores nothing. `Media::Upload.call(file:, folder: nil)` and `Media::Search.new(place:)` take the place.
+- MCP: `list_media_tool` takes `folder` (a folder's id, or `none`) and lists the images directly in it, and it and `get_media_tool` name each image's `folder` (`{id, name, path}`, or null); the new `list_media_folders_tool` lists the folders in tree order with `parent_id`, `path` and `image_count`. All need `media.upload`.
+- Library folders: `Media::SaveFolder` creates, renames and moves a folder (four levels deep at most, a thousand at most, one name per parent in any case, under the tree's table lock); each is recorded as `media_folder.created`, `media_folder.renamed` or `media_folder.moved`, and the audit log's Type filter offers "Media folder".
+- `Media::DeleteFolder` deletes a folder: its images (trashed ones too) and subfolders move one level up, a subfolder whose name the parent holds takes the next free " 2", " 3" and is recorded as `media_folder.renamed`, and one `media_folder.deleted` is recorded; `Media::DeleteFolder.preview` says what will move.
+- The media library's folders, in the tree column of the Media screen.
+- A folder is created ("+ New folder" in the Folders column, a row's "+", or "New folder inside…"), renamed and deleted from the Media screen: a small dialog with its Name field and the refusal under it, and a confirm that says what moves where before a delete. The place heading of a folder has a "Folder actions" menu for `media.manage`.
+- Move to…: images move from the image panel's new Folder fact (its path a link to that place) and a folder from its "Folder actions" menu, through a dialog that lists "Not in a folder" (or "Top of the library") and every folder, marks the current place, and, for a folder, refuses its own branch and places too deep, saying why. `GET /media/move/new` draws its list; a refusal stands in the dialog. A folder move's toast says where it went.
+- Selecting several images on the Media screen: "Select" in the place heading enters selection mode (`select=1`; the panel closes), where a press, Space or Shift+click (a range) ticks tiles, and a bar sticky over the grid says how many are selected and offers "Select all" (what the page draws), "Clear", "Move to…" (the Move to… dialog for the selection) and "Done". Escape, Done or any visit leaves it.
+- Dragging onto the Folders column, with a fine pointer: an image tile (or, in selection mode, the whole selection from a ticked tile) dropped on a folder row or "Not in a folder", and a folder by its row's handle (`media.manage`) dropped on a folder row or "All media"; a folded row opens after a 600 ms rest, a row that cannot take the folder says why ("too deep", "this folder", "name taken"), and the move is said in the screen's polite status.
+- The image picker browses folders and opens where you last were.
+- The Media screen and the open picker follow changes made in another tab: the Folders column and its counts are redrawn in place, folds and focus kept, and when the images of the place shown changed a notice above the grid offers "Show changes" (`GET /media/folders`, the column's part with the place's digest, `Media::Place#digest`).
+
+### Migrations
+
+- `20261116130000_create_media_folders`: the table `media_folders` and `media_assets.folder_id`; every existing image starts in no folder.
+
 ## 0.8.0 (2026-11-16)
 
 ### Added

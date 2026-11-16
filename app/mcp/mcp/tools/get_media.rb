@@ -18,7 +18,7 @@ module Mcp
 
       description "Get a single library image by id: title, default alt text and caption, dimensions, and every place it's " \
         "currently used. Use its id in a rich-text image directive: " \
-        "::image{asset=\"ID\" alt=\"…\" caption=\"…\"}. A `usages` entry is only named (type/id/title) " \
+        "::image{asset=\"ID\" alt=\"…\" caption=\"…\"}. `folder` is the library folder it sits in ({id, name, path}), or null. A `usages` entry is only named (type/id/title) " \
         "when this token can also read that page or post; usages it can't are folded into " \
         "hidden_usages instead, never named. Requires the media.upload permission."
       input_schema(
@@ -71,11 +71,21 @@ module Mcp
           width: asset.width,
           height: asset.height,
           usage_count: places.size,
+          folder: folder_of(asset),
           usages: readable.map { |place| { type: kind_of(place), id: place.id, title: Audit::Snapshot.label_for(place) } },
           hidden_usages: hidden.size
         }
       end
       private_class_method :data_for
+
+      def self.folder_of(asset)
+        return nil unless asset.folder_id
+
+        tree = Media::FolderTree.load
+        node = tree.find(asset.folder_id)
+        node && { id: node.id, name: node.name, path: tree.path_name(node.id) }
+      end
+      private_class_method :folder_of
 
       # One entry per distinct place this asset is used -- the same
       # grouping `Media::Asset#usages_summary` already does (one per

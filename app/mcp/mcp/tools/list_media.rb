@@ -24,7 +24,10 @@ module Mcp
       PER_PAGE = 50
 
       description "List images in the media library, newest first. `query` matches title, alt text (any " \
-        "language) or the original filename; `unused` narrows to images nothing currently references. " \
+        "language) or the original filename; `unused` narrows to images nothing currently references; " \
+        "`folder` (a folder's id from list_media_folders_tool, or \"none\" for images in no folder) lists " \
+        "only the images directly in that folder, not its subfolders'. Each result names its `folder` " \
+        "({id, name, path}, or null). " \
         "Each result's `directive` is a ready-to-paste ::image{asset=\"ID\"} for a post/page rich-text " \
         "body -- add alt/caption yourself, e.g. ::image{asset=\"42\" alt=\"…\" caption=\"…\"}. Requires " \
         "the media.upload permission."
@@ -32,6 +35,7 @@ module Mcp
         properties: {
           query: { type: "string", description: "Matches title, alt text (any language), or filename." },
           unused: { type: "boolean", description: "Only images with no usages anywhere on the site." },
+          folder: { type: [ "integer", "string" ], description: "A folder's id, or \"none\" for images in no folder (default: every image)." },
           locale: { type: "string", enum: Locales::SUPPORTED.keys, description: "Which language's alt text to show (default: the site's current default locale)." },
           page: { type: "integer", description: "1-indexed; up to 50 results per page (default: 1)." }
         }
@@ -39,7 +43,7 @@ module Mcp
       annotations(read_only_hint: true, idempotent_hint: true, destructive_hint: false, open_world_hint: false,
         title: "List media")
 
-      def self.call(query: nil, unused: false, locale: nil, page: 1, server_context:)
+      def self.call(query: nil, unused: false, folder: nil, locale: nil, page: 1, server_context:)
         # `allowed?`, not `holds?`: `holds?` answers
         # "anywhere, under any scope" for navigation and buttons only
         # (`AccessControl.holds?`'s own comment); an authorization check
@@ -52,7 +56,14 @@ module Mcp
         invalid_locale = reject_unless_enabled(locale)
         return invalid_locale if invalid_locale
 
-        scope = Media::Asset.kept.with_file
+        # One read of the tree serves the place, the folder named in each
+        # entry and its path. `folder` arrives as an Integer or a String;
+        # `Media::Place.parse` takes the String form of either.
+        tree = Media::FolderTree.load
+        place = Media::Place.parse(folder.nil? ? nil : folder.to_s, tree: tree)
+        return folder_not_found unless place
+
+        scope = place.narrow(Media::Asset.kept.with_file)
         scope = scope.unused if unused
         scope = Media::Search.call(scope, query) if query.present?
 
@@ -60,7 +71,7 @@ module Mcp
         assets = scope.order(id: :desc).offset((page_number - 1) * PER_PAGE).limit(PER_PAGE).to_a
         counts = usage_counts(assets)
 
-        items = assets.map { |asset| entry_for(asset, locale, counts) }
+        items = assets.map { |asset| entry_for(asset, locale, counts, tree) }
 
         MCP::Tool::Response.new([ { type: "text", text: items.to_json } ], structured_content: items)
       end
@@ -82,7 +93,7 @@ module Mcp
       end
       private_class_method :usage_counts
 
-      def self.entry_for(asset, locale, counts)
+      def self.entry_for(asset, locale, counts, tree)
         {
           id: asset.id,
           title: asset.title,
@@ -94,10 +105,17 @@ module Mcp
           width: asset.width,
           height: asset.height,
           usage_count: counts.fetch(asset.id, 0),
+          folder: folder_entry(asset.folder_id, tree),
           directive: %(::image{asset="#{asset.id}"})
         }
       end
       private_class_method :entry_for
+
+      def self.folder_entry(folder_id, tree)
+        node = folder_id && tree.find(folder_id)
+        node && { id: node.id, name: node.name, path: tree.path_name(node.id) }
+      end
+      private_class_method :folder_entry
     end
   end
 end

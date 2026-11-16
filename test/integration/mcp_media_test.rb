@@ -121,6 +121,82 @@ class McpMediaTest < ActionDispatch::IntegrationTest
     assert_equal %(::image{asset="#{asset.id}"}), entry["directive"]
   end
 
+  # --- folders ---------------------------------------------------------------
+
+  test "list_media narrows to a folder or to none, and an unknown folder is an error" do
+    raw = token_for(users(:one), access_control_groups(:admin))
+    trips = Media::Folder.create!(name: "Trips")
+    inside = create_media_asset
+    inside.update!(folder: trips)
+    loose = create_media_asset
+
+    in_folder = call_tool(raw, "list_media_tool", folder: trips.id)["structuredContent"].map { |item| item["id"] }
+    as_text = call_tool(raw, "list_media_tool", folder: trips.id.to_s)["structuredContent"].map { |item| item["id"] }
+    none = call_tool(raw, "list_media_tool", folder: "none")["structuredContent"].map { |item| item["id"] }
+    everything = call_tool(raw, "list_media_tool")["structuredContent"].map { |item| item["id"] }
+    unknown = call_tool(raw, "list_media_tool", folder: Media::Folder.maximum(:id) + 1000)
+
+    assert_equal [ inside.id ], in_folder
+    assert_equal in_folder, as_text
+    assert_includes none, loose.id
+    assert_not_includes none, inside.id
+    assert_includes everything, inside.id
+    assert_includes everything, loose.id
+    assert_equal true, unknown["isError"]
+    assert_includes text_of(unknown), "No such folder"
+    assert_equal true, call_tool(raw, "list_media_tool", folder: "nonsense")["isError"]
+  end
+
+  test "get_media's folder is nil when the folder went between two reads" do
+    gone = Media::Asset.new(folder_id: Media::Folder.maximum(:id).to_i + 1000)
+
+    assert_nil Mcp::Tools::GetMedia.send(:folder_of, gone)
+  end
+
+  test "list_media and get_media name each image's folder with its path" do
+    raw = token_for(users(:one), access_control_groups(:admin))
+    parent = Media::Folder.create!(name: "Clients")
+    child = Media::Folder.create!(name: "Acme", parent: parent)
+    inside = create_media_asset
+    inside.update!(folder: child)
+    loose = create_media_asset
+
+    listed = call_tool(raw, "list_media_tool", folder: child.id)["structuredContent"].sole
+    got = call_tool(raw, "get_media_tool", id: inside.id)["structuredContent"]
+    listed_loose = call_tool(raw, "list_media_tool", folder: "none")["structuredContent"].find { |item| item["id"] == loose.id }
+    got_loose = call_tool(raw, "get_media_tool", id: loose.id)["structuredContent"]
+
+    expected = { "id" => child.id, "name" => "Acme", "path" => "Clients / Acme" }
+    assert_equal expected, listed["folder"]
+    assert_equal expected, got["folder"]
+    assert_nil listed_loose["folder"]
+    assert listed_loose.key?("folder")
+    assert_nil got_loose["folder"]
+    assert got_loose.key?("folder")
+  end
+
+  test "list_media_folders lists the tree in order with kept image counts and needs media.upload" do
+    raw = token_for(users(:one), access_control_groups(:admin))
+    beta = Media::Folder.create!(name: "Beta")
+    alpha = Media::Folder.create!(name: "Alpha")
+    inner = Media::Folder.create!(name: "Inner", parent: alpha)
+    create_media_asset.update!(folder: inner)
+    create_media_asset.update!(folder: inner)
+    create_media_asset.update!(folder: alpha)
+
+    result = call_tool(raw, "list_media_folders_tool")
+    denied = call_tool(token_for(users(:reader), access_control_groups(:read_only)), "list_media_folders_tool")
+
+    assert_equal false, result["isError"], text_of(result)
+    assert_equal [
+      { "id" => alpha.id, "name" => "Alpha", "parent_id" => nil, "path" => "Alpha", "image_count" => 1 },
+      { "id" => inner.id, "name" => "Inner", "parent_id" => alpha.id, "path" => "Alpha / Inner", "image_count" => 2 },
+      { "id" => beta.id, "name" => "Beta", "parent_id" => nil, "path" => "Beta", "image_count" => 0 }
+    ], result["structuredContent"]
+    assert_equal true, denied["isError"]
+    assert_includes text_of(denied), "You don't have permission to upload media"
+  end
+
   # A record counts once: a hero, an image block and the published copy of one
   # page are one place, and the two tools answer the same number.
   test "list_media and get_media agree on usage_count: a page is one place however many ways it shows the image" do

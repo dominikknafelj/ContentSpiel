@@ -19,6 +19,7 @@ module Admin
   class MediaController < BaseController
     include AutosaveResponses
     include MediaUploadResponses
+    include MediaPlaces
 
     # "About 48 per page" (design spec §6), by page number (`Pagination`,
     # design pass spec §4): `@pagination.total` is a `COUNT(*)` over the same
@@ -61,23 +62,49 @@ module Admin
     # toolbar, the grid and the pagination, rendered on their own
     # inside the picker's `<turbo-frame id="media-picker-grid">`
     # (`admin/media/picker`, no layout) with select buttons instead of panel
-    # links. Deliberately this endpoint rather than a second one: one search,
-    # one set of segments and counts, one constant-query load (`Media::Search`,
+    # links, beside the library's places (read-only). Deliberately this
+    # endpoint rather than a second one: one search, one set of segments and
+    # counts, one constant-query load (`Media::Search`,
     # kept images only), and the same `media.upload` gate -- the picker's only
     # permission is "may browse and choose". It has no panel.
+    #
+    # `select=1` is selection mode (the card StudioMediaFolders, D6): the
+    # tiles are buttons that tick, the selection's bar stands over the grid,
+    # and no panel opens (a `selected` beside it is not read). Every link of
+    # the grid keeps it (`list_query`); a link to a place, a page or a search
+    # leaves it, and so does Done.
+    #
+    # `folder` chooses the place the listing is of (`Media::Place`: All media,
+    # Not in a folder, or one folder's own images). A folder that names nothing
+    # is the 404 with "Back to Media" on the screen, like a stale `selected`;
+    # in the picker it is All media, since a remembered place may have gone,
+    # and the answer says so (`data-media-place-gone`) for the picker's script
+    # to forget it.
     def index
-      @search = Media::Search.new(q: params[:q], filter: params[:filter], actor: Current.actor)
+      @folder_tree = Media::FolderTree.load
+      @place = Media::Place.parse(params[:folder], tree: @folder_tree)
+      if @place.nil?
+        raise_place_not_found unless params[:picker].present?
+        @place = Media::Place::ALL
+        @place_gone = true
+      end
+
+      @search = Media::Search.new(q: params[:q], filter: params[:filter], actor: Current.actor, place: @place)
       scope = @search.results
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: scope.count)
       @assets = scope.order(id: :desc).limit(PER_PAGE).offset(@pagination.offset).to_a
 
       @counts = @search.counts
-      return render :picker, layout: false if params[:picker].present?
+      return picker if params[:picker].present?
 
       @library_has_images = @search.any_images?(counts: @counts)
 
-      @selected = selected_asset
+      @selecting = selecting?
+      @selected = selected_asset unless @selecting
       @link_params = list_query
+      @place_query = shown_query
+      delete_folder_preview
+      folder_column unless turbo_frame_request?
     end
 
     # The old detail page's URL: every link that ever pointed at it (an email, a
@@ -99,7 +126,7 @@ module Admin
     # tiles (two different callers, deliberately not merged into one endpoint,
     # per that resource's own routing comment).
     def create
-      result = Media::Upload.call(file: params[:file])
+      result = Media::Upload.call(file: params[:file], folder: upload_folder_id)
 
       if result.ok?
         render json: upload_json(result.record, picker: false), status: :created
@@ -200,12 +227,48 @@ module Admin
       Media::Asset.kept.with_file.find(raw)
     end
 
+    # The picker's frame: the grid and, beside it, the places
+    # (`FolderTreeComponent`, `mode: :picker`), whose links keep the search
+    # shown.
+    def picker
+      @folder_counts = Media::FolderCounts.call
+      @place_query = shown_query
+      render :picker, layout: false
+    end
+
+    # What the Folders column draws, for a full answer only: a frame answer
+    # keeps only `#content`, and the column outlives it (`admin/media/index`).
+    def folder_column
+      @folder_counts = Media::FolderCounts.call
+      @media_open = TreeOpenSet.parse(cookies[TreeOpenSet::MEDIA_COOKIE], readable_ids: @folder_tree.ids)
+    end
+
+    # The folder shown and what deleting it would move where, for the delete
+    # confirm the screen draws in a folder for `media.manage`
+    # (`Admin::MediaLibrary::DeleteFolderDialogComponent`).
+    def delete_folder_preview
+      return unless @place.folder && can?("media.manage")
+
+      @shown_folder = Media::Folder.find(@place.folder)
+      @delete_preview = Media::DeleteFolder.preview(@shown_folder, tree: @folder_tree)
+    end
+
+    # A `folder` that names no folder of the screen: the library as it was
+    # listed, the place dropped with the page.
+    def raise_place_not_found
+      @not_found_back = { label: t("admin.media.not_found_back"), url: admin_media_path(**list_query.except(:page, :folder), **admin_url_options) }
+      raise ActiveRecord::RecordNotFound, "Couldn't find Media::Folder"
+    end
+
     # The grid's own state, kept by every link out of the panel and by the
     # panel form's own URL (symbol keys, strings only, never `locale`, which
-    # `admin_url_options` carries).
+    # `admin_url_options` carries): the search, the segment, the place, the
+    # page and selection mode.
     def list_query
-      request.query_parameters.slice("q", "filter", "page").select { |_, value| value.is_a?(String) }.symbolize_keys
+      request.query_parameters.slice("q", "filter", "folder", "page", "select").select { |_, value| value.is_a?(String) }.symbolize_keys
     end
+
+    def selecting? = params[:select] == "1"
 
     # What an autosave in the panel changes on the screen behind it, answered
     # with the save itself so nothing reloads under the typing editor: the

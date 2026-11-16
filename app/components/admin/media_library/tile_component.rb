@@ -40,11 +40,27 @@ module Admin
     # would (`Media::Asset#alt_text` with no override), so a blank per-use
     # override field can show what will actually be used.
     #
+    # `select: true` is the tile in the Media screen's selection mode
+    # (`select=1`, the card StudioMediaFolders, D6): a button with
+    # `aria-pressed`, as the picker's is, which `admin--media--selection`
+    # toggles (a press, Space, Shift+click for a range), with the 24px chip
+    # at its top left holding a tick. The tick is a picture of the state, not
+    # a control: the button is the one control and the one name, so the
+    # checkbox is out of the tab order and hidden from a screen reader, and
+    # takes no pointer (a press on it is the button's). The tile carries its
+    # id and its title for the bar's Move to… (`selection_data`).
+    #
     # `open_notes:` and `notes_unread:` are the caller's to say for the same
     # reason (`GridComponent#note_counts`, `#note_unread`): the image's open
     # notes as the notes pill on the image's top right corner, accent while
     # something there is unread and addressed to the viewer, nothing at zero.
     # Never in the picker, whose grid reads none.
+    #
+    # `folder_path:` is the whole path of the image's folder ("Clients / Client
+    # A"), the caller's to say and only for a search in All media: the tile
+    # then adds a third line, the folder mark and the folder's name, truncated,
+    # with the path as its `title`. `folder_name:` is that folder's own name,
+    # given beside the path because a name may itself hold " / ".
     #
     # `unused:` is the caller's to say, not read here: a grid answers it for a
     # whole page in one query (`GridComponent#used_ids`), which a per-tile
@@ -65,7 +81,13 @@ module Admin
 
       PICK_ACTIONS = "click->admin--media--select#select dblclick->admin--media--select#choose keydown->admin--media--select#key".freeze
 
-      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false)
+      SELECT_ACTIONS = "admin--media--selection#toggle".freeze
+
+      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false, folder_path: nil, folder_name: nil,
+                     select: false)
+        @select = select
+        @folder_path = folder_path
+        @folder_name = folder_name
         @asset = asset
         @url = url
         @unused = unused
@@ -77,6 +99,20 @@ module Admin
       end
 
       def pick? = @pick
+
+      def select? = @select
+
+      def selection_data = { action: SELECT_ACTIONS, "admin--media--selection-target": "tile", "asset-id": asset.id, "asset-title": asset.title }
+
+      attr_reader :folder_path
+
+      # What `admin--media--drag` picks up and the ghost says: the Media
+      # screen's tiles only, never the picker's.
+      def drag_data = (pick? ? {} : { media_tile_id: asset.id, media_tile_title: asset.title })
+
+      # The folder's own name, which the line shows: given beside the path
+      # because a name may itself hold " / ".
+      attr_reader :folder_name
 
       def open_notes = @open_notes.to_i
 

@@ -1,15 +1,18 @@
-# WHICH BRANCHES OF A PAGE TREE A PERSON HAS OPENED OR FOLDED, read from the
-# cookie `cs_tree_open` (`COOKIE`). The Pages tree draws its folds from it on the
-# server from the first paint (`Admin::PagesScreen::TreeComponent`,
+# WHICH BRANCHES OF A TREE A PERSON HAS OPENED OR FOLDED, read from the
+# cookie its tree names: `cs_tree_open` (`COOKIE`, the pages of both page
+# trees) or `cs_media_open` (`MEDIA_COOKIE`, the library's folders). The
+# Pages tree draws its folds from it on the server from the first paint (`Admin::PagesScreen::TreeComponent`,
 # `TreeRowComponent.for_page`), and the mind graph's list draws its first
 # folds from `to_s`, handed over as `data-tree-open`. The browser writes it,
 # through `tree/open_set.js` alone; no Ruby
 # writes it (`admin_design_rules_test.rb`, "the open set has one writer").
 #
-# THE FORMAT. Page ids joined by `.`, the newest first: a bare id is a branch
+# THE FORMAT, one for both cookies. The ids of a tree's nodes (page ids in
+# `COOKIE`, folder ids in `MEDIA_COOKIE`) joined by `.`, the newest first: a bare id is a branch
 # opened beyond the default, and `-` before an id a branch folded where the
-# default would show it open (the root). Example: `12.40.-7`. The cookie
-# holds nothing but page ids, and is sent on the admin path only, so a
+# default would show it open (the root; a folder tree has no root, so its
+# caller passes `root: false`). Example: `12.40.-7`. A cookie
+# holds nothing but its tree's ids, and is sent on the admin path only, so a
 # visitor's page never sees it.
 #
 # THE RULE (`open?`), one for the server, `open_set.js` and the graph:
@@ -27,6 +30,7 @@
 # viewer has.
 class TreeOpenSet
   COOKIE = "cs_tree_open"
+  MEDIA_COOKIE = "cs_media_open"
   LIMIT = 300
   MAX_BYTES = 4_096
 

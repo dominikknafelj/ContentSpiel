@@ -25,7 +25,7 @@ class McpController < ActionController::API
       version: "1.0.0",
       instructions: instructions,
       tools: [ Mcp::Tools::ListPosts, Mcp::Tools::GetPost, Mcp::Tools::CreatePost, Mcp::Tools::UpdatePost,
-        Mcp::Tools::ListMedia, Mcp::Tools::GetMedia ],
+        Mcp::Tools::ListMedia, Mcp::Tools::GetMedia, Mcp::Tools::ListMediaFolders ],
       server_context: { user: @current_api_user }
     )
 

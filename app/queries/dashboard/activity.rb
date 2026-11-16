@@ -64,7 +64,7 @@ module Dashboard
     ACTIONS = {
       "page" => %w[created updated published unpublished moved trashed restored translation_confirmed],
       "post" => %w[created updated published unpublished scheduled trashed restored translation_confirmed],
-      "media" => %w[uploaded updated trashed restored translation_confirmed],
+      "media" => %w[uploaded updated moved trashed restored translation_confirmed],
       "block" => %w[created updated reordered translation_confirmed],
       # A note's start and its resolve only: replies are left out so they
       # don't flood the feed.
@@ -174,8 +174,20 @@ module Dashboard
     def joins?(run, event, record)
       newest, newest_record = run.first
       COLLAPSING.include?(event.action) && event.action == newest.action && actor_key(event) == actor_key(newest) &&
-        (event.action == "media.uploaded" || record == newest_record) &&
+        (event.action == "media.uploaded" || record == newest_record || same_target_folder?(event, newest)) &&
         newest.last_occurred_at - event.last_occurred_at <= Audit::COALESCE_WINDOW
+    end
+
+    # Moves of different images join only when they went to the same place
+    # (the new `folder_id`, nil for "Not in a folder"): the counted sentence
+    # names one folder.
+    def same_target_folder?(event, newest)
+      event.action == "media.moved" && target_folder(event) == target_folder(newest)
+    end
+
+    def target_folder(event)
+      changes = event.field_changes
+      changes.is_a?(Hash) ? Array(changes["folder_id"]).last : nil
     end
 
     def actor_key(event) = [ event.user_id, event.actor_type, event.actor_id ]
@@ -192,7 +204,7 @@ module Dashboard
       mixed = run.map { |(e, _)| e.snapshot.is_a?(Hash) ? e.snapshot["block_type"] : nil }.uniq.size > 1
       fallback = (record.published_at if record.respond_to?(:published_at))
       target =
-        if count > 1 && event.action == "media.uploaded"
+        if count > 1 && %w[media.uploaded media.moved].include?(event.action)
           Audit::Sentence::Target.new(nil, Audit::Sentence.library_route)
         else
           Audit::Sentence::Target.new(record.title.presence || "(untitled)", Audit::Sentence.route_for(record))

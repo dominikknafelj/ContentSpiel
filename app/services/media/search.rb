@@ -24,11 +24,17 @@ class Media::Search
   # is what is searched: kept images, with their variants preloaded, unless a
   # caller says otherwise.
   #
+  # `place` is the `Media::Place` the search looks in (All media unless a
+  # caller says otherwise): the place is the set, the search and the segment
+  # narrow it, and the counts are the place's.
+  #
   # Only a String is a query: a forged `?q[]=x` or
   # `?q[a]=x` arrives as an Array/Parameters, which `sanitize_sql_like`
   # can't take -- it's no search at all rather than a 500.
-  def initialize(q: nil, filter: nil, actor: nil, scope: Media::Asset.kept.with_file)
-    @scope = scope
+  def initialize(q: nil, filter: nil, actor: nil, place: Media::Place::ALL, scope: Media::Asset.kept.with_file)
+    @library = scope
+    @place = place
+    @scope = place.narrow(scope)
     @query = q.is_a?(String) ? q : nil
     @filter = FILTERS.include?(filter) && available?(filter) ? filter : "all"
     @user_id = (actor.is_a?(ApiToken) ? actor.user : actor)&.id
@@ -63,10 +69,11 @@ class Media::Search
   # library, so that path asks the scope itself, one `SELECT 1 ... LIMIT 1`
   # (`unscope(:includes)`: the default scope preloads variants). The scope is
   # kept images only, so a library whose images are all in the trash is empty.
+  # The library, not the place: an empty folder is no empty library.
   def any_images?(counts:)
-    return counts[:all].positive? if @query.blank?
+    return counts[:all].positive? if @query.blank? && @place.all?
 
-    @scope.unscope(:includes).exists?
+    @library.unscope(:includes).exists?
   end
 
   # The title/alt/filename match (`#call`'s old body), on the scope.
