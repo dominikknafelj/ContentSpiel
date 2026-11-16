@@ -477,9 +477,16 @@ class SetupController < ApplicationController
 
     # The homepage always exists when setup is over, so "/" is never a 404 on
     # a new site (`StarterContents::EnsureHome`, run as the signed-in owner);
-    # it and the marker that ends setup commit together.
+    # it and the marker that ends setup commit together. The settings row is
+    # locked FOR UPDATE first, since the transaction ends by writing it:
+    # `Pages::Save` would otherwise hold it FOR SHARE and `Setup.complete!`
+    # upgrade that share, and two submissions at once would each hold the
+    # share the other's upgrade waits for (`ContentSpiel::LockOrder`,
+    # `test/controllers/setup_review_race_test.rb`). A second submission
+    # waits, then finds the homepage and the marker there.
     def update_review
       SiteSetting.transaction do
+        Current.site.lock!
         StarterContent.raise!(StarterContents::EnsureHome.call(locale: Current.site.default_locale))
         Setup.complete!
       end
