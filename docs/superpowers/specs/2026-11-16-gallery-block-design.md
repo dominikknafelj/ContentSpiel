@@ -2,7 +2,7 @@
 
 Status: built (plan `docs/superpowers/plans/2026-11-16-gallery-block.md`). Where the build left this text, §20 "As built" says so; the description of the code as it is lives in `docs/reference/content-blocks-and-types.md`, "The Gallery block". The behaviour is settled here; the looks are the
 Design System's cards **StudioGallery** (CS Studio) and **SiteGallery** (the
-public site, the default theme), version `1794849828-4a8d` (v251) (§16). A card's
+public site, the default theme), version `1794862802-0737` (v253) (§16). A card's
 word wins over this file's; on behaviour this file wins, and where the two
 differed the ruling is in §19. A word the cards do not give is marked "(not on
 the card)". An answer marked **(call)** is the planner's recommendation, for
@@ -234,9 +234,10 @@ type exists, the case the reference's step 2 warns of.
 
 - **Grid:** every image in a frame of the set ratio, in rows; the number of
   columns is the theme's. The default theme's (SiteGallery, D7): the block is a
-  size container (`container-type: inline-size`), one column below 360px of
-  its width, two from 360px, three from 640px, so a phone draws one and a
-  content-width half column (368px) two (§19); the gap `--th-gallery-gap`.
+  size container (`container-type: inline-size`), one column below 320px of
+  its width, two from 320px, three from 640px, so a phone draws one and a
+  section's half column (352px, 328px in a band) two (§19, §20); the gap
+  `--th-gallery-gap`.
   Captions under their image.
 - **Carousel:** one image at a time at the block's width, in a frame of the set
   ratio, the caption under it; the other images are a scroll away (§7).
@@ -261,7 +262,7 @@ width (`Blocks::ImageComponent.sizes_for(block)`, the content column or the
 section column's share) divided by how many images a row holds.
 `sizes(per_row:)` takes an Integer, or a Hash of the block's least width in
 pixels to the images a row holds there: `sizes(per_row: 1)` for the carousel,
-`sizes(per_row: Blocks::GalleryComponent::GRID_COLUMNS)` (`{ 0 => 1, 360 =>
+`sizes(per_row: Blocks::GalleryComponent::GRID_COLUMNS)` (`{ 0 => 1, 320 =>
 2, 640 => 3 }`) for the default grid, a theme with another grid passing its
 own. Each width `sizes_for` names is divided by the count for that width: a
 fixed width in pixels by the count its own width takes, a width relative to
@@ -828,7 +829,7 @@ Held by a test:
 ## 16. The design answers
 
 The Design System (`https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT`,
-version `1794849828-4a8d` (v251)) holds both cards:
+version `1794862802-0737` (v253)) holds both cards:
 
 - **StudioGallery** (CS Studio): D1 the icon (§10.1), D2 the card's controls
   (§10.2), D3 the image rows (§10.3), D4 the picker choosing several and a
@@ -839,7 +840,7 @@ version `1794849828-4a8d` (v251)) holds both cards:
   and the default template's class names (§7.8, §8), accessibility and dark.
 
 `test/support/design_system_entries.rb` gains `StudioGallery` and
-`SiteGallery` in `ENTRIES`, its `VERSION` `1794849828-4a8d` (v251). A look this file
+`SiteGallery` in `ENTRIES`, its `VERSION` `1794862802-0737` (v253). A look this file
 or the plan needs that neither card gives goes back to the design agent, never
 decided here.
 
@@ -919,10 +920,13 @@ A card's word wins; on behaviour this file wins. Each conflict and its ruling:
   image of the folder; StudioGallery counts only the images not yet in the gallery and offers "the
   first 12 of 31" past the limit. The card wins: §10.6's endpoint takes
   `except` and answers `total`.
-- **A section's half column.** v245 set the thresholds (one column below 360px
-  of the block, two from 360px, three from 640px). At the content width
-  (`Blocks::SectionComponent::CONTENT_WIDTH`, 736px) a half column is 368px
-  and draws two.
+- **A section's half column.** v245 set the thresholds at 360px and 640px;
+  v253 (`1794862802-0737`) moved the first to 320px (one column below 320px of
+  the block, two from 320px, three from 640px), because a half column is
+  drawn narrower than its share of the 736px content column
+  (`Blocks::SectionComponent::CONTENT_WIDTH`): 352px (less the 32px gap), and
+  328px in a tinted or strong band (less its 1.5rem each side). Both draw
+  two.
 - **Design System v245** answered the two open questions: the button's edge
   and the grid's thresholds.
 
@@ -932,18 +936,22 @@ Where the build left this text. Everything else stands as written; the
 description of the code is `docs/reference/content-blocks-and-types.md`, "The
 Gallery block".
 
-- **The Design System is v251 (`1794849828-4a8d`).** After v245 it answered the
+- **The Design System is v253 (`1794862802-0737`).** After v245 it answered the
   tile (v246: the inline size-6 thumbnail, no 72px box, §10.5), the picker's
   zero status, its tile at the limit and a chosen tile's name (v249, §10.4),
-  and the card's screen-reader status, the field radius, the shared Remove
-  and the line shown without upload rights (v251, §10.3).
+  the card's screen-reader status, the field radius, the shared Remove and
+  the line shown without upload rights (v251, §10.3), and the grid's first
+  threshold at 320px (v253, §19).
 - **`sizes(per_row:)` takes an Integer or a Hash** of least block widths to
-  counts (`Blocks::GalleryComponent::GRID_COLUMNS`, `{ 0 => 1, 360 => 2, 640 =>
+  counts (`Blocks::GalleryComponent::GRID_COLUMNS`, `{ 0 => 1, 320 => 2, 640 =>
   3 }`); a width relative to the viewport takes the narrowest block's count, so
-  it may over-ask and never under-asks (§19). The top-level width is
-  `SectionComponent::CONTENT_WIDTH` (736px), not the 768px breakpoint the
-  image's own hint names. In a section column a half column of the content
-  width (368px) draws two images a row.
+  it may over-ask and never under-asks (§19). A width in pixels is divided at
+  the width the block is drawn at, not at the image's hint: at the top level
+  `SectionComponent::CONTENT_WIDTH` (736px, not the 768px breakpoint), in a
+  section column `SectionComponent.column_width` (its share of 736px less the
+  32px gaps and a content-width band's 1.5rem each side, `COLUMN_GAP` and
+  `BAND_PADDING`, held to `sections.css`). A half column is drawn at 352px
+  (328px in a band) and draws two images a row, each asking 169px (157px).
 - **The position stands at the inline end in both directions**, from one
   document order (§19).
 - **The tile's words** are the card's: `grid`, `carousel` (each with the count

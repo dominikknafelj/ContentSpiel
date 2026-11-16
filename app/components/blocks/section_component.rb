@@ -29,6 +29,14 @@ module Blocks
     # (`app/views/layouts/application.html.erb`).
     CONTENT_WIDTH = 736
 
+    # `sections.css`'s gap between a section's columns (`gap: 2rem`) and a
+    # content-width tinted or strong band's inline padding on each side
+    # (`padding-inline: 1.5rem` on its inner element; a full-width band's is
+    # 0), in pixels. `test/integration/design_tokens_test.rb` holds them to
+    # the stylesheet.
+    COLUMN_GAP = 32
+    BAND_PADDING = 24
+
     # The `sizes` of an image in `column` of `section`:
     # the column's share of the 736px content column from 768px of viewport
     # up, its share of the viewport while the columns still sit side by side
@@ -44,6 +52,22 @@ module Blocks
       weights = BlockTypes::Section.weights(section.settings["layout"])
       share = weights.fetch(column - 1, weights.first).fdiv(weights.sum)
       "(min-width: 768px) #{(CONTENT_WIDTH * share).round}px, (min-width: 480px) #{(share * 100).round}vw, 100vw"
+    end
+
+    # The width in CSS pixels `column` of `section` is drawn at in the
+    # content column (from 768px of viewport up): the section measures
+    # CONTENT_WIDTH in every band and width (its padding is on the inner
+    # element), so its layout is always side by side there, four across
+    # included; a content-width band's padding and the gaps come off, and
+    # the rest is shared by the weights. Where `image_sizes` is a hint that
+    # may round up, this is what a block that lays itself out by its own
+    # width (a gallery's grid) is actually given. A Float.
+    def self.column_width(section, column)
+      settings = section.settings
+      weights = BlockTypes::Section.weights(settings["layout"])
+      banded = %w[tinted strong].include?(settings["background"].to_s) && settings["width"].to_s != "full"
+      inner = CONTENT_WIDTH - (banded ? 2 * BAND_PADDING : 0) - (weights.size - 1) * COLUMN_GAP
+      inner * weights.fetch(column - 1, weights.first).fdiv(weights.sum)
     end
 
     def initialize(block:, page:)

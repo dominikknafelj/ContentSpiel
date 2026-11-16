@@ -1049,14 +1049,26 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes css, "box-shadow: 0 0 0 1px var(--th-gallery-control-edge), var(--th-shadow-menu);"
     assert_match(/@media \(prefers-reduced-motion: no-preference\) \{\s*\.content-block--gallery__track \{ scroll-behavior: smooth; \}/, css)
     assert_equal 1, css.scan(/(?<![\w-])scroll-behavior/).size, "the track moves smoothly only without reduced motion"
-    assert_match(/@container \(min-width: 360px\)/, css)
+    assert_match(/@container \(min-width: 320px\)/, css)
     assert_match(/@container \(min-width: 640px\)/, css)
-    assert_equal [ 360, 640 ], Blocks::GalleryComponent::GRID_COLUMNS.keys.drop(1)
+    assert_equal [ 320, 640 ], Blocks::GalleryComponent::GRID_COLUMNS.keys.drop(1)
     # "Show whole images" beats the preview's inline background with
     # `!important`, and only that: an image with no preview is the 28px
     # empty mark (images.css), which a `contain` would blow up to the frame.
     important = css.scan(/([^{}]+)\{[^{}]*!important[^{}]*\}/).flatten.map(&:strip)
     assert_equal [ ".content-block--gallery--fit .content-block--gallery__frame img[style]" ], important
+  end
+
+  # `Blocks::SectionComponent.column_width` (what a gallery's `sizes` asks
+  # from) reads the section's gap and a content-width band's inline padding
+  # from these two constants: they are sections.css's values in pixels.
+  test "the section's column gap and a band's inline padding are SectionComponent's constants" do
+    css = Rails.root.join("app/assets/tailwind/themes/default/sections.css").read.gsub(%r{/\*.*?\*/}m, "")
+    gap = css[/\.content-section__grid \{[^}]*\bgap: ([\d.]+)rem;/, 1]
+    padding = css[/\.content-section--strong > \.content-section__inner \{ padding-inline: ([\d.]+)rem; \}/, 1]
+    assert_equal Blocks::SectionComponent::COLUMN_GAP, (gap.to_f * 16).round
+    assert_equal Blocks::SectionComponent::BAND_PADDING, (padding.to_f * 16).round
+    assert_match(/\.content-section--full > \.content-section__inner \{ padding-inline: 0; \}/, css)
   end
 
   private

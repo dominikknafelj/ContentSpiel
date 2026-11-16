@@ -201,27 +201,46 @@ class Blocks::GalleryComponentTest < ActiveSupport::TestCase
   test "sizes divides each width by the images a row holds there, and never under-asks" do
     columns = Blocks::GalleryComponent::GRID_COLUMNS
     top = component(gallery(images(1)))
+    # The top-level block is the 736px content column: three images and two
+    # gaps, (736 - 2 * 14) / 3. Its 100vw is a phone's block (343px of a
+    # 375px viewport), one image a row, left whole.
     assert_equal "(min-width: 768px) 236px, 100vw", top.send(:sizes, per_row: columns)
     assert_equal Blocks::ImageComponent::SIZES, top.send(:sizes, per_row: 1)
     assert_equal Blocks::ImageComponent::SIZES, top.send(:sizes)
     assert_equal "(min-width: 768px) 361px, 50vw", top.send(:sizes, per_row: 2), "an Integer is every width's count"
 
+    # A half column is drawn at 352px (736 less the 32px gap, halved), not
+    # the 368px the image's hint names, and in a tinted or strong band at
+    # 328px (the band's 1.5rem each side comes off first): both draw two,
+    # (352 - 14) / 2 and (328 - 14) / 2.
     page = create_page(title: "Columns")
-    section = page.content_blocks.create!(block_type: :section, position: 0, settings: { "layout" => "two" })
-    in_column = gallery(images(1), page: page, section: section, section_column: 1)
-    column = Blocks::GalleryComponent.new(block: in_column, page: page)
-    assert_equal "(min-width: 768px) 177px, (min-width: 480px) 50vw, 100vw", column.send(:sizes, per_row: columns)
-    assert_equal Blocks::ImageComponent.sizes_for(in_column), column.send(:sizes, per_row: 1)
+    { "none" => 169, "tinted" => 157, "strong" => 157 }.each_with_index do |(background, each), position|
+      section = page.content_blocks.create!(block_type: :section, position: position, settings: { "layout" => "two", "background" => background })
+      in_column = gallery(images(1), page: page, section: section, section_column: 1)
+      column = Blocks::GalleryComponent.new(block: in_column, page: page)
+      assert_equal "(min-width: 768px) #{each}px, (min-width: 480px) 50vw, 100vw", column.send(:sizes, per_row: columns), background
+      assert_equal Blocks::ImageComponent.sizes_for(in_column), column.send(:sizes, per_row: 1)
+    end
+    full = page.content_blocks.create!(block_type: :section, position: 3, settings: { "layout" => "two", "background" => "tinted", "width" => "full" })
+    in_full = Blocks::GalleryComponent.new(block: gallery(images(1), page: page, section: full, section_column: 2), page: page)
+    assert_equal "(min-width: 768px) 169px, (min-width: 480px) 50vw, 100vw", in_full.send(:sizes, per_row: columns),
+                 "a full-width band's content box is the content column with no padding of its own"
 
-    # Each width asks at least what its row draws: three images and two
-    # gaps fill the 736px top-level block, two images and a gap the
-    # column's share of it, read from the `sizes` asked; below 768px a
-    # phone's one column is the viewport's width.
+    # A quarter of the content column (148px in a band) holds one image a
+    # row, asked whole.
+    quarter = page.content_blocks.create!(block_type: :section, position: 4, settings: { "layout" => "four", "background" => "strong" })
+    in_quarter = gallery(images(1), page: page, section: quarter, section_column: 4)
+    assert_equal Blocks::ImageComponent.sizes_for(in_quarter), Blocks::GalleryComponent.new(block: in_quarter, page: page).send(:sizes, per_row: columns)
+
+    # Each pixel width asks at least what its row draws, at the width the
+    # block is drawn at.
     asked = ->(sizes) { sizes[/\(min-width: 768px\) (\d+)px/, 1].to_i }
     gap = Blocks::GalleryComponent::GRID_GAP
     assert_operator 3 * asked.(top.send(:sizes, per_row: columns)) + 2 * gap, :>=, Blocks::SectionComponent::CONTENT_WIDTH
-    share = asked.(Blocks::ImageComponent.sizes_for(in_column))
-    assert_operator 2 * asked.(column.send(:sizes, per_row: columns)) + gap, :>=, share
+    banded = page.content_blocks.find_by!(position: 1)
+    in_band = gallery(images(1), page: page, section: banded, section_column: 2)
+    drawn = Blocks::SectionComponent.column_width(banded, 2)
+    assert_operator 2 * asked.(Blocks::GalleryComponent.new(block: in_band, page: page).send(:sizes, per_row: columns)) + gap, :>=, drawn.floor
 
     grid = component(gallery(images(2)))
     render_inline grid

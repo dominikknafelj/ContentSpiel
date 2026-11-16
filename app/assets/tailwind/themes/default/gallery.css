@@ -60,7 +60,7 @@
 }
 
 /* THE GRID is a list of figures, the block a size container: one image a
-   row below 360px of the block's width, two from 360px, three from 640px
+   row below 320px of the block's width, two from 320px, three from 640px
    (`Blocks::GalleryComponent::GRID_COLUMNS`, which `sizes` divides the
    widths by: a change here changes that constant). */
 .content-block--gallery--grid {
@@ -74,7 +74,7 @@
   padding: 0;
   list-style: none;
 }
-@container (min-width: 360px) {
+@container (min-width: 320px) {
   .content-block--gallery__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (min-width: 640px) {

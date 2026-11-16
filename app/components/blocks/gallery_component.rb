@@ -47,9 +47,10 @@ module Blocks
     )
 
     # The default theme's grid by the block's own width (`gallery.css`, a
-    # size container): one image a row below 360px, two from 360px, three
-    # from 640px. What `sizes` divides a width by for that grid.
-    GRID_COLUMNS = { 0 => 1, 360 => 2, 640 => 3 }.freeze
+    # size container): one image a row below 320px, two from 320px, three
+    # from 640px, so a section's half column (352px, 328px in a band) draws
+    # two. What `sizes` divides a width by for that grid.
+    GRID_COLUMNS = { 0 => 1, 320 => 2, 640 => 3 }.freeze
 
     # The default grid's gap in pixels, `--th-gallery-gap` (`--th-sp-3`).
     GRID_GAP = 14
@@ -129,14 +130,19 @@ module Blocks
     # divided by the count for it. `per_row` is an Integer, or a Hash of the
     # block's least width in pixels to the count a row holds from there.
     #
-    # A width in pixels is the block's own (the content column, which is
-    # `SectionComponent::CONTENT_WIDTH` and not the 768px the image's hint
-    # asks, or a section column's share of it), so it takes the count of its
-    # width and asks `round((W - (n - 1) * gap) / n)`. A width relative to
-    # the viewport can be any block's, a phone's one column among them, so
-    # it takes the narrowest block's count, `per_row`'s least key, and is
-    # divided without the gaps: it asks more than a row draws, never less. A
-    # count of one leaves the width as `sizes_for` names it.
+    # A width in pixels stands for the block in the content column, and is
+    # replaced by the width the block is drawn at there (`drawn_width`: the
+    # content column, `SectionComponent::CONTENT_WIDTH`, or a section
+    # column's share of it less the gaps and a band's padding), which is
+    # narrower than the hint (the 768px breakpoint, or the plain share): the
+    # count is read from the drawn width, as the container query reads it,
+    # and one image asks `round((W - (n - 1) * gap) / n)`. Read from the hint
+    # instead, a width between the two would ask for fewer columns than are
+    # drawn. A width relative to the viewport can be any block's, a phone's
+    # one column among them, so it takes the narrowest block's count,
+    # `per_row`'s least key, and is divided without the gaps: it asks more
+    # than a row draws, never less. A count of one leaves the width as
+    # `sizes_for` names it.
     def sizes(per_row: 1)
       counts = per_row.is_a?(Hash) ? per_row.sort.to_h : { 0 => per_row }
       Blocks::ImageComponent.sizes_for(block).split(", ").map do |entry|
@@ -146,15 +152,21 @@ module Blocks
     end
 
     def share_of(width, counts)
-      number = width.to_i
       if width.end_with?("px")
-        wide = [ number, Blocks::SectionComponent::CONTENT_WIDTH ].min
+        wide = drawn_width
         count = counts.select { |least, _| least <= wide }.values.last || counts.values.first
         count == 1 ? width : "#{(wide - (count - 1) * GRID_GAP).fdiv(count).round}px"
       else
         count = counts.values.first
-        count == 1 ? width : "#{number.fdiv(count).ceil}vw"
+        count == 1 ? width : "#{width.to_i.fdiv(count).ceil}vw"
       end
+    end
+
+    # The block's width in the content column: a section column's
+    # (`SectionComponent.column_width`), else the column's own.
+    def drawn_width
+      section = block.section if block.section_id
+      section&.container? ? Blocks::SectionComponent.column_width(section, block.section_column) : Blocks::SectionComponent::CONTENT_WIDTH
     end
 
     # One of the block's public words, in the visitor's language where

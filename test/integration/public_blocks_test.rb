@@ -489,9 +489,10 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
 
   # A gallery's grid asks for one image's share of its block (gallery block
   # spec §7.1): at the top level a third of the 736px content column less
-  # two gaps; in a column of an equal two-column section half of its 368px
-  # less one gap, the widths relative to the viewport left whole. A
-  # carousel's image is its block's width, the column's own.
+  # two gaps; in a column of an equal two-column section, drawn at 352px
+  # (736 less the 32px gap, halved), half of that less one gap, the widths
+  # relative to the viewport left whole. A carousel's image is its block's
+  # width, the column's own hint.
   test "a gallery in a section's column asks for its column's share" do
     asset = processed_asset
     @root.content_blocks.create!(block_type: :gallery, position: 0, settings: { "layout" => "grid", "images" => [ asset.id ] })
@@ -502,7 +503,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
 
     sizes = css_select(".content-block--gallery img[sizes]").map { |img| img["sizes"] }
     assert_equal [ "(min-width: 768px) 236px, 100vw", "(min-width: 768px) 368px, (min-width: 480px) 50vw, 100vw",
-                   "(min-width: 768px) 177px, (min-width: 480px) 50vw, 100vw" ], sizes
+                   "(min-width: 768px) 169px, (min-width: 480px) 50vw, 100vw" ], sizes
   end
 
   test "a page of sections costs no query per section or per block in one" do
