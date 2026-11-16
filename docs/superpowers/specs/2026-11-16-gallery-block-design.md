@@ -1,9 +1,12 @@
 # The Gallery block: a list of library images, as a grid or a carousel
 
-Status: designed, not built. The behaviour is settled here; every new screen
-element, the public carousel's look included, is a design request (§16), and
-nothing of a look is decided in this file. An answer marked **(call)** is the
-planner's recommendation, for the owner to overrule. The plan is
+Status: designed, not built. The behaviour is settled here; the looks are the
+Design System's cards **StudioGallery** (CS Studio) and **SiteGallery** (the
+public site, the default theme), version `1794828751-4e8a` (§16). A card's
+word wins over this file's; on behaviour this file wins, and where the two
+differed the ruling is in §19. A word the cards do not give is marked "(not on
+the card)". An answer marked **(call)** is the planner's recommendation, for
+the owner to overrule; the owner's questions are in one place, §18. The plan is
 `docs/superpowers/plans/2026-11-16-gallery-block.md`. It follows "Adding a
 block type" (`docs/reference/content-blocks-and-types.md`) step by step (§14),
 and advances #116 (a schema field that refers to library images).
@@ -73,7 +76,7 @@ block's `settings` and `translated_settings`:
 | `layout` | `:select` `{ "grid" => "Grid", "carousel" => "Carousel" }`, `control: :segmented`, default `"grid"` | no | the public layout |
 | `ratio` | `:select` `{ "3:2", "4:3", "1:1" => "Square", "16:9" }`, default `"3:2"`, `label: "Shape"` | no | every frame's shape |
 | `fit` | `:boolean`, `label: "Show whole images"` | no | false: each image fills its frame, cropped at the centre; true: each image is shown whole inside its frame, on the stage colour |
-| `label` | `:string`, `max: 80`, `help: :gallery_label`, `placeholder_public: "blocks.gallery.label"` | yes | the gallery's name for a screen reader (the carousel's and the grid's accessible name), "Image gallery" in the visitor's language when blank |
+| `label` | `:string`, `max: 80`, `help: :"gallery.label_help"`, `placeholder_public: "blocks.gallery.label"` | yes | the gallery's name for a screen reader (the carousel's and the grid's accessible name), "Image gallery" in the visitor's language when blank |
 | `images` | **`:media_list`** (new), `max: 60` | no | the ordered library image ids |
 | `texts` | **`:media_texts`** (new), `of: :images`, `max: 1000` | yes | per image, per language: `{ "<asset id>" => { "caption" => String, "alt" => String } }` |
 
@@ -85,7 +88,8 @@ the layout shift the owner ruled out; `fit` gives the uncropped look inside a
 steady frame.
 
 **An image appears once in a gallery (call).** The list is unique; adding an
-image that is already there is a no-op the picker shows (D4). That lets the
+image that is already there is a no-op the picker shows (its tile is marked
+"In the gallery" and cannot be chosen, §10.4). That lets the
 texts be keyed by the image's id, so reordering moves no text, and nothing
 needs an item id of its own.
 
@@ -189,11 +193,11 @@ What protects a hero's image protects a gallery's, by the field's type:
 ```ruby
 BlockTypes.register :gallery do |t|
   t.label "Gallery"
-  t.icon "images", family: :media           # a new entry of ICONS (D1)
+  t.icon "images", family: :media           # a new entry of ICONS (StudioGallery, D1)
   t.field :layout, :select, options: LAYOUTS, default: "grid", control: :segmented
   t.field :ratio, :select, options: RATIOS, default: "3:2", label: "Shape"
   t.field :fit, :boolean, label: "Show whole images"
-  t.field :label, :string, translated: true, max: LABEL_LENGTH, help: :gallery_label, placeholder_public: "blocks.gallery.label"
+  t.field :label, :string, translated: true, max: LABEL_LENGTH, help: :"gallery.label_help", placeholder_public: "blocks.gallery.label"
   t.field :images, :media_list, max: MAX_IMAGES
   t.field :texts, :media_texts, translated: true, of: :images, max: TEXT_LENGTH
   t.component Blocks::GalleryComponent
@@ -209,9 +213,9 @@ end
 ```
 
 `MAX_IMAGES = 60`, `LABEL_LENGTH = 80`, `TEXT_LENGTH = 1000`, all on
-`BlockTypes::Gallery`. The token names are proposals, settled by the public
-look's card (D6) before the build: a token's name is a promise from the day it
-ships. **No token is named `gallery-frame`**: the outside test type
+`BlockTypes::Gallery`. The token names are SiteGallery's ("The tokens"), the
+six above; a token's name is a promise from the day it ships. **No token is
+named `gallery-frame`**: the outside test type
 `gallery/album` (`test/support/gallery_album.rb`) declares it, its owner
 `gallery` sharing the prefix the built-in uses, as a gem owner `card` would
 share the Card's.
@@ -229,8 +233,11 @@ type exists, the case the reference's step 2 warns of.
 ## 6. Layouts, the frame and the limits
 
 - **Grid:** every image in a frame of the set ratio, in rows; the number of
-  columns at each width is the default theme's (D7), and a theme's. Captions
-  under their image.
+  columns is the theme's. The default theme's (SiteGallery, D7): the block is a
+  size container (`container-type: inline-size`), one column below 480px of
+  its width, two from 480px, three from 768px, so a phone draws one and a
+  content-width half column (368px) one too (§19); the gap `--th-gallery-gap`.
+  Captions under their image.
 - **Carousel:** one image at a time at the block's width, in a frame of the set
   ratio, the caption under it; the other images are a scroll away (§7).
 - **The frame** is the set ratio in both layouts, with `object-fit: cover`
@@ -251,9 +258,18 @@ Every image is drawn by `Media::PictureComponent` (one `<img>`, its `width` and
 load), lazy (the default), so the widths are the ones the library already
 makes (`docs/reference/media.md`, "What a page draws"). `sizes` is the block's
 width (`Blocks::ImageComponent.sizes_for(block)`, the content column or the
-section column's share) divided by how many images a row holds:
-`sizes(per_row: 1)` for the carousel and `sizes(per_row: 3)` for the default
-grid, a theme with another grid passing its own count. Nothing shifts: every
+section column's share) divided by how many images a row holds.
+`sizes(per_row:)` takes an Integer, or a Hash of the block's least width in
+pixels to the images a row holds there: `sizes(per_row: 1)` for the carousel,
+`sizes(per_row: Blocks::GalleryComponent::GRID_COLUMNS)` (`{ 0 => 1, 480 =>
+2, 768 => 3 }`) for the default grid, a theme with another grid passing its
+own. Each width `sizes_for` names is divided by the count for that width: a
+fixed width in pixels by the count its own width takes, a width relative to
+the viewport (`100vw`, `50vw`) by the count of the narrowest block it can be,
+which is one. So the default grid at the top level asks
+`(min-width: 768px) 256px, 100vw` (`Blocks::ImageComponent::SIZES`' 768px over
+three): it may ask for more
+pixels than a two-column row draws, never fewer (§19). Nothing shifts: every
 frame has its `aspect-ratio` before any image arrives, and a carousel's slides
 are all in the document from the start, so the row's height is set at once.
 **No image is eager (call):** a gallery is rarely the first thing on a page; the
@@ -288,8 +304,8 @@ script). In document order:
 6. **The slide picker** (call): one button per image ("Show image 3",
    `aria-current="true"` on the current one) for a gallery of **12 images or
    fewer**; above twelve, none: the position, the buttons and the scroll do it,
-   and 60 dots is no picker. Whether the picker is dots, numbers or thumbnails
-   is D6.
+   and 60 dots is no picker. In the default theme the picker is dots
+   (SiteGallery, D6; §7.8).
 7. **A status**, visually hidden, `aria-live="polite"`, written only when a
    button or a key moved the carousel ("Image 3 of 12"), never on a free
    scroll or a swipe, which would talk over the person's own gesture (call).
@@ -362,6 +378,51 @@ gallery's images, the focus back to the image that opened it, Escape, nothing
 left in Turbo's cache) as a public component and script of its own, behind a
 setting of the block. Owner question (§18).
 
+### 7.8 The default theme's look (SiteGallery, D6 and D7)
+
+- **The frame:** the block's width at the set ratio (`aspect-ratio`),
+  `--th-radius`, `overflow: hidden`; the image `object-fit: cover`, or
+  `contain` on `--th-gallery-stage` with "Show whole images". A slide is 100%
+  wide with **no peek**: the buttons and the dots say there is more, and
+  without the script the scrollbar does.
+- **Previous and Next:** 44px circles over the frame's sides, centred on the
+  frame's height (never on the caption), 10px in; the ground
+  `--th-gallery-control`, the arrow `--th-gallery-control-ink`, a 20px Lucide
+  chevron at stroke 2, the edge `--th-line-strong` (1px) with
+  `--th-shadow-menu`. Disabled at an end: the arrow `--th-meta`, the edge
+  `--th-line` with no shadow, `disabled`. The focus ring is the site's: 2px
+  `--th-accent`, 2px out. They come first in the document (`controls`) and
+  stand over the frame by `position: absolute` in a box of the frame's ratio.
+- **The caption:** 8px under the frame, 13px/1.5, `--th-meta`, `--th-dim` on a
+  tinted band, `--th-on-band-strong-dim` on a strong one, as the Image
+  block's.
+- **The foot,** 10px under the caption: the dots centred, the position at the
+  inline end (13px `--th-meta`, tabular figures, in a 4.5em box aligned to the
+  end; an empty box of the same width at the start keeps the dots centred).
+- **The dots:** each a 24×24 button (the 2.5.8 target); at rest an 8px ring
+  of 1.5px `--th-gallery-pick`; the current one a 20×8 pill filled
+  `--th-gallery-pick-current`, with `aria-current="true"`. Above twelve images
+  there are none: the position alone.
+- **Right to left:** Previous stands at the right with its chevron mirrored,
+  the position at the inline end (the left), the arrow keys follow the screen
+  (§7.5).
+- **A phone:** the same at 343px; the buttons stay 44px.
+- **Without the script:** the track alone, `scroll-snap-type: x mandatory`,
+  `scrollbar-width: thin`, focusable and named "Images"; the controls, the
+  foot and the status stay `hidden`. With the script
+  (`[data-gallery-carousel-state]`) the track's scrollbar is `none`.
+- **The grid:** §6; each figure its frame (cover, or contain on the stage)
+  and its caption as the carousel's.
+- **Dark:** tokens only. The control is a light disc over the image in the
+  light scheme and a dark one (`--th-surface` dark) in the dark scheme.
+- **The default template's class names** (the default theme's own, not on the
+  contract's list): `content-block content-block--gallery` with
+  `content-block--gallery--grid` or `--carousel`, `--ratio-3-2` (and
+  `-4-3`, `-1-1`, `-16-9`), `--fit`; the parts `content-block--gallery__track`,
+  `__slide`, `__frame`, `__caption`, `__controls`, `__button` (with
+  `__button--previous`, `__button--next`), `__foot`, `__position`, `__picks`,
+  `__pick`, `__status`, `__grid`, `__item`.
+
 ## 8. The theme contract
 
 - **The component's line** (`Theme::Contract.components`, the ledger, the
@@ -383,23 +444,34 @@ setting of the block. Owner question (§18).
   gallery's caption is its own: the owner named "a caption per language" for
   the gallery and "alt from the library by default" for the alt. A gallery
   whose captions appear under some images and not others, because some library
-  images happen to carry one, is a set nobody wrote. The card can offer the
-  library's caption as a starting text (D3). Owner question (§18).
-- **`sizes(per_row: 1)`**: §7.1.
+  images happen to carry one, is a set nobody wrote. The card offers the
+  library's caption as a starting text: "Use library caption" fills the field
+  once, and the field stays the gallery's own (§10.3). Owner question (§18).
+- **`sizes(per_row: 1)`**: an Integer or a Hash of least widths to counts,
+  §7.1.
 - **`string(key)`**: a public word in the visitor's language, English the
   fallback (`public.blocks.gallery.*`: `label` "Image gallery", `carousel`
   "carousel", `slide` "slide", `position` "%{index} of %{count}", `track`
   "Images", `previous` "Previous image", `next` "Next image", `show` "Show image
   %{index}", `moved` "Image %{index} of %{count}").
-- **The tokens** (`t.tokens`, values in both blocks of `tokens.css` from base
-  tokens where one is right, a strong band's in `sections.css`):
-  `--th-gallery-stage` (the ground behind a fitted image), `--th-gallery-control`
-  and `--th-gallery-control-ink` (a button's ground and its arrow),
-  `--th-gallery-pick` and `--th-gallery-pick-current` (a picker button at rest
-  and current), fixed `--th-gallery-gap`. Contrast is measured on the page, a
-  tinted band and a strong band, both schemes (`design_tokens_test.rb`): a
-  button's arrow on its ground at 4.5:1, a button's and a picker's edge on each
-  ground at 3:1.
+- **The tokens** (`t.tokens`; SiteGallery's table). The page's values stand
+  in `tokens.css`, declared on `:root` and resolved there, so a band that
+  re-values `--th-ink` does not reach a token that sits on the image; a tinted
+  band's and a strong band's own values stand in `sections.css`
+  (`.content-section--tinted`, `.content-section--strong`):
+
+  | Token | Page, light and dark | Tinted band | Strong band | What |
+  |---|---|---|---|---|
+  | `--th-gallery-stage` | `var(--th-sunken)` | the same | `color-mix(in oklab, var(--th-on-band-strong) 10%, var(--th-band-strong))` | the ground behind a fitted image |
+  | `--th-gallery-control` | `color-mix(in oklab, var(--th-surface) 92%, transparent)` | the same | the same (it sits on the image) | a Previous or Next button's ground |
+  | `--th-gallery-control-ink` | `var(--th-ink)` | the same | the same | its arrow |
+  | `--th-gallery-pick` | `var(--th-meta)` | `var(--th-dim)` | `var(--th-on-band-strong-dim)` | a dot's ring at rest |
+  | `--th-gallery-pick-current` | `var(--th-ink)` | the same | `var(--th-on-band-strong)` | the current dot |
+  | `--th-gallery-gap` (fixed) | `var(--th-sp-3)` (14px) | | | the grid's gap |
+
+  Contrast is measured on the page, a tinted band and a strong band, both
+  schemes (`design_tokens_test.rb`): a button's arrow on its ground at 4.5:1,
+  a button's edge and a dot's ring on each ground at 3:1 (§19 on the edge).
 - **The script's markup** (`Theme::Contract::SCRIPTS["gallery-carousel"]`, the
   ledger's `SCRIPTS`, the reference's Scripts table): targets `track`, `slide`,
   `previous`, `next`, `position`, `pick`, `status`, `controls`; values
@@ -407,7 +479,7 @@ setting of the block. Owner question (§18).
   states `first`, `middle`, `last`; no parts, no answer. These are the
   template's **named parts**: a theme that replaces the template keeps them and
   the script works; the default template's class names are the default theme's
-  own, not on a list.
+  own, not on a list (§7.8 names them).
 - **The reference** (`docs/reference/theming.md`): the component's row, the
   tokens' rows, the script's row, and a section "The Gallery block" (what the
   template is handed, what it must keep: the track focusable and named, the
@@ -429,60 +501,187 @@ own alt is not searched: it is the asset's, read live and in no copy
 bump: no stored document holds a gallery yet. A case in
 `test/models/site_search/block_text_test.rb`.
 
-## 10. The editor (looks: D2 to D5)
+## 10. The editor (StudioGallery, D1 to D5)
 
-- **The card** draws the fields in order. `layout`, `ratio`, `fit` and `label`
-  are ordinary inputs. **The image rows are the `texts` field's input**
-  (`Admin::Fields::MediaTextsField`): one row per image of the list, in its
-  order, with its thumbnail, its caption and its alt override for the language
-  being edited (the library image's alt in that language as the alt's
-  placeholder), and on the default language's tab the controls that change the
-  list: Add images, Add a folder, a drag handle and keyboard moves, Remove.
-- **The list is the `images` field's input, the hidden variant**
-  (`Admin::Fields::MediaListField`, `hidden?` true, as the Diagram block's
-  drawing is): a hidden input holding the ids as JSON, written by the rows'
-  script and dispatched as `input`, so the card's autosave sends the list and
-  the texts together through `app/javascript/saving/queue.js`. A reorder is a
-  change of a field, not a block move: no new write path.
+### 10.1 The icon (D1)
+
+Lucide **`images`** (two stacked frames), a new entry `images` of
+`BlockTypeDefinition::ICONS` and of the `_icon` partial, on the **media** chip
+(`cs-ic-media` on `cs-ic-media-bg`), beside the Image and Card blocks. Its
+drawing, at the partial's stroke of 1.5: `<path d="M18 22H4a2 2 0 0 1-2-2V6"/>
+<path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18"/> <circle cx="12"
+cy="8" r="2"/> <rect width="16" height="16" x="6" y="2" rx="2"/>`.
+
+### 10.2 The card's controls (D2)
+
+- **One row:** Layout (`control: :segmented`, "Grid" / "Carousel", its
+  visible legend), then Shape (the select well: "3:2", "4:3", "Square",
+  "16:9") filling the rest. The two wrap onto two lines below 420px of the
+  card. The row is drawn for a `control: :segmented` select followed directly
+  by another `:select`, judged from the fields and never from the type's name,
+  and wraps by `flex-wrap` and the fields' least widths, not a size container:
+  no size container stands inside the post form ("Rules a change can break
+  silently", `docs/reference/design-system.md`).
+- **Then** the switch "Show whole images" (ChoiceFields), with no label above.
+- **Then** Label, full width, its placeholder the visitor's word ("Image
+  gallery"), and the help line under it: "What a screen reader calls the
+  gallery. Leave it blank for “Image gallery” in each visitor's language."
+  (`admin.components.fields.gallery.label_help`, its "Image gallery" the
+  `%{placeholder}` the Search block's help line takes, so another editing
+  language reads its own visitor's word).
+- **Then** the Images section, under a `cs-line` rule with 12px above it: the
+  heading "Images" (14px/600) and, at the right, "12 of 60" (`text-small
+  cs-meta`).
+
+### 10.3 The image rows (D3)
+
+- **The rows are the `texts` field's input** (`Admin::Fields::MediaTextsField`):
+  one row per image of the list, in its order. **The list is the `images`
+  field's input, the hidden variant** (`Admin::Fields::MediaListField`,
+  `hidden?` true, as the Diagram block's drawing is): a hidden input holding
+  the ids as JSON, written by the rows' script and dispatched as `input`, so
+  the card's autosave sends the list and the texts together through
+  `app/javascript/saving/queue.js`. A reorder is a change of a field, not a
+  block move: no new write path.
 - **An input learns its sibling's value**: `Admin::Ui::FieldComponent` hands
   every input the values being drawn (`values:`, the block's `FieldSet` for
   that language), so the texts input reads the list it describes (`of:`). A
   generic addition, unused by every other input.
-- **On a translation tab** the list is shown read-only ("12 images",
-  `MediaListField.display`) and the rows are the texts of that language, with
-  the default language's caption and alt as each row's reference
-  (`MediaTextsField.reference?` false: the rows draw their own), and no
-  control that changes the list.
+- **A row:** a `cs-paper` tile (`rounded-tile`, `p-2`, 8px apart), a grid of
+  `20px 96px 1fr 28px`, gap 10:
+  1. **the drag handle,** the block list's grip, `cs-meta`, a button named
+     "Move %{title}";
+  2. **the thumbnail,** 96px at 4:3, `rounded` 8px, the library's 480 width
+     (`Media::Asset#thumbnail_url`);
+  3. **two fields, stacked:** Caption (a one-line well that grows) and Alt
+     text (a well), for the language being edited. Alt's placeholder is the
+     library image's alt in that language; with no library alt either, it
+     reads "No alt text in the library" and the well's bottom edge is
+     `cs-warn` (the panel's `.admin-media-alt-warn`). A blank caption whose
+     library image has one shows a tertiary "Use library caption" at the right
+     of the Caption label: it fills the field, which stays editable and the
+     gallery's own;
+  4. **Remove,** a 28px icon button (×, `cs-dim`), named "Remove %{title}". It
+     applies at once (autosaved), with no confirm.
+- **Keyboard moves on the handle,** as the block list's: Space or Enter picks
+  the row up (it lifts to elevation 4 on `cs-tile-raised` with a 2px accent
+  outline inside); Up and Down move it; Space drops it; Escape puts it back.
+  Each step is said in a polite status: "Picked up forest-path.jpg, image 2 of
+  12. Up and Down Arrow move it, Space drops it, Escape puts it back.",
+  "Moved to 3 of 12.", "Dropped at 3 of 12.", and on Escape "Cancelled.
+  forest-path.jpg is back where it was." (not on the card: the block list's
+  sentence).
+- **Drag** goes through `loadSortable()` (`app/javascript/editor/drag.js`, the
+  one SortableJS loader) with the row as the dragged unit (elevation 4).
+- **A missing image** (an id whose image is gone, trashed or purged): the
+  thumbnail box is `cs-sunken` with Lucide `image-off` in `cs-meta` (a new
+  `:image_off` of the `_icon` partial); in place of the fields, "This image is
+  no longer in the library" (14px/500) and, in `text-small cs-warn-ink`, "It
+  isn't shown on the site. Remove it, or leave it until someone restores the
+  image."; Remove as usual.
+- **Under the rows:** "Add images" and "Add a folder" (the folder icon), small
+  secondaries, then "12 of 60 images" at the right. "Add a folder" is drawn
+  only when the library has a folder (`Media::Folder.exists?`, one query per
+  card drawn). Both open the picker for several images (§10.4); "Add a
+  folder" opens it with the focus on its list of places, where a folder is
+  chosen (not on the card: what it opens beyond the picker).
+- **The limit reached:** both buttons `aria-disabled` (sunken, `cs-meta`), and
+  the line "A gallery holds at most 60 images. Remove one to add another."
+  under them.
+- **Empty:** a dashed `cs-line-strong` box (`rounded-tile`, `p-5`, centred,
+  `text-sm cs-dim`): "No images yet. Add them from the library, in the order
+  the site shows them." with the two buttons, secondary (the editor's
+  primaries are Publish and + Add block).
+- **On a translation tab:** the heading row reads "12 images · the list is
+  changed in English", in the default language's name; the rows have no
+  handle and no Remove; each field has its reference above it, `text-label
+  cs-meta`, one line, truncated: "English: The harbour at dusk, from the north
+  pier" (the translation pair's reference, shown inline,
+  `MediaTextsField.reference?` false: the rows draw their own); the alt's
+  placeholder is the library alt in this language. No control changes the
+  list there.
+- **Held** (someone else's form, `HeldFields`): the rows are read-only, as
+  every held field.
 - **The rows' script**, `admin--editor--gallery`
   (`app/javascript/controllers/admin/editor/gallery_controller.js`): opens the
   picker for several images, adds what it hands back (skipping images already
-  there, stopping at 60), removes, reorders by drag through `loadSortable()`
-  (`app/javascript/editor/drag.js`, the one SortableJS loader) and by keyboard
-  moves on the handle, and writes the hidden list. Its actions write, so none is
-  in `read_only_actions`: in a form someone else holds (`HeldFields`) the rows
-  are read-only. Then the count in `docs/reference/live-editing.md` stays.
-- **The picker, several at once** (a change to `Admin::Ui::MediaPickerComponent`'s
-  contract, whose limit "It hands back one image" goes): the opener asks with
-  `detail: { opener, multiple: true, max:, chosen: [ids] }`; tiles toggle; the
-  images already in the gallery are marked and not chosen again; Use adds them
-  in the order they were chosen; `media-picker:picked` carries `items: [{ id,
-  url, title, alt, caption }]` for a multiple opening, and the one image's keys
-  as today for every other opener (the hero, the Image and Card blocks, the
-  rich-text editor are untouched).
-- **Add a whole folder** (needs folders): in a folder, the picker offers to add
-  all of its images, in **upload order, oldest first (call)**: a batch from a
-  camera goes up in shot order, and the editor reorders after; up to what the
-  gallery still takes. `GET /media_folders/:id/images` answers them as the
-  picker's items, kept images directly in the folder, `media.upload`.
-- **The tile** (step 8): its `summary` is the layout's word and the count
-  ("Carousel · 12 images"), "Empty" with none, and a hint "3 without alt" when
-  images have no alt in that language (the library's or the override); its
-  `preview` the label as the heading when one is written. **Its thumbnail** is
-  the first image's, through the tile's generic thumbnail, which learns to take
-  the first id of a `media_ids` field where a type has no `image` column. Whether
-  it shows one or a strip is D5.
+  there, stopping at 60), removes, reorders by drag and by the keyboard moves,
+  fills a caption from the library's, and writes the hidden list. Its actions
+  write, so none is in `read_only_actions`, and the count in
+  `docs/reference/live-editing.md` stays.
+
+### 10.4 The picker, several at once (D4)
+
+A change to `Admin::Ui::MediaPickerComponent`'s contract, whose limit "It
+hands back one image: several cannot be chosen." goes.
+
+- **The opening:** the opener asks with `detail: { opener, multiple: true,
+  max:, chosen: [ids] }`, `max` what the gallery still takes. Every other
+  opener (the hero, the Image and Card blocks, the rich-text editor) is
+  unchanged: one image, "Use image", and `media-picker:picked` with that
+  image's keys `{ id, url, title, alt, caption }`.
+- **The title** reads "Add images" for a multiple opening. The footer's
+  primary is "Add 3 images" ("Add images", disabled, at none chosen), and the
+  status reads "3 selected · the gallery takes 48 more".
+- **A chosen tile:** the accent outline and, at its top left, its order: a
+  22px accent pill with `cs-on-accent` 12px/600 numerals and a 2px surface
+  ring. Unchoosing renumbers the rest. The tile stays a button with
+  `aria-pressed`, its name ending ", chosen 2nd". The choice and its order
+  survive a search, a segment, a page and a place. Use adds them in that
+  order: `media-picker:picked` carries `items: [{ id, url, title, alt,
+  caption }]`.
+- **Already in the gallery:** the thumbnail desaturated (`saturate(.35)`, no
+  opacity), a `cs-surface` pill at the top left with a check and "In the
+  gallery" (11px, `cs-dim`); the tile is `aria-disabled` with that
+  description.
+- **The limit:** when the choices reach what the gallery takes, the other
+  tiles turn `aria-disabled`, and the status says "The gallery takes no more:
+  60 images."
+- **A whole folder** (needs folders, built: §17): in a folder's place, a row
+  above the grid holds the folder mark, its name, "34 images" (`cs-meta`, the
+  folder's own kept images, `Media::FolderCounts`) and, at the right, a small
+  secondary "Add all 31 new images in this folder", the number counting the
+  folder's images not yet in the gallery. When more are new than the gallery
+  takes: "Add the first 12 of 31 new images", in **upload order, oldest first
+  (call)**: a batch from a camera goes up in shot order, and the editor
+  reorders after. Pressing it adds them and closes the picker; the row is
+  hidden when nothing is new, and in a single opening, and in All media and
+  Not in a folder. The images are answered by `GET /media_folders/:id/images`
+  (§10.6).
+
+### 10.5 The tile (D5)
+
+- **One thumbnail,** the first image's, in the tile's thumbnail box (72px,
+  4:3), through the tile's generic thumbnail, which learns to take the first
+  existing id of a `media_ids` field where a type has no `image` column. No
+  strip: the summary says the count. With no image the box is plain
+  `cs-sunken`.
+- **The summary line** (`summary`): "Carousel · 12 images" / "Grid · 1 image",
+  or "Empty" with no image. **The preview** (`preview`): the label as the
+  heading when one is written, so the tile's name reads "Gallery · Harbour
+  walk".
+- **The hint:** the warn badge (the media grid's "No alt" look,
+  `Admin::Ui::BadgeComponent` `tone: :warn`) "3 without alt", counting the
+  images whose alt is blank in this language, the override and the library's
+  both. The tile's closed set of summary parts gains the kind `:warn`, drawn
+  as that badge after the line.
 - **Live editing, autosave, the base, the stale check, the claim and the hold**
   are the card's and need nothing; they are tested for the type all the same.
+
+### 10.6 The folder's images
+
+`GET /media_folders/:id/images?limit=L&except=1,2,3` (`as:
+:media_folder_images`, `Admin::MediaFoldersController#images`) answers JSON
+`{ total:, items: [{ id, url, title, alt, caption }] }`: `total` the kept
+images directly in the folder whose ids are not in `except`, `items` the
+oldest `limit` of them by id (`limit` capped at
+`BlockTypes::Gallery::MAX_IMAGES`; `except` at most `MAX_IMAGES` ids, anything
+that is no whole number dropped). The folder is read through
+`Media::FolderTree.load` and `Media::Place.parse(params[:id], tree:)`, its
+images through `Place#narrow(Media::Asset.kept)`, so a subfolder's images are
+never among them. It needs `media.upload` (the picker's own gate), asked
+before any folder is looked up; a folder the tree does not hold is a 404. The
+controller's `media.manage` gate stays on its writes alone.
 
 ## 11. The sample and the showcase
 
@@ -500,8 +699,10 @@ bump: no stored document holds a gallery yet. A case in
   and `alt="…"` of the override, so the canary and the scaffold compare
   values, not a class name.
 - **The showcase** (`db/seeds/showcase.rb`): `DevelopmentShowcase.call` makes
-  the gallery's three images (three tinted PNGs made with libvips, titled
-  "Showcase image 1" to "3", so a carousel visibly steps) and draws the Gallery
+  the gallery's three images (three tinted PNGs made with libvips, uploaded
+  through `Media::Upload` and titled "Showcase image 1" to "3", so a carousel
+  visibly steps; found again by that title on a later run, since
+  `Media::Upload` never dedupes) and draws the Gallery
   from its sample in every layout and band as every type is, plus once more as a
   grid (`settings: { "layout" => "grid" }`, as the Note's kinds are drawn from
   one sample).
@@ -510,13 +711,49 @@ bump: no stored document holds a gallery yet. A case in
 
 - Public words: `config/locales/public.en.yml`, `public.blocks.gallery.*` (§8),
   read through `string`.
-- CS Studio: the card's under `admin.components.fields.media_texts.*` and
-  `media_list.*` (`config/locales/admin/fields.en.yml`), the help line
-  `admin.components.fields.gallery_label` ("What a screen reader calls the
-  gallery. Leave it blank for “Image gallery” in each visitor's language."),
-  the tile's under `admin.components.editor_screen.tile_summary.types.gallery`,
-  the picker's new words under `admin.components.ui.media_picker`. The new files
-  join `CONVERTED` in `test/lib/admin_i18n_test.rb`.
+- CS Studio, `config/locales/admin/fields.en.yml` (StudioGallery, "Words"):
+  - `admin.components.fields.gallery.label_help` "What a screen reader calls
+    the gallery. Leave it blank for “%{placeholder}” in each visitor's
+    language." (the card's sentence, its "Image gallery" the placeholder);
+  - `admin.components.fields.media_list.display` one "1 image", other
+    "%{count} images" (not on the card as a key: the card's "12 images", the
+    read-only display every field type has);
+  - `admin.components.fields.media_texts.*`, every other word of the card and
+    its rows: `images` "Images", `count` "%{count} of %{max}", `count_line`
+    "%{count} of %{max} images", `add` "Add images", `add_folder` "Add a
+    folder", `limit` "A gallery holds at most %{max} images. Remove one to add
+    another.", `empty` "No images yet. Add them from the library, in the order
+    the site shows them.", `caption` "Caption", `alt` "Alt text",
+    `use_library_caption` "Use library caption", `no_library_alt` "No alt text
+    in the library", `remove` "Remove %{title}", `move` "Move %{title}",
+    `picked_up` "Picked up %{title}, image %{position} of %{count}. Up and Down
+    Arrow move it, Space drops it, Escape puts it back.", `moved` "Moved to
+    %{position} of %{count}.", `dropped` "Dropped at %{position} of
+    %{count}.", `cancelled` "Cancelled. %{title} is back where it was." (not on
+    the card), `missing` "This image is no longer in the library",
+    `missing_hint` "It isn't shown on the site. Remove it, or leave it until
+    someone restores the image.", `translation_list` "%{count} images · the
+    list is changed in %{language}" (one: "1 image · …", not on the card),
+    `reference` "%{language}: %{text}".
+- CS Studio, `config/locales/admin/ui.en.yml`,
+  `admin.components.ui.media_picker`: `title_multiple` "Add images";
+  `add_count` zero "Add images" (the card's word at none chosen), one "Add 1
+  image", other "Add %{count} images"; `takes` "%{count} selected · the
+  gallery takes %{left} more"; `full` "The gallery takes no more: %{max}
+  images."; `in_gallery` "In the gallery"; `chosen_order` "%{name}, chosen
+  %{ordinal}" with `ordinal` one "%{count}st", two "%{count}nd", few
+  "%{count}rd", other "%{count}th", chosen by `Intl.PluralRules`' ordinal type
+  (not on the card: the card gives ", chosen 2nd" only); `folder_count` one
+  "1 image", other "%{count} images" (not on the card as a key: "34 images");
+  `add_folder` one "Add the 1 new image in this folder" (not on the card),
+  other "Add all %{count} new images in this folder"; `add_folder_first` "Add
+  the first %{count} of %{total} new images".
+- CS Studio, `config/locales/admin/editor_screen.en.yml`,
+  `admin.components.editor_screen.tile_summary.types.gallery`: `grid` one
+  "Grid · 1 image", other "Grid · %{count} images"; `carousel` one "Carousel ·
+  1 image", other "Carousel · %{count} images"; `empty` "Empty";
+  `without_alt` "%{count} without alt".
+- The new files join `CONVERTED` in `test/lib/admin_i18n_test.rb`.
 - The type's label and the selects' choices are literals of the definition, as
   every type's are.
 
@@ -539,7 +776,7 @@ records the block's saves as `block.updated` (the list and the texts in
 | 5. The public component | §7, §8: `Blocks::GalleryComponent`, its template, `gallery.css`, its tokens in `tokens.css` and `sections.css`, contrast, the Lookbook preview |
 | 6. Strings | §12 |
 | 7. A public script | §7.5: `gallery-carousel`, a case in `public_javascript_test.rb`, `test/system/gallery_block_test.rb` |
-| 8. The editor | §10: the inputs, the rows' script, the tile, the icon (D1); cases in the card, tile, held-fields and content-blocks tests; `test/system/admin/gallery_block_test.rb` |
+| 8. The editor | §10: the inputs, the rows' script, the tile, the icon `images`; cases in the card, tile, held-fields and content-blocks tests; `test/system/admin/gallery_block_test.rb` |
 | 9. The ledger and the reference | the component line, the six tokens and the script, with the release note; `theming.md`'s tables and section; the fixture theme |
 | 9a. The component's contract | `include Blocks::Contract`; `interface:` the theme methods, `words:` the nine keys, `motion: :reduced` (a smooth scroll only without reduced motion), `widths: :from_container`, its limits (60 images, the picker to twelve, no lightbox, no autoplay) |
 | 10. The documents | `content-blocks-and-types.md` (a section, the list at its top), `media.md` (the role `block_field`, field-derived usages), `CLAUDE.md` (the index and the rules below), the roadmap ("Shipped", #116's rest, the AI and partial-state follow-ups), the spec's "As built" |
@@ -572,63 +809,112 @@ Held by a test:
   the slides' group role and label, or the `hidden` on its controls: the theme
   check reads names, not markup's meaning.
 - What `gallery-carousel` writes into a page it takes back: browser tests only.
-- `sizes(per_row:)` handed a count other than what the theme's grid draws:
+- `sizes(per_row:)` handed counts other than what the theme's grid draws:
   the browser then fetches a wider or narrower width than needed.
 - A change of what `search_text` gives without a bump of
   `SiteSearch::Documents::REVISION`.
 
-## 16. Design requests
+## 16. The design answers
 
-Each goes to the design agent before its part is built; the plan's second part
-waits for the cards.
+The Design System (`https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT`,
+version `1794828751-4e8a`) holds both cards, "Decided, not built":
 
-- **D1, the block's icon**: a new entry of `BlockTypeDefinition::ICONS` (the
-  Lucide `images`, or another), on the media family's chip.
-- **D2, the card's controls**: Layout (segmented), Shape, "Show whole images"
-  and the label with its help line: their arrangement in the card.
-- **D3, the image rows**: the row (thumbnail, caption, alt override with the
-  library's alt as placeholder, the library caption offered as a start or not),
-  the drag handle and the keyboard moves, Remove, a missing image's row (an id
-  whose image is gone), the empty card and its first action, "Add images",
-  "Add a folder", the count against 60 and the limit reached, and the rows on a
-  translation tab with the default language's texts as their reference.
-- **D4, the picker choosing several**: a tile's chosen look and its order, the
-  images already in the gallery, the footer ("4 selected · Add 4 images"), the
-  limit reached, and "Add all N images in this folder" (with folders).
-- **D5, the tile**: its line, its hint for missing alt texts, and one thumbnail
-  or a strip.
-- **D6, the public carousel, the default theme's**: the frame, Previous and
-  Next (over the image or under it, their size for a finger), the position, the
-  slide picker (dots, numbers or thumbnails; up to twelve), the caption's
-  place, whether the next slide peeks in, the focus rings, the stage colour with
-  "Show whole images", narrow widths, a section's column, tinted and strong
-  bands, dark, a right-to-left page, and the look without the script. The six
-  tokens' names and values come from this card.
-- **D7, the public grid, the default theme's**: columns at each width and in a
-  section's column, the gap, captions, the fitted look.
-- **D8, the Design System cards**: the Gallery block's card and tile in CS
-  Studio, the picker's several-at-once state, and a public card for the
-  carousel and the grid.
+- **StudioGallery** (CS Studio): D1 the icon (§10.1), D2 the card's controls
+  (§10.2), D3 the image rows (§10.3), D4 the picker choosing several and a
+  whole folder (§10.4), D5 the tile (§10.5), D8 the cards themselves; its
+  "Words" are §12's. The MediaPicker and StudioMediaGrid cards point to it.
+- **SiteGallery** (the public site, the default theme): D6 the carousel and D7
+  the grid (§6, §7.8), the six tokens with their values (§8), the named parts
+  and the default template's class names (§7.8, §8), accessibility and dark.
+
+`test/support/design_system_entries.rb` gains `StudioGallery` and
+`SiteGallery` in `ENTRIES`, its `VERSION` `1794828751-4e8a`. A look this file
+or the plan needs that neither card gives goes back to the design agent, never
+decided here.
 
 ## 17. Order and folders
 
-The block needs the folders spec (`2026-11-16-media-folders-design.md`) for
-"add a whole folder" alone. **If folders land first** (recommended), the plan's
-tasks run in order and the folder task is part of the build. **If the gallery
-lands first**, everything but that task ships; the task waits for the folders'
-`Media::FolderTree`, `Media::Place` and the picker's places, and the picker's
-"Add all N images in this folder" is drawn only where the picker shows a
-folder. Nothing else of the block knows folders: moving an image between
-folders changes no gallery.
+Folders were built first (owner ruling, folders spec §20, 7), on the base
+branch (`media-folders-gallery`, pull request #278): `Media::Folder`,
+`Media::FolderTree`, `Media::Place`, `Media::FolderCounts`, the picker's places
+(`app/views/admin/media/picker.html.erb`, `FolderTreeComponent` with `mode:
+:picker`, `#media-picker-place`) and `docs/reference/media.md`, "Folders". So
+"Add a whole folder" is part of the build (§10.4, §10.6). Nothing else of the
+block knows folders: moving an image between folders changes no gallery, and
+the folders' limits (one folder per image, four levels, 1,000 folders, 200
+images a move) touch nothing here.
 
-## 18. Only the owner can answer
+## 18. For the owner
 
-1. **Autoplay**: none in this build (§7.6). Wanted later?
-2. **A lightbox**: not now (§7.7). Wanted, and in this block or as a setting?
-3. **Captions without a library default** (§8): right, or should a gallery
-   show a library caption where its own is blank, as the Image block does?
-4. **AI translation of the captions** (§3.3): a follow-up, or part of the first
-   build?
-5. **The numbers**: 60 images, a slide picker up to 12, the grid as the
-   default layout, 3:2 as the default shape.
-6. **Which first**: folders or the gallery (§17).
+The gallery's own open questions. Each stands as the planner's recommendation
+until the owner overrules it:
+
+1. **Autoplay:** none in this build (§7.6). Wanted later?
+2. **A lightbox:** not now (§7.7). Wanted, and in this block or as a setting?
+3. **Captions with no library default** (§8): a gallery shows only its own
+   captions; the card offers "Use library caption" as a start. Or should a
+   gallery show a library caption where its own is blank, as the Image block
+   does?
+4. **AI translation of the captions** (§3.3): a follow-up, not this build.
+5. **The numbers:** at most **60** images; a slide picker up to **12**; the
+   **grid** the default layout; **3:2** the default shape.
+
+The other calls, which the owner may also overrule: an image appears once in a
+gallery (§3.1); a partial translation reads as translated (§3.3); no image is
+eager (§7.1); the status speaks only after a button or a key (§7.3); a
+carousel of one image attaches no script (§7.3); Previous and Next never wrap
+(§7.5); in a right-to-left page the arrow keys follow the screen (§7.5); a
+whole folder is added oldest first (§10.4); the Gallery stands after the
+Image block in the picker (§14).
+
+Ruled already, and not open: folders first, and the folders' limits (folders
+spec §20).
+
+## 19. Where the cards and this file differed
+
+A card's word wins; on behaviour this file wins. Each conflict and its ruling:
+
+- **`sizes` in a grid.** SiteGallery's D7 says `per_row: 3` "slightly
+  over-asks in a two-column container". It under-asks there (a third of the
+  width for an image drawn at half), and on a phone, where the grid is one
+  column, it asks for a third of the width: the images would be blurred. §7.1's
+  behaviour (the block's width divided by the images a row holds, at the
+  widths the library makes) wins: `sizes(per_row:)` takes a Hash of least
+  widths to counts, and a viewport-relative width takes one a row, so it may
+  over-ask, never under-ask. The method keeps its name and its Integer form.
+- **The button's edge at 3:1.** §8 measures a button's edge on each ground at
+  3:1; SiteGallery draws the edge `--th-line-strong` with `--th-shadow-menu`
+  and says it measures 3:1, while `tokens.css` calls `--th-line-strong` a
+  1.5:1 hairline. The measurement stands (`design_tokens_test.rb`, Task 7). If
+  the card's edge fails it, the colour goes back to the design agent; it is
+  not chosen here.
+- **The position in a right-to-left page.** SiteGallery says "the start (the
+  left)"; the left is the inline end in a right-to-left page, which is where
+  its preview draws it. It is the inline end in both directions, from one
+  document order.
+- **The tile's hint.** The design request had "3 without alt" as a meta-coloured hint;
+  StudioGallery draws it as the warn badge. The card wins: the tile's closed
+  set of summary parts gains `:warn`.
+- **The tile's words.** The plan had `grid`, `carousel`, `images` and
+  `no_alt`; StudioGallery's are `grid` and `carousel` with the count in them,
+  `empty` and `without_alt` (§12).
+- **The label's help key.** The first draft named `help: :gallery_label`; the card gives the
+  words. The key follows the Search block's (`:"gallery.label_help"`, with
+  `%{placeholder}`), which reads the card's words in English and the visitor's
+  word in another editing language.
+- **"Add a folder" in the card.** §10.3 names it; StudioGallery draws it only
+  when the library has a folder, and says what it does only through D4's
+  folder row. It opens the multiple picker with the focus on the places (not
+  on the card).
+- **"Add all N images in this folder".** The design request counted every
+  image of the folder; StudioGallery counts only the images not yet in the gallery and offers "the
+  first 12 of 31" past the limit. The card wins: §10.6's endpoint takes
+  `except` and answers `total`.
+- **A section's half column.** SiteGallery's D7 gives the thresholds (one
+  column below 480px of the block, two from 480px, three from 768px) and says
+  "so a section's half column draws two". At the content width
+  (`Blocks::SectionComponent::CONTENT_WIDTH`, 736px) a half column is 368px
+  and draws one; only a full-width band's half column reaches 480px. The
+  thresholds are the card's exact values and stand; if two images a row are
+  wanted in a content-width half column, the thresholds go back to the design
+  agent.
