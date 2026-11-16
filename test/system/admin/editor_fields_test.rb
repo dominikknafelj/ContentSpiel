@@ -99,6 +99,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
         t.detail_component Posts::DetailComponent, theme_methods: %w[post]
         t.field :featured, :boolean
       end
+      switch_on_registered_types
       post_record = create_post(title: "Launch", content_type: "test/flagged")
 
       visit_editor(post_record)
@@ -120,6 +121,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
         t.detail_component Posts::DetailComponent, theme_methods: %w[post]
         t.field :featured, :boolean
       end
+      switch_on_registered_types
       post_record = create_post(title: "Launch", content_type: "test/flagged")
 
       visit_editor(post_record)
