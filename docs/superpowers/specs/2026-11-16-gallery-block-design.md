@@ -2,7 +2,7 @@
 
 Status: designed, not built. The behaviour is settled here; the looks are the
 Design System's cards **StudioGallery** (CS Studio) and **SiteGallery** (the
-public site, the default theme), version `1794828751-4e8a` (§16). A card's
+public site, the default theme), version `1794835099-7966` (v245) (§16). A card's
 word wins over this file's; on behaviour this file wins, and where the two
 differed the ruling is in §19. A word the cards do not give is marked "(not on
 the card)". An answer marked **(call)** is the planner's recommendation, for
@@ -201,8 +201,8 @@ BlockTypes.register :gallery do |t|
   t.field :images, :media_list, max: MAX_IMAGES
   t.field :texts, :media_texts, translated: true, of: :images, max: TEXT_LENGTH
   t.component Blocks::GalleryComponent
-  t.theme_methods :block, :page, :layout, :ratio, :fit, :label, :items, :sizes, :string
-  t.tokens themed: %w[gallery-stage gallery-control gallery-control-ink gallery-pick gallery-pick-current], fixed: %w[gallery-gap]
+  t.theme_methods :block, :page, :layout, :ratio, :fit, :label, :items, :sizes, :string, :pattern
+  t.tokens themed: %w[gallery-stage gallery-control gallery-control-ink gallery-control-edge gallery-pick gallery-pick-current], fixed: %w[gallery-gap]
   t.stylesheet "gallery.css"
   t.summary ->(block, locale:) { Gallery.summary(block, locale: locale) }
   t.preview ->(block, locale:) { Gallery.preview(block, locale: locale) }
@@ -214,7 +214,7 @@ end
 
 `MAX_IMAGES = 60`, `LABEL_LENGTH = 80`, `TEXT_LENGTH = 1000`, all on
 `BlockTypes::Gallery`. The token names are SiteGallery's ("The tokens"), the
-six above; a token's name is a promise from the day it ships. **No token is
+seven above; a token's name is a promise from the day it ships. **No token is
 named `gallery-frame`**: the outside test type
 `gallery/album` (`test/support/gallery_album.rb`) declares it, its owner
 `gallery` sharing the prefix the built-in uses, as a gem owner `card` would
@@ -234,9 +234,9 @@ type exists, the case the reference's step 2 warns of.
 
 - **Grid:** every image in a frame of the set ratio, in rows; the number of
   columns is the theme's. The default theme's (SiteGallery, D7): the block is a
-  size container (`container-type: inline-size`), one column below 480px of
-  its width, two from 480px, three from 768px, so a phone draws one and a
-  content-width half column (368px) one too (§19); the gap `--th-gallery-gap`.
+  size container (`container-type: inline-size`), one column below 360px of
+  its width, two from 360px, three from 640px, so a phone draws one and a
+  content-width half column (368px) two (§19); the gap `--th-gallery-gap`.
   Captions under their image.
 - **Carousel:** one image at a time at the block's width, in a frame of the set
   ratio, the caption under it; the other images are a scroll away (§7).
@@ -261,15 +261,17 @@ width (`Blocks::ImageComponent.sizes_for(block)`, the content column or the
 section column's share) divided by how many images a row holds.
 `sizes(per_row:)` takes an Integer, or a Hash of the block's least width in
 pixels to the images a row holds there: `sizes(per_row: 1)` for the carousel,
-`sizes(per_row: Blocks::GalleryComponent::GRID_COLUMNS)` (`{ 0 => 1, 480 =>
-2, 768 => 3 }`) for the default grid, a theme with another grid passing its
+`sizes(per_row: Blocks::GalleryComponent::GRID_COLUMNS)` (`{ 0 => 1, 360 =>
+2, 640 => 3 }`) for the default grid, a theme with another grid passing its
 own. Each width `sizes_for` names is divided by the count for that width: a
 fixed width in pixels by the count its own width takes, a width relative to
 the viewport (`100vw`, `50vw`) by the count of the narrowest block it can be,
-which is one. So the default grid at the top level asks
-`(min-width: 768px) 256px, 100vw` (`Blocks::ImageComponent::SIZES`' 768px over
-three): it may ask for more
-pixels than a two-column row draws, never fewer (§19). Nothing shifts: every
+which is one. The top-level block is `Blocks::SectionComponent::CONTENT_WIDTH`
+(736px) wide, a section column its share of it, and one image asks
+`round((W - (n - 1) * gap) / n)` for a block of width W holding n columns with
+the gap `--th-sp-3` (14px): `(736 - 2 * 14) / 3 = 236`, so the default grid at
+the top level asks `(min-width: 768px) 236px, 100vw`. It may ask for more
+pixels than a row draws, never fewer (§19). Nothing shifts: every
 frame has its `aspect-ratio` before any image arrives, and a carousel's slides
 are all in the document from the start, so the row's height is set at once.
 **No image is eager (call):** a gallery is rarely the first thing on a page; the
@@ -388,8 +390,9 @@ setting of the block. Owner question (§18).
 - **Previous and Next:** 44px circles over the frame's sides, centred on the
   frame's height (never on the caption), 10px in; the ground
   `--th-gallery-control`, the arrow `--th-gallery-control-ink`, a 20px Lucide
-  chevron at stroke 2, the edge `--th-line-strong` (1px) with
-  `--th-shadow-menu`. Disabled at an end: the arrow `--th-meta`, the edge
+  chevron at stroke 2, the edge `box-shadow: 0 0 0 1px
+  var(--th-gallery-control-edge), var(--th-shadow-menu)` (the shadow is depth
+  only). Disabled at an end: the arrow `--th-meta`, the edge
   `--th-line` with no shadow, `disabled`. The focus ring is the site's: 2px
   `--th-accent`, 2px out. They come first in the document (`controls`) and
   stand over the frame by `position: absolute` in a box of the frame's ratio.
@@ -429,7 +432,7 @@ setting of the block. Owner question (§18).
   reference's components table): `blocks/gallery_component` with `block`,
   `page`, `layout` ("grid" or "carousel"), `ratio` (the stored ratio, "3:2"),
   `fit` (true or false), `label` (the gallery's name in the language shown,
-  else the visitor's word), `items`, `sizes` and `string`.
+  else the visitor's word), `items`, `sizes`, `string` and `pattern`.
 - **`items`**: an Array, in the gallery's order, of the images that can be
   drawn (an id that names no image, or an image whose file is gone, is
   skipped), each a value with `index` (1-based), `picture` (a Hash whose keys
@@ -449,6 +452,10 @@ setting of the block. Owner question (§18).
   once, and the field stays the gallery's own (§10.3). Owner question (§18).
 - **`sizes(per_row: 1)`**: an Integer or a Hash of least widths to counts,
   §7.1.
+- **`pattern(key)`**: a public sentence of `position` or `moved` uninterpolated,
+  its `%{index}` and `%{count}` left for the script to fill in; the template
+  writes it into the script's two values. `string(key, **values)` is never
+  called with a value missing.
 - **`string(key)`**: a public word in the visitor's language, English the
   fallback (`public.blocks.gallery.*`: `label` "Image gallery", `carousel`
   "carousel", `slide` "slide", `position` "%{index} of %{count}", `track`
@@ -465,13 +472,15 @@ setting of the block. Owner question (§18).
   | `--th-gallery-stage` | `var(--th-sunken)` | the same | `color-mix(in oklab, var(--th-on-band-strong) 10%, var(--th-band-strong))` | the ground behind a fitted image |
   | `--th-gallery-control` | `color-mix(in oklab, var(--th-surface) 92%, transparent)` | the same | the same (it sits on the image) | a Previous or Next button's ground |
   | `--th-gallery-control-ink` | `var(--th-ink)` | the same | the same | its arrow |
+  | `--th-gallery-control-edge` | `var(--th-ink)` | the same | the same (it sits on the image) | a button's edge, drawn as a 1px ring of `box-shadow` |
   | `--th-gallery-pick` | `var(--th-meta)` | `var(--th-dim)` | `var(--th-on-band-strong-dim)` | a dot's ring at rest |
   | `--th-gallery-pick-current` | `var(--th-ink)` | the same | `var(--th-on-band-strong)` | the current dot |
   | `--th-gallery-gap` (fixed) | `var(--th-sp-3)` (14px) | | | the grid's gap |
 
   Contrast is measured on the page, a tinted band and a strong band, both
   schemes (`design_tokens_test.rb`): a button's arrow on its ground at 4.5:1,
-  a button's edge and a dot's ring on each ground at 3:1 (§19 on the edge).
+  a button's edge on its ground and a dot's ring on paper, a tinted band and a
+  strong band at 3:1.
 - **The script's markup** (`Theme::Contract::SCRIPTS["gallery-carousel"]`, the
   ledger's `SCRIPTS`, the reference's Scripts table): targets `track`, `slide`,
   `previous`, `next`, `position`, `pick`, `status`, `controls`; values
@@ -489,7 +498,7 @@ setting of the block. Owner question (§18).
   written from that section alone (`with_gallery_theme`), drawn and driven by
   the script in a test.
 - **The release note** with the ledger's lines: Added the Gallery block's
-  component line, its six tokens and the `gallery-carousel` script.
+  component line, its seven tokens and the `gallery-carousel` script.
 
 ## 9. Search
 
@@ -777,7 +786,7 @@ records the block's saves as `block.updated` (the list and the texts in
 | 6. Strings | §12 |
 | 7. A public script | §7.5: `gallery-carousel`, a case in `public_javascript_test.rb`, `test/system/gallery_block_test.rb` |
 | 8. The editor | §10: the inputs, the rows' script, the tile, the icon `images`; cases in the card, tile, held-fields and content-blocks tests; `test/system/admin/gallery_block_test.rb` |
-| 9. The ledger and the reference | the component line, the six tokens and the script, with the release note; `theming.md`'s tables and section; the fixture theme |
+| 9. The ledger and the reference | the component line, the seven tokens and the script, with the release note; `theming.md`'s tables and section; the fixture theme |
 | 9a. The component's contract | `include Blocks::Contract`; `interface:` the theme methods, `words:` the nine keys, `motion: :reduced` (a smooth scroll only without reduced motion), `widths: :from_container`, its limits (60 images, the picker to twelve, no lightbox, no autoplay) |
 | 10. The documents | `content-blocks-and-types.md` (a section, the list at its top), `media.md` (the role `block_field`, field-derived usages), `CLAUDE.md` (the index and the rules below), the roadmap ("Shipped", #116's rest, the AI and partial-state follow-ups), the spec's "As built" |
 | 11. The whole check | `bin/ci` |
@@ -817,18 +826,18 @@ Held by a test:
 ## 16. The design answers
 
 The Design System (`https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT`,
-version `1794828751-4e8a`) holds both cards, "Decided, not built":
+version `1794835099-7966` (v245)) holds both cards, "Decided, not built":
 
 - **StudioGallery** (CS Studio): D1 the icon (§10.1), D2 the card's controls
   (§10.2), D3 the image rows (§10.3), D4 the picker choosing several and a
   whole folder (§10.4), D5 the tile (§10.5), D8 the cards themselves; its
   "Words" are §12's. The MediaPicker and StudioMediaGrid cards point to it.
 - **SiteGallery** (the public site, the default theme): D6 the carousel and D7
-  the grid (§6, §7.8), the six tokens with their values (§8), the named parts
+  the grid (§6, §7.8), the seven tokens with their values (§8), the named parts
   and the default template's class names (§7.8, §8), accessibility and dark.
 
 `test/support/design_system_entries.rb` gains `StudioGallery` and
-`SiteGallery` in `ENTRIES`, its `VERSION` `1794828751-4e8a`. A look this file
+`SiteGallery` in `ENTRIES`, its `VERSION` `1794835099-7966` (v245). A look this file
 or the plan needs that neither card gives goes back to the design agent, never
 decided here.
 
@@ -882,12 +891,10 @@ A card's word wins; on behaviour this file wins. Each conflict and its ruling:
   widths the library makes) wins: `sizes(per_row:)` takes a Hash of least
   widths to counts, and a viewport-relative width takes one a row, so it may
   over-ask, never under-ask. The method keeps its name and its Integer form.
-- **The button's edge at 3:1.** §8 measures a button's edge on each ground at
-  3:1; SiteGallery draws the edge `--th-line-strong` with `--th-shadow-menu`
-  and says it measures 3:1, while `tokens.css` calls `--th-line-strong` a
-  1.5:1 hairline. The measurement stands (`design_tokens_test.rb`, Task 7). If
-  the card's edge fails it, the colour goes back to the design agent; it is
-  not chosen here.
+- **The button's edge at 3:1.** SiteGallery's edge `--th-line-strong` is a
+  1.5:1 hairline; v245 answered: the edge is `--th-gallery-control-edge`
+  (`var(--th-ink)`, a seventh token), drawn as a ring of `box-shadow` with
+  `--th-shadow-menu` for depth only, and measured at 3:1 on the control.
 - **The position in a right-to-left page.** SiteGallery says "the start (the
   left)"; the left is the inline end in a right-to-left page, which is where
   its preview draws it. It is the inline end in both directions, from one
@@ -910,11 +917,9 @@ A card's word wins; on behaviour this file wins. Each conflict and its ruling:
   image of the folder; StudioGallery counts only the images not yet in the gallery and offers "the
   first 12 of 31" past the limit. The card wins: §10.6's endpoint takes
   `except` and answers `total`.
-- **A section's half column.** SiteGallery's D7 gives the thresholds (one
-  column below 480px of the block, two from 480px, three from 768px) and says
-  "so a section's half column draws two". At the content width
+- **A section's half column.** v245 set the thresholds (one column below 360px
+  of the block, two from 360px, three from 640px). At the content width
   (`Blocks::SectionComponent::CONTENT_WIDTH`, 736px) a half column is 368px
-  and draws one; only a full-width band's half column reaches 480px. The
-  thresholds are the card's exact values and stand; if two images a row are
-  wanted in a content-width half column, the thresholds go back to the design
-  agent.
+  and draws two.
+- **Design System v245** answered the two open questions: the button's edge
+  and the grid's thresholds.
