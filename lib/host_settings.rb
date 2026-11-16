@@ -15,10 +15,11 @@ require_relative "site_address"
 module HostSettings
   class MissingSecret < StandardError; end
 
-  # The proxy's health check asks `/up` by IP and over plain HTTP, so it is
-  # left out of both host authorisation and the HTTPS redirect. The path
+  # The proxy's health check asks `/up` (and a monitor `/ready`) by IP and over plain HTTP, so it is
+  # left out of both host authorisation and the HTTPS redirect. The paths
   # exactly: `/up/x` is an ordinary request.
-  HEALTH_CHECK = ->(request) { request.path == "/up" }
+  HEALTH_PATHS = %w[/up /ready].freeze
+  HEALTH_CHECK = ->(request) { HEALTH_PATHS.include?(request.path) }
 
   # HSTS as the design says it, written out and not left to Rails' default
   # (two years, subdomains included): one year, for this host name alone, no

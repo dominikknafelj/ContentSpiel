@@ -93,6 +93,31 @@ class Admin::KeyboardControlsSystemTest < ApplicationSystemTestCase
     assert_selector "dialog#new-page-dialog[open]"
   end
 
+  # The arrow keys are native to radios of one name; what is held here is that
+  # the tile's markup keeps them (one Tab stop for the group, the choice moving
+  # with the arrows). The group is drawn into a real screen, as the screen's
+  # own CSS draws it.
+  test "a choice tile is one Tab stop for its group, and the arrow keys move the choice between its tiles" do
+    visit_screen admin_pages_path
+    tiles = %w[scheduled later].map.with_index do |value, index|
+      Admin::Ui::ChoiceTileComponent.new(name: "choice", value: value, title: "Title #{value}", line: "Line #{value}", checked: index.zero?)
+    end
+    html = ApplicationController.render(inline: <<~ERB, locals: { tiles: tiles }, layout: false)
+      <div><p>Before</p><div role="radiogroup" aria-label="What goes live"><% tiles.each do |tile| %><%= render tile %><% end %></div><button>After</button></div>
+    ERB
+    page.execute_script("document.body.insertAdjacentHTML('beforeend', arguments[0])", html)
+
+    page.find("p", text: "Before").click
+    stop_on("input[value=scheduled]")
+    page.send_keys(:down)
+    assert find("input[value=later]").checked?
+    assert_equal "later", page.evaluate_script("document.activeElement.value")
+    page.send_keys(:up)
+    assert find("input[value=scheduled]").checked?
+    page.send_keys(:tab)
+    assert_equal "After", focused_text
+  end
+
   test "a checkbox is a Tab stop that Space checks and unchecks: a posts row's Select" do
     post = Current.set(actor: users(:one)) { create_post(title: "Checked by keyboard") }
     visit_screen admin_posts_path

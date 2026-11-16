@@ -1,0 +1,18 @@
+<details class="admin-list-rail__rail admin-history-versions" data-history-versions>
+  <summary class="admin-disclosure cursor-pointer">
+    <span class="text-sm font-semibold text-ink"><%= summary_title %></span>
+    <span class="min-w-0 truncate text-small text-dim"><%= summary_line %></span>
+  </summary>
+  <section aria-labelledby="history-versions-heading">
+    <h2 id="history-versions-heading" class="admin-history-versions__heading text-sm font-semibold text-ink"><%= t(".heading") %></h2>
+    <ul class="mt-2">
+      <%= render Admin::HistoryScreen::VersionRowComponent.new(working: history.working) %>
+      <% rows.each do |row| %>
+        <%= render Admin::HistoryScreen::VersionRowComponent.new(row: row, href: row_url(row), current: chosen?(row)) %>
+      <% end %>
+    </ul>
+    <% unless pagination.single_page? %>
+      <%= render Admin::Ui::PaginationComponent.new(pagination: pagination, url: page_url) %>
+    <% end %>
+  </section>
+</details>

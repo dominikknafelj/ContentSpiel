@@ -17,6 +17,8 @@ en:
         # The pager under the card: the log is unbounded, so it pages by offset.
         newer: "Newer"
         older: "Load older"
+        # A page's or a post's activity links to its History screen.
+        history: "History"
       show:
         snapshot: "Snapshot"
         neighbours: "Neighbouring events"

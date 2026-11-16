@@ -1,3 +1,46 @@
+<% if diffs? %>
+<%= tag.div data: { changes_overview: "diffs", nothing: (none_in_language? ? "" : nil) } do %>
+  <% if none_in_language? %>
+    <p class="text-sm text-dim"><%= t(".diffs.none") %></p>
+  <% end %>
+  <% if field_entries.any? %>
+    <h3 class="text-label text-meta"><%= t(".diffs.fields.#{type}") %></h3>
+    <ul class="mt-2 space-y-3">
+      <% field_entries.each do |entry| %>
+        <li data-diff-field>
+          <p class="text-label text-meta"><%= entry.label %></p>
+          <%= diff_box(entry) %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+  <% if block_rows.any? %>
+    <h3 class="<%= "mt-5" if field_entries.any? %> text-label text-meta"><%= t(".blocks") %></h3>
+    <ul class="mt-1 divide-y divide-line border-y border-line">
+      <% block_rows.each do |change, entry| %>
+        <%= tag.li class: "py-2 text-sm", data: { change: change.kind } do %>
+          <div class="flex min-w-0 items-center gap-3">
+            <span class="w-18 shrink-0 text-label text-meta"><%= kind_label(change) %></span>
+            <%= render block_icon(change) %>
+            <span class="shrink-0 font-medium text-ink"><%= type_label(change) %></span>
+            <% if (line = summary(change)) %>
+              <span class="min-w-0 truncate text-dim"><%= line %></span>
+            <% end %>
+            <% if change.kind == :moved %>
+              <span class="shrink-0 text-small text-meta" data-moved-places><%= moved_to(change) %></span>
+            <% end %>
+          </div>
+          <% if entry %>
+            <div class="ml-21 mt-2">
+              <%= diff_box(entry) %>
+            </div>
+          <% end %>
+        <% end %>
+      <% end %>
+    </ul>
+  <% end %>
+<% end %>
+<% else %>
 <%# What is scheduled now, in every answer (see `schedule_facts`). %>
 <%= tag.span "", hidden: true, data: schedule_facts %>
 <% unless schedule_only? %>
@@ -24,11 +67,11 @@
     <% end %>
     <% if field_labels.any? %>
       <h3 class="mt-4 <%= setup_label_class %>"><%= t(".fields.#{type}") %></h3>
-      <p class="mt-1 text-sm text-ink" data-changed-fields><%= field_labels.to_sentence %></p>
+      <p class="mt-1 text-sm text-ink" data-changed-fields><%= field_labels.to_sentence %></p><%# i18n-ok: to_sentence joins with the locale's support.array words %>
     <% end %>
     <% if language_names.any? %>
       <h3 class="mt-4 <%= setup_label_class %>"><%= t(".languages") %></h3>
-      <p class="mt-1 text-sm text-ink" data-changed-languages><%= language_names.to_sentence %></p>
+      <p class="mt-1 text-sm text-ink" data-changed-languages><%= language_names.to_sentence %></p><%# i18n-ok: to_sentence joins with the locale's support.array words %>
     <% end %>
   <% end %>
 
@@ -89,5 +132,6 @@
     <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, class: "mt-4", data: { publishing_held: "" })
           .with_content(t(".held.#{type}", name: ::PersonName.of(user))) %>
   <% end %>
+<% end %>
 <% end %>
 <% end %>

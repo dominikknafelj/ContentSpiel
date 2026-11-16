@@ -70,6 +70,7 @@ require_relative "support/encryption_keys"
 require_relative "support/form_sends"
 require_relative "support/search_block"
 require_relative "support/log_capture"
+require_relative "support/error_alerts"
 require_relative "support/sanitizer_parses"
 require_relative "support/contrast_measure"
 require_relative "support/theme_test_helper"
@@ -150,6 +151,9 @@ module ActiveSupport
     # test/support/media_renditions.rb.
     include MediaRenditions
     include MailState
+    # `with_error_alerts { ... }`: the error subscriber on for a block -- see
+    # test/support/error_alerts.rb.
+    include ErrorAlerts
     # `open_invitation(email)`: an open invitation -- see
     # test/support/invites.rb.
     include Invites

@@ -49,6 +49,10 @@ production:
     class: SignIn::Sso::RecheckJob
     queue: default
     schedule: every hour at minute 25
+  alerts_check:
+    class: Alerts::CheckJob
+    queue: default
+    schedule: every minute
 
 development:
   trash_purge_expired:
@@ -87,6 +91,10 @@ development:
     class: SignIn::Sso::RecheckJob
     queue: default
     schedule: every hour at minute 25
+  alerts_check:
+    class: Alerts::CheckJob
+    queue: default
+    schedule: every minute
 
 test:
   trash_purge_expired:
@@ -121,3 +129,7 @@ test:
     class: SignIn::Sso::RecheckJob
     queue: default
     schedule: every hour at minute 25
+  alerts_check:
+    class: Alerts::CheckJob
+    queue: default
+    schedule: every minute

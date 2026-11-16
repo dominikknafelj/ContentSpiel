@@ -41,8 +41,9 @@ module Media
 
     MAX = 200
 
-    # `record` is nil; `moved` is the images that changed folder.
-    Result = Data.define(:record, :errors, :denied, :notice, :refusal, :moved) do
+    # `record` is nil; `moved` is the images that changed folder. Its other
+    # members are `ApplicationService::Result`'s, which `#answer` copies whole.
+    Result = Data.define(:record, :errors, :denied, :notice, :refusal, :value, :permission, :moved) do
       def ok? = errors.empty?
 
       def denied? = denied

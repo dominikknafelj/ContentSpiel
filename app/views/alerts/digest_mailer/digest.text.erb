@@ -1,0 +1,14 @@
+<%= t("mail.alerts_mailer.digest.intro", count: @count, site: site_name) %>
+<% @alerts.each do |alert| %>
+
+<%= alert_kind(alert) %>: <%= alert_sentence(alert) %>
+  <%= alert_facts(alert) %>
+<% end %>
+<% if @more.positive? %>
+
+<%= t("mail.alerts_mailer.digest.more", count: @more) %>
+<% end %>
+
+<%= system_status_url %>
+
+<%= t("mail.alerts_mailer.digest.outro", site: site_name, minutes: digest_every) %>

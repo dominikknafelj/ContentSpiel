@@ -27,6 +27,13 @@ module Audit
     scope :for_subject, ->(record) { where(subject: record) }
     scope :by_user, ->(user) { where(user_id: user.id) }
 
+    # The events of these actions (one name or a list).
+    scope :of_actions, ->(actions) { where(action: actions) }
+
+    # The events whose newest moment, `last_occurred_at`, falls in the range: a
+    # coalesced row counts in the window it was last extended in.
+    scope :last_occurred_between, ->(range) { where(last_occurred_at: range) }
+
     # The `block.deleted` events that took a block away: its own, and the
     # section's that deleted it WITH the section (`deleted_block_ids`, the one
     # event `ContentBlocks::Destroy` records for them all), on this page.

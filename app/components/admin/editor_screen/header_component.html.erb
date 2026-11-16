@@ -31,8 +31,11 @@
         <%= link_to "Preview", preview_path, target: "_blank", rel: "noopener", class: setup_tertiary_link_class %>
       <% end %>
 
-      <% if can_publish? %>
-        <%= button_to primary_label, publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
+      <% if can_publish? && scheduled? %>
+        <%# What goes live is asked in the dialog (D9): the button cannot know what will have been saved by the press. %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".publish_now"), variant: :primary, type: "button", data: dialog_trigger(publish_now_dialog_id)) %>
+      <% elsif can_publish? %>
+        <%= button_to "Publish", publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" } } %>
       <% end %>
 
       <%# "Discard changes…" and "Publish changes…": drawn once for whoever has
@@ -47,6 +50,9 @@
       <% if menu_items? %>
         <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "More actions", close_on_select: true,
               button_class: Admin::Ui::ButtonComponent.classes(:tertiary)) do |menu| %>
+          <% if may_see_history? %>
+            <% menu.with_item do %><%= link_to t(".history"), history_url %><% end %>
+          <% end %>
           <% if can?("audit.view") %>
             <% menu.with_item do %><%= link_to "Activity", activity_url %><% end %>
           <% end %>
@@ -160,6 +166,10 @@
 <% unless draft? %>
   <%= render Admin::EditorScreen::PublishChangesDialogComponent.new(record: record, state: state, url_options: url_options,
         error: publish_error, when_chosen: publish_when, value: publish_value, open_on_load: review_on_load?) %>
+<% end %>
+
+<% if can_publish? && scheduled? %>
+  <%= render Admin::EditorScreen::PublishNowDialogComponent.new(record: record, locale: locale, url_options: url_options) %>
 <% end %>
 
 <% if can_unpublish? %>

@@ -1,0 +1,23 @@
+en:
+  admin:
+    publishing:
+      # Names a version comparison gives what it compares
+      # (`Publishing::TextDiff`, drawn by the History screen).
+      text_diff:
+        field_names:
+          title: "Title"
+          subtitle: "Subtitle"
+          meta_title: "Meta title"
+          meta_description: "Meta description"
+          hero_alt: "Hero image alt text"
+          hero_media_asset_id: "Hero image"
+          settings: "Template"
+          excerpt: "Excerpt"
+          body: "Body"
+          metadata: "Fields"
+          translated_metadata: "Fields"
+          tags: "Tags"
+        parts:
+          body: "Body"
+          caption: "Caption"
+          alt: "Alt text"

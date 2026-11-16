@@ -61,12 +61,13 @@ module Audit
       "taken_over" => [ "took over editing ", "" ],
       "changes_published" => [ "published changes to ", "" ],
       "changes_discarded" => [ "discarded the unpublished changes to ", "" ],
+      "version_restored" => [ "restored version %{number} of ", "" ],
       "scheduled_change_cancelled" => [ "cancelled the scheduled changes to ", "" ]
     }.freeze
 
     CONTENT_ACTIONS = {
-      "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over changes_published changes_discarded scheduled_change_cancelled],
-      "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over changes_published changes_discarded scheduled_change_cancelled],
+      "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over changes_published changes_discarded version_restored scheduled_change_cancelled],
+      "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over changes_published changes_discarded version_restored scheduled_change_cancelled],
       "media" => %w[uploaded updated moved trashed restored purged translation_confirmed],
       "settings" => %w[translation_confirmed]
     }.freeze
@@ -137,7 +138,7 @@ module Audit
       session.created session.destroyed session.ended session.failed session.locked access.denied
       passkey.added passkey.renamed passkey.removed recovery_codes.generated recovery_code.used
       session.second_factor_failed session.confirmation_failed
-      sso.linked sso.refused sso.unlinked
+      sso.linked sso.refused sso.unlinked request.limited
     ].freeze
 
     ACTIONS = (
@@ -165,7 +166,7 @@ module Audit
     SECURITY_ACTIONS = %w[
       session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted
       passkey.added passkey.removed recovery_codes.generated recovery_code.used session.second_factor_failed session.confirmation_failed
-      sso.linked sso.refused sso.unlinked
+      sso.linked sso.refused sso.unlinked request.limited
     ].freeze
 
     # `sso.refused`'s reasons (`SignIn::Sso::ACCOUNT_REASONS`) in words. A
@@ -347,6 +348,8 @@ module Audit
         elsif verb == "changes_published" && (date = changes_scheduled_date)
           before = "scheduled changes to "
           after = " for #{date}"
+        elsif verb == "version_restored"
+          before = restored_version_verb(before)
         elsif verb == "taken_over" && handed_over?
           before = "handed over editing "
         elsif verb == "updated" && @action == "media.updated" && alt_only?
@@ -370,6 +373,14 @@ module Audit
 
         time = self.class.parse_time(was)
         time.present? && time > event.occurred_at
+      end
+
+      # "restored version 5 of ": the number the restore returned to. An
+      # event with no number to name (metadata that is not ours) says only
+      # that a version was restored.
+      def restored_version_verb(phrase)
+        number = Integer(self.class.metadata_of(event)["number"].to_s, 10, exception: false)
+        number ? format(phrase, number: number) : "restored a version of "
       end
 
       # A publish of changes that was given a time (`metadata["scheduled"]`):
@@ -499,6 +510,7 @@ module Audit
         # Nor the address of a lock-out, which is the event's own `ip`.
         when "session.locked" then [ text(locked_sentence) ]
         when "access.denied" then denied_parts
+        when "request.limited" then [ text(limited_sentence) ]
         when "user.owner_changed" then owner_parts
         # The actor IS the subject: the account the invitation's token made.
         when "invitation.accepted" then [ text("accepted the invite") ]
@@ -550,6 +562,13 @@ module Audit
       def regenerated_parts
         count = event.metadata.is_a?(Hash) ? event.metadata["count"].to_i : 0
         [ text("regenerated #{count} #{count == 1 ? "image" : "images"}") ]
+      end
+
+      # The door and the limit's name, from the metadata: no address, no
+      # typed value ever reaches the event.
+      def limited_sentence
+        metadata = self.class.metadata_of(event)
+        "hit the request limit at #{metadata["door"]} (#{metadata["limit"]})"
       end
 
       # A lock-out of the account's bucket, of one known device's or of the

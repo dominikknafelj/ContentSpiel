@@ -48,6 +48,8 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     "app/services/publishing/publish_changes.rb" => %w[page.changes_published post.changes_published],
     # "#{page or post}.changes_discarded"
     "app/services/publishing/discard_changes.rb" => %w[page.changes_discarded post.changes_discarded],
+    # "#{kind}.version_restored": a page or a post
+    "app/services/publishing/restore_version.rb" => %w[page.version_restored post.version_restored],
     # "#{prefix}.scheduled_change_cancelled": a page or a post
     "app/services/publishing/cancel_scheduled_change.rb" => %w[page.scheduled_change_cancelled post.scheduled_change_cancelled],
     # "#{PREFIX.fetch(subject class)}.taken_over": a block, a page's settings or a post
@@ -347,6 +349,13 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You were refused access", read(sentence_for(event("access.denied", metadata: {})))
   end
 
+  test "a request limit reads actor-led, with its door and limit" do
+    limited = event("request.limited", metadata: { "limit" => "default", "door" => "admin/invites#create" })
+    assert_equal "You hit the request limit at admin/invites#create (default)", read(sentence_for(limited))
+    assert_equal "System hit the request limit at admin/sessions#create (default)",
+      read(sentence_for(event("request.limited", user_id: nil, metadata: { "limit" => "default", "door" => "admin/sessions#create" })))
+  end
+
   test "owner changes read from the new value" do
     on = event("user.owner_changed", subject_type: "User", subject_id: users(:two).id, subject_label: "two", field_changes: { "owner" => [ false, true ] })
     off = event("user.owner_changed", subject_type: "User", subject_id: users(:two).id, subject_label: "two", field_changes: { "owner" => [ true, false ] })
@@ -357,7 +366,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   end
 
   test "the security keys" do
-    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted] +
+    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted request.limited] +
       PASSKEY_EVENTS - %w[passkey.renamed] + SSO_EVENTS
     assert_equal secure.sort, Audit::Sentence::ACTIONS.select { |action| sentence_for(Audit::Event.new(action:, occurred_at: Time.current, last_occurred_at: Time.current)).security }.sort
   end
@@ -610,6 +619,16 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You discarded the unpublished changes to “Hello”", read(sentence_for(event("post.changes_discarded", subject_type: "Post", subject_id: post.id, subject_label: "Hello")))
     assert_equal "You cancelled the scheduled changes to “Pricing”", read(sentence_for(event("page.scheduled_change_cancelled", subject_type: "Page", subject_id: page.id, subject_label: "Pricing", metadata: { "number" => 2 })))
     assert_equal "You cancelled the scheduled changes to “Hello”", read(sentence_for(event("post.scheduled_change_cancelled", subject_type: "Post", subject_id: post.id, subject_label: "Hello")))
+  end
+
+  test "a restore reads 'restored version 5 of Pricing'" do
+    page = create_page(title: "Pricing")
+    post = as(@me) { create_post(title: "Hello", published: false) }
+
+    assert_equal "You restored version 5 of “Pricing”", read(sentence_for(event("page.version_restored", subject_type: "Page", subject_id: page.id, subject_label: "Pricing", metadata: { "number" => 5, "images_missing" => 1 })))
+    assert_equal "You restored version 2 of “Hello”", read(sentence_for(event("post.version_restored", subject_type: "Post", subject_id: post.id, subject_label: "Hello", metadata: { "number" => 2 })))
+    assert_equal "You restored a version of “Hello”", read(sentence_for(event("post.version_restored", subject_type: "Post", subject_id: post.id, subject_label: "Hello"))),
+      "metadata with no number names none"
   end
 
   test "a take-over reads as having taken over editing, of a block on its page, of a page, of a post" do

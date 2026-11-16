@@ -114,6 +114,13 @@ module Telemetry
     server.address
     http.response.status_code
     error.type
+    error.place
+  ].freeze
+
+  # The events the CMS adds to a span some instrumentation started, through
+  # the helper of each below, held to the same prefixes and to ATTRIBUTES.
+  EVENTS = %w[
+    error.reported
   ].freeze
 
   # The API's provider is a proxy until `config/initializers/opentelemetry.rb`
@@ -152,6 +159,22 @@ module Telemetry
     span
   end
 
+  # An error report on the current span (`Alerts::ErrorSubscriber`): its
+  # class and its place in the code (`app/models/page.rb:120`, or none), never
+  # its message, which may quote what a request carried. With no span that
+  # records it is a no-op, as every write is.
+  def self.error_event(error_class:, place:)
+    add_event("error.reported", { "error.type" => error_class, "error.place" => place }.compact)
+  end
+
+  # An event from EVENTS with keys from ATTRIBUTES on the current span.
+  def self.add_event(name, attributes)
+    raise ArgumentError, "#{name.inspect} is not among Telemetry::EVENTS" unless EVENTS.include?(name)
+
+    check_keys(attributes)
+    OpenTelemetry::Trace.current_span.add_event(name, attributes: attributes)
+  end
+
   # A name from SPANS, a kind the API knows and keys from ATTRIBUTES, checked
   # whether or not a span is started, so a misspelling fails everywhere.
   def self.check_span(name, kind, attributes)
@@ -171,5 +194,5 @@ module Telemetry
   def self.span_kinds
     OpenTelemetry::Trace::SpanKind.constants.map { |name| OpenTelemetry::Trace::SpanKind.const_get(name) }
   end
-  private_class_method :check_span, :check_keys, :span_kinds
+  private_class_method :add_event, :check_span, :check_keys, :span_kinds
 end

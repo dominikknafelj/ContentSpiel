@@ -67,4 +67,17 @@ class JobQueuesTest < ActiveSupport::TestCase
         recurring.dig(name, "forms_resend_not_ready"), name)
     end
   end
+
+  # The alerts' scan, digest and prune run every minute wherever the
+  # clean-up runs: a digest waits at most a minute after its quiet spell.
+  test "the alerts' check is scheduled every minute in every environment that schedules the trash's" do
+    recurring = YAML.safe_load(ERB.new(File.read(Rails.root.join("config/recurring.yml"))).result, aliases: true)
+    environments = recurring.select { |_, tasks| tasks.is_a?(Hash) && tasks.key?("trash_purge_expired") }.keys
+
+    assert_equal %w[development production test], environments.sort
+    environments.each do |name|
+      assert_equal({ "class" => "Alerts::CheckJob", "queue" => "default", "schedule" => "every minute" },
+        recurring.dig(name, "alerts_check"), name)
+    end
+  end
 end

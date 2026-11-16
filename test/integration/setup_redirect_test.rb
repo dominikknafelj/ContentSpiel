@@ -55,6 +55,9 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
     get "/up"
     assert_response :success
 
+    get "/ready", headers: { "Accept" => "text/html" }
+    assert_response :success
+
     get admin_sign_in_path
     assert_response :success
 

@@ -1,0 +1,44 @@
+<%# A page's or a post's History screen (`Admin::HistoryController`; the
+    StudioHistory card): the heading row (`Admin::HistoryScreen::HeadComponent`),
+    then the lists' rail (`.admin-list-rail`): the versions on the rail
+    (`Admin::HistoryScreen::VersionsComponent`, first in the document at every
+    width, as a list's rail is) and the comparison where the editor's column
+    stands. A record never published shows the empty state in the
+    comparison's place, and the working version alone on the rail.
+
+    Every link and the comparison's form keep the other choices of the
+    address: a row changes the version, the pager the page, the form the
+    other side and the language. %>
+<% page_record = @record.is_a?(Page) %>
+<% route = page_record ? :admin_page_history_path : :admin_post_history_path %>
+<% history_url = ->(**choices) { public_send(route, @record, **admin_url_options, **choices.compact_blank) } %>
+<% with_param = params[:with].presence %>
+
+<% if page_record %>
+  <%= render "admin/pages/tree", selected: @record %>
+  <%# The page the tree marks selected (`admin--pages--tree`, "The selected row"). %>
+  <div hidden data-tree-open-page="<%= @record.id %>"></div>
+<% end %>
+
+<div class="admin-list-rail">
+  <%= render Admin::HistoryScreen::HeadComponent.new(record: @record, locale: admin_locale, url_options: admin_url_options) %>
+
+  <div class="admin-list-rail__grid">
+    <%= render Admin::HistoryScreen::VersionsComponent.new(history: @history, chosen: @version,
+          url: ->(number) { history_url.call(version: number, with: with_param, page: params[:page]) },
+          page_url: ->(number) { history_url.call(version: params[:version], with: with_param, page: number) }) %>
+
+    <% if @version %>
+      <%= render Admin::HistoryScreen::ComparisonComponent.new(record: @record, version: @version, previous: @previous, with: @with, numbers: @history.numbers,
+            changes: @changes, locale: admin_locale, form_url: history_url.call, hidden: { version: @version.number, page: params[:page] },
+            restore_offered: @restore_offered) %>
+    <% else %>
+      <%= render Admin::HistoryScreen::ComparisonComponent.empty(record: @record) %>
+    <% end %>
+  </div>
+</div>
+
+<%# The restore dialog, opened by the comparison's "Restore version N…": outside the comparison's GET form, whose form it would otherwise be inside. %>
+<% if @restore_offered %>
+  <%= render Admin::HistoryScreen::RestoreDialogComponent.new(record: @record, version: @version, shown_at: @history.shown_at(@version), changes: @restore_changes, locale: admin_locale, url_options: admin_url_options) %>
+<% end %>

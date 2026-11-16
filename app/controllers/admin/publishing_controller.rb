@@ -1,6 +1,7 @@
 module Admin
-  # Publishing a page's or post's changes, discarding them and withdrawing a
-  # scheduled change (drafts spec §4.3). A class, never a namespace:
+  # Publishing a page's or post's changes, discarding them, withdrawing a
+  # scheduled change (drafts spec §4.3) and restoring a version (version
+  # history spec R3). A class, never a namespace:
   # `Admin::Publishing` would shadow `Publishing::` for every bare reference
   # inside `module Admin`.
   #
@@ -13,6 +14,7 @@ module Admin
     include RecordOfKind
     include EditingClaims
     include Scheduling
+    include PublishingState
 
     SCOPE = "admin.components.editor_screen.publishing".freeze
 
@@ -38,13 +40,15 @@ module Admin
     # is from the page view. `part=schedule` answers that alone, with no
     # overview and no trial: what the discard and the cancel dialogs ask
     # when they open, one request per opening like the publish dialog's.
+    # `part=publish_now` is the Publish now dialog's body (D9).
     def changes
       response.set_header("Cache-Control", "no-store")
-      return render(Admin::EditorScreen::ChangesOverviewComponent.schedule_only(record: @record), layout: false) if params[:part] == "schedule"
+      return render(Admin::Ui::ChangesOverviewComponent.schedule_only(record: @record), layout: false) if params[:part] == "schedule"
+      return publish_now_answer if params[:part] == "publish_now"
 
-      addresses = can?("#{kind}s.publish", @record) ? ::Publishing::Changes.addresses(@record) : ::PublicSite::Paths::Foreseen.nothing
-      render Admin::EditorScreen::ChangesOverviewComponent.new(record: @record, changes: ::Publishing::Changes.of(@record), lost: addresses.lost, moved: addresses.moved,
-        holds: ::Editing::Holds.on(@record, viewer: Current.user, tab: Current.editing_tab), locale: admin_locale, url_options: admin_url_options), layout: false
+      addresses = trial_addresses
+      render Admin::Ui::ChangesOverviewComponent.new(record: @record, changes: ::Publishing::Changes.of(@record), lost: addresses.lost, moved: addresses.moved,
+        holds: holds, locale: admin_locale, url_options: admin_url_options), layout: false
     end
 
     # Publishes now, at a time, or at the time the changes are already
@@ -71,6 +75,29 @@ module Admin
       forbidden_or(result) { redirect_to editor_path, status: :see_other, alert: result.errors.to_sentence }
     end
 
+    # Restores a version from the History screen's dialog (version history
+    # spec R3, R12): the rows become version `number`, as unpublished
+    # changes, and the editor opens on them. Refused, as a discard is, while
+    # another tab holds any part of the record: it writes every part. The
+    # dialog's form carries the record's `updated_at` as the dialog read it
+    # (`shown_updated_at`), and the service refuses a press made after a save
+    # since; an absent or unreadable value is nil, refused the same way, as
+    # no dialog showed what such a press would change.
+    #
+    # A refusal goes back to the History screen on the version pressed, with
+    # its sentence: the comparison there is what a person looks at again.
+    def restore
+      number = Integer(params[:number].to_s, 10, exception: false)
+      back = history_path(number)
+      return if refuse_discard_under_hold(@record, to: back)
+
+      result = ::Publishing::RestoreVersion.call(@record, number: number, shown_updated_at: shown_updated_at)
+      return forbidden_or(result) { redirect_to back, status: :see_other, alert: result.errors.to_sentence } unless result.ok?
+
+      restored = t("admin.components.history_screen.#{@record.published_at ? "restored" : "restored_draft"}", number: result.value[:number])
+      redirect_to editor_path, status: :see_other, notice: [ restored, (t("admin.components.history_screen.left_behind", sentence: result.notice) if result.notice) ].compact.join(" ")
+    end
+
     # Withdraws the change that waits for its time. It writes no row an
     # editor holds, so it asks no hold either.
     def cancel_scheduled_change
@@ -88,13 +115,34 @@ module Admin
 
     def kind = @record.is_a?(Page) ? "page" : "post"
 
-    # The pending copy the dialog showed when the press was made (its id, nil
-    # for none): each dialog's form carries it in `pending`, filled from the
-    # answer it got when it opened, and the service refuses when it is no
-    # longer so (`Publishing::ShownSchedule`). A request without the field (a
-    # script) showed nothing and is not checked.
-    def shown_pending
-      params.key?(:pending) ? params[:pending].presence&.to_i : ::Publishing::ShownSchedule::NOT_ASKED
+    def holds = ::Editing::Holds.on(@record, viewer: Current.user, tab: Current.editing_tab)
+
+    def trial_addresses = can?("#{kind}s.publish", @record) ? ::Publishing::Changes.addresses(@record) : ::PublicSite::Paths::Foreseen.nothing
+
+    # A CHOICE ONLY WHEN THE ROWS DIFFER from what was scheduled: the mark
+    # (`Publishing::State#changes?`) says that something was saved since, and
+    # the comparison that it still differs (a change typed and taken back
+    # leaves the mark with nothing to publish, and then "with the later
+    # changes" would publish what was scheduled under another name). With a
+    # choice, the trial says which addresses the rows would take away or move,
+    # as the Publish changes dialog does; without one nothing of the rows goes
+    # live, so there is no trial.
+    def publish_now_answer
+      changes = ::Publishing::State.of(@record).changes? ? ::Publishing::Changes.of(@record) : nil
+      changes = nil if changes&.none?
+      addresses = changes ? trial_addresses : ::PublicSite::Paths::Foreseen.nothing
+      render Admin::EditorScreen::PublishNowDialogComponent.answer(record: @record, changes: changes, holds: holds, locale: admin_locale,
+        lost: addresses.lost, moved: addresses.moved, url_options: admin_url_options), layout: false
+    end
+
+    def history_path(number)
+      public_send(@record.is_a?(Page) ? :admin_page_history_path : :admin_post_history_path, @record, **admin_url_options, version: number)
+    end
+
+    def shown_updated_at
+      Time.iso8601(params[:shown_updated_at].to_s)
+    rescue ArgumentError
+      nil
     end
 
     def editor_path

@@ -18,6 +18,9 @@ class User < ApplicationRecord
   # Never shown, kept or sent anywhere.
   def self.unusable_password = SecureRandom.base58(48)
 
+  # The accounts that are told about alerts.
+  scope :owners, -> { where(owner: true) }
+
   def sso_linked? = sso_subject.present?
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }

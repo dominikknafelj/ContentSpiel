@@ -47,6 +47,7 @@ class PublicReadersTest < ActiveSupport::TestCase
     "component_previews_controller.rb" => "development previews of components",
     "mcp_controller.rb" => "the token-guarded MCP endpoint, not the public site",
     "setup_controller.rb" => "the setup wizard",
+    "readiness_controller.rb" => "the readiness check: a round trip to each database, reads no record",
     "invitations_controller.rb" => "the invitation page of someone with no account yet: no site content, no record read",
     "preview_controller.rb" => "the preview shows the working version by design; the concern it shares is scanned",
     "form_sends_controller.rb" => "a visitor's send of a form: reads the form's rows (a form has no published copy) and a page only " \

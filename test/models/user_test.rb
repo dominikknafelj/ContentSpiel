@@ -13,6 +13,12 @@ class UserTest < ActiveSupport::TestCase
     assert_not User.new(email_address: "TAKEN@example.com", password: "password12345").valid?
   end
 
+  test "owners are the users flagged as owner" do
+    assert_includes User.owners, users(:one)
+    assert_not_includes User.owners, users(:two)
+    assert User.owners.all?(&:owner?)
+  end
+
   # users(:one) is the sole owner in fixtures (test/fixtures/users.yml);
   # every other fixture user, including :two, isn't an owner at all, so
   # none of them can trip this guard.

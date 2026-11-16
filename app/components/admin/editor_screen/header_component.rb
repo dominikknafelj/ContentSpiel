@@ -11,11 +11,13 @@ module Admin
     # reaches the site only with "Publish changes", so a live record has no
     # primary button until its rows differ from what is published (the
     # button is `Publishing::State`'s `publish_changes`) -- while a draft
-    # offers Publish and a scheduled record Publish now plus Edit schedule…. Everything else (Activity, Schedule…,
-    # Cancel scheduled change…, Unpublish…, Move to trash…) sits in the ⋯ menu, the destructive item last
-    # and after a divider. Every item that opens a dialog ends with an
+    # offers Publish and a scheduled record Publish now… (a dialog that
+    # asks what goes live, D9) plus Edit schedule…. Everything else
+    # (History, Activity, Schedule…, Cancel scheduled change…, Unpublish…,
+    # Move to trash…) sits in the ⋯ menu, the destructive item last and
+    # after a divider. Every item that opens a dialog ends with an
     # ellipsis (the brand book: "an action that opens a dialog ends with
-    # …"); Activity is a link and has none. A dialog's own confirm button
+    # …"); History and Activity are links and have none. A dialog's own confirm button
     # names the act without one ("Unpublish", "Move to trash"): it does it.
     #
     # Every publish/unpublish/schedule/delete form carries `data-turbo-frame=
@@ -24,7 +26,7 @@ module Admin
     # tree column and the sidebar's Trash badge showing what they showed
     # before. A full-page visit re-renders them for free.
     #
-    # The dialogs (schedule, unpublish, delete) are siblings AFTER the `<header>`, not
+    # The dialogs (schedule, Publish now, unpublish, delete) are siblings AFTER the `<header>`, not
     # inside it: the header is sticky with its own stacking context, and a
     # modal opened from within it would be clipped by it. Dialog forms still
     # cannot nest in the editor form -- the header is never inside one.
@@ -183,7 +185,8 @@ module Admin
 
       def can_edit_schedule? = state.action?(:schedule) && scheduled? && may_publish?
 
-      def primary_label = scheduled? ? "Publish now" : "Publish"
+      # A scheduled record's "Publish now…" opens it; a draft's "Publish" posts at once.
+      def publish_now_dialog_id = PublishNowDialogComponent.dialog_id_for(record)
 
       # "Cancel scheduled change" (the state's own action), in the menu; its
       # confirmation and its form are the publish dialogs' (`PublishChangesDialogComponent`).
@@ -234,27 +237,22 @@ module Admin
       # Whether the ⋯ menu has anything to hold (a viewer who can only read
       # gets no empty menu).
       def menu_items?
-        can?("audit.view") || can_schedule? || can_cancel_scheduled_change? || can_unpublish? || may_delete?
+        may_see_history? || can?("audit.view") || can_schedule? || can_cancel_scheduled_change? || can_unpublish? || may_delete?
       end
 
-      # [label, url-or-nil] per crumb; a crumb the viewer may not open is plain
-      # text. A page: "Pages" and each ancestor, root first. A post: "Posts" and
-      # its content type's filtered list.
+      # The History screen opens for whoever holds `<type>s.edit` on the
+      # record, the plain key and not the owner rule (version history spec R4).
+      def may_see_history? = can?("#{type}s.edit", record)
+
+      def history_url = helpers.public_send("admin_#{type}_history_path", record, **url_options)
+
+      # [label, url-or-nil] per crumb (`Admin::RecordCrumbsHelper`, shared
+      # with the History screen), the module's crumb worded here.
+      MODULE_CRUMBS = { pages: "Pages", posts: "Posts" }.freeze
+
       def breadcrumb
-        if page?
-          # On Home itself "Pages" would link to the page you are on (`/pages`
-          # opens Home), so it is plain text there.
-          pages_crumb = [ "Pages", can?("pages.read") && !record.root? ? helpers.admin_pages_path(**url_options) : nil ]
-          ancestors = record.ancestors.to_a.reverse.map do |ancestor|
-            [ ::Locales.read(ancestor, :title, locale: locale), can?("pages.read", ancestor) ? helpers.admin_page_path(ancestor, **url_options) : nil ]
-          end
-          [ pages_crumb ] + ancestors
-        else
-          allowed = can?("posts.read")
-          label = ::ContentTypes.find(record.content_type)&.label || record.content_type
-          [ [ "Posts", allowed ? helpers.admin_posts_path(**url_options) : nil ],
-            [ label, allowed ? helpers.admin_posts_path(type: record.content_type, **url_options) : nil ] ]
-        end
+        helpers.record_crumbs(record, locale: locale, url_options: url_options, can: ->(key, subject) { can?(key, subject) })
+          .map { |label, url| [ MODULE_CRUMBS.fetch(label, label), url ] }
       end
 
       def publish_url = route("publish")

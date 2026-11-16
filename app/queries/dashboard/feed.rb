@@ -37,7 +37,7 @@ module Dashboard
     # submission arriving or being deleted: its subject
     # is the form, never a page or a post, and a visitor or the system is
     # nobody's "by"; listed so no reader of this list ever counts one.
-    NOT_A_CHANGE = (%w[access.denied page.taken_over post.taken_over block.taken_over
+    NOT_A_CHANGE = (%w[access.denied request.limited page.taken_over post.taken_over block.taken_over
                        page.scheduled_change_cancelled post.scheduled_change_cancelled] +
                     Audit::Sentence::NOTE_VERBS.keys + Audit::Sentence::SUBMISSION_ACTIONS).freeze
 

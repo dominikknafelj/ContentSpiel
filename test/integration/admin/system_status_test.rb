@@ -337,4 +337,43 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
     assert_response :forbidden
   end
+
+  test "the Alerts card lists a recent alert and is no part of the checks' count" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+
+    assert_response :success
+    assert_select "h2", text: "Alerts"
+    assert_select "p", text: "The last 7 days, newest first. Not part of the checks."
+    assert_select "#system-alerts li", text: /RuntimeError.*app\/models\/page\.rb:120/m
+    results = Setup::SystemCheck.run(remote_ip: "127.0.0.1").reject(&:off?)
+    assert_select "p", text: /\A#{results.count(&:ok?)} of #{results.size} checks? passed/
+    assert_select "#system-checks #system-alerts", count: 0
+  end
+
+  test "a security alert links to the audit log only for a holder of audit.view" do
+    sign_in_as(users(:one))
+    get "/cs-studio/system_status"
+    assert_select "#system-alerts li[data-alert-kind=owner_changed] a[href=?]", "/cs-studio/audit_events", text: "Open audit log →"
+
+    access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})
+    sign_in_as(users(:reader))
+    get "/cs-studio/system_status"
+    assert_select "#system-alerts li[data-alert-kind=owner_changed]", text: /Ana was made an owner by Ben/
+    assert_select "#system-alerts a", text: "Open audit log →", count: 0
+  end
+
+  test "mail working and no site address: the Alerts card says the owners can't be mailed and why" do
+    sign_in_as(users(:one))
+
+    with_mail_state(:working) do
+      with_site_address(nil) do
+        get "/cs-studio/system_status"
+      end
+    end
+
+    assert_select "#system-alerts [role=alert]", text: /the site has no address for the mail to link to\. Set PUBLIC_HOST/
+    assert_select "#system-alerts li", text: /Not mailed: the site has no address/
+  end
 end

@@ -175,6 +175,23 @@ class ApplicationMailer < ActionMailer::Base
     env.local?
   end
 
+  # The url options a mailed link is built with, by the rules above; `{}`
+  # when no origin is known and no mail is to be built. A class method so a
+  # caller can ask before it queues (`Alerts::Mailing`, which marks nothing
+  # while there is none).
+  def self.link_url_options(origin = nil)
+    return SiteAddress.admin.url_options if SiteAddress.admin.configured?
+
+    configured = SiteAddress.current
+    return configured.url_options if configured.configured?
+
+    return {} unless request_origin_used?
+
+    SiteAddress.parse(origin, source: "the request's origin").url_options
+  rescue SiteAddress::Invalid
+    {}
+  end
+
   def mail(...)
     super.tap { |message| deliver_with_site_settings(message) unless @site_settings_applied }
   end
@@ -204,20 +221,10 @@ class ApplicationMailer < ActionMailer::Base
     Rails.logger.warn "[ContentSpiel] A mail was not sent: outgoing mail is not set up."
   end
 
-  # Shared by the mails that carry a link (PasswordsMailer, InvitesMailer),
-  # so the origin rules above are written once.
-  def link_origin(origin)
-    return SiteAddress.admin.url_options if SiteAddress.admin.configured?
-
-    configured = SiteAddress.current
-    return configured.url_options if configured.configured?
-
-    return {} unless self.class.request_origin_used?
-
-    SiteAddress.parse(origin, source: "the request's origin").url_options
-  rescue SiteAddress::Invalid
-    {}
-  end
+  # Shared by the mails that carry a link (PasswordsMailer, InvitesMailer,
+  # SignInMailer, Alerts::DigestMailer), so the origin rules above are
+  # written once.
+  def link_origin(origin) = self.class.link_url_options(origin)
 
   # The site's name in the mail's default language, as text: the subject,
   # the heading and the footer. Read per message, so in the job.

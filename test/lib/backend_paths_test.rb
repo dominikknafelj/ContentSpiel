@@ -21,7 +21,7 @@ class BackendPathsTest < ActiveSupport::TestCase
   ACTIVE_STORAGE_WRITE = "drawn because the read helpers share their file; `ActiveStorageWriteRefusal` answers 404 to everyone".freeze
 
   VIEW_COMPONENTS = "ViewComponent's preview routes, drawn in development and test only, never in production".freeze
-  HEALTH_CHECK = "the health check, asked by the proxy".freeze
+  HEALTH_CHECK = "the health check, asked by the proxy, and the readiness check, asked by a monitor".freeze
   SYSTEM_TEST_ENTRYPOINT = "Rails' own entrypoint of the browser tests, drawn in the test environment only".freeze
 
   # The reasons whose routes answer on every host, ADMIN_HOST or not: the
@@ -41,6 +41,7 @@ class BackendPathsTest < ActiveSupport::TestCase
     "POST /forms/:form_id" => "a visitor's send of a form",
     "POST /search/suggestions" => "a visitor's suggestions while typing in a search field",
     "GET /up(.:format)" => HEALTH_CHECK,
+    "GET /ready(.:format)" => HEALTH_CHECK,
     "GET /rails/active_storage/blobs/redirect/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,
     "GET /rails/active_storage/blobs/proxy/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,
     "GET /rails/active_storage/blobs/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,

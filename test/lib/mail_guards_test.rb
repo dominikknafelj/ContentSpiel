@@ -172,7 +172,7 @@ class MailGuardsTest < ActiveSupport::TestCase
   end
 
   test "every link into CS Studio a mailer builds takes the link origin's options" do
-    paths = ROOT.glob("app/mailers/**/*.rb") + ROOT.glob("app/views/*_mailer/**/*.erb")
+    paths = ROOT.glob("app/mailers/**/*.rb") + ROOT.glob("app/views/**/*_mailer/**/*.erb")
     offences = paths.to_h { |path| [ path.to_s.delete_prefix("#{ROOT}/"), mailer_link_offences(SourceCode.code_of(path.to_s)) ] }.reject { |_, found| found.empty? }
     assert_empty offences
 

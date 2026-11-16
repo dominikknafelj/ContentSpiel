@@ -39,7 +39,7 @@ test/components/admin/editor_screen/block_picker_component_test.rb: 1.0
 test/components/admin/editor_screen/block_samples_card_test.rb: 1.0
 test/components/admin/editor_screen/block_tile_component_test.rb: 3.6
 test/components/admin/editor_screen/changed_elsewhere_component_test.rb: 1.1
-test/components/admin/editor_screen/changes_overview_component_test.rb: 9.7
+test/components/admin/ui/changes_overview_component_test.rb: 9.7
 test/components/admin/editor_screen/delete_block_dialog_component_test.rb: 0.4
 test/components/admin/editor_screen/form_column_test.rb: 0.0
 test/components/admin/editor_screen/header_component_test.rb: 8.4
