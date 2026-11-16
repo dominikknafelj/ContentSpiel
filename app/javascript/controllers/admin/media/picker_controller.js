@@ -42,6 +42,15 @@ function forget() {
 // Nothing is dispatched on Cancel, × or Escape: the opener simply gets focus
 // back.
 //
+// SEVERAL (the Gallery card, the card StudioGallery, D4): `detail: { opener,
+// multiple: true, max, chosen, focus }`, `max` what the gallery still takes,
+// `chosen` the ids already in it, and `focus: "places"` (optional) to put the
+// focus on the places rather than the search when the grid arrives. The title
+// reads "Add images", `admin--media--select` keeps the list (its `reset`
+// carries the opening), and `picked` answers `detail: { items: [{ id, url,
+// title, alt, caption }, ...] }` in the order chosen. Every other opening is
+// a single one, and its title and primary are put back.
+//
 // `picked` is dispatched from the dialog's `close` handler, not straight
 // from `#choose`: closing a modal dialog restores focus asynchronously, so
 // dispatching first would let that restore land *after* whatever focus the
@@ -68,7 +77,7 @@ function forget() {
 // selected, scrolled into view in the list. Uploads go to that place. Below
 // 640px the places are a select, whose change loads the frame (`place`).
 export default class extends Controller {
-  static targets = [ "frame", "file", "status", "uploadInto" ]
+  static targets = [ "frame", "file", "status", "uploadInto", "title" ]
   static values = { gridUrl: String, uploadUrl: String, tileClass: String, buttonClass: String }
 
   connect() {
@@ -97,15 +106,28 @@ export default class extends Controller {
     const opener = event.detail?.opener
     if (!opener) return
 
+    const multiple = event.detail.multiple === true
     this.opener = opener
     this.pending = null
     this.selectNextUpload = false
     this.uploads.abort()
     this.statusTarget.textContent = ""
-    this.dispatch("reset")
-    this.focusSearchOnLoad = true
+    this.titleTarget.textContent = messages(this.element).t(multiple ? "components.ui.media_picker.title_multiple" : "components.ui.media_picker.title")
+    this.dispatch("reset", { detail: multiple ? this.severalOpening(event.detail) : {} })
+    this.focusOnLoad = multiple && event.detail.focus === "places" ? "places" : "search"
     this.loadGrid()
     if (!this.element.open) this.element.showModal()
+  }
+
+  // What a multiple opening hands `admin--media--select`: `max` a whole
+  // number, `present` the ids that are (anything else in `chosen` is
+  // dropped).
+  severalOpening({ max, chosen }) {
+    return {
+      multiple: true,
+      max: Number.isInteger(max) && max > 0 ? max : 0,
+      present: Array.isArray(chosen) ? chosen.filter((id) => Number.isInteger(id)) : []
+    }
   }
 
   // A fresh load on every open: setting `src` to the URL it already has
@@ -141,21 +163,33 @@ export default class extends Controller {
   }
 
   // The grid arrived or navigated (search, segment, page): live upload tiles go
-  // back at the start of it, and the first time, the search box takes focus --
-  // unless the editor has already moved on to something else in the dialog.
+  // back at the start of it, and the first time, the search box takes focus
+  // (or, asked with `focus: "places"`, the place shown) -- unless the editor
+  // has already moved on to something else in the dialog.
   gridLoaded(event) {
     if (event.target !== this.frameTarget) return
 
     this.gridPending = false
     this.uploads.reattach()
     this.showPlace()
-    if (!this.focusSearchOnLoad) return
+    if (!this.focusOnLoad) return
 
-    this.focusSearchOnLoad = false
+    const focus = this.focusOnLoad
+    this.focusOnLoad = null
     const active = document.activeElement
     if (active === this.element || active === document.body || active?.dataset?.action?.includes("admin--media--picker#browse")) {
-      this.search?.focus()
+      if (focus === "places") this.placeControl()?.focus({ preventScroll: true })
+      else this.search?.focus()
     }
+  }
+
+  // The places' control for the place shown: the select below 640px, its
+  // row's link from there.
+  placeControl() {
+    const select = this.frameTarget.querySelector("#media-picker-place-select")
+    if (select?.checkVisibility()) return select
+
+    return this.frameTarget.querySelector(`[id="media-picker-place-row-${this.shownPlace}"] a`)
   }
 
   // The place the frame now shows: kept for the next open (or forgotten, a
@@ -183,9 +217,7 @@ export default class extends Controller {
     this.refocusPlace = false
     const active = document.activeElement
     if (active !== document.body && active !== this.element) return
-    const select = this.frameTarget.querySelector("#media-picker-place-select")
-    const control = select?.checkVisibility() ? select : row?.querySelector("a")
-    control?.focus({ preventScroll: true })
+    this.placeControl()?.focus({ preventScroll: true })
   }
 
   showAllMedia() {
@@ -242,13 +274,15 @@ export default class extends Controller {
     return this.search?.value || ""
   }
 
-  // The select controller's `chosen`: its detail is the payload.
+  // The select controller's `chosen`: its detail is the payload (one image's
+  // keys, or a multiple opening's `items`).
   chosen(event) {
     this.choose(event.detail)
   }
 
   choose(detail) {
-    if (!detail || !Number.isInteger(detail.id)) return
+    const several = Array.isArray(detail?.items) && detail.items.length > 0 && detail.items.every((item) => Number.isInteger(item?.id))
+    if (!several && !Number.isInteger(detail?.id)) return
 
     this.pending = detail
     this.element.close()

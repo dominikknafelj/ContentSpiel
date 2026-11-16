@@ -504,7 +504,212 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_selector "#{card} [data-admin--media--field-target=title]", text: @asset.title
   end
 
+  # The picker choosing several (the card StudioGallery, D4), opened by a
+  # stand-in for the Gallery card: `media-picker:open` with `multiple`, `max`
+  # (what the gallery still takes) and `chosen` (the ids already in it).
+  test "a multiple opening reads Add images, toggles tiles numbered in the order chosen, keeps the order across searches and places, and hands back items" do
+    harbour, crowd = titled("Harbour"), titled("Crowd")
+    client_a = client_folders.last
+    stage = in_folder(titled("Stage"), client_a)
+    visit_screen(admin_root_path)
+
+    open_multiple(max: 10)
+    within("dialog[open]") do
+      assert_selector "h2", exact_text: "Add images"
+      assert_button "Add images", disabled: true
+      assert_no_button "Use image"
+
+      click_on "Harbour"
+      assert_order harbour => 1
+      assert_selector "[role=status]", exact_text: "1 selected · the gallery takes 9 more"
+      click_on "Crowd"
+      assert_order harbour => 1, crowd => 2
+      assert_button "Add 2 images", disabled: false
+      # Unchoosing renumbers the rest.
+      click_on "Harbour"
+      assert_order crowd => 1
+      assert_selector "#{tile(harbour)}[aria-pressed=false]"
+      click_on "Harbour"
+      assert_order crowd => 1, harbour => 2
+
+      fill_in "Search images", with: "Crowd"
+      assert_no_button "Harbour"
+      assert_order crowd => 1
+      assert_selector "[role=status]", exact_text: "2 selected · the gallery takes 8 more"
+      fill_in "Search images", with: ""
+      assert_order crowd => 1, harbour => 2
+
+      find("button[aria-label='Unfold Clients']").click
+      click_on "Client A"
+      assert_place client_a.id
+      click_on "Stage"
+      assert_order stage => 3
+      click_on "All media"
+      assert_place "all"
+      assert_order crowd => 1, harbour => 2, stage => 3
+      assert_selector "[role=status]", exact_text: "3 selected · the gallery takes 7 more"
+      click_on "Add 3 images"
+    end
+    refute_selector "dialog[open]"
+
+    picked = page.evaluate_script("window.__picked")
+    assert_equal [ crowd.id, harbour.id, stage.id ], picked.fetch("items").map { |item| item["id"] }
+    assert_equal %w[alt caption id title url], picked["items"].first.keys.intersection(%w[id url title alt caption]).sort
+    assert_equal "Crowd", picked["items"].first["title"]
+    assert_nil picked["id"], "a multiple opening answers items, not one image's keys"
+    assert_equal "stand-in-opener", page.evaluate_script("document.activeElement.id")
+  end
+
+  test "images already in the gallery are marked and not chosen again" do
+    harbour, crowd = titled("Harbour"), titled("Crowd")
+    visit_screen(admin_root_path)
+
+    open_multiple(max: 5, chosen: [ harbour.id ])
+    within("dialog[open]") do
+      present = find("#{tile(harbour)}[aria-disabled=true]")
+      assert_equal "In the gallery", find_by_id(present["aria-describedby"], visible: :all).text(:all).strip
+      assert_selector "#{tile(harbour)} [data-media-pick-in-gallery]", text: "In the gallery"
+      assert_match(/saturate\(0\.35\)/, page.evaluate_script(%(getComputedStyle(document.querySelector("#{tile(harbour)} img:not([aria-hidden])")).filter)))
+
+      present.click
+      assert_selector "#{tile(harbour)}[aria-pressed=false]"
+      assert_no_selector "#{tile(harbour)} [data-media-pick-order]"
+      assert_button "Add images", disabled: true
+
+      click_on "Crowd"
+      assert_order crowd => 1
+      # The mark outlives a load of the grid.
+      fill_in "Search images", with: "Harbour"
+      assert_selector "#{tile(harbour)}[aria-disabled=true]"
+      assert_selector "#{tile(harbour)} [data-media-pick-in-gallery]"
+      assert_no_selector "#{tile(crowd)}[aria-disabled]"
+    end
+  end
+
+  test "the choice stops at max and says so" do
+    harbour, crowd, stage = titled("Harbour"), titled("Crowd"), titled("Stage")
+    visit_screen(admin_root_path)
+
+    # 58 images in the gallery, so it takes 2 more of its 60.
+    open_multiple(max: 2, chosen: (1..58).map { |n| 1_000_000 + n })
+    within("dialog[open]") do
+      click_on "Harbour"
+      click_on "Crowd"
+      assert_selector "[role=status]", exact_text: "The gallery takes no more: 60 images."
+      assert_selector "#{tile(stage)}[aria-disabled=true]"
+      assert_no_selector "#{tile(harbour)}[aria-disabled], #{tile(crowd)}[aria-disabled]"
+
+      find(tile(stage)).click
+      assert_selector "#{tile(stage)}[aria-pressed=false]"
+      assert_order harbour => 1, crowd => 2
+
+      click_on "Harbour"
+      assert_no_selector "#{tile(stage)}[aria-disabled]"
+      assert_selector "[role=status]", exact_text: "1 selected · the gallery takes 1 more"
+      click_on "Stage"
+      assert_order crowd => 1, stage => 2
+    end
+  end
+
+  test "a chosen tile's name says its place in the order" do
+    harbour, crowd, stage = titled("Harbour"), titled("Crowd"), titled("Stage")
+    visit_screen(admin_root_path)
+
+    open_multiple(max: 10)
+    within("dialog[open]") do
+      click_on "Harbour"
+      click_on "Crowd"
+      click_on "Stage"
+      assert_selector "#{tile(harbour)}[aria-label='Harbour, chosen 1st']"
+      assert_selector "#{tile(crowd)}[aria-label='Crowd, chosen 2nd']"
+      assert_selector "#{tile(stage)}[aria-label='Stage, chosen 3rd']"
+
+      click_on "Harbour"
+      assert_selector "#{tile(harbour)}:not([aria-label])"
+      assert_selector "#{tile(stage)}[aria-label='Stage, chosen 2nd']"
+      # The number is a picture of the name, never read beside it.
+      assert_selector "#{tile(stage)} [data-media-pick-order][aria-hidden=true]", text: "2"
+    end
+  end
+
+  test "focus: places puts the focus on the places, and without it the default focus stays" do
+    visit_screen(admin_root_path)
+
+    open_multiple(max: 10, focus: "places")
+    await_js(%(document.activeElement?.closest("#media-picker-place-row-all") !== null), message: "the place shown did not take the focus")
+    within("dialog[open]") { click_on "Cancel" }
+    refute_selector "dialog[open]"
+
+    open_multiple(max: 10)
+    await_js(%(document.activeElement?.matches("dialog[open] input[type=search]")), message: "the search field did not take the focus")
+  end
+
+  test "a single opener still gets one image's keys" do
+    titled("Harbour")
+    visit_screen(admin_root_path)
+
+    # A multiple opening first: what it changed is put back for the next.
+    open_multiple(max: 10)
+    within("dialog[open]") { click_on "Cancel" }
+    refute_selector "dialog[open]"
+
+    open_stand_in
+    within("dialog[open]") do
+      assert_selector "h2", exact_text: "Choose an image"
+      assert_selector "[role=status]", exact_text: "No image selected"
+      click_on "Harbour"
+      assert_no_selector "[data-media-pick-order]"
+      assert_no_selector "[aria-label*=chosen]"
+      click_on "Use image"
+    end
+    refute_selector "dialog[open]"
+
+    picked = page.evaluate_script("window.__picked")
+    assert_equal "Harbour", picked["title"]
+    assert_equal %w[alt caption id title url], picked.keys.intersection(%w[id url title alt caption]).sort
+    assert_nil picked["items"]
+  end
+
   private
+
+  # A library image with a title of its own.
+  def titled(title)
+    asset = create_media_asset(filename: "tiny.png")
+    asset.update_columns(title: title) # version: none (a test's own rows)
+    asset
+  end
+
+  # The picker's tile of an image.
+  def tile(asset) = "#media-picker-asset-#{asset.id} button"
+
+  # Each tile chosen, with its number, and no other.
+  def assert_order(order)
+    order.each { |asset, number| assert_selector "#{tile(asset)}[aria-pressed=true] [data-media-pick-order]", exact_text: number.to_s }
+    assert_selector "[data-media-pick-order]", count: order.size
+  end
+
+  # The Gallery card's stand-in: a button that opens the picker and keeps
+  # what it is answered in `window.__picked`.
+  def open_stand_in(**detail)
+    page.execute_script(<<~JS, detail.to_json)
+      let opener = document.getElementById("stand-in-opener")
+      if (!opener) {
+        opener = document.createElement("button")
+        opener.id = "stand-in-opener"
+        opener.type = "button"
+        opener.textContent = "Stand-in"
+        document.body.append(opener)
+        opener.addEventListener("media-picker:picked", (event) => { window.__picked = event.detail })
+      }
+      window.__picked = null
+      window.dispatchEvent(new CustomEvent("media-picker:open", { detail: { opener, ...JSON.parse(arguments[0]) } }))
+    JS
+    assert_selector "dialog[open] #media-picker-place", visible: :all
+  end
+
+  def open_multiple(max:, chosen: [], focus: nil)
+    open_stand_in(multiple: true, max: max, chosen: chosen, **(focus ? { focus: focus } : {}))
+  end
 
   # Holds every grid request of the picker until `window.__releaseGrid()`,
   # counting them in `window.__gridRequests`.

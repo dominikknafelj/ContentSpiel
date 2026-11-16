@@ -111,4 +111,17 @@ class Admin::MessagesTest < ApplicationSystemTestCase
     assert_equal [ "1 plik", "2 pliki", "5 plikow", "1.5 pliku" ],
       in_page(%([ 1, 2, 5, 1.5 ].map((count) => messages(document.getElementById("pl")).t("n", { count }))))["value"]
   end
+
+  # A gallery's tile says its place in the order ("chosen 2nd"): the
+  # category is the ordinal one, never the count's ("2 images" is `other`,
+  # "2nd" is `two`).
+  test "an ordinal asks the ordinal rules" do
+    add_messages_element("ordinal", { "@locale" => "en", "o" => { "one" => "%{count}st", "two" => "%{count}nd", "few" => "%{count}rd", "other" => "%{count}th" },
+      "n" => { "one" => "%{count} image", "other" => "%{count} images" } }.to_json)
+
+    assert_equal %w[1st 2nd 3rd 4th 11th 12th 13th 21st 22nd 23rd 101st 111th],
+      in_page(%([ 1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111 ].map((count) => messages(document.getElementById("ordinal")).t("o", { count, ordinal: true }))))["value"]
+    assert_equal [ "2 images", "1 image" ], in_page(%([ 2, 1 ].map((count) => messages(document.getElementById("ordinal")).t("n", { count }))))["value"], "a count keeps the cardinal rules"
+    assert_equal "2th", in_page(%(messages(document.getElementById("ordinal")).t("o", { count: 2 })))["value"], "without ordinal: true the cardinal category is asked"
+  end
 end

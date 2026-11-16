@@ -23,7 +23,14 @@ module Admin
     # opener dispatches `media-picker:open` on `window` with itself as
     # `detail.opener`; the picker answers with `media-picker:picked`
     # (`{ id, url, title, alt, caption }`) dispatched *on that opener*,
-    # bubbling, after it has closed and handed focus back.
+    # bubbling, after it has closed and handed focus back. The Gallery card
+    # asks for several (the card StudioGallery, D4): `multiple: true`, `max`
+    # (what the gallery still takes), `chosen` (the ids already in it, marked
+    # "In the gallery" and never chosen again) and, optionally, `focus:
+    # "places"`; it reads "Add images", numbers each tile in the order it was
+    # chosen, and answers `{ items: [...] }`, each item one image's keys, in
+    # that order. Its two marks are drawn here once, as templates
+    # `admin--media--select` clones into a tile.
     #
     # The grid is `Admin::MediaController#index` itself (`picker=1`), loaded into
     # a `<turbo-frame id="media-picker-grid">` each time the picker opens -- the
@@ -60,13 +67,17 @@ module Admin
         interface: %i[url_options],
         limits: [
           "It is drawn once, by the admin layout, and only for someone with media.upload; a field opens it with media-picker:open and never draws a picker of its own.",
-          "It hands back one image: several cannot be chosen.",
+          "It hands back one image, or several in the order chosen when the opener asks for several.",
           "What it lists is the Media screen's own listing (picker=1), loaded into its frame each time it opens; the toolbar and the tiles are Admin::MediaLibrary's.",
           "It browses the library's places and opens at the last one shown, per browser."
         ],
         states: %i[rest],
-        script_states: { open: [ "test/system/admin/media_picker_test.rb", "choosing: a click only selects, Use image fills the field, a double click picks at once" ] },
-        keys: %w[title upload upload_into upload_nowhere close file none selected cancel use],
+        script_states: {
+          open: [ "test/system/admin/media_picker_test.rb", "choosing: a click only selects, Use image fills the field, a double click picks at once" ],
+          multiple: [ "test/system/admin/media_picker_test.rb",
+                      "a multiple opening reads Add images, toggles tiles numbered in the order chosen, keeps the order across searches and places, and hands back items" ]
+        },
+        keys: %w[title upload upload_into upload_nowhere close file none selected cancel use title_multiple add_count takes full in_gallery chosen_order ordinal],
         slots: [],
         controller: "admin--media--picker",
         keyboard: [ "test/system/admin/media_picker_test.rb", "the keyboard reaches a tile by Tab from the search field, Space selects it and a second Enter on it confirms" ]
@@ -77,6 +88,11 @@ module Admin
       # The footer's words `admin--media--select` says, served on the dialog
       # beside the upload tiles'.
       FOOTER_MESSAGES = %w[components.ui.media_picker.none components.ui.media_picker.selected].freeze
+
+      # What a multiple opening says instead (the title and the primary,
+      # which a single opening then puts back), and a chosen tile's name.
+      MULTIPLE_MESSAGES = %w[title title_multiple use add_count takes full chosen_order ordinal]
+                          .map { |key| "components.ui.media_picker.#{key}" }.freeze
 
       # The words before Upload, which `admin--media--picker` writes for each
       # place the frame shows.
