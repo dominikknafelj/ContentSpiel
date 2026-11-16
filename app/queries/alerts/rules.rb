@@ -67,7 +67,7 @@ module Alerts
     # One row per kind and window; `first_seen_at` and `mailed_at` stay as
     # they were, the rest follows the window's events as they are now.
     def upsert_window(kind, start, window_events, occurrences, counts)
-      Alerts::Alert.upsert(
+      Alerts::Alert.upsert( # version: none (alerts are no part of a page)
         { kind:, fingerprint: "#{kind}|#{start.iso8601}", occurrences:,
           details: { "window_start" => start.iso8601 }.merge(counts),
           first_seen_at: window_events.minimum(:occurred_at), last_seen_at: window_events.maximum(:last_occurred_at) },
@@ -83,7 +83,7 @@ module Alerts
 
       people = User.where(id: events.flat_map { |event| [ event.user_id, (event.subject_id if event.subject_type == "User") ] }.compact).index_by(&:id)
       rows = events.map { |event| event_alert(event, people) }
-      Alerts::Alert.insert_all(rows, unique_by: :fingerprint).length
+      Alerts::Alert.insert_all(rows, unique_by: :fingerprint).length # version: none (alerts are no part of a page)
     end
 
     # The columns the per-event rules read, and not `snapshot`.
