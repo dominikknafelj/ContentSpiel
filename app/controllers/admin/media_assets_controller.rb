@@ -27,7 +27,7 @@ module Admin
       upload = params[:file]
       return render_errors([ "file must be attached" ]) unless upload.respond_to?(:tempfile)
 
-      result = Media::Upload.call(file: upload)
+      result = Media::Upload.call(file: upload, folder: upload_folder_id)
 
       if result.ok?
         render json: upload_json(result.record, picker: true), status: :created

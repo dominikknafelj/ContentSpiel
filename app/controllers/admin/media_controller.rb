@@ -37,6 +37,12 @@ module Admin
     before_action -> { forbidden! unless holds_any?(%w[media.upload media.manage]) }, only: %i[update destroy]
     before_action :set_asset, only: %i[show update destroy]
 
+    # The one builder of a link to a place (the Folders column's rows, the
+    # breadcrumb, the picker's places): `q` and `filter` kept, `folder` the
+    # place's own (nothing for All media), the language, and never `page`
+    # (page 3 of one folder is no page of another), `selected` or `select`.
+    helper_method :place_query
+
     # The grid (design spec §6): search (title, alt in any
     # locale, filename) and the segments All / Unused / Missing alt /
     # Untranslated / Mine, newest first, 48 tiles a page, each segment with its
@@ -65,8 +71,23 @@ module Admin
     # one set of segments and counts, one constant-query load (`Media::Search`,
     # kept images only), and the same `media.upload` gate -- the picker's only
     # permission is "may browse and choose". It has no panel.
+    #
+    # `folder` chooses the place the listing is of (`Media::Place`: All media,
+    # Not in a folder, or one folder's own images). A folder that names nothing
+    # is the 404 with "Back to Media" on the screen, like a stale `selected`;
+    # in the picker it is All media, since a remembered place may have gone,
+    # and the answer says so (`data-media-place-gone`) for the picker's script
+    # to forget it.
     def index
-      @search = Media::Search.new(q: params[:q], filter: params[:filter], actor: Current.actor)
+      @folder_tree = Media::FolderTree.load
+      @place = Media::Place.parse(params[:folder], tree: @folder_tree)
+      if @place.nil?
+        raise_place_not_found unless params[:picker].present?
+        @place = Media::Place::ALL
+        @place_gone = true
+      end
+
+      @search = Media::Search.new(q: params[:q], filter: params[:filter], actor: Current.actor, place: @place)
       scope = @search.results
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: scope.count)
       @assets = scope.order(id: :desc).limit(PER_PAGE).offset(@pagination.offset).to_a
@@ -99,7 +120,7 @@ module Admin
     # tiles (two different callers, deliberately not merged into one endpoint,
     # per that resource's own routing comment).
     def create
-      result = Media::Upload.call(file: params[:file])
+      result = Media::Upload.call(file: params[:file], folder: upload_folder_id)
 
       if result.ok?
         render json: upload_json(result.record, picker: false), status: :created
@@ -200,11 +221,25 @@ module Admin
       Media::Asset.kept.with_file.find(raw)
     end
 
+    # A `folder` that names no folder of the screen: the library as it was
+    # listed, the place dropped with the page.
+    def raise_place_not_found
+      @not_found_back = { label: t("admin.media.not_found_back"), url: admin_media_path(**list_query.except(:page, :folder), **admin_url_options) }
+      raise ActiveRecord::RecordNotFound, "Couldn't find Media::Folder"
+    end
+
+    def place_query(place)
+      query = request.query_parameters.slice("q", "filter").select { |_, value| value.is_a?(String) }.symbolize_keys
+      query[:folder] = place.to_param unless place.all?
+      query.merge(admin_url_options.slice(:locale))
+    end
+
     # The grid's own state, kept by every link out of the panel and by the
     # panel form's own URL (symbol keys, strings only, never `locale`, which
-    # `admin_url_options` carries).
+    # `admin_url_options` carries): the search, the segment, the place and the
+    # page.
     def list_query
-      request.query_parameters.slice("q", "filter", "page").select { |_, value| value.is_a?(String) }.symbolize_keys
+      request.query_parameters.slice("q", "filter", "folder", "page").select { |_, value| value.is_a?(String) }.symbolize_keys
     end
 
     # What an autosave in the panel changes on the screen behind it, answered

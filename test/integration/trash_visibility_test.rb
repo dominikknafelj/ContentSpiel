@@ -485,6 +485,29 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "p", text: /No results for/
   end
 
+  test "a trashed image is in no folder's listing or count, and comes back to its folder" do
+    folder = Media::Folder.create!(name: "Client A")
+    [ @kept_asset, @gone_asset ].each { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
+    place = Media::Place.parse(folder.id.to_s, tree: Media::FolderTree.load)
+    sign_in_as users(:one)
+
+    assert_equal [ @kept_asset.id ], Media::Search.new(place: place, actor: users(:one)).results.ids
+    assert_equal 1, Media::Search.new(place: place, actor: users(:one)).counts[:all]
+    assert_equal({ all: 1, none: 0, folders: { folder.id => 1 } }, Media::FolderCounts.call)
+
+    get "/cs-studio/media", params: { folder: folder.id }
+    assert_select "#media-asset-#{@kept_asset.id}"
+    assert_select "#media-asset-#{@gone_asset.id}", count: 0
+    assert_select "#media-count-all", text: "1"
+
+    as(users(:one)) { assert Trash::Restore.call(@gone_asset.reload).ok? }
+
+    assert_equal folder.id, @gone_asset.reload.folder_id
+    assert_equal({ all: 2, none: 0, folders: { folder.id => 2 } }, Media::FolderCounts.call)
+    get "/cs-studio/media", params: { folder: folder.id }
+    assert_select "#media-asset-#{@gone_asset.id}"
+  end
+
   test "the dashboard's drafts, going-live, needs-translation and activity lists show kept records and never trashed ones" do
     with_locales(%w[en de], default: "en")
     # Drafts are "mine" by their newest audit event, so create them as the viewer.

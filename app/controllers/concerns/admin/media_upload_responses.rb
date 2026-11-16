@@ -33,19 +33,35 @@ module Admin
       {
         id: asset.id, title: asset.title, url: asset.display_url(min_width: 960),
         tile: view_context.render(tile),
-        counts: media_counts
+        counts: media_counts,
+        folder_counts: Media::FolderCounts.call
       }
     end
 
-    # The segment counts for the search the grid is showing (they respect the
-    # search, never the segment). One place for the upload answer and the panel's
-    # autosave answer (`Admin::MediaController#grid_streams`).
+    # The segment counts for the search and the place the grid is showing (they
+    # respect the search, never the segment). One place for the upload answer and
+    # the panel's autosave answer (`Admin::MediaController#grid_streams`).
     def media_counts
-      Media::Search.new(q: params[:q], actor: Current.actor).counts
+      Media::Search.new(q: params[:q], place: requested_place || Media::Place::ALL, actor: Current.actor).counts
+    end
+
+    # The place `folder` names, nil when it names no folder.
+    def requested_place
+      Media::Place.parse(params[:folder], tree: Media::FolderTree.load)
+    end
+
+    # The folder an upload lands in: the place's, or none. A `folder` that names
+    # no folder is not "no folder": the upload is made to a folder that is gone
+    # (id 0 when it is no number at all) and `Media::Upload` refuses it.
+    def upload_folder_id
+      place = requested_place
+      return place.folder if place
+
+      Integer(params[:folder].to_s, 10, exception: false) || 0
     end
 
     def upload_list_query
-      params.permit(:q, :filter, :page).to_h.symbolize_keys.select { |_, value| value.is_a?(String) }
+      params.permit(:q, :filter, :folder, :page).to_h.symbolize_keys.select { |_, value| value.is_a?(String) }
     end
   end
 end

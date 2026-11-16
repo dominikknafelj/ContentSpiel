@@ -61,10 +61,10 @@
   </div>
 </div>
 
-<%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], selected_id: @selected&.id, url_options: admin_url_options) %>
+<%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], selected_id: @selected&.id, url_options: admin_url_options, place: (@place.to_param unless @place.all?)) %>
 </div>
 
-<% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :selected).merge("page" => page)) } %>
+<% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :selected, :folder).merge("page" => page)) } %>
 <%# DOM order is visual order at every width (grid, then rail; the rail stacks
     under the grid in a narrow library): no `order-*` swap, so tab order never
     contradicts what is drawn. `admin--media--panel` moves focus into the

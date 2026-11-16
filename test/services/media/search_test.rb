@@ -140,4 +140,33 @@ class Media::SearchTest < ActiveSupport::TestCase
   end
 
   def ids(**options) = Media::Search.new(actor: @viewer, **options).results.map(&:id).sort
+
+  test "a search and a segment narrow the place, and the counts are the place's" do
+    folder = Media::Folder.create!(name: "Client A")
+    [ @complete, @german_only ].each { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
+    place = Media::Place.parse(folder.id.to_s, tree: Media::FolderTree.load)
+
+    search = Media::Search.new(place: place, actor: @viewer)
+    assert_equal [ @complete, @german_only ].map(&:id).sort, search.results.ids.sort
+    assert_equal 2, search.counts[:all]
+    assert_equal 1, search.counts[:missing_alt]
+
+    assert_equal [ @complete.id ], Media::Search.new(q: "Beach", place: place, actor: @viewer).results.ids
+    assert_equal [ @german_only.id ], Media::Search.new(filter: "missing_alt", place: place, actor: @viewer).results.ids
+    assert_empty Media::Search.new(q: "Sand", place: place, actor: @viewer).results
+
+    none = Media::Search.new(place: Media::Place::NONE, actor: @viewer)
+    assert_equal [ @translated_gap.id, @bare.id ].sort, none.results.ids.sort
+    assert_equal 2, none.counts[:all]
+    assert_equal 4, Media::Search.new(actor: @viewer).counts[:all]
+  end
+
+  test "an empty place is no empty library" do
+    folder = Media::Folder.create!(name: "Empty")
+    place = Media::Place.parse(folder.id.to_s, tree: Media::FolderTree.load)
+    search = Media::Search.new(place: place, actor: @viewer)
+
+    assert_equal 0, search.counts[:all]
+    assert search.any_images?(counts: search.counts)
+  end
 end

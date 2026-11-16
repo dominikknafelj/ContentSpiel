@@ -20,6 +20,10 @@ module Admin
     # typed in the panel. The chosen image rides along as a hidden `selected`,
     # so searching or choosing a segment keeps the panel open.
     #
+    # `place` is the `folder` the listing is of (`Media::Place#to_param`, nil
+    # for All media): it rides along as a hidden field, and Clear keeps it (it
+    # clears the search and the segment, never the place).
+    #
     # `picker: true` is the same toolbar inside `Admin::Ui::MediaPickerComponent`'s own
     # frame (`media-picker-grid`): the form targets that frame (no history, the
     # dialog is not a page), carries `picker=1` so every later request is the
@@ -33,7 +37,8 @@ module Admin
 
       def self.count_id(key, picker: false) = "media-#{"picker-" if picker}count-#{key}"
 
-      def initialize(counts:, filter:, q:, selected_id: nil, url_options: {}, picker: false)
+      def initialize(counts:, filter:, q:, selected_id: nil, url_options: {}, picker: false, place: nil)
+        @place = place
         @picker = picker
         @counts = counts
         @filter = filter.to_s
@@ -44,7 +49,7 @@ module Admin
 
       def path = helpers.admin_media_path(**url_options)
 
-      def clear_path = helpers.admin_media_path(**url_options, **(picker? ? { picker: 1 } : {}))
+      def clear_path = helpers.admin_media_path(**url_options, **(picker? ? { picker: 1 } : {}), **(place ? { folder: place } : {}))
 
       def picker? = @picker
 
@@ -79,7 +84,7 @@ module Admin
 
       private
 
-      attr_reader :counts, :filter, :q, :selected_id, :url_options
+      attr_reader :counts, :filter, :q, :selected_id, :url_options, :place
     end
   end
 end

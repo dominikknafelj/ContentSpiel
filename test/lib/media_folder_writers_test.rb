@@ -47,6 +47,12 @@ class MediaFolderWritersTest < ActiveSupport::TestCase
     assert_includes written, "app/services/media/delete_folder.rb"
   end
 
+  test "every allowed file writes folder_id" do
+    written = offences.map { |offence| offence.split(":").first }.uniq
+
+    assert_empty ALLOWED - written, "a file the guard allows that writes no folder_id is a stale entry"
+  end
+
   test "the guard's patterns read a write and let a read through" do
     assert(WRITES.any? { |pattern| "asset.folder_id = 4".match?(pattern) })
     assert(WRITES.any? { |pattern| "asset.update_columns(folder_id: 4)".match?(pattern) })
