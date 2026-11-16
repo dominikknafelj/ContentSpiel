@@ -116,7 +116,9 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
   end
 
   test "a limited address answers the same for a known and an unknown address, past the rate limit and past the wide cap" do
-    10.times { |index| attempt("person#{index}@example.org", paced: false) }
+    # The eleventh is the trip, which records `request.limited` once; the two
+    # compared are refusals after it, which write nothing.
+    11.times { |index| attempt("person#{index}@example.org", paced: false) }
     limited = [ answer_to(EMAIL, password: PASSWORD), answer_to(UNKNOWN) ]
     assert_equal(*limited)
     assert_equal I18n.t("admin.sessions.limited"), limited.first[:flash]
@@ -325,9 +327,8 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
     10.times { |index| attempt("person#{index}@example.org", paced: false) }
     assert_equal I18n.t("admin.sessions.refused"), flash[:alert]
 
-    assert_no_difference -> { Audit::Event.count } do
-      attempt(EMAIL, password: PASSWORD, paced: false)
-    end
+    attempt(EMAIL, password: PASSWORD, paced: false)
+    assert_equal [ "request.limited" ], Audit::Event.order(:id).last(1).map(&:action)
     assert_redirected_to admin_sign_in_path
     assert_equal "Try again later.", flash[:alert]
     assert_nil cookies[:session_id]
@@ -335,5 +336,18 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
     travel 3.minutes + 1.second
     attempt(EMAIL, password: PASSWORD)
     assert_redirected_to admin_root_path
+  end
+
+  test "the eleventh sign-in POST in three minutes records one request.limited, the twelfth none" do
+    10.times { |index| attempt("person#{index}@example.org", paced: false) }
+    limited = Audit::Event.where(action: "request.limited")
+    assert_empty limited
+
+    attempt(EMAIL, password: PASSWORD, paced: false)
+    event = limited.sole
+    assert_equal({ "limit" => "default", "door" => "admin/sessions#create" }, event.metadata)
+
+    attempt(EMAIL, password: PASSWORD, paced: false)
+    assert_equal 1, limited.count
   end
 end

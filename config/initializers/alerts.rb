@@ -12,3 +12,12 @@ Rails.error.subscribe(Object.new.tap do |subscriber|
     Alerts::ErrorSubscriber.new.report(error, handled: handled, severity: severity, context: context, source: source)
   end
 end)
+
+# A refused request of a rate limit is an audit event unless its door is
+# public (`Audit::RequestLimits`). The notification is named by its string and
+# the block names the module each time it runs, as `editing.rb` does, so no
+# application constant loads while Rails boots and a development reload is
+# followed.
+ActiveSupport::Notifications.subscribe("rate_limit.action_controller") do |*, payload|
+  Audit::RequestLimits.heard(payload)
+end

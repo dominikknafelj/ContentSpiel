@@ -314,7 +314,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   end
 
   test "the security keys" do
-    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted] +
+    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted request.limited] +
       PASSKEY_EVENTS - %w[passkey.renamed] + SSO_EVENTS
     assert_equal secure.sort, Audit::Sentence::ACTIONS.select { |action| sentence_for(Audit::Event.new(action:, occurred_at: Time.current, last_occurred_at: Time.current)).security }.sort
   end
