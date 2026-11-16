@@ -45,6 +45,11 @@ Rails.application.configure do
   # :test, where the settings' state is recorded as for a real send.
   config.x.mail.smtp_loopback_only = true
 
+  # Error reports queue no alert, so the suite's own handled reports stay
+  # quiet; a test turns them on with `with_error_alerts`
+  # (test/support/error_alerts.rb).
+  config.x.alerts.errors = false
+
   # Set host to be used by links generated in mailer templates.
   config.action_mailer.default_url_options = { host: "example.com" }
 
