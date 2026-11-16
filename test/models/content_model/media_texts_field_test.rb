@@ -20,6 +20,10 @@ class ContentModel::MediaTextsFieldTest < ActiveSupport::TestCase
     assert_equal({ "12" => { "caption" => "Dawn" } }, fields({ "texts" => { "12" => { "caption" => "Dawn", "other" => "x" } } }).texts)
     assert_nil fields({ "texts" => { "12" => { "caption" => "" } } }).texts
     assert_nil fields({ "texts" => "nonsense" }).texts
+    [ { "1" => [ 1, 2 ] }, { "1" => [ [ 1 ] ] }, '{"1":[1,2]}', { "1" => [ [ "caption", "x" ] ] }, { "1" => "text" }, { "1" => 5 } ].each do |sent|
+      assert_nil fields({ "texts" => sent }).texts, sent.inspect
+    end
+    assert_equal({ "2" => { "caption" => "ok" } }, fields({ "texts" => { "1" => [ 1 ], "2" => { "caption" => "ok" } } }).texts, "a pair that is no Hash is dropped, the rest kept")
   end
 
   test "a text over max characters is refused as too long" do
@@ -53,6 +57,7 @@ class ContentModel::MediaTextsFieldTest < ActiveSupport::TestCase
   end
 
   test "only a built-in block type may declare either: a content type, a field group and an outside block type may not" do
+    saved = BlockTypes.all.dup
     [ ContentModel::ContentTypeDefinition, ContentModel::FieldGroupDefinition ].each do |kind|
       %i[media_list media_texts].each do |type|
         options = type == :media_texts ? { translated: true, of: :images } : {}
@@ -61,7 +66,6 @@ class ContentModel::MediaTextsFieldTest < ActiveSupport::TestCase
       end
     end
 
-    saved = BlockTypes.all.dup
     error = assert_raises(ArgumentError) do
       BlockTypes.register("outside/pictures") do |t|
         t.field :images, :media_list

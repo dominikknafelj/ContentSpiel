@@ -16,6 +16,7 @@ class ContentModel::MediaListFieldTest < ActiveSupport::TestCase
   test "a list casts from an array or a JSON string to unique positive ids in order" do
     assert_equal [ 3, 1, 4 ], fields({ "images" => "[3, 1, 3, -2, \"x\", 4]" }).images
     assert_equal [ 3, 1, 4 ], fields({ "images" => [ 3, "1", 3, -2, "x", 4, 0 ] }).images
+    assert_equal [ 2**63 - 1 ], fields({ "images" => [ 10**30, "99999999999999999999", 2**63 - 1, 2**63 ] }).images, "an id above the bigint maximum is no image"
   end
 
   test "anything else and an empty list cast to nil" do

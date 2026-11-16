@@ -427,8 +427,8 @@ module ContentModel
       # dropped, nil when nothing is left. Keyed by id, so a text stays with
       # its image when the list is reordered, and an id the list no longer
       # holds is the block's to drop, not this type's (it cannot see the
-      # list). Translated, since a text is prose, and tracked for translation
-      # state. `max:` counts characters of each text, refused as `:too_long`.
+      # list). Translated by option (`translated: true`, required), not offered
+      # to AI translation, and tracked for translation state. `max:` counts characters of each text, refused as `:too_long`.
       def media_texts
         FieldType.new(
           name: :media_texts, translatable: false, audit: :value,
@@ -631,12 +631,15 @@ module ContentModel
 
         ids = list.filter_map do |entry|
           case entry
-          when Integer then entry if entry.positive?
-          when String then entry.to_i if entry.match?(/\A[1-9]\d*\z/)
+          when Integer then entry if entry.between?(1, MEDIA_ID_MAX)
+          when String then entry.to_i.then { |id| id if id <= MEDIA_ID_MAX } if entry.match?(/\A[1-9]\d*\z/)
           end
         end.uniq
         ids.presence
       end
+
+      # An id past a bigint's maximum is no image: it could never be a key.
+      MEDIA_ID_MAX = 2**63 - 1
 
       MEDIA_TEXT_KEYS = %w[caption alt].freeze
 
@@ -648,9 +651,10 @@ module ContentModel
         return nil unless value.is_a?(Hash)
 
         texts = value.each_with_object({}) do |(id, pair), kept|
-          next unless id.to_s.match?(/\A\d+\z/) && pair.respond_to?(:to_h) && !pair.is_a?(String)
+          pair = pair.to_unsafe_h if pair.respond_to?(:to_unsafe_h)
+          next unless id.to_s.match?(/\A\d+\z/) && pair.is_a?(Hash)
 
-          pair = pair.to_h.stringify_keys
+          pair = pair.stringify_keys
           cleaned = MEDIA_TEXT_KEYS.each_with_object({}) { |key, hash| (text = STRIPPED.call(pair[key])) && hash[key] = text }
           kept[id.to_s] = cleaned if cleaned.any?
         end
