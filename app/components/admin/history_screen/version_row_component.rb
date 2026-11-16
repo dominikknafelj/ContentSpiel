@@ -40,7 +40,11 @@ module Admin
       def chip_status = CHIPS[row.state]
 
       def time_line
-        line = t(row.live_at.future? ? ".goes_live" : ".went_live", time: datetime(row.live_at))
+        return t(".goes_live", time: datetime(row.live_at)) if row.live_at.future?
+
+        # "was scheduled" is said of a copy that has gone live: a pending one
+        # is scheduled now, which its chip says.
+        line = t(".went_live", time: datetime(row.live_at))
         row.was_scheduled ? t(".with_scheduled", line: line) : line
       end
 

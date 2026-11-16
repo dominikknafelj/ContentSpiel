@@ -28,8 +28,11 @@ class Admin::HistoryScreen::ComparisonComponentTest < ViewComponent::TestCase
     draw
 
     assert_selector "section[aria-labelledby=history-comparison-heading] h2#history-comparison-heading", text: "Version 2"
-    assert_equal [ "the version before it (1)", "the working version", "Version 1" ], page.all("select[name=with] option").map(&:text)
+    assert_equal [ "the version before it (1)", "the working version" ], page.all("select[name=with] option").map(&:text), "version 1 is the version before it, offered once"
     assert_selector "select[name=with] option[selected][value=previous]"
+    draw(version: 1, with: "working")
+    assert_equal [ "the working version", "Version 2" ], page.all("select[name=with] option").map(&:text), "the chosen version is not offered against itself"
+    draw
     assert_selector "input[type=hidden][name=version][value='2']", visible: :hidden
     assert_no_selector "input[name=page]", visible: :hidden
     assert_selector "form[method=get][action='/h'][data-controller~='admin--ui--auto-submit']"

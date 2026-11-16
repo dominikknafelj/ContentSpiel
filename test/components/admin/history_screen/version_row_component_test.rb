@@ -49,14 +49,20 @@ class Admin::HistoryScreen::VersionRowComponentTest < ViewComponent::TestCase
     assert_text "Kept when history began"
   end
 
-  test "a pending copy is Scheduled, goes live later, and says it was scheduled" do
+  test "a pending copy is Scheduled and goes live later; only a copy gone live says it was scheduled" do
     live_at = 3.days.from_now.change(hour: 9, min: 0)
     pending = Publishing::Version.take!(@pricing.reload, live_at: live_at, by: @me) # version: none (a test takes a copy)
 
     draw(row: row_for(pending.number), href: "/v")
 
     assert_selector ".admin-status-chip", text: "Scheduled"
-    assert_text "Goes live #{I18n.l(live_at.in_time_zone(Current.site.effective_time_zone), format: :"admin.datetime")} · was scheduled"
+    assert_text "Goes live #{I18n.l(live_at.in_time_zone(Current.site.effective_time_zone), format: :"admin.datetime")}"
+    assert_no_text "was scheduled"
+
+    Publishing::Version.where(id: pending.id).update_all(live_at: 1.hour.ago, created_at: 2.hours.ago) # version: none (a test lets the copy's time pass) # changes: none (a test)
+    draw(row: row_for(pending.number), href: "/v")
+
+    assert_text "· was scheduled"
   end
 
   test "an earlier copy has no chip" do

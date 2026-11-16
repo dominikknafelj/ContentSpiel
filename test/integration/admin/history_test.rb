@@ -130,19 +130,20 @@ class Admin::HistoryTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "someone with edit and not publish on a live page sees the history and no Restore" do
-    branch = create_page(title: "Branch")
-    page = create_page(title: "Pricing", parent: branch)
+  test "the chosen version's own number, or the previous one's, is the default comparison" do
+    page = create_page(title: "Pricing")
     publish_title(page, "Pricing and plans")
-    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: { "page_ids" => [ branch.id ] })
-    sign_in_as users(:editor_branch)
+    publish_title(page, "Pricing for teams")
+    sign_in_as users(:one)
 
-    get admin_page_history_path(page, version: 1)
-
-    assert_response :success
-    assert_equal "Version 1", comparison.at_css("h2").text.strip
-    assert_nil comparison.at_css("[data-history-restore]")
-    assert_not_includes response.body, "Restore version"
+    get admin_page_history_path(page, version: 3, with: 3)
+    assert_equal "previous", comparison.at_css("select[name=with] option[selected]")["value"]
+    get admin_page_history_path(page, version: 3, with: 2)
+    assert_equal "previous", comparison.at_css("select[name=with] option[selected]")["value"]
+    get admin_page_history_path(page, version: 1, with: 1)
+    assert_equal "working", comparison.at_css("select[name=with] option[selected]")["value"]
+    get admin_page_history_path(page, version: 3, with: 1)
+    assert_equal "1", comparison.at_css("select[name=with] option[selected]")["value"]
   end
 
   test "an author sees the history of their own live post" do

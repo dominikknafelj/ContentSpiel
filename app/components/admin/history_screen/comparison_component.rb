@@ -56,7 +56,9 @@ module Admin
         options = []
         options << [ t(".before_it", number: @previous.number), "previous" ] if @previous
         options << [ t(".working_option"), "working" ]
-        options + (@numbers - [ version.number ]).map { |number| [ t(".version", number: number), number.to_s ] }
+        # The chosen version is not compared with itself, and the one before
+        # it is already its own option.
+        options + (@numbers - [ version.number, @previous&.number ]).map { |number| [ t(".version", number: number), number.to_s ] }
       end
 
       def with_value = @with

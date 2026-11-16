@@ -23,19 +23,12 @@ module Admin
 
       def editor_url = helpers.public_send(page? ? :admin_page_path : :admin_post_path, record, **url_options)
 
-      # [label, url-or-nil] per crumb before the record's own.
+      # [label, url-or-nil] per crumb before the record's own
+      # (`Admin::RecordCrumbsHelper`, the editor header's), the module's
+      # crumb worded here.
       def crumbs
-        if page?
-          pages = [ t(".pages"), can?("pages.read") && !record.root? ? helpers.admin_pages_path(**url_options) : nil ]
-          [ pages ] + record.ancestors.to_a.reverse.map do |ancestor|
-            [ ::Locales.read(ancestor, :title, locale: locale), can?("pages.read", ancestor) ? helpers.admin_page_path(ancestor, **url_options) : nil ]
-          end
-        else
-          allowed = can?("posts.read")
-          label = ::ContentTypes.find(record.content_type)&.label || record.content_type
-          [ [ t(".posts"), allowed ? helpers.admin_posts_path(**url_options) : nil ],
-            [ label, allowed ? helpers.admin_posts_path(type: record.content_type, **url_options) : nil ] ]
-        end
+        helpers.record_crumbs(record, locale: locale, url_options: url_options, can: ->(key, subject) { can?(key, subject) })
+          .map { |label, url| [ label.is_a?(Symbol) ? t(".#{label}") : label, url ] }
       end
     end
   end

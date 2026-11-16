@@ -56,12 +56,17 @@ module Admin
     end
 
     # What the `with` select shows chosen: "previous" while a copy comes
-    # before this one, "working" for the first copy or on asking, or a number.
+    # before this one, "working" for the first copy or on asking, or another
+    # copy's number. The chosen version's own number, or the previous one's
+    # (which the select offers as "the version before it"), is the default.
     def with_choice
+      default = @previous ? "previous" : "working"
       case params[:with].to_s
       when "working" then "working"
-      when "", "previous" then @previous ? "previous" : "working"
-      else number_param(:with).to_s
+      when "", "previous" then default
+      else
+        number = number_param(:with)
+        [ @version.number, @previous&.number ].include?(number) ? default : number.to_s
       end
     end
 
