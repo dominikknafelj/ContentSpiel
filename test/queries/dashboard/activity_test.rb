@@ -311,6 +311,20 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert_empty activity(users(:reader)).rows, "a viewer without media.upload sees no upload, counted or not"
   end
 
+  test "moves to one folder are one row reading moved 3 images to the folder, and moves to two folders are two rows" do
+    client, other = Media::Folder.create!(name: "Client A"), Media::Folder.create!(name: "Client B")
+    move = ->(folder) { assert as(@me) { Media::MoveImages.call(asset_ids: [ create_media_asset.id ], folder: folder) }.ok? }
+    3.times { move.call(client) }
+
+    row = activity.rows.first
+    assert_equal [ "media.moved", 3 ], [ row.event.action, row.count ]
+    assert_equal "moved 3 images to “Client A”", row.sentence.parts.map(&:text).join
+    assert_equal Audit::Sentence.library_route, row.sentence.subject_route
+
+    move.call(other)
+    assert_equal [ [ "media.moved", 1 ], [ "media.moved", 3 ] ], activity.rows.map { |r| [ r.event.action, r.count ] }
+  end
+
   test "an untitled page still names its target in a counted row" do
     page = as(@me) { create_page(title: "Blank soon") }
     page.update_columns(title: {}) # a page whose title is blank in every language

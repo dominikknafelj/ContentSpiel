@@ -12,12 +12,20 @@ module Media
   # AT MOST `MAX` IDS, refused before anything is read. A trashed or missing
   # id is refused as missing, nothing moves.
   #
-  # THE ORDER inside the transaction: the target folder's row FOR SHARE, then
+  # THE ORDER inside the transaction: the target folder's row FOR KEY SHARE, then
   # the images' rows FOR UPDATE by id. `Media::DeleteFolder` takes the folder's
   # row FOR UPDATE before it touches an image, so a delete waits for a move
   # that came first (its images go up with the rest) and a move that comes
   # after finds the folder gone and moves nothing; no image falls to "Not in a
   # folder" through the foreign key's nullify.
+  #
+  # FOR KEY SHARE and not FOR SHARE: it still blocks that FOR UPDATE and the
+  # row's DELETE, which is all the rule needs, but not the re-parenting of the
+  # folder. Deleting the target's PARENT re-parents the target (`update_all`
+  # takes FOR NO KEY UPDATE on it, which FOR SHARE would block) after it has
+  # updated that parent's images, the very ones a move may be holding: the
+  # move would wait for the delete's image locks and the delete for the move's
+  # folder lock, a deadlock answered as a 500.
   #
   # The write is one `update_all(folder_id:)`: it touches no `updated_at` and
   # no content version. An open panel's autosave base is the image's
@@ -54,7 +62,7 @@ module Media
 
       moved = nil
       outcome = Media::Asset.transaction do
-        target = @folder && Media::Folder.lock("FOR SHARE").find_by(id: @folder.id)
+        target = @folder && Media::Folder.lock("FOR KEY SHARE").find_by(id: @folder.id)
         next failure(nil, [ "That folder is gone." ]) if @folder && target.nil?
 
         locked = Media::Asset.kept.where(id: ids).order(:id).lock("FOR UPDATE").to_a
