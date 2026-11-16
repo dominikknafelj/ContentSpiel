@@ -101,7 +101,8 @@ module BlockTypes
       ContentModel::Preview.new(heading: label, line: true) if label.present?
     end
 
-    # The captions and alt overrides of the images that are there, in the
+    # The captions and alt overrides of the images that are there (kept,
+    # with a file: what `Blocks::GalleryComponent#items` draws), in the
     # list's order, read as the public page reads them (the fallback-aware
     # reader), as the Image block gives its own caption and alt. The library
     # image's own alt and caption are the asset's, read live and in no copy,
@@ -113,7 +114,7 @@ module BlockTypes
       ids = Array(settings&.images)
       return [] if ids.empty?
 
-      there = Media::Asset.with_file.where(id: ids).select { |asset| asset.file.attached? }.to_set(&:id)
+      there = Media::Asset.kept.with_file.where(id: ids).select { |asset| asset.file.attached? }.to_set(&:id)
       texts = settings.texts.to_h
       ids.select { |id| there.include?(id) }.flat_map { |id| texts.fetch(id.to_s, {}).values_at("caption", "alt") }.compact
     end

@@ -347,6 +347,20 @@ class Admin::MediaFoldersTest < ActionDispatch::IntegrationTest
                  "an except that is no string is ignored"
   end
 
+  # An image whose file is gone is no item, so it is not counted either:
+  # "Add all N" never names more images than it adds.
+  test "a folder's images count only the images with a file, as the items are" do
+    folder = Media::Folder.create!(name: "Client A")
+    with_file = create_media_asset.tap { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
+    without = create_media_asset.tap { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
+    without.file.attachment.delete
+    sign_in_as(users(:one))
+
+    answer = folder_images(folder.id)
+    assert_equal [ with_file.id ], answer["items"].map { |item| item["id"] }
+    assert_equal 1, answer["total"]
+  end
+
   test "a folder's images need media.upload, asked before the folder is looked up, and an unknown folder is a 404" do
     folder = Media::Folder.create!(name: "Client A")
     unknown = Media::Folder.maximum(:id) + 1000

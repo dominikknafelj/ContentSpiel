@@ -51,15 +51,17 @@ module Admin
         open_set: TreeOpenSet::EMPTY, manage: false, mode: :picker, digest: place.digest(tree), gone: gone), layout: false
     end
 
-    # `total` counts the folder's kept images (never a subfolder's) whose ids
-    # `except` does not name; `items` are the oldest `limit` of them by id,
-    # upload order, each with the keys a picker tile hands back, in the
-    # admin language. `limit` and `except` never pass a gallery's size.
+    # `total` counts the folder's kept images with a file (never a
+    # subfolder's) whose ids `except` does not name; `items` are the oldest
+    # `limit` of them by id, upload order, each with the keys a picker tile
+    # hands back, in the admin language. `limit` and `except` never pass a gallery's size.
     def images
       place = Media::Place.parse(params[:id].to_s, tree: Media::FolderTree.load)
       raise ActiveRecord::RecordNotFound unless place&.folder
 
-      scope = place.narrow(Media::Asset.kept).where.not(id: excepted_ids)
+      # One scope for both, so "Add all N" never counts an image it would not
+      # add: one with no file is no picker tile and no gallery item.
+      scope = place.narrow(Media::Asset.kept.joins(:file_attachment)).where.not(id: excepted_ids)
       items = scope.with_file.order(:id).limit(images_limit).map { |asset| picked_keys(asset) }
       render json: { total: scope.count, items: items }
     end

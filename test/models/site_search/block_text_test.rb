@@ -128,4 +128,17 @@ class SiteSearch::BlockTextTest < ActiveSupport::TestCase
     assert_equal "First caption First alt Second caption", body
     assert_equal "Zweite Unterschrift", field(document("de"), "body").text
   end
+
+  # A gallery's usage rows keep its images from the trash, so a trashed one
+  # in its list was trashed around the services: the site skips it
+  # (`Blocks::GalleryComponent#items`), and its texts are not searched.
+  test "a gallery gives no texts of an image in the trash" do
+    kept, trashed = Array.new(2) { create_media_asset }
+    block = add_block("gallery", settings: { "images" => [ trashed.id, kept.id ],
+                                             "texts" => { trashed.id.to_s => { "caption" => "Trashed caption", "alt" => "Trashed alt" },
+                                                          kept.id.to_s => { "caption" => "Kept caption" } } })
+    trashed.update_columns(trashed_at: Time.current) # version: none (an image trashed around the services)
+
+    assert_equal [ "Kept caption" ], BlockTypes::Gallery.search_text(block.reload, locale: "en")
+  end
 end
