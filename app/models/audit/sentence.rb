@@ -672,6 +672,7 @@ module Audit
         @pages = readable(Page, "pages.read", ids("Page") + owner_ids("Page"))
         @posts = readable(Post, "posts.read", ids("Post") + owner_ids("Post"))
         @media = media_ids
+        @folders = existing(Media::Folder, "media.upload", ids("Media::Folder"))
         @users = existing(User, "users.manage", ids("User"))
         @groups = existing(AccessControl::Group, "groups.manage", ids("AccessControl::Group"))
         @settings = holds?("settings.manage")
@@ -685,6 +686,10 @@ module Audit
         when "ContentBlock" then owner_target(event)
         when "Page", "Post" then Target.new(event.subject_label, (Sentence.route_for(records(type)[event.subject_id]) if records(type)[event.subject_id]))
         when "Media::Asset" then Target.new(event.subject_label, (Route.new(:admin_media_path, [], { selected: event.subject_id }) if @media.include?(event.subject_id)))
+        when "Media::Folder"
+          # A deleted folder's sentence has no link, and neither has a folder that is gone.
+          open = event.action != "media_folder.deleted" && @folders.include?(event.subject_id)
+          Target.new(event.subject_label, (Route.new(:admin_media_path, [], { folder: event.subject_id }) if open))
         when "User" then Target.new(event.subject_label, (Route.new(:edit_admin_user_path, [ event.subject_id ], {}) if @users.include?(event.subject_id)))
         when "AccessControl::Group" then Target.new(event.subject_label, (Route.new(:edit_admin_group_path, [ event.subject_id ], {}) if @groups.include?(event.subject_id)))
         when "SiteSetting" then Target.new(event.subject_label, (Route.new(:admin_settings_path, [], {}) if @settings))

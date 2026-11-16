@@ -157,6 +157,20 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "Media folder", Audit::Filter::SUBJECT_TYPES.fetch("Media::Folder")
   end
 
+  test "a folder's sentence links to the Media screen at that folder while it exists, and a deleted one has no link" do
+    folder = Media::Folder.create!(name: "Trips")
+    made = event("media_folder.created", subject_type: "Media::Folder", subject_id: folder.id, subject_label: "Trips")
+    route = sentence_for(made).subject_route
+
+    assert_equal [ :admin_media_path, [], { folder: folder.id } ], [ route.name, route.args, route.params ]
+
+    deleted = event("media_folder.deleted", subject_type: "Media::Folder", subject_id: folder.id, subject_label: "Trips")
+    assert_nil sentence_for(deleted).subject_route
+
+    folder.destroy!
+    assert_nil sentence_for(made).subject_route
+  end
+
   # A form's five actions, its name quoted as a subject.
   test "a form's actions" do
     cases = {
