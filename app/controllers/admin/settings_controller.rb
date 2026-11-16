@@ -24,6 +24,8 @@ module Admin
     include MailTestSending
     include GlanceRows
 
+    helper_method :post_type_counts
+
     before_action -> { forbidden! unless holds_any?(%w[settings.manage languages.manage]) }
     # The AI test is a `settings.manage` action; the module gate above would
     # also let a languages-only viewer reach it.
@@ -72,7 +74,10 @@ module Admin
         # `language_order` is the one tracked field that makes a reorder a
         # single change for the footer (`admin--settings--sortable-rows`); the rows
         # themselves are what is read.
-        languages: [ :code, :fallback ]
+        languages: [ :code, :fallback ],
+        # The Post types card's switches; the hidden empty value keeps an
+        # all-off form an empty list, not a missing field.
+        content_types: []
       )
 
       if stale_form?(site, params[:base_updated_at])
@@ -147,6 +152,13 @@ module Admin
 
     private
 
+    # Kept posts per type the viewer may read, for the Post types card, in one
+    # grouped statement through the read scope (a count of posts the viewer
+    # cannot read would say they exist). Read once per request.
+    def post_type_counts
+      @post_type_counts ||= AccessControl.scope(Current.actor, "posts.read", Post.kept).group(:content_type).count
+    end
+
     # The card's foot, its state and the rail's Mail row, as they are after a test mail.
     def mail_test_streams(**result)
       [
@@ -162,7 +174,7 @@ module Admin
     # unless a new file came with it), the social link rows in the order the
     # form numbered them, and only the languages/fields actually posted.
     def site_arguments(permitted)
-      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, :passkey_policy, *Admin::Ui::MailFieldsComponent::FIELDS,
+      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, :passkey_policy, :content_types, *Admin::Ui::MailFieldsComponent::FIELDS,
         *Admin::SettingsScreen::ImagesCardComponent::FIELDS).to_h
       attributes["image_widths"] = ImageSettings.parse_widths(attributes["image_widths"]) if attributes.key?("image_widths")
       attributes = drop_blank_file_params(attributes, fields: %w[logo])

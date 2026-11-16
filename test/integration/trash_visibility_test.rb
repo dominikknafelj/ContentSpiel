@@ -1391,6 +1391,15 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal({ total: 1, made: 0, failed: 0 }, Media::RenditionProgress.new.counts)
   end
 
+  test "the Post types card counts no trashed post" do
+    @gone_post.update!(trashed_at: Time.current)
+    sign_in_as(users(:one))
+
+    get admin_settings_path
+
+    assert_select "[data-post-type=blog] [data-post-count]", text: "1 post"
+  end
+
   private
 
   def call_tool(raw_token, name, arguments = {})

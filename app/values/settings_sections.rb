@@ -21,6 +21,7 @@ module SettingsSections
   ALL = [
     Section.new(id: "site", permission: "settings.manage", family: :structure, icon: :pages),
     Section.new(id: "languages", permission: "languages.manage", family: :text, icon: :translations),
+    Section.new(id: "post_types", permission: "settings.manage", family: :lists, icon: :posts),
     Section.new(id: "publishing", permission: "settings.manage", family: :lists, icon: :file_text),
     Section.new(id: "forms", permission: "settings.manage", family: :form, icon: :clipboard_list),
     Section.new(id: "ai", permission: "settings.manage", family: :code, icon: :assistant),

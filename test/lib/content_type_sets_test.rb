@@ -19,6 +19,8 @@ class ContentTypeSetsTest < ActiveSupport::TestCase
     "app/services/settings/save.rb" => "the switch is normalised against the declared names",
     "db/seeds.rb" => "development switches every declared type on",
     "app/values/theme/contract.rb" => "a theme's contract is the code's, whatever a site switches on",
+    "app/components/admin/settings_screen/post_types_card_component.rb" => "the card draws every declared type, on or off",
+    "app/components/admin/settings_screen/values.rb" => "the Post types card's typed value is read against every declared type, on or off",
     "app/models/site_setting.rb" => "the at-least-one rule counts declared names"
   }.freeze
 

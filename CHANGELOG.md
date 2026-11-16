@@ -4,7 +4,7 @@
 
 ### Added
 
-- Each post type is switched on or off in Settings (the Post types card follows); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`.
+- Each post type is switched on or off in Settings (Settings › Post types: a switch per declared type, with its post count, saved with the save bar and found in ⌘K); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`.
 
 ### Changed
 

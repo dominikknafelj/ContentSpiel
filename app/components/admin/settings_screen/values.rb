@@ -61,6 +61,14 @@ module Admin
         field(name) { site.public_send(name) }
       end
 
+      # The post types shown switched on: the declared names ticked in the
+      # submitted form, else the stored ones. A stored name that is no longer
+      # declared is neither shown nor compared (the service carries it).
+      def content_types
+        names = submitted&.key?(:content_types) ? Array(submitted[:content_types]).map(&:to_s) : site.content_types
+        ::ContentTypes.all.map { |definition| definition.name.to_s }.select { |name| names.include?(name) }
+      end
+
       def remove_logo? = ActiveModel::Type::Boolean.new.cast(submitted&.dig(:remove_logo)) || false
 
       # The stored logo. After a refused save the record in memory holds the
@@ -126,6 +134,7 @@ module Admin
         end
         names += SINGLE_FIELDS.select { |name| single(name) != saved.single(name) }.map(&:to_s)
         names << "logo" if remove_logo?
+        names << "content_types" if content_types != saved.content_types
         names << "social_links" if social_rows != saved.social_rows.map { |name, url| [ name.to_s, url.to_s ] }
         names + language_changes(saved)
       end
