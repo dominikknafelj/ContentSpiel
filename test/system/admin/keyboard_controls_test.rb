@@ -93,6 +93,29 @@ class Admin::KeyboardControlsSystemTest < ApplicationSystemTestCase
     assert_selector "dialog#new-page-dialog[open]"
   end
 
+  # No screen draws a choice tile yet that this test could visit, so it draws a
+  # group on a page of its own: the arrow keys are the browser's for radios of
+  # one name, and what is held here is that the tile's markup keeps them so.
+  test "a choice tile is one Tab stop for its group, and the arrow keys move the choice between its tiles" do
+    tiles = %w[scheduled later].map.with_index do |value, index|
+      Admin::Ui::ChoiceTileComponent.new(name: "choice", value: value, title: "Title #{value}", line: "Line #{value}", checked: index.zero?)
+    end
+    html = ApplicationController.render(inline: <<~ERB, locals: { tiles: tiles })
+      <p>Before</p><div role="radiogroup" aria-label="What goes live"><% tiles.each do |tile| %><%= render tile %><% end %></div><button>After</button>
+    ERB
+    page.driver.browser.goto("data:text/html;charset=utf-8,#{ERB::Util.url_encode(html)}")
+
+    page.find("p", text: "Before").click
+    stop_on("input[value=scheduled]")
+    page.send_keys(:arrow_down)
+    assert find("input[value=later]").checked?
+    assert_equal "later", page.evaluate_script("document.activeElement.value")
+    page.send_keys(:arrow_up)
+    assert find("input[value=scheduled]").checked?
+    page.send_keys(:tab)
+    assert_equal "After", focused_text
+  end
+
   test "a checkbox is a Tab stop that Space checks and unchecks: a posts row's Select" do
     post = Current.set(actor: users(:one)) { create_post(title: "Checked by keyboard") }
     visit_screen admin_posts_path

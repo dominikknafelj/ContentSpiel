@@ -33,6 +33,7 @@ module DesignSystemEntries
     "Admin::Ui::BlockIconComponent" => "IconChip",
     "Admin::Ui::ChangesOverviewComponent" => "StudioHistory",
     "Admin::Ui::ChannelChipComponent" => "Badge",
+    "Admin::Ui::ChoiceTileComponent" => "ChoiceFields",
     "Admin::Ui::CheckboxComponent" => "ChoiceFields",
     "Admin::Ui::ConfirmDialogComponent" => "Dialog",
     "Admin::Ui::ConfirmIdentityDialogComponent" => "StudioPasskeys",
