@@ -1,0 +1,28 @@
+<%= tag.li class: class_names("admin-history-row", "admin-history-row--working" => working?), data: { version_row: row_key } do %>
+  <div class="flex items-center justify-between gap-2">
+    <% if working? %>
+      <span class="text-sm font-semibold text-ink"><%= t(".working") %></span>
+      <% if working.changes %>
+        <%= render Admin::Ui::UnpublishedChipComponent.new %>
+      <% end %>
+    <% else %>
+      <%= link_to t(".version", number: row.number), href, class: "admin-row-link text-sm font-semibold text-ink", aria: { current: (current? ? "true" : nil) } %>
+      <% if chip_status %>
+        <%= render Admin::Ui::StatusChipComponent.new(status: chip_status, at: row.live_at) %>
+      <% end %>
+    <% end %>
+  </div>
+  <% if working? %>
+    <p class="mt-0.5 text-small text-dim"><%= saved_line %></p>
+  <% else %>
+    <p class="mt-0.5 text-small text-dim"><%= time_line %></p>
+    <% if row.publisher %>
+      <p class="mt-1 flex min-w-0 items-center gap-1.5 text-small text-dim">
+        <%= render Admin::Ui::ActorAvatarComponent.new(user: row.publisher, viewer: Current.user, size: :sm) %>
+        <span class="min-w-0 truncate"><%= publisher_name %></span>
+      </p>
+    <% else %>
+      <p class="mt-1 text-small text-meta"><%= t(".kept_when_began") %></p>
+    <% end %>
+  <% end %>
+<% end %>

@@ -54,6 +54,13 @@ module Publishing
 
     def find(number) = copies.find_by!(number: number)
 
+    # The newest copy, pending or not: the version the screen shows first.
+    # Nil for a record never published.
+    def newest = copies.order(number: :desc).first
+
+    # Every copy's number, newest first: what a version can be compared with.
+    def numbers = copies.order(number: :desc).pluck(:number)
+
     # The copy before `number`, or nil for the first.
     def previous(number) = copies.where(arel_table[:number].lt(number)).order(number: :desc).first
 

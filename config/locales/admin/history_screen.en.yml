@@ -1,0 +1,68 @@
+# CS Studio's History screen components, `app/components/admin/history_screen/`
+# (docs/reference/i18n.md; the words are the StudioHistory card's). Keys are
+# `admin.components.history_screen.<class name without Admin:: and Component,
+# underscored>`. The view has no words of its own: an `admin.history` scope
+# would make every `history.…` literal in a script read as a message key
+# (`test/lib/script_messages_test.rb`).
+# YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
+# glyph that opens a YAML token (a bullet, `·`) is double-quoted.
+en:
+  admin:
+    components:
+      history_screen:
+        # `Admin::HistoryScreen::HeadComponent`, the crumbs and the heading row.
+        head:
+          title: "History"
+          breadcrumb: "Breadcrumb"
+          pages: "Pages"
+          posts: "Posts"
+          back: "Back to editor"
+        # `Admin::HistoryScreen::VersionRowComponent`, one row of the versions.
+        version_row:
+          version: "Version %{number}"
+          working: "Working version"
+          saved: "Saved %{time}"
+          # The time of a save made today: "14:02 today".
+          today: "%{time} today"
+          went_live: "Went live %{time}"
+          goes_live: "Goes live %{time}"
+          # A copy that was a scheduled change: "Went live 8 Nov 2026, 16:40 · was scheduled".
+          with_scheduled: "%{line} · was scheduled"
+          kept_when_began: "Kept when history began"
+        # `Admin::HistoryScreen::VersionsComponent`, the rail, and below its
+        # threshold the disclosure whose summary names the chosen version.
+        versions:
+          heading: "Versions"
+          version: "Version %{number}"
+          went_live: "Went live %{time}"
+          goes_live: "Goes live %{time}"
+          count:
+            one: "1 version"
+            other: "%{count} versions"
+          # "Went live 3 Nov 2026 · 7 versions".
+          summary_line: "%{time} · %{count}"
+        # `Admin::HistoryScreen::ComparisonComponent`, one version compared
+        # with another or with the working version, in one language.
+        comparison:
+          version: "Version %{number}"
+          compared_with: "compared with"
+          before_it: "the version before it (%{number})"
+          working_option: "the working version"
+          language: "Language"
+          differs: "%{language} · differs"
+          # The other languages under the select: "Deutsch differs too; Español is the same."
+          others_differ:
+            one: "%{languages} differs"
+            other: "%{languages} differ"
+          others_differ_too:
+            one: "%{languages} differs too"
+            other: "%{languages} differ too"
+          others_same:
+            one: "%{languages} is the same"
+            other: "%{languages} are the same"
+          separator: "; "
+          line: "%{parts}."
+          empty_title: "No versions yet"
+          empty_body:
+            page: "A version is kept each time this page is published."
+            post: "A version is kept each time this post is published."

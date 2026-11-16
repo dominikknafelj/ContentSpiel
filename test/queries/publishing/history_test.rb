@@ -90,4 +90,15 @@ class Publishing::HistoryTest < ActiveSupport::TestCase
     assert_nil h.previous(1)
     assert_raises(ActiveRecord::RecordNotFound) { h.find(999) }
   end
+
+  test "newest is the copy with the highest number, and numbers are every copy's, newest first" do
+    page = create_page(title: "About")
+    publish_again(page, "About us")
+    third = publish_again(page, "About all of us")
+    h = history(page)
+
+    assert_equal third.number, h.newest.number
+    assert_equal [ 3, 2, 1 ], h.numbers
+    assert_nil history(create_page(title: "Draft", published: false)).newest
+  end
 end

@@ -43,6 +43,8 @@ module Admin
     # `offset` is typed by the visitor: past this it is this (an empty page),
     # never a number Postgres refuses as out of range for a bigint.
     MAX_OFFSET = 1_000_000
+    # The subjects whose Activity links to their History screen, with that screen's route.
+    HISTORY_KINDS = { "Page" => [ Page, :admin_page_history_path ], "Post" => [ Post, :admin_post_history_path ] }.freeze
 
     before_action -> { require_permission("audit.view") }
     before_action :load_filter
@@ -55,6 +57,7 @@ module Admin
       @entries = events.zip(Audit::Sentence.for_events(events, viewer: Current.actor, channel: Current.channel))
       @users = users_for_filter
       @other_actions = other_actions
+      @history_url = history_url
     end
 
     # The event is found whatever the filters say; only an id that names no
@@ -79,6 +82,17 @@ module Admin
     private
 
     def load_filter = @filter = Audit::Filter.new(params)
+
+    # A page's or a post's Activity links to its History screen, for a viewer
+    # who may open it: `<kind>s.edit` on the record (version history spec
+    # R4), asked through the scope, so a record outside it gets no link.
+    def history_url
+      model, route = HISTORY_KINDS[@filter.subject_type]
+      return unless model && @filter.subject?
+
+      record = admin_scope(model.all, "#{model.table_name}.edit").find_by(id: @filter.subject_id)
+      public_send(route, record, **admin_url_options) if record
+    end
 
     def offset = params[:offset].to_i.clamp(0, MAX_OFFSET)
 

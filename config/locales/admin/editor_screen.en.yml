@@ -486,6 +486,8 @@ en:
           waiting_lister_unnamed: "Not listed on the site yet: a page lists this post, and its changes are not published."
           # The ⋯ menu's item, while a change waits for its time.
           cancel_scheduled_change: "Cancel scheduled change…"
+          # The ⋯ menu's link to the record's History screen, before Activity.
+          history: "History"
           # Under the address of a live record, and of a scheduled one, with
           # the button's name as it reads.
           live_hint: "This %{type} is live. Changes are published with “Publish changes…”."

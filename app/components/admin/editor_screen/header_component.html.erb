@@ -47,6 +47,9 @@
       <% if menu_items? %>
         <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "More actions", close_on_select: true,
               button_class: Admin::Ui::ButtonComponent.classes(:tertiary)) do |menu| %>
+          <% if may_see_history? %>
+            <% menu.with_item do %><%= link_to t(".history"), history_url %><% end %>
+          <% end %>
           <% if can?("audit.view") %>
             <% menu.with_item do %><%= link_to "Activity", activity_url %><% end %>
           <% end %>

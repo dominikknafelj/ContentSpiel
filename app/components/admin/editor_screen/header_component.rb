@@ -11,11 +11,11 @@ module Admin
     # reaches the site only with "Publish changes", so a live record has no
     # primary button until its rows differ from what is published (the
     # button is `Publishing::State`'s `publish_changes`) -- while a draft
-    # offers Publish and a scheduled record Publish now plus Edit schedule…. Everything else (Activity, Schedule…,
+    # offers Publish and a scheduled record Publish now plus Edit schedule…. Everything else (History, Activity, Schedule…,
     # Cancel scheduled change…, Unpublish…, Move to trash…) sits in the ⋯ menu, the destructive item last
     # and after a divider. Every item that opens a dialog ends with an
     # ellipsis (the brand book: "an action that opens a dialog ends with
-    # …"); Activity is a link and has none. A dialog's own confirm button
+    # …"); History and Activity are links and have none. A dialog's own confirm button
     # names the act without one ("Unpublish", "Move to trash"): it does it.
     #
     # Every publish/unpublish/schedule/delete form carries `data-turbo-frame=
@@ -234,8 +234,14 @@ module Admin
       # Whether the ⋯ menu has anything to hold (a viewer who can only read
       # gets no empty menu).
       def menu_items?
-        can?("audit.view") || can_schedule? || can_cancel_scheduled_change? || can_unpublish? || may_delete?
+        may_see_history? || can?("audit.view") || can_schedule? || can_cancel_scheduled_change? || can_unpublish? || may_delete?
       end
+
+      # The History screen opens for whoever holds `<type>s.edit` on the
+      # record, the plain key and not the owner rule (version history spec R4).
+      def may_see_history? = can?("#{type}s.edit", record)
+
+      def history_url = helpers.public_send("admin_#{type}_history_path", record, **url_options)
 
       # [label, url-or-nil] per crumb; a crumb the viewer may not open is plain
       # text. A page: "Pages" and each ancestor, root first. A post: "Posts" and

@@ -229,6 +229,13 @@ Rails.application.routes.draw do
         end
       end
 
+      # A page's or a post's History screen (`Admin::HistoryController`): its
+      # published versions and the comparison of one with another. Under the
+      # record's own address, as the editor's crumbs are; a GET whose choices
+      # (`version`, `with`, `locale`, `page`) are its query.
+      get "pages/:id/history", to: "history#show", defaults: { kind: "page" }, constraints: { id: /\d+/ }, as: :page_history
+      get "posts/:id/history", to: "history#show", defaults: { kind: "post" }, constraints: { id: /\d+/ }, as: :post_history
+
       # The Tags module: a flat list with no `:new`/`:create` of its own -- a
       # tag has no editor screen, only an inline rename (`:update`), a delete
       # (`:destroy`) and a merge into another tag (`merge`, `Tags::Merge`) from
