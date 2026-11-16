@@ -195,6 +195,30 @@ class Admin::MediaFoldersSystemTest < ApplicationSystemTestCase
     assert_equal "", toasts_text
   end
 
+  # A folder with no images of its own draws its count empty (an upload's
+  # answer may fill it), which takes no room: the "+" still ends the row, as
+  # it does on a row whose count shows.
+  test "a row's + stands at the row's end, with a count shown or none" do
+    visit_screen "/cs-studio/media"
+    find("#{row(@clients.id)} button[aria-label='Unfold Clients']").click
+    assert_selector row(@client_a.id)
+
+    gap = ->(folder) do
+      page.evaluate_script(<<~JS)
+        (() => {
+          const row = document.querySelector("#{row(folder.id)}")
+          const add = row.querySelector(":scope > .admin-tree-row__add")
+          const end = row.getBoundingClientRect().right - parseFloat(getComputedStyle(row).paddingRight)
+          return Math.round(end - add.getBoundingClientRect().right)
+        })()
+      JS
+    end
+    # Clients and Events hold no image of their own; Client A holds the logo.
+    assert_selector "#{row(@clients.id)} [data-media-place-count='#{@clients.id}']", exact_text: "", visible: :all
+    assert_selector "#{row(@client_a.id)} [data-media-place-count='#{@client_a.id}']", exact_text: "1", visible: :all
+    [ @clients, @events, @client_a ].each { |folder| assert_equal 0, gap.call(folder), "#{folder.name}'s + is not at the row's end" }
+  end
+
   test "a taken name keeps the dialog open with the error under the field and the focus in it" do
     visit_screen "/cs-studio/media"
 
