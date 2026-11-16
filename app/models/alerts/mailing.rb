@@ -15,26 +15,36 @@ module Alerts
   #
   # The mailer is handed the owner and the alerts' ids, never their details:
   # a job's arguments are written to the queue's row and Active Job's log.
-  # The alerts are marked `mailed_at` in one statement, a job's write as
-  # mail's state columns are, with no audit event (`Alerts::Alert`).
   #
-  # The name shadows the standard library's `Digest` for every bare
-  # reference inside `module Alerts`: code there writes `::Digest::SHA256`.
-  class Digest
+  # MARKED, THEN QUEUED. The alerts are marked `mailed_at` in one statement
+  # (a job's write, as mail's state columns are, with no audit event:
+  # `Alerts::Alert`) before the mails are queued. A queue write that fails
+  # after the mark loses one digest, whose alerts System status still shows
+  # and whose next occurrence mails again; queued first, a mark that failed
+  # would leave them due and mail them again every minute.
+  #
+  # ONE DIGEST FOR TWO RUNS AT ONCE. The mark takes only alerts that are
+  # still due (`Alert.due`), so a run that started before another's mark
+  # finds those rows taken, marks none of them, and queues only what it
+  # marked itself (`claim`): two check runs overlapping, a slow one and the
+  # next minute's, never mail the same alert twice.
+  class Mailing
     NOT_READY = "[ContentSpiel] An alert digest was not sent: mail is not ready.".freeze
     NO_ADDRESS = "[ContentSpiel] An alert digest was not sent: no site address is known. Set PUBLIC_HOST.".freeze
     # How often a skipped digest's line is logged.
     SKIPPED_LOGGED_EVERY = 1.hour
 
+    # `now` to the microsecond, the column's precision, so the claim reads
+    # back exactly the rows it wrote.
     def initialize(now: Time.current)
-      @now = now
+      @now = now.floor(6)
     end
 
     # Queues the digests that are due; answers how many mails were queued.
     def deliver
       return 0 if too_soon?
 
-      ids = Alert.due(@now).order(last_seen_at: :desc, id: :desc).pluck(:id)
+      ids = pending_ids
       return 0 if ids.empty?
       return skipped(:not_ready, NOT_READY) unless MailSettings.current.ready?
       return skipped(:no_address, NO_ADDRESS) if DigestMailer.link_url_options.empty?
@@ -42,12 +52,28 @@ module Alerts
       owners = User.owners.to_a
       return 0 if owners.empty?
 
-      Alert.where(id: ids).update_all(mailed_at: @now, updated_at: @now) # version: none (alerts are no part of a page)
+      ids = claim(ids)
+      return 0 if ids.empty?
+
       owners.each { |owner| ApplicationMailer.queue(DigestMailer, :digest, owner, ids) }
       owners.size
     end
 
     private
+
+    # The due alerts' ids, newest seen first.
+    def pending_ids = Alert.due(@now).order(last_seen_at: :desc, id: :desc).pluck(:id)
+
+    # Marks those of `ids` that are still due as mailed now, and answers the
+    # ids this call marked, in the order given: a run at the same time that
+    # marked one first keeps it.
+    def claim(ids)
+      marked = Alert.due(@now).where(id: ids).update_all(mailed_at: @now, updated_at: @now) # version: none (alerts are no part of a page)
+      return [] if marked.zero?
+
+      mine = Alert.where(id: ids, mailed_at: @now).pluck(:id)
+      ids & mine
+    end
 
     def too_soon?
       last = Alert.last_mailed_at

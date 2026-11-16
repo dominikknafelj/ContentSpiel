@@ -177,7 +177,7 @@ class ApplicationMailer < ActionMailer::Base
 
   # The url options a mailed link is built with, by the rules above; `{}`
   # when no origin is known and no mail is to be built. A class method so a
-  # caller can ask before it queues (`Alerts::Digest`, which marks nothing
+  # caller can ask before it queues (`Alerts::Mailing`, which marks nothing
   # while there is none).
   def self.link_url_options(origin = nil)
     return SiteAddress.admin.url_options if SiteAddress.admin.configured?

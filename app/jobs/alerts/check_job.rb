@@ -1,6 +1,6 @@
 module Alerts
   # Every minute (`config/recurring.yml`): the scan of the audit log
-  # (`Alerts::Rules`), then the owners' digest (`Alerts::Digest`), then the
+  # (`Alerts::Rules`), then the owners' digest (`Alerts::Mailing`), then the
   # prune of alerts past their keeping (`Alert.expired`).
   #
   # Each step rescues its own failure, so a scan that fails does not keep
@@ -18,7 +18,7 @@ module Alerts
     def perform
       now = Time.current
       step(:rules) { Rules.new(now: now).apply }
-      step(:digest) { Digest.new(now: now).deliver }
+      step(:digest) { Mailing.new(now: now).deliver }
       step(:prune) { Alert.expired(now).delete_all } # version: none (alerts are no part of a page)
       nil
     end

@@ -59,10 +59,22 @@ class Alerts::CheckJobTest < ActiveJob::TestCase
   end
 
   test "a failing digest still lets the prune run" do
-    with_singleton_override(Alerts::Digest, :new, ->(**) { raise ActiveRecord::ConnectionNotEstablished }) do
+    with_singleton_override(Alerts::Mailing, :new, ->(**) { raise ActiveRecord::ConnectionNotEstablished }) do
       assert_error_reported(ActiveRecord::ConnectionNotEstablished) { Alerts::CheckJob.perform_now }
     end
 
     assert_not Alerts::Alert.exists?(@old.id)
+  end
+
+  test "with error alerts on, a failing step's report becomes no alert of its own" do
+    failing = Class.new { def apply = raise(RuntimeError, "scan failed") }.new
+
+    with_error_alerts do
+      with_singleton_override(Alerts::Rules, :new, ->(**) { failing }) do
+        Alerts::CheckJob.perform_now
+      end
+    end
+
+    assert_no_enqueued_jobs only: Alerts::RecordErrorJob
   end
 end

@@ -1,5 +1,5 @@
 module Alerts
-  # The owners' digest of alerts (`Alerts::Digest` queues it): a line per
+  # The owners' digest of alerts (`Alerts::Mailing` queues it): a line per
   # alert, newest first, up to LISTED and then how many more, and one button
   # to System status. Handed the owner and the alerts' ids; the alerts are
   # read here, in the job, so one deleted since (pruned, or its row gone) is
@@ -15,7 +15,7 @@ module Alerts
   # away in between, and one line says so, naming nobody.
   class DigestMailer < ApplicationMailer
     LISTED = 20
-    NOT_SENT = Digest::NO_ADDRESS
+    NOT_SENT = Mailing::NO_ADDRESS
 
     helper_method :system_status_url, :alert_kind, :alert_sentence, :alert_facts, :digest_every
 

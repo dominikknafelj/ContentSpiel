@@ -2,7 +2,7 @@ require "test_helper"
 
 # The digest: which alerts are mailed, to whom, how often, and that nothing
 # is marked while no mail can go.
-class Alerts::DigestTest < ActiveSupport::TestCase
+class Alerts::MailingTest < ActiveSupport::TestCase
   include ActionMailer::TestHelper
   include ActiveJob::TestHelper
   include LogCapture
@@ -21,7 +21,7 @@ class Alerts::DigestTest < ActiveSupport::TestCase
                           first_seen_at: seen, last_seen_at: seen, mailed_at: mailed)
   end
 
-  def deliver(now: Time.current) = Alerts::Digest.new(now: now).deliver
+  def deliver(now: Time.current) = Alerts::Mailing.new(now: now).deliver
 
   def queued = { fingerprint: MailSettings.current.fingerprint }
 
@@ -92,11 +92,11 @@ class Alerts::DigestTest < ActiveSupport::TestCase
         end
 
         assert_nil alert.reload.mailed_at
-        assert_equal [ Alerts::Digest::NOT_READY ], log.lines.map(&:strip).grep(/ContentSpiel/)
+        assert_equal [ Alerts::Mailing::NOT_READY ], log.lines.map(&:strip).grep(/ContentSpiel/)
         @owners.each { assert_not_includes log, it.email_address }
 
         travel 31.minutes
-        assert_equal [ Alerts::Digest::NOT_READY ], capture_log { deliver }.lines.map(&:strip).grep(/ContentSpiel/)
+        assert_equal [ Alerts::Mailing::NOT_READY ], capture_log { deliver }.lines.map(&:strip).grep(/ContentSpiel/)
       end
     end
   end
@@ -110,7 +110,7 @@ class Alerts::DigestTest < ActiveSupport::TestCase
         end
 
         assert_nil alert.reload.mailed_at
-        assert_equal [ Alerts::Digest::NO_ADDRESS ], log.lines.map(&:strip).grep(/ContentSpiel/)
+        assert_equal [ Alerts::Mailing::NO_ADDRESS ], log.lines.map(&:strip).grep(/ContentSpiel/)
       end
     end
   end
@@ -118,6 +118,43 @@ class Alerts::DigestTest < ActiveSupport::TestCase
   test "with nothing due nothing is logged, even with mail not ready" do
     with_mail_state(:not_set_up) do
       assert_empty capture_log { assert_equal 0, deliver }.lines.grep(/ContentSpiel/)
+    end
+  end
+
+  test "with no owner nothing is queued and nothing is marked" do
+    User.owners.update_all(owner: false) # version: none (a test's setup)
+    with_mail_state(:working) do
+      with_site_address(SITE) do
+        alert = make
+        assert_no_enqueued_emails { assert_equal 0, deliver }
+        assert_nil alert.reload.mailed_at
+      end
+    end
+  end
+
+  test "the mark takes only alerts still due: a second mark of the same ids takes none" do
+    older = make(seen: NOW - 5.minutes)
+    newer = make
+    ids = [ newer.id, older.id ]
+
+    assert_equal ids, Alerts::Mailing.new(now: NOW).send(:claim, ids)
+    assert_equal [], Alerts::Mailing.new(now: NOW + 1.second).send(:claim, ids)
+    assert_equal [ NOW ], [ older, newer ].map { it.reload.mailed_at }.uniq
+  end
+
+  test "two runs at once, the second finishing before the first marks, send one mail per owner" do
+    with_mail_state(:working) do
+      with_site_address(SITE) do
+        make
+        first = Alerts::Mailing.new(now: NOW)
+        pending = first.send(:pending_ids)
+        first.define_singleton_method(:pending_ids) do
+          Alerts::Mailing.new(now: NOW + 1.second).deliver
+          pending
+        end
+
+        assert_enqueued_emails(@owners.size) { assert_equal 0, first.deliver }
+      end
     end
   end
 end
