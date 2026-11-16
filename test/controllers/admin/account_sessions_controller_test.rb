@@ -20,6 +20,10 @@ class Admin::AccountSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   # The answer every End gets: the row removed, the foot drawn again, one toast.
+  # The answer with a session's id masked where it names that session (its
+  # row's id), never inside another number such as a class's "opacity-100".
+  def without_id(body, id) = body.gsub(/session-#{id}(?!\d)/, "session-ID")
+
   def assert_end_answer(id, toast:, others:)
     assert_response :ok
     assert_equal STREAM, response.media_type
@@ -53,11 +57,11 @@ class Admin::AccountSessionsControllerTest < ActionDispatch::IntegrationTest
 
     end_session(theirs.id)
     assert_end_answer(theirs.id, toast: "That session had already ended.", others: "You're not signed in anywhere else.")
-    stranger = response.body.gsub(theirs.id.to_s, "ID")
+    stranger = without_id(response.body, theirs.id)
 
     end_session(mine.id)
     assert_end_answer(mine.id, toast: "That session had already ended.", others: "You're not signed in anywhere else.")
-    assert_equal response.body.gsub(mine.id.to_s, "ID"), stranger, "an id tells nothing about whose it is"
+    assert_equal without_id(response.body, mine.id), stranger, "an id tells nothing about whose it is"
 
     assert Session.exists?(theirs.id)
     assert_empty Audit::Event.where(action: "session.ended")
