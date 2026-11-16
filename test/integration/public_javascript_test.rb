@@ -81,8 +81,9 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_includes entry_point_script, %(import "admin")
   end
 
-  # SortableJS is imported with `import()` by the four controllers that drag
-  # (`editor/drag`'s `loadSortable`, the tree, Settings' language rows), and is
+  # SortableJS is imported with `import()` by the controllers that drag
+  # (`editor/drag`'s `loadSortable`: the blocks list, the tree, Settings' language rows,
+  # the Media screen's drag and the Gallery card's rows), and is
   # `preload: false`: a screen with nothing to drag never fetches it, though
   # the map still names it for the `import()` to resolve.
   test "a CS Studio screen with nothing to drag preloads no SortableJS, and the editor fetches it on demand" do

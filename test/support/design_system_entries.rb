@@ -9,17 +9,17 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794828751-4e8a".freeze
+  VERSION = "1794849828-4a8d".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
     ActionZone Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog EditorDiagramBlock EditorDiagramError EditorSearchBlock FieldFrame FoundationComponentContract FoundationContrast
     FoundationFocus FoundationIcons FoundationLayout FoundationMotion Gif GroupFields IconChip ImageField ImageViewer Mails MediaPicker Menu NoteMarker Notice
     PasswordField PatternDestructiveActions PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation PatternNotifications PatternSaving Person
-    PrefixInput PresenceMarker PublicDiagramBlock RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage
+    PrefixInput PresenceMarker PublicDiagramBlock RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteGallery SiteHeader SiteImage
     SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSearch SiteSearchMatches SiteSearchSuggest SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
     StudioBlockCard StudioCommandPalette StudioDashboardCards StudioDrawDiagrams StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms
-    StudioGroups StudioHeldStrip StudioListTable StudioMediaFolders StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioPostTypes StudioRail
+    StudioGallery StudioGroups StudioHeldStrip StudioListTable StudioMediaFolders StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioPostTypes StudioRail
     StudioSectionTile StudioSessions StudioSettings StudioShell StudioSignIn StudioSingleSignOn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations
     StudioTrash StudioTree StudioUsers StudioWizard TableGrid Tabs TextFields Toast Tooltip
   ].freeze

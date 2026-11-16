@@ -1,8 +1,8 @@
 # The Gallery block: a list of library images, as a grid or a carousel
 
-Status: designed, not built. The behaviour is settled here; the looks are the
+Status: built (plan `docs/superpowers/plans/2026-11-16-gallery-block.md`). Where the build left this text, §20 "As built" says so; the description of the code as it is lives in `docs/reference/content-blocks-and-types.md`, "The Gallery block". The behaviour is settled here; the looks are the
 Design System's cards **StudioGallery** (CS Studio) and **SiteGallery** (the
-public site, the default theme), version `1794835099-7966` (v245) (§16). A card's
+public site, the default theme), version `1794849828-4a8d` (v251) (§16). A card's
 word wins over this file's; on behaviour this file wins, and where the two
 differed the ruling is in §19. A word the cards do not give is marked "(not on
 the card)". An answer marked **(call)** is the planner's recommendation, for
@@ -353,10 +353,12 @@ Studio never imports it (its preview draws the public page, which does).
 - **Its state** is written on its element as `data-gallery-carousel-state`:
   `first`, `middle`, `last` (a theme's stylesheet may read it).
 - **Take-back:** at `disconnect` it disconnects the observer, removes the
-  listeners and puts `hidden` back on what it showed; at `turbo:before-cache`
-  it empties the status and resets the position's words, leaving `hidden`
-  alone (the Code block's copy script's two incidents). A slide it needs at
-  `disconnect` is kept in a field, not read through a target.
+  listeners and puts back what the server drew (`hidden` on what it showed,
+  the status empty, the position the first slide's, no state); nothing is
+  taken back at `turbo:before-cache`, which Turbo also runs for a page it does
+  not leave, so a copy shown again is decided afresh by `connect`. The
+  elements are kept in fields at `connect`, not read through targets at
+  `disconnect`.
 - **Words** come from the markup (the server's `public.blocks.gallery.*` in the
   visitor's language, on the element's values); the script holds no English.
 
@@ -660,11 +662,11 @@ hands back one image: several cannot be chosen." goes.
 
 ### 10.5 The tile (D5)
 
-- **One thumbnail,** the first image's, in the tile's thumbnail box (72px,
-  4:3), through the tile's generic thumbnail, which learns to take the first
-  existing id of a `media_ids` field where a type has no `image` column. No
-  strip: the summary says the count. With no image the box is plain
-  `cs-sunken`.
+- **One thumbnail,** the first image that exists, as the tile's inline size-6
+  thumbnail before the words (v246: no 72px box), through the tile's generic
+  thumbnail, which learns to take the first existing id of a `media_ids` field
+  where a type has no `image` column. No strip: the summary says the count.
+  With no image the tile says "Empty" and draws no thumbnail.
 - **The summary line** (`summary`): "Carousel · 12 images" / "Grid · 1 image",
   or "Empty" with no image. **The preview** (`preview`): the label as the
   heading when one is written, so the tile's name reads "Gallery · Harbour
@@ -826,7 +828,7 @@ Held by a test:
 ## 16. The design answers
 
 The Design System (`https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT`,
-version `1794835099-7966` (v245)) holds both cards, "Decided, not built":
+version `1794849828-4a8d` (v251)) holds both cards:
 
 - **StudioGallery** (CS Studio): D1 the icon (§10.1), D2 the card's controls
   (§10.2), D3 the image rows (§10.3), D4 the picker choosing several and a
@@ -837,7 +839,7 @@ version `1794835099-7966` (v245)) holds both cards, "Decided, not built":
   and the default template's class names (§7.8, §8), accessibility and dark.
 
 `test/support/design_system_entries.rb` gains `StudioGallery` and
-`SiteGallery` in `ENTRIES`, its `VERSION` `1794835099-7966` (v245). A look this file
+`SiteGallery` in `ENTRIES`, its `VERSION` `1794849828-4a8d` (v251). A look this file
 or the plan needs that neither card gives goes back to the design agent, never
 decided here.
 
@@ -923,3 +925,68 @@ A card's word wins; on behaviour this file wins. Each conflict and its ruling:
   and draws two.
 - **Design System v245** answered the two open questions: the button's edge
   and the grid's thresholds.
+
+## 20. As built
+
+Where the build left this text. Everything else stands as written; the
+description of the code is `docs/reference/content-blocks-and-types.md`, "The
+Gallery block".
+
+- **The Design System is v251 (`1794849828-4a8d`).** After v245 it answered the
+  tile (v246: the inline size-6 thumbnail, no 72px box, §10.5), the picker's
+  zero status, its tile at the limit and a chosen tile's name (v249, §10.4),
+  and the card's screen-reader status, the field radius, the shared Remove
+  and the line shown without upload rights (v251, §10.3).
+- **`sizes(per_row:)` takes an Integer or a Hash** of least block widths to
+  counts (`Blocks::GalleryComponent::GRID_COLUMNS`, `{ 0 => 1, 360 => 2, 640 =>
+  3 }`); a width relative to the viewport takes the narrowest block's count, so
+  it may over-ask and never under-asks (§19). The top-level width is
+  `SectionComponent::CONTENT_WIDTH` (736px), not the 768px breakpoint the
+  image's own hint names. In a section column a half column of the content
+  width (368px) draws two images a row.
+- **The position stands at the inline end in both directions**, from one
+  document order (§19).
+- **The tile's words** are the card's: `grid`, `carousel` (each with the count
+  in it, one and other), `empty` and `without_alt` (§12); the alt counted is the
+  one a visitor is given in the language shown, the override and the library's
+  interleaved per language (`Media::Asset#alt_text`).
+- **The label's help** is `help: :"gallery.label_help"`, which takes the
+  placeholder as the Search block's does.
+- **The folder's images** answer `{ total, items }` and take `limit` and
+  `except` (§10.6); the controller reads the folder through
+  `Media::FolderTree.load` and `Media::Place`.
+- **"Add a folder"** opens the same picker with the focus on its list of places.
+  Its row hands back the chosen tiles first, then the folder's oldest new
+  images; it asks again whenever the choice changes.
+- **A multiple picker's uploads** join the choice in the order they finish, up
+  to the limit.
+- **A duplicate** is checked as an Image block's duplicate is: it needs
+  `media.upload`, and a missing or trashed image in the copied list refuses the
+  copy with the field's error.
+- **The choosing check** is keyed `settings.images`, like every schema field's
+  error, and reads before the transaction with no lock; no task writes the
+  settings row.
+- **Pluralisation of an ordinal** ("chosen 2nd") is `Intl.PluralRules`' ordinal
+  type, asked through an `ordinal: true` option of `i18n/messages.js`.
+- **The tile's closed set of summary parts gains `:warn`** (§19), and the
+  tile's `summary` of an outside type may use it too.
+- **The block card draws a segmented select and the select after it as one row**
+  (`Admin::Fields::Base.opens_row?` and `fills_row?`), by `flex-wrap` and least
+  widths.
+- **The tokens are declared in `tokens.css` and resolved there**; only the
+  tinted and strong bands' own values are in `sections.css`. There are seven,
+  six themed and `--th-gallery-gap` fixed.
+- **The carousel's script is preloaded on CS Studio pages** as the Search
+  block's is: public-only controllers are preloaded by every entry point and
+  imported and registered by `site` alone.
+- **The panel's word for role `block_field`** is the block type's label as
+  "%{type} block" ("Gallery block"), "Block" once the type is gone (not on the
+  card).
+- **A test's stand-in for an unregistered type is `retired_widget`**, which
+  frees the name `gallery` for the built-in.
+- **The showcase's three images** are uploaded through `Media::Upload` and found
+  by title on a second run.
+- **What the spec left to the owner stays** (§18): no autoplay, no lightbox,
+  no library caption by default, no AI translation of the captions, 60 images,
+  twelve dots, the grid by default and 3:2. The limits the build found are
+  rows of `docs/roadmap.md`, "Known gaps", "Gallery block".
