@@ -220,6 +220,78 @@ en:
           outdated: "%{language}: outdated"
           more: "+%{count} ▾"
 
+        # What changed between two sides of a record (`ChangesOverviewComponent`):
+        # by name in the publish, restore and Publish now dialogs, and with
+        # each entry's words on the History screen (`diffs`). A field's name
+        # is `admin.publishing.text_diff.field_names`, shared with the
+        # comparison's data.
+        changes_overview:
+          none: "Nothing to publish. This is the same as what is published."
+          # Nothing was changed since a change was scheduled: its time can still be changed below.
+          none_scheduled: "Nothing new to publish. This is the same as the changes scheduled for %{time}."
+          compared_with_scheduled: "Compared with the changes scheduled for %{time}."
+          blocks: "Blocks"
+          fields:
+            page: "Page"
+            post: "Post"
+          languages: "Languages"
+          kinds:
+            changed: "Changed"
+            added: "Added"
+            removed: "Removed"
+            moved: "Moved"
+          untitled: "(untitled)"
+          held:
+            page: "%{name} is editing this page. Only what has been saved is published."
+            post: "%{name} is editing this post. Only what has been saved is published."
+          # Other live records that a publish leaves without an address:
+          # information, nothing is refused for it.
+          lost_addresses:
+            heading: "Addresses"
+            body:
+              page: "When this page is published, these lose their address and show “not found” on the site:"
+              post: "When this post is published, these lose their address and show “not found” on the site:"
+            hidden:
+              one: "1 more that you can’t open"
+              other: "%{count} more that you can’t open"
+          # Live records that a publish MOVES to another address (a post
+          # whose list on this page goes and which another page lists too):
+          # the second group under "Addresses". The old address stays as a
+          # redirect of the record (`PublicSite::Paths.foresee` reads it from
+          # the trial), except where another record takes it in the same
+          # publish, which the line then says (`no_redirect`).
+          moved_addresses:
+            body:
+              page: "When this page is published, these move to another address. Each old address then redirects to the new one:"
+              post: "When this post is published, these move to another address. Each old address then redirects to the new one:"
+            # The old address and the new one.
+            change: "%{from} → %{to}"
+            # The record whose dialog this is, among those that move.
+            own:
+              page: "This page"
+              post: "This post"
+            no_redirect: "(no redirect: another page or post takes the old address)"
+            hidden:
+              one: "1 more that you can’t open"
+              other: "%{count} more that you can’t open"
+          # The record's own address: the one thing a publish is refused for.
+          own_address:
+            page: "This page would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
+            post: "This post would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
+          # The History screen's comparison, in one language.
+          diffs:
+            fields:
+              page: "Page fields"
+              post: "Post fields"
+            none: "No differences."
+            # A rich-text change that left the words alone.
+            formatting: "Formatting changed"
+            too_long: "The text is too long to compare word by word."
+            # A moved block's places in reading order, each an ordinal ("4th").
+            moved_to: "now %{to}, was %{from}"
+            # Values with no words that changed (a hero image, a list's rows), named.
+            opaque: "%{names} changed"
+
         # A word diff's screen-reader cues, each before its word.
         word_diff:
           removed: "Removed: "

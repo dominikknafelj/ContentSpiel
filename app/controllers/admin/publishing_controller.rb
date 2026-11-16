@@ -41,10 +41,10 @@ module Admin
     # when they open, one request per opening like the publish dialog's.
     def changes
       response.set_header("Cache-Control", "no-store")
-      return render(Admin::EditorScreen::ChangesOverviewComponent.schedule_only(record: @record), layout: false) if params[:part] == "schedule"
+      return render(Admin::Ui::ChangesOverviewComponent.schedule_only(record: @record), layout: false) if params[:part] == "schedule"
 
       addresses = can?("#{kind}s.publish", @record) ? ::Publishing::Changes.addresses(@record) : ::PublicSite::Paths::Foreseen.nothing
-      render Admin::EditorScreen::ChangesOverviewComponent.new(record: @record, changes: ::Publishing::Changes.of(@record), lost: addresses.lost, moved: addresses.moved,
+      render Admin::Ui::ChangesOverviewComponent.new(record: @record, changes: ::Publishing::Changes.of(@record), lost: addresses.lost, moved: addresses.moved,
         holds: ::Editing::Holds.on(@record, viewer: Current.user, tab: Current.editing_tab), locale: admin_locale, url_options: admin_url_options), layout: false
     end
 

@@ -120,4 +120,26 @@ class Publishing::TextDiffTest < ActiveSupport::TestCase
     assert_nil entry.result
     assert_equal "Plain words here", entry.before.first.shown
   end
+
+  test "a post's tags are compared as their names, in alphabetical order" do
+    post = create_post(title: "Post", tags: %w[zebra apple])
+    version = Publishing.baseline(post.reload)
+    assert Posts::Save.call(post, attributes: { tag_names: %w[zebra apple mango] }).ok?
+
+    entry = Publishing::TextDiff.field(Publishing::Changes.between(post.reload, from: version, to: :working), "tags", locale: :en)
+    assert_equal "Tags", entry.label
+    assert_equal [ "apple, zebra" ], entry.before.map(&:shown)
+    assert_equal [ "apple, mango, zebra" ], entry.after.map(&:shown)
+    assert_equal "mango,", words(entry.result.segments, :insert)
+  end
+
+  test "a field with no words, a hero image, is named as changed and diffs nothing" do
+    image = create_media_asset
+    assert Pages::Save.call(@page, attributes: { hero_media_asset_id: image.id }).ok?
+
+    entry = Publishing::TextDiff.field(changes, "hero_media_asset_id", locale: :en)
+    assert_equal [ "Hero image" ], entry.opaque
+    assert_not entry.result.changed?
+    assert entry.after.sole.opaque?
+  end
 end

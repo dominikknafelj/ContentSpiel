@@ -44,8 +44,8 @@ class Publishing::ChangesTest < ActiveSupport::TestCase
 
     assert_equal %w[settings], changes.fields
     assert_empty changes.locales
-    assert_equal "Template", I18n.t("admin.components.editor_screen.changes_overview.field_names.settings")
-    assert_not I18n.exists?("admin.components.editor_screen.changes_overview.field_names.page_type"), "the page type's name is gone with it"
+    assert_equal "Template", I18n.t("admin.publishing.text_diff.field_names.settings")
+    assert_not I18n.exists?("admin.publishing.text_diff.field_names.page_type"), "the page type's name is gone with it"
   end
 
   test "a changed block, an added one and a removed one are each named once, the removed one as the copy had it" do
@@ -64,6 +64,21 @@ class Publishing::ChangesTest < ActiveSupport::TestCase
     assert ContentBlocks::Reorder.call(@page, [ @third.id, @first.id, @second.id ]).ok?
 
     assert_equal [ [ :moved, @third.id ] ], kinds
+  end
+
+  test "a block's places are where it stands in each side's reading order, nil on the side it is not on" do
+    fourth = add("Fourth")
+    assert ContentBlocks::Destroy.call(@second).ok?
+    overview = changes
+
+    assert_equal({ fourth.id => [ nil, 3 ], @second.id => [ 2, nil ] }, overview.blocks.to_h { |entry| [ entry.block.id, overview.places_of(entry) ] })
+  end
+
+  test "a moved block's places are where it was and where it is" do
+    assert ContentBlocks::Reorder.call(@page, [ @third.id, @first.id, @second.id ]).ok?
+    overview = changes
+
+    assert_equal [ 3, 1 ], overview.places_of(overview.blocks.sole)
   end
 
   test "a block put into a section is moved, and the new section is added" do

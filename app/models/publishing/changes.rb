@@ -49,6 +49,7 @@ module Publishing
       was = version ? side(version) : now
       @sides = [ was, now ]
       @block_sides = {}.compare_by_identity
+      @block_places = {}.compare_by_identity
       @fields = changed_fields(was, now)
       @blocks = changed_blocks(was.fetch("blocks", []), now.fetch("blocks", []))
       @locales = @changed_locales.to_a.sort
@@ -59,6 +60,12 @@ module Publishing
     # block is read from these (`Publishing::TextDiff`), never from the row,
     # which is the working version's whatever the sides are.
     def sides_of(change) = @block_sides.fetch(change.block)
+
+    # Where one block of this comparison stands on each side, `[was, now]`:
+    # its place in the side's reading order, counted from 1 among all its
+    # blocks (a section's inner blocks included), nil where it is not on a
+    # side. What a move is worded with ("now 4th, was 2nd").
+    def places_of(change) = @block_places.fetch(change.block)
 
     def none? = fields.empty? && blocks.empty?
 
@@ -210,7 +217,8 @@ module Publishing
       stayed = ->(id) { before[id] && after[id] && before[id].values_at("section_id", "section_column") == after[id].values_at("section_id", "section_column") }
       settled = unmoved(was.map { |block| block["id"] }.select(&stayed), now.map { |block| block["id"] }.select(&stayed))
 
-      entries = now.filter_map do |block|
+      was_places = was.each_with_index.to_h { |block, index| [ block["id"], index + 1 ] }
+      entries = now.each_with_index.filter_map do |block, index|
         id = block["id"]
         old = before[id]
         kind =
@@ -218,11 +226,21 @@ module Publishing
           elsif content_differs?(old, block) then :changed
           elsif old.values_at("section_id", "section_column") != block.values_at("section_id", "section_column") || !settled.include?(id) then :moved
           end
-        Block.new(kind:, block: rows.fetch(id)).tap { |entry| @block_sides[entry.block] = [ old, block ] } if kind
+        next unless kind
+
+        Block.new(kind:, block: rows.fetch(id)).tap do |entry|
+          @block_sides[entry.block] = [ old, block ]
+          @block_places[entry.block] = [ was_places[id], index + 1 ]
+        end
       end
       gone = was.reject { |block| after.key?(block["id"]) }
       removed = gone.any? ? block_rows(@was_source, gone.map { |block| block["id"] }) : {}
-      entries + gone.map { |block| note_languages(block) && Block.new(kind: :removed, block: removed.fetch(block["id"])).tap { |entry| @block_sides[entry.block] = [ block, nil ] } }
+      entries + gone.map { |block| note_languages(block) && Block.new(kind: :removed, block: removed.fetch(block["id"])).tap { |entry| record_removed(entry, block, was_places) } }
+    end
+
+    def record_removed(entry, block, was_places)
+      @block_sides[entry.block] = [ block, nil ]
+      @block_places[entry.block] = [ was_places[block["id"]], nil ]
     end
 
     def content_differs?(old, block)

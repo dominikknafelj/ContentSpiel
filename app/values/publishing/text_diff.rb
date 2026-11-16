@@ -32,8 +32,11 @@ module Publishing
 
     def field(changes, name, locale:)
       translated = Changes::TRANSLATED.fetch(changes.record.class.polymorphic_name).include?(name)
-      was, now = changes.sides.map { |side| [ field_part(side["fields"][name], locale, translated) ] }
-      Entry.new(label: I18n.t(name, scope: FIELD_NAMES, default: name.humanize), before: was, after: now, result: diff(was, now), opaque: [])
+      was, now = changes.sides.map { |side| [ name == "tags" ? tags_part(side) : field_part(side["fields"][name], locale, translated, reference: name.end_with?("_id")) ] }
+      label = I18n.t(name, scope: FIELD_NAMES, default: name.humanize)
+      # A field's part has no label, so what changed is `[nil]`: asked for
+      # emptiness, never `any?`.
+      Entry.new(label:, before: was, after: now, result: diff(was, now), opaque: opaque_changes(was, now).empty? ? [] : [ label ])
     end
 
     def block(changes, change, locale:)
@@ -54,10 +57,16 @@ module Publishing
       (before.keys | after.keys).select { |label| before[label] != after[label] }
     end
 
-    def field_part(value, locale, translated)
+    # A reference to another row (`hero_media_asset_id`) is a value with no
+    # words: its number is no text a person wrote.
+    def field_part(value, locale, translated, reference: false)
       value = value[locale.to_s] if translated && value.is_a?(Hash)
-      text_part(nil, value)
+      reference ? opaque(nil, value) : text_part(nil, value)
     end
+
+    # A post's tags are not a field of the side but its own list
+    # (`Snapshot#tags_of`), compared as their names in alphabetical order.
+    def tags_part(side) = text_part(nil, side.fetch("tags", []).map { |tag| tag["name"] }.sort.join(", "))
 
     # A block's words in `locale`: its body, caption and alt, then each field
     # of its schema that holds a value, named by the schema's label.

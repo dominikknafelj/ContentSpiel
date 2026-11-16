@@ -309,6 +309,28 @@ class Admin::DraftsSystemTest < ApplicationSystemTestCase
     assert_nil post.reload.full_path("en")
   end
 
+  # The overview's keyboard (`Admin::Ui::ChangesOverviewComponent`): its only
+  # Tab stops are the links to the records whose address a publish changes.
+  test "the dialog's overview takes the keyboard to a lost address's link with Tab, and Enter there opens that record" do
+    post = nil
+    as_me do
+      list = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).record
+      publish_changes(@page)
+      post = create_post(title: "Hello there")
+      assert ContentBlocks::Destroy.call(list).ok?
+    end
+    visit_editor(@page)
+    await_notes_live
+    press "Publish changes…"
+
+    within(publish_dialog) { assert_selector "[data-lost-address] a", text: "Hello there" }
+    page.find("#{publish_dialog} [data-publishing-overview]").click
+    stop_on("#{publish_dialog} [data-lost-address] a")
+    page.send_keys(:enter)
+
+    assert_current_path admin_post_path(post)
+  end
+
   # -- discard -----------------------------------------------------------------------
 
   test "Discard changes puts the page back to what is published, after asking once" do

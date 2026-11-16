@@ -1,5 +1,5 @@
 module Admin
-  module EditorScreen
+  module Ui
     # What "Publish changes" will change, worded from `Publishing::Changes`
     # (drafts spec §3): blocks changed, added, removed and moved, each by its
     # type and a line of what is in it; the record's own fields; the
@@ -16,7 +16,44 @@ module Admin
     # The answer to the dialog's POST (`Admin::PublishingController#changes`),
     # put into the dialog by `admin--editor--publish-dialog`. One element with
     # no id in it: it is drawn beside the editor's own cards.
+    #
+    # TWO DETAILS. `:names` is the dialogs' (publish, restore, Publish now):
+    # what changed, by name. `:diffs` is the History screen's comparison of
+    # two versions in ONE language (`locale`): each field that differs in it,
+    # by its label over its words (`Publishing::TextDiff`, drawn by
+    # `WordDiffComponent`), then each block in reading order with a changed
+    # block's words under its row and a moved one's places. Nothing of a
+    # publish is said there (no schedule facts, addresses or holders: nothing
+    # is published from it), and a field that differs only in another
+    # language is not shown, since its words here are the same.
     class ChangesOverviewComponent < Admin::AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Headings over lists of what changed; a diff's removed and added words carry WordDiff's screen-reader cues, and the only Tab stops are the links to the records that lose or move their address.",
+        motion: :none,
+        content_edges: %i[long many none],
+        widths: :from_container,
+        interface: %i[record changes holds locale detail lost moved url_options schedule_only],
+        limits: [
+          "It words the comparison it is handed and decides no change itself: the diffs detail asks Publishing::TextDiff for each entry's words.",
+          "In the diffs detail it compares one language, and draws no schedule facts, addresses or holders.",
+          "A structured value with no words (a list's rows, a hero image) is named as changed, never drawn."
+        ],
+        states: %i[names diffs none],
+        keys: %w[
+          none none_scheduled compared_with_scheduled blocks fields.page fields.post languages kinds.changed kinds.added kinds.removed kinds.moved
+          untitled held.page held.post lost_addresses.heading lost_addresses.body.page lost_addresses.body.post lost_addresses.hidden
+          moved_addresses.body.page moved_addresses.body.post moved_addresses.change moved_addresses.own.page moved_addresses.own.post
+          moved_addresses.no_redirect moved_addresses.hidden own_address.page own_address.post
+          diffs.fields.page diffs.fields.post diffs.none diffs.formatting diffs.too_long diffs.moved_to diffs.opaque
+        ],
+        slots: [],
+        controller: nil,
+        keyboard: [ "test/system/admin/drafts_test.rb", "the dialog's overview takes the keyboard to a lost address's link with Tab, and Enter there opens that record" ]
+      )
+
+      DETAILS = %i[names diffs].freeze
       KINDS = %i[changed added removed moved].freeze
       DIALOG = "admin.components.editor_screen.publish_changes_dialog".freeze
       SUMMARY_LENGTH = 80
@@ -26,7 +63,10 @@ module Admin
       # The answer to `part=schedule`: what is scheduled now and nothing else.
       def self.schedule_only(record:) = new(record: record, changes: nil, holds: nil, locale: ::Locales.default, schedule_only: true)
 
-      def initialize(record:, changes:, holds:, locale:, lost: [], moved: [], url_options: {}, schedule_only: false)
+      def initialize(record:, changes:, holds:, locale:, detail: :names, lost: [], moved: [], url_options: {}, schedule_only: false)
+        raise ArgumentError, "unknown detail #{detail.inspect}" unless DETAILS.include?(detail)
+
+        @detail = detail
         @schedule_only = schedule_only
         @record = record
         @changes = changes
@@ -40,6 +80,8 @@ module Admin
       def type = record.is_a?(::Page) ? "page" : "post"
 
       def schedule_only? = @schedule_only
+
+      def diffs? = @detail == :diffs
 
       # WHAT IS SCHEDULED NOW, for the dialogs' scripts (`admin--editor--publish-dialog`):
       # the pending copy's id (what each form sends back as `pending`, so
@@ -61,7 +103,7 @@ module Admin
 
       def kind_label(entry) = t(".kinds.#{entry.kind}")
 
-      def type_label(entry) = entry.block.definition&.label || entry.block.block_type.to_s.humanize
+      def type_label(entry) = ::Publishing::TextDiff.block_label(entry.block)
 
       # One line of what the block holds, as its tile says it: the first
       # paragraph, or the image's file name. A section and a list are named
@@ -77,7 +119,7 @@ module Admin
 
       # The record's own fields, each by the name its form gives it, once (a
       # post type's own fields are two columns and one name).
-      def field_labels = changes.fields.map { |name| t(".field_names.#{name}", default: name.humanize) }.uniq
+      def field_labels = changes.fields.map { |name| t(name, scope: ::Publishing::TextDiff::FIELD_NAMES, default: name.humanize) }.uniq # i18n-ok: a column with no key is named by its own name, humanised, as TextDiff names it
 
       def language_names = changes.locales.map { |code| ::Locales.name(code) }
 
@@ -88,6 +130,8 @@ module Admin
       # Whoever holds a part of this record in another tab: their unsaved
       # text is not in the rows, so it is not published.
       def holders
+        return [] unless holds
+
         subjects = [ record, *(record.is_a?(::Page) ? ::ContentBlock.where(owner: record).to_a : []) ]
         subjects.filter_map { |subject| holds.other(subject)&.user }.uniq
       end
@@ -110,7 +154,7 @@ module Admin
         entry.record.is_a?(::Page) ? helpers.admin_page_path(entry.record, **url_options) : helpers.admin_post_path(entry.record, **url_options)
       end
 
-      def lost_languages(entry) = entry.locales.map(&:upcase).to_sentence
+      def lost_languages(entry) = entry.locales.map(&:upcase).to_sentence # i18n-ok: to_sentence joins with the locale's support.array words
 
       # THE RECORDS THAT WOULD MOVE, the record's own among them (a post
       # whose published tags take it to another list): one line per record
@@ -137,9 +181,78 @@ module Admin
 
       def addresses? = others_lost.any? || hidden_lost.to_i.positive? || moved_entries.any? || hidden_moved.positive?
 
+      # -- detail: :diffs --------------------------------------------------------
+
+      # The fields that differ in this language, each a `TextDiff::Entry`.
+      def field_entries
+        @field_entries ||= changes.fields.map { |name| ::Publishing::TextDiff.field(changes, name, locale: locale) }.select { |entry| differs?(entry) }
+      end
+
+      # Every changed block in reading order (the copy's order on the later
+      # side, a removed block where it stood), each with its words in this
+      # language, or nil for an added or removed block, which has no second
+      # side to compare.
+      def block_rows
+        @block_rows ||= changes.blocks.sort_by { |change| ordering(change) }.map do |change|
+          entry = ::Publishing::TextDiff.block(changes, change, locale: locale) if change.kind == :changed
+          [ change, entry && differs?(entry) ? entry : nil ]
+        end
+      end
+
+      def none_in_language? = field_entries.empty? && block_rows.empty?
+
+      # "now 4th, was 2nd", by place in each side's reading order.
+      def moved_to(change)
+        was, now = changes.places_of(change)
+        t(".diffs.moved_to", to: now.ordinalize, from: was.ordinalize)
+      end
+
+      # The structured values that changed with no words, by their labels.
+      def opaque_line(entry)
+        return if entry.opaque.empty?
+
+        t(".diffs.opaque", names: entry.opaque.map { |label| part_label(label) }.to_sentence) # i18n-ok: to_sentence joins with the locale's support.array words
+      end
+
+      # An entry's words: the diff box, or the line that stands in its place
+      # (too long to compare, or only the formatting changed), and the line
+      # naming what changed with no words. A paragraph break is a "\n"
+      # segment, kept by `whitespace-pre-line`.
+      def diff_box(entry)
+        result = entry.result
+        lines = []
+        if result.too_long?
+          lines << tag.p(t(".diffs.too_long"), class: "text-small text-meta", data: { diff_too_long: "" })
+        elsif result.changed?
+          lines << tag.div(render(Admin::Ui::WordDiffComponent.new(segments: result.segments)),
+            class: "rounded-tile bg-paper px-3 py-2.5 text-sm leading-[1.6] text-ink whitespace-pre-line", data: { diff: "" })
+        elsif entry.opaque.empty?
+          lines << tag.p(t(".diffs.formatting"), class: "text-small text-meta", data: { diff_formatting: "" })
+        end
+        lines << tag.p(opaque_line(entry), class: "text-small text-meta", data: { diff_opaque: "" }) if entry.opaque.any?
+        safe_join(lines)
+      end
+
+      # The type's icon at a tile's size, never the block's own: an icon that
+      # follows its block carries an id, and this element has none.
+      def block_icon(change) = Admin::Ui::BlockIconComponent.new(definition: change.block.definition, place: :tile)
+
       attr_reader :locale
 
       private
+
+      # Whether an entry's sides differ in this language: a field changed only
+      # in another reads the same words on both sides here.
+      def differs?(entry) = entry.before != entry.after
+
+      def part_label(label) = label.is_a?(Symbol) ? t(label, scope: "admin.publishing.text_diff.parts") : label
+
+      # A block on the later side by its place there; a removed one by the
+      # place it had, after a block that now stands at that number.
+      def ordering(change)
+        was, now = changes.places_of(change)
+        now ? [ now, 0 ] : [ was, 1 ]
+      end
 
       attr_reader :record, :changes, :holds, :lost, :moved, :url_options
 
@@ -158,7 +271,7 @@ module Admin
       # that the viewer may read: a title out of scope is never shown.
       def readable_records(rows)
         rows.map { |row| row.values_at(:record_type, :record_id) }.uniq.group_by(&:first).flat_map do |record_type, keys|
-          klass = record_type == "Page" ? ::Page : ::Post
+          klass = record_type == ::Page.polymorphic_name ? ::Page : ::Post
           AccessControl.scope(Current.actor, "#{record_type.downcase}s.read", klass.kept.where(id: keys.map(&:last))).to_a
         end.index_by { |found| [ found.class.polymorphic_name, found.id ] }
       end
