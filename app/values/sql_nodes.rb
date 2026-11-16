@@ -86,6 +86,14 @@ module SqlNodes
   # `COUNT(*) FILTER (WHERE condition)`: one of several counts in one query.
   def count_where(condition) = Arel.star.count.filter(condition)
 
+  # `string_agg(CAST(value AS text), 'separator' ORDER BY order)`: the values
+  # of a group joined into one text in a stated order (NULL for no rows).
+  # Arel has no node for an aggregate's own ORDER BY; it is the infix between
+  # the separator and the order.
+  def ordered_join(value, separator, order:)
+    function("string_agg", cast(value, "text"), Arel::Nodes::InfixOperation.new("ORDER BY", quoted(separator), order))
+  end
+
   # `(a, b)`: a row value, compared as a whole (`row(a, b).lt(row(x, y))`).
   def row(*values) = Arel::Nodes::Grouping.new(values.map { |value| quoted(value) })
 

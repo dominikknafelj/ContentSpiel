@@ -191,7 +191,7 @@
 // empties the rows while another graph is loaded, `mark` moves the mark to
 // the item of `id` (null for none), and `row` answers the treeitem of `id`.
 // `treeData` is the graph's element, whose `data-tree-open-path`,
-// `data-tree-locale` and `data-tree-open` the tree carries (the last a seed
+// `data-tree-open-cookie`, `data-tree-locale` and `data-tree-open` the tree carries (the last a seed
 // the list uses up). `scroller` is the element that scrolls the rows into
 // view, the container's by default. The list puts its parts before what the
 // container already holds (the last line, the app's) and takes back only its
@@ -297,7 +297,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     if (!main) return tree
     const label = container.getAttribute("aria-label")
     if (label) tree.setAttribute("aria-label", label)
-    for (const name of [ "treeOpenPath", "treeOpen" ]) {
+    for (const name of [ "treeOpenPath", "treeOpenCookie", "treeOpen" ]) {
       if (given[name] != null) tree.dataset[name] = given[name]
     }
     return tree
@@ -819,7 +819,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
       // used up by the first drawing: every later one, and a page Turbo
       // restores from its snapshot, reads the cookie, which this list and
       // the Pages tree write.
-      drawFolds(tree, readOpenSet(tree.dataset.treeOpen ?? null))
+      drawFolds(tree, readOpenSet(tree, tree.dataset.treeOpen ?? null))
       useSeed()
       put(tree)
     },

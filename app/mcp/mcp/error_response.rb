@@ -41,6 +41,9 @@ module Mcp
     # this ever needs to report.
     def image_not_found = error_response("Image not found")
 
+    # A `folder` that is no folder of the library, or no id and not "none".
+    def folder_not_found = error_response("No such folder")
+
     # A tool call from a token that doesn't hold `key` at all (media
     # library design spec §5.2's ruling: both media tools require
     # `media.upload`) -- reuses the permission's own registered label, the

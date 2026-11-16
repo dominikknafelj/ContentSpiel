@@ -215,7 +215,7 @@ class Notes::SignalsTest < ActiveSupport::TestCase
       File.readlines(file).any? { |line| !line.strip.start_with?("#") && line.match?(/Live::Signals\.later\b/) }
     end
     callers.each do |file|
-      assert_match(/^\s*module \w+::Signals\b|^\s*module Signals\b/, File.read(file), "#{file} calls Live::Signals.later but is not a Signals module") unless file.end_with?("app/models/live/signals.rb")
+      assert_match(/^\s*module \w+::\w*Signals\b|^\s*module \w*Signals\b/, File.read(file), "#{file} calls Live::Signals.later but is not a Signals module") unless file.end_with?("app/models/live/signals.rb")
     end
   end
 

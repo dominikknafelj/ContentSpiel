@@ -36,6 +36,14 @@ class Admin::Ui::TreeFindComponentTest < ViewComponent::TestCase
     assert_raises(ArgumentError) { Admin::Ui::TreeFindComponent.new(controls: "") }
   end
 
+  test "the folders noun says Find a folder and counts folders" do
+    render_inline(Admin::Ui::TreeFindComponent.new(controls: "folders-tree", noun: :folders))
+    assert_selector "label[for='folders-tree-find']", text: "Find a folder", exact_text: true
+    assert_selector "input[placeholder='Find a folder'][aria-controls='folders-tree']"
+    assert_equal({ "one" => "1 folder matches", "other" => "%{count} folders match" }, messages["components.ui.tree_find.count.folders"])
+    assert_equal "No folders match", messages["components.ui.tree_find.none.folders"]
+  end
+
   test "Clear the search to move pages is drawn only where the tree moves, hidden, outside the live region" do
     render_inline(Admin::Ui::TreeFindComponent.new(controls: "tree-list", moving: true))
     assert_selector "p[role=status] + p#tree-list-find-moving[hidden][data-admin--tree--find-target=moving]", text: "Clear the search to move pages", exact_text: true, visible: :hidden

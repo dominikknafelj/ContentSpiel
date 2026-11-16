@@ -317,6 +317,48 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_no_match %r{/blobs/}, rendered_content
   end
 
+  # D9: between Type and Uploaded, the path a link to that place (the grid's
+  # search kept), and Move to… only for a viewer who may move the image (the
+  # rule of editing it: `media.manage`, or its own uploader).
+  test "the Folder row links the path and offers Move to only to a viewer who may move the image" do
+    clients = Media::Folder.create!(name: "Clients")
+    client_a = Media::Folder.create!(name: "Client A", parent: clients)
+    asset = create_media_asset
+    asset.update!(title: "launch-stage.jpg")
+    asset.update_columns(folder_id: client_a.id) # version: none (a test's own rows)
+
+    as(users(:one)) do
+      render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en", link_params: { q: "logo", page: "2" })
+    end
+
+    assert_equal %w[File Type Folder Uploaded], page.first("#media-panel dl").all("dt").map(&:text)
+    dd = page.find("dd#media-panel-folder-#{asset.id}")
+    link = dd.find("a", text: "Clients / Client A")
+    assert_equal "/cs-studio/media?folder=#{client_a.id}&q=logo", link[:href]
+    assert_equal "content", link["data-turbo-frame"]
+    move = dd.find("button", text: "Move to…")
+    assert_equal "media-move-dialog", move["data-admin--ui--dialog-id-param"]
+    assert_equal asset.id.to_s, move["data-admin--media--move-asset-ids-param"]
+    assert_equal "launch-stage.jpg", move["data-admin--media--move-title-param"]
+    assert_selector "dd#media-panel-folder-#{asset.id} button svg[aria-hidden=true]"
+
+    as(media_only_viewer) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en") }
+    assert_selector "dd#media-panel-folder-#{asset.id} a", text: "Clients / Client A"
+    assert_no_selector "dd#media-panel-folder-#{asset.id} button"
+  end
+
+  test "an image in no folder reads Not in a folder" do
+    asset = create_media_asset
+
+    as(users(:one)) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en") }
+    assert_selector "dd#media-panel-folder-#{asset.id} span.text-meta", text: "Not in a folder"
+    assert_no_selector "dd#media-panel-folder-#{asset.id} a"
+    assert_selector "dd#media-panel-folder-#{asset.id} button", text: "Move to…"
+
+    as(media_only_viewer) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en") }
+    assert_equal "Not in a folder", page.find("dd#media-panel-folder-#{asset.id}").text.squish
+  end
+
   private
 
   def media_only_viewer

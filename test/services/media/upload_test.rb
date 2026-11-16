@@ -58,4 +58,38 @@ class Media::UploadTest < ActiveSupport::TestCase
     assert result.ok?, result.errors.inspect
     assert_equal users(:author), result.record.created_by
   end
+
+  test "an upload in a folder lands in it and says so in its event" do
+    folder = Media::Folder.create!(name: "Client A")
+    result = as(users(:author)) { Media::Upload.call(file: upload, folder: folder) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal folder.id, result.record.reload.folder_id
+    assert_equal folder.id, Audit::Event.find_by!(action: "media.uploaded").metadata["folder_id"]
+
+    by_id = as(users(:author)) { Media::Upload.call(file: upload, folder: folder.id) }
+    assert_equal folder.id, by_id.record.reload.folder_id
+  end
+
+  test "an upload with no folder lands in none" do
+    result = as(users(:author)) { Media::Upload.call(file: upload) }
+
+    assert_nil result.record.reload.folder_id
+    assert_nil Audit::Event.find_by!(action: "media.uploaded").metadata["folder_id"]
+  end
+
+  test "an upload into a folder deleted meanwhile is refused and stores nothing" do
+    folder = Media::Folder.create!(name: "Gone")
+    gone_id = folder.id
+    folder.destroy!
+    result = nil
+
+    assert_no_difference [ "Media::Asset.count", "ActiveStorage::Attachment.count", "ActiveStorage::Blob.count" ] do
+      result = as(users(:author)) { Media::Upload.call(file: upload, folder: gone_id) }
+    end
+
+    assert_not result.ok?
+    assert_equal [ "That folder is gone." ], result.errors
+    assert_not Audit::Event.exists?(action: "media.uploaded")
+  end
 end

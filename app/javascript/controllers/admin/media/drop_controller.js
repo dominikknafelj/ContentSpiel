@@ -30,6 +30,11 @@ import { Controller } from "@hotwired/stimulus"
 // page's own until its `dragend` or `drop`; an own drag is left entirely to
 // the browser.
 //
+// In the screen's selection mode (`admin--media--selection` on the library,
+// where Upload images is not drawn either) a dropped file is no upload: the
+// overlay stays hidden and the drop is refused, since a tile the upload added
+// would be a link among buttons that tick.
+//
 // The listeners are on `document` (the whole screen is the target), so they
 // are removed in `disconnect`, or each visit to the screen would add another set.
 const STALE_MS = 1000
@@ -77,7 +82,7 @@ export default class extends Controller {
     // What tells the browser this page accepts a drop at all (without it `drop`
     // never fires).
     event.preventDefault()
-    if (event.dataTransfer) event.dataTransfer.dropEffect = this.dialogOpen ? "none" : "copy"
+    if (event.dataTransfer) event.dataTransfer.dropEffect = this.dialogOpen || this.selecting ? "none" : "copy"
     this.armStale()
     if (this.depth === 0) this.enter(event)
   }
@@ -105,7 +110,7 @@ export default class extends Controller {
 
     event.preventDefault()
     this.hide()
-    if (this.dialogOpen) return
+    if (this.dialogOpen || this.selecting) return
     // The zone turns its own drop into a `change` on its input, which uploads.
     if (event.target instanceof Element && event.target.closest("[data-controller~='file-drop']")) return
 
@@ -114,7 +119,7 @@ export default class extends Controller {
   }
 
   show() {
-    if (this.dialogOpen) return
+    if (this.dialogOpen || this.selecting) return
 
     this.overlayTarget.hidden = false
   }
@@ -128,6 +133,10 @@ export default class extends Controller {
   carriesFiles(event) {
     if (this.own) return false
     return Array.from(event.dataTransfer?.types || []).includes("Files")
+  }
+
+  get selecting() {
+    return this.element.closest("[data-controller~='admin--media--selection']") !== null
   }
 
   // Another modal owns the screen: a drop is not an upload for the page behind it.

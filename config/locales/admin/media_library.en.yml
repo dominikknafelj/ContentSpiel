@@ -17,7 +17,142 @@ en:
             no_matches: "No matches."
             no_matches_description: "No images match the current search or filter."
             clear: "Clear filters"
+          # A folder with no image of its own, and a library with every image in a folder.
+          empty_folder:
+            title: "No images in this folder yet"
+            body: "Drop images here, or use Upload images: they go into %{name}."
+            holds_html:
+              one: "It holds %{count} folder: %{links}."
+              other: "It holds %{count} folders: %{links}."
+            separator: ", "
+          empty_none: "Every image is in a folder."
+        # The Folders column (`Admin::MediaLibrary::FolderTreeComponent`);
+        # `heading` is the column head's, which the Media screen's view draws.
+        folder_tree:
+          heading: "Folders"
+          all: "All media"
+          none: "Not in a folder"
+          empty: "No folders yet."
+          # The column head's button, which creates at the top level, and a
+          # row's "+", which creates inside that folder.
+          new_folder: "+ New folder"
+          add: "New folder in %{name}"
+          # The picker's places below 640px, a select (the card's D12).
+          picker_select: "Folder"
+        # Dragging images and folders onto the Folders column
+        # (`admin--media--drag`): the ghost's words for several images
+        # (`count`; one is its title), what the screen's polite status says
+        # after a drop (`moved`) or over a row that cannot take a folder
+        # (`refused`, with one of the three reasons, which also stands in the
+        # row's count).
+        drag:
+          count: "%{count} images"
+          moved:
+            one: "Moved “%{title}” to %{folder}."
+            other: "Moved %{count} images to %{folder}."
+          refused: "Can't move “%{name}” there: %{reason}."
+          too_deep: "too deep"
+          this_folder: "this folder"
+          name_taken: "name taken"
+        # The New folder and Rename folder dialog
+        # (`Admin::MediaLibrary::FolderDialogComponent`, its form
+        # `FolderFormComponent`); `admin--media--folder-dialog` words it for
+        # each opening.
+        folder_dialog:
+          new_title: "New folder"
+          rename_title: "Rename folder"
+          name: "Name"
+          top: "At the top of the library"
+          inside: "Inside %{path}"
+          cancel: "Cancel"
+          create: "Create folder"
+          rename: "Rename"
+        # The Move to… dialog (`Admin::MediaLibrary::MoveDialogComponent`,
+        # its list `MoveChoicesComponent`): `admin--media--move` words the
+        # title for each opening. "this folder" and "too deep" say why a place
+        # cannot take a folder.
+        move_dialog:
+          # `image` names the one image moved; `images` counts them, and is
+          # also one image's title when it has none to name.
+          title:
+            image: "Move “%{title}”"
+            images:
+              one: "Move %{count} image"
+              other: "Move %{count} images"
+            folder: "Move “%{name}”"
+          find: "Find a folder"
+          none: "Not in a folder"
+          top: "Top of the library"
+          current: "Current"
+          this_folder: "this folder"
+          too_deep: "too deep"
+          cancel: "Cancel"
+          submit: "Move here"
+        # The confirm before a folder is deleted
+        # (`Admin::MediaLibrary::DeleteFolderDialogComponent`): what moves
+        # where (`Media::DeleteFolder.preview`). A part with nothing to move is
+        # left out of the sentence.
+        delete_folder_dialog:
+          title: "Delete “%{name}”?"
+          confirm: "Delete folder"
+          images:
+            one: "%{count} image"
+            other: "%{count} images"
+          folders:
+            one: "%{count} folder"
+            other: "%{count} folders"
+          into_parent_both: "Its %{images} and %{folders} move to “%{parent}”. Nothing else is deleted."
+          # One kind of thing moves: the verb agrees with its count.
+          into_parent:
+            one: "Its %{things} moves to “%{parent}”. Nothing else is deleted."
+            other: "Its %{things} move to “%{parent}”. Nothing else is deleted."
+          # The verb agrees with the folders' count, the sentence's subject.
+          to_top_both:
+            one: "Its %{folders} moves to the top of the library, and its %{images} to Not in a folder. Nothing else is deleted."
+            other: "Its %{folders} move to the top of the library, and its %{images} to Not in a folder. Nothing else is deleted."
+          to_top_folders:
+            one: "Its %{folders} moves to the top of the library. Nothing else is deleted."
+            other: "Its %{folders} move to the top of the library. Nothing else is deleted."
+          to_top_images:
+            one: "Its %{images} moves to Not in a folder. Nothing else is deleted."
+            other: "Its %{images} move to Not in a folder. Nothing else is deleted."
+          empty: "It is empty."
+          renamed: "“%{from}” becomes “%{to}”, because “%{parent}” already has a folder of that name."
+          renamed_at_top: "“%{from}” becomes “%{to}”, because the top of the library already has a folder of that name."
+          undone: "This can't be undone."
+        # The heading over the grid: the place's name, its count and Upload.
+        place_heading:
+          count:
+            one: "%{count} image"
+            other: "%{count} images"
+          breadcrumb_label: "Where you are"
+          upload: "Upload images"
+          # Selection mode's way in (`select=1`), before Upload images.
+          select: "Select"
+          # The folder's ⋯ menu (a folder, for `media.manage`).
+          menu: "Folder actions"
+          new_inside: "New folder inside…"
+          rename: "Rename…"
+          move: "Move to…"
+          delete: "Delete folder…"
+        # The notice `admin--media--live` puts above the grid when another tab
+        # changed the place shown.
+        live:
+          changed: "Images here changed since you opened this view."
+          show: "Show changes"
+        # Selection mode's bar (`Admin::MediaLibrary::SelectionBarComponent`):
+        # `count` is also what its status says; `select_all` counts the tiles
+        # the page draws, and reads `all_selected` once all of them are.
+        selection:
+          count: "%{count} selected"
+          select_all: "Select all %{count}"
+          all_selected: "All %{count} selected"
+          clear: "Clear"
+          move: "Move to…"
+          done: "Done"
         toolbar:
+          searching_in: "Searching in %{name}."
+          search_all: "Search all media for “%{q}” →"
           search_label: "Search images"
           search_placeholder: "Search title, alt text or filename"
           show: "Show"
@@ -47,9 +182,15 @@ en:
           facts:
             file: "File"
             type: "Type"
+            folder: "Folder"
             uploaded: "Uploaded"
             # `%{name}` is the uploader's name as `UserNameComponent` draws it.
             uploaded_by_html: "by %{name} · %{date}"
+          # The Folder fact's words (drawn by `FolderFactComponent`, which a
+          # move's answer draws again): no folder, and the Move to… for a
+          # viewer who may move the image.
+          no_folder: "Not in a folder"
+          move: "Move to…"
           download_original: "Download original"
           download_hint: "Only editors can download the original."
           alt_placeholder: "Add alt text"

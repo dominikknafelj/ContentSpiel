@@ -40,6 +40,7 @@ module Audit
       "SiteSetting" => "Settings",
       "ApiToken" => "API token",
       "Media::Asset" => "Media asset",
+      "Media::Folder" => "Media folder",
       "Forms::Form" => "Form"
     }.freeze
 

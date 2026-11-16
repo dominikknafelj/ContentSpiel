@@ -79,6 +79,18 @@ class Admin::Ui::TreeItemComponentTest < ViewComponent::TestCase
     assert_no_selector ".admin-tree-row__mark svg"
   end
 
+  test "a row's mark can be each folder glyph, silent to a screen reader" do
+    %i[folder folder_open folder_none media].each do |name|
+      html = ApplicationController.render(partial: "admin/shared/tree_glyph", locals: { name: name })
+      render_row { |item| item.with_mark { html.html_safe } }
+      svg = page.find(".admin-tree-row__mark svg")
+      assert_equal "true", svg["aria-hidden"], name
+      assert_equal name.to_s, svg["data-tree-glyph"]
+      assert_equal %w[14 14 1.3], [ svg["width"], svg["height"], svg["stroke-width"] ]
+    end
+    assert_equal "2.2 2.2", Nokogiri::HTML5.fragment(ApplicationController.render(partial: "admin/shared/tree_glyph", locals: { name: :folder_none })).at_css("svg")["stroke-dasharray"]
+  end
+
   test "the slots are drawn in their order: handle, disclosure, mark, title, state, trailing, add" do
     render_row(parent: true, controls: "tree-children-1") do |item|
       item.with_handle { %(<button type="button" class="admin-tree-node__handle" data-part="handle">⠿</button>).html_safe }

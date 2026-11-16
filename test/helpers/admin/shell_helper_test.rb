@@ -23,6 +23,12 @@ class Admin::ShellHelperTest < ActionView::TestCase
     assert_raises(KeyError) { Admin::Shell::TreeSubjects.key("pages", :title) }
   end
 
+  test "the media subject is the Folders column, which does not fill" do
+    assert_not Admin::Shell::TreeSubjects.fill?("media")
+    assert_equal "Folders", I18n.t("admin.#{Admin::Shell::TreeSubjects.key('media', :button)}")
+    assert_equal "Open folders", I18n.t("admin.#{Admin::Shell::TreeSubjects.key('media', :open)}")
+  end
+
   test "every subject has every word" do
     Admin::Shell::TreeSubjects::ALL.each_key do |subject|
       Admin::Shell::TreeSubjects::WORDS.each do |word|

@@ -505,6 +505,22 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_no_match(/● CHANGED ELSEWHERE/, response.body)
   end
 
+  test "a panel's autosave after a move elsewhere is not stale" do
+    sign_in_as(users(:one))
+    asset = upload_asset(filename: "hero.png")
+    base = asset.updated_at.iso8601(6)
+    folder = Media::Folder.create!(name: "Client A")
+    travel 1.minute
+
+    assert Media::MoveImages.call(asset_ids: [ asset.id ], folder: folder, actor: users(:one)).ok?
+
+    patch "/cs-studio/media/#{asset.id}", params: { media_asset: { title: "Mine", alt: "", caption: "" }, base_updated_at: base }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Mine", asset.reload.title
+    assert_equal folder.id, asset.folder_id
+    assert_no_match(/ALSO CHANGED ELSEWHERE/, response.body)
+  end
+
   test "editing title, alt and caption autosaves per locale through Media::Save" do
     sign_in_as(users(:one))
     asset = upload_asset(filename: "hero.png")
@@ -645,7 +661,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-count-missing_alt", text: "3"
     assert_select "#media-count-mine", text: "1"
     assert_select "input#media-filter-unused[checked]"
-    assert_select "input[name=filter]", count: 5
+    assert_select "input[name=filter]:not([type=hidden])", count: 5
 
     get "/cs-studio/media", params: { q: "mine" }
     assert_select "#media-count-all", text: "1"
@@ -679,7 +695,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { filter: "untranslated" }
 
     assert_response :success
-    assert_select "input[name=filter]", count: 4
+    assert_select "input[name=filter]:not([type=hidden])", count: 4
     assert_select "input#media-filter-all[checked]"
   end
 
@@ -1026,6 +1042,198 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     count
   end
 
+  # --- places (media folders) ---------------------------------------------
+
+  def place_in(folder) = Media::Place.parse(folder.id.to_s, tree: Media::FolderTree.load)
+
+  def put_in(folder, *assets) = assets.each { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
+
+  test "the grid lists a folder's own images and not its subfolders'" do
+    sign_in_as(users(:one))
+    parent = Media::Folder.create!(name: "Parent")
+    child = Media::Folder.create!(name: "Child", parent: parent)
+    own, deeper, loose = create_media_asset, create_media_asset, create_media_asset
+    put_in(parent, own)
+    put_in(child, deeper)
+
+    get "/cs-studio/media", params: { folder: parent.id }
+    assert_response :success
+    assert_select "#media-asset-#{own.id}"
+    assert_select "#media-asset-#{deeper.id}", count: 0
+    assert_select "#media-asset-#{loose.id}", count: 0
+    assert_select "#media-count-all", text: "1"
+
+    get "/cs-studio/media", params: { folder: "none" }
+    assert_select "#media-asset-#{loose.id}"
+    assert_select "#media-asset-#{own.id}", count: 0
+
+    get "/cs-studio/media", params: { folder: "all" }
+    assert_select "[id^=media-asset-]", count: 3
+  end
+
+  test "an unknown folder is the 404 with Back to Media" do
+    sign_in_as(users(:one))
+
+    [ "999999999", "5x", "0" ].each do |raw|
+      get "/cs-studio/media", params: { folder: raw, q: "wall", filter: "unused", page: "3" }
+
+      assert_response :not_found
+      assert_select "a", text: "Back to Media" do |links|
+        href = links.first["href"]
+        assert_includes href, "q=wall"
+        assert_includes href, "filter=unused"
+        assert_not_includes href, "page="
+        assert_not_includes href, "folder="
+      end
+    end
+
+    get "/cs-studio/media", params: { folder: [ "1" ] }
+    assert_response :not_found
+  end
+
+  test "the picker answers All media for a folder that names nothing" do
+    sign_in_as(users(:one))
+    create_media_asset
+    create_media_asset
+
+    get "/cs-studio/media", params: { picker: 1, folder: "999999999" }
+    assert_response :success
+    assert_select "turbo-frame#media-picker-grid > #media-picker-place[hidden][data-media-place=all][data-media-place-name='All media'][data-media-place-gone]"
+    assert_select "turbo-frame#media-picker-grid[data-media-place-gone]", count: 0
+    assert_select PICK, count: 2
+    assert_select "input[name=folder]", count: 0
+
+    folder = Media::Folder.create!(name: "Client A")
+    get "/cs-studio/media", params: { picker: 1, folder: folder.id }
+    assert_select "#media-picker-place[data-media-place=?][data-media-place-name=?]:not([data-media-place-gone])", folder.id.to_s, "Client A"
+    assert_select "input[name=folder][value=?]", folder.id.to_s
+  end
+
+  test "every link of the grid and the panel keeps folder" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+    assets = Array.new(49) { create_media_asset }
+    put_in(folder, *assets)
+
+    get "/cs-studio/media", params: { folder: folder.id, selected: assets.last.id, q: "tiny" }
+    assert_response :success
+    hrefs = css_select("#media-library a[href*='/cs-studio/media?'], #media-library a[href='/cs-studio/media']")
+               .reject { |link| link.ancestors("nav, p[data-media-searching-in]").any? }.map { |link| link["href"] } # but the links to other places: the breadcrumb and the way out of a search
+    assert_predicate hrefs, :any?
+    assert(hrefs.all? { |href| href.include?("folder=#{folder.id}") }, hrefs.reject { |href| href.include?("folder=") }.inspect)
+    assert_select "#media-library form input[name=folder][value=?]", folder.id.to_s
+    assert_select "form[action*='/media/#{assets.last.id}'][action*='folder=#{folder.id}']"
+    assert_select "a[href*='page=2'][href*='folder=#{folder.id}']"
+  end
+
+  test "a link to another place keeps q and filter and drops page" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+
+    get "/cs-studio/media", params: { folder: folder.id, q: "wall", filter: "unused", page: "3", selected: "7", locale: "de" }
+    query = controller.send(:place_query, Media::Place::NONE)
+    assert_equal({ q: "wall", filter: "unused", folder: "none", locale: "de" }, query)
+
+    assert_equal({ q: "wall", filter: "unused", folder: folder.id.to_s, locale: "de" }, controller.send(:place_query, place_in(folder)))
+    assert_equal({ q: "wall", filter: "unused", locale: "de" }, controller.send(:place_query, Media::Place::ALL))
+  end
+
+  test "an upload answer carries the folder counts, and the upload lands in the place's folder" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+
+    post "/cs-studio/media", params: { file: fixture_file_upload("tiny.png", "image/png"), folder: folder.id.to_s }
+    assert_response :created
+    body = response.parsed_body
+    assert_equal folder.id, Media::Asset.find(body["id"]).folder_id
+    assert_equal({ "all" => 1, "none" => 0, "folders" => { folder.id.to_s => 1 } }, body["folder_counts"])
+    assert_equal 1, body["counts"]["all"]
+    assert_includes body["tile"], "folder=#{folder.id}"
+
+    post "/cs-studio/media_assets", params: { file: fixture_file_upload("tiny.png", "image/png"), folder: "none" }
+    assert_response :created
+    assert_nil Media::Asset.find(response.parsed_body["id"]).folder_id
+
+    post "/cs-studio/media", params: { file: fixture_file_upload("tiny.png", "image/png") }
+    assert_nil Media::Asset.find(response.parsed_body["id"]).folder_id
+  end
+
+  test "an upload into a folder that is gone is refused on the file's tile and stores nothing" do
+    sign_in_as(users(:one))
+
+    [ "999999999", "junk" ].each do |raw|
+      assert_no_difference "Media::Asset.count" do
+        post "/cs-studio/media", params: { file: fixture_file_upload("tiny.png", "image/png"), folder: raw }
+      end
+      assert_response :unprocessable_entity
+      assert_equal [ "That folder is gone." ], response.parsed_body["errors"]
+    end
+  end
+
+  test "selected without folder opens the panel over All media as before" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+    inside, outside = create_media_asset, create_media_asset
+    put_in(folder, inside)
+
+    get "/cs-studio/media", params: { selected: outside.id }
+
+    assert_response :success
+    assert_select "#media-asset-#{inside.id}"
+    assert_select "#media-asset-#{outside.id} a[aria-current='true']"
+    assert_select "#media-panel-title"
+  end
+
+  # The Folders column is the shell's tree column, subject `media`: its words
+  # are the subject's, and it holds the head, the find over the folders and
+  # the tree of places.
+  test "the Media screen's column is the media subject with the Folders words" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+
+    get "/cs-studio/media"
+
+    assert_response :success
+    assert_select "aside#tree-column" do
+      assert_select "h2", text: "Folders"
+      assert_select ".admin-tree-hide[aria-label='Hide folders']"
+      assert_select ".admin-tree-fold[aria-label='Show folders']"
+      assert_select ".admin-tree-divider[aria-label='Folders width']"
+      assert_select "[role=search] input[aria-controls='media-folder-tree']"
+      assert_select "#media-folder-tree-part > ul#media-folder-tree[data-tree-open-cookie='cs_media_open']"
+      assert_select "#media-folder-tree [data-media-place='#{folder.id}']", text: /Client A/
+    end
+    assert_select "button[aria-controls='tree-column']", text: "Folders"
+    assert_select "#content #media-folder-tree", count: 0
+  end
+
+  test "a frame answer draws no column" do
+    sign_in_as(users(:one))
+    Media::Folder.create!(name: "Client A")
+
+    get "/cs-studio/media", headers: { "Turbo-Frame" => "content" }
+
+    assert_response :success
+    assert_select "#media-library"
+    assert_select "#tree-column", count: 0
+    assert_select "#media-folder-tree", count: 0
+  end
+
+  test "the content names its place and its query for the column's script" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+
+    get "/cs-studio/media", params: { folder: folder.id, q: "logo", filter: "unused", page: "2" }
+
+    assert_select "#media-library[data-media-place=?]", folder.id.to_s do |library|
+      assert_equal({ "q" => "logo", "filter" => "unused" }, JSON.parse(library.first["data-media-query"]))
+    end
+    assert_select "#media-folder-tree [data-media-place='#{folder.id}'].admin-tree-row--selected a[aria-current=page]"
+
+    get "/cs-studio/media", params: { q: [ "x" ] }
+    assert_select "#media-library[data-media-place=all][data-media-query='{}']"
+  end
+
   # Decision D12: a bad `?selected=` stays a 404, and its way on is the
   # library as it was listed.
   test "a selected id that names nothing is the 404 with a link back to Media that keeps the search and the segment" do
@@ -1046,5 +1254,65 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/999999999"
     assert_response :not_found
     assert_select "a", text: "Back to the dashboard"
+  end
+
+  test "the page title stays Media and the h1 is the place's name" do
+    sign_in_as(users(:one))
+    clients = Media::Folder.create!(name: "Clients")
+    client_a = Media::Folder.create!(name: "Client A", parent: clients)
+
+    get "/cs-studio/media"
+    assert_select "title", text: /\AMedia ·/
+    assert_select "h1", text: "All media"
+    assert_select "#media-place-count", text: /\A\d+ images?\z/
+
+    get "/cs-studio/media", params: { folder: client_a.id }
+    assert_select "title", text: /\AMedia ·/
+    assert_select "h1", count: 1, text: "Client A"
+    assert_select "nav[aria-label='Where you are'] a", text: "Clients"
+    assert_select "[data-empty-state-title]", text: "No images in this folder yet"
+
+    get "/cs-studio/media", params: { folder: "none" }
+    assert_select "h1", text: "Not in a folder"
+  end
+
+  test "select drops the panel and is dropped by a link to another place" do
+    sign_in_as(users(:one))
+    clients = Media::Folder.create!(name: "Clients")
+    client_a = Media::Folder.create!(name: "Client A", parent: clients)
+    assets = Array.new(49) { create_media_asset }
+    put_in(client_a, *assets)
+
+    # Select is a link to the place as listed, with select=1 and without the
+    # panel's image.
+    get "/cs-studio/media", params: { folder: client_a.id, q: "tiny", page: "2", selected: assets.first.id }
+    select = css_select("[data-media-place-heading] a").find { |link| link.text.strip == "Select" }
+    query = Rack::Utils.parse_query(URI(select["href"]).query)
+    assert_equal({ "folder" => client_a.id.to_s, "q" => "tiny", "page" => "2", "select" => "1" }, query)
+
+    get "/cs-studio/media", params: { folder: client_a.id, select: "1", selected: assets.last.id }
+    assert_response :success
+    assert_select "#media-rail", count: 0
+    assert_select "#media-library[data-controller='admin--media--drag admin--media--live admin--media--selection']"
+    assert_select "#media-library > [data-media-selection-bar]"
+    assert_select "[data-media-selection-bar] button", text: "Select all 48"
+    assert_select "#media-library ul.admin-media-grid > li > button[aria-pressed=false][data-asset-id]", count: 48
+    assert_select "#media-library ul.admin-media-grid a", count: 0
+    assert_select "[data-media-place-heading] a", text: "Select", count: 0
+    assert_select "[data-media-place-heading] button", text: "Upload images", count: 0
+    done = css_select("[data-media-selection-bar] a").find { |link| link.text.strip == "Done" }
+    assert_equal({ "folder" => client_a.id.to_s }, Rack::Utils.parse_query(URI(done["href"]).query))
+
+    # Every way to another place, page or search leaves selection mode.
+    column = css_select("##{Admin::MediaLibrary::FolderTreeComponent::ID} a")
+    assert_operator column.size, :>=, 4, "All media, Not in a folder and the two folders"
+    links = css_select("#media-library nav a, a[href*='page=']") + column
+    links.each { |link| assert_not_includes link["href"], "select=", link.to_html }
+    assert_not_includes controller.send(:place_query, place_in(clients)).keys, :select
+    assert_select "#media-library form[action$='/cs-studio/media'] input[name=select]", count: 0
+
+    get "/cs-studio/media", params: { folder: clients.id }
+    assert_select "#media-library[data-controller='admin--media--drag admin--media--live']"
+    assert_select "#media-library ul.admin-media-grid button[aria-pressed]", count: 0
   end
 end

@@ -25,6 +25,7 @@
       <dt><%= t(".facts.file") %></dt><dd class="min-w-0 break-all text-right text-ink"><%= filename %></dd>
     <% end %>
     <dt><%= t(".facts.type") %></dt><dd class="text-right text-ink"><%= file_facts %></dd>
+    <dt><%= t(".facts.folder") %></dt><%= render folder_fact %>
     <dt><%= t(".facts.uploaded") %></dt>
     <dd class="text-right text-ink">
       <% if uploader? %>

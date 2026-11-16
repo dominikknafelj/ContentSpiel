@@ -57,6 +57,29 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_selector "#media-count-all", text: "2"
   end
 
+  # The Folders column's counts follow an upload's answer (`folder_counts`),
+  # a folder's from nothing at 0 to 1 too.
+  test "an upload into a folder moves the Folders column's counts, a folder's from 0 to 1" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    create_media_asset(filename: "wide.png")
+    shoots = Media::Folder.create!(name: "Shoots")
+    sign_in_via_form(users(:one))
+    visit_screen "/cs-studio/media?folder=#{shoots.id}"
+
+    count = ->(place) { "#media-folder-tree [data-media-place-count='#{place}']" }
+    assert_selector count.call(shoots.id), text: "", visible: :all
+    assert_selector count.call("all"), text: "1", visible: :all
+    assert_selector count.call("none"), text: "1", visible: :all
+
+    attach_file("media-upload-input", file_fixture("tiny.png").to_s, visible: :all)
+    assert_selector count.call(shoots.id), exact_text: "1", visible: :all, wait: 10
+    assert_selector count.call("all"), exact_text: "2", visible: :all
+    assert_selector count.call("none"), exact_text: "1", visible: :all
+    # The row's count shows where it was nothing: the place shown is the selected row.
+    assert_selector count.call(shoots.id), exact_text: "1"
+    assert_equal shoots.id, Media::Asset.order(:id).last.folder_id
+  end
+
   test "choosing a tile opens the panel and advances the URL; typing an alt text takes No alt off the tile and drops the Missing alt count" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de], default: "en")
@@ -590,6 +613,11 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     at_library(1199, "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}") do
       assert_rail_docked(false)
+      # A gap this test does not close: a thread's link to an image whose
+      # rail does not dock lands with the Notes section under the image's
+      # panel, below the window's fold, and its lazy frame loads only when
+      # scrolled to, so the thread the link names is out of sight on arrival.
+      scroll_to find("#media-rail-panel-notes")
       assert_selector "#media-rail-panel-notes #note-thread-#{thread.id}", visible: :visible, text: "Too dark here"
       assert_selector "#media-rail-panel-image #media-panel", visible: :visible
     end
@@ -665,7 +693,8 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
   # The window sized so that the library (`#media-library`, the rail's
   # container) is `width` wide, measured on the page itself: the sidebar,
-  # the content's padding and the scrollbar stand between the two.
+  # the Folders column, the content's padding and the scrollbar stand
+  # between the two.
   def at_library(width, path)
     at_window(width + 400) do
       visit_screen path
@@ -693,6 +722,22 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
   def release_uploads
     page.execute_script("window.__releaseUploads()")
+  end
+
+  test "a file dropped in selection mode is refused: no overlay, no upload" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form(users(:one))
+    create_media_asset
+    visit_screen "/cs-studio/media?select=1"
+    assert_selector "[data-media-selection-bar]"
+
+    dispatch_file_drag("dragenter", "tiny.png")
+    assert_no_selector "[data-admin--media--drop-target=overlay]", visible: :visible
+    assert_no_difference -> { Media::Asset.count } do
+      dispatch_file_drop("tiny.png")
+      await_frames
+      assert_no_selector "[data-upload-tile]"
+    end
   end
 
   # A `DataTransfer` carrying real `File`s built from fixture bytes, in the page.

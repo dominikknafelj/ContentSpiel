@@ -366,6 +366,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     element = css_select("[data-controller='admin--mind-graph--graph']").first
     assert_equal "#{inside.id}.-#{branch.id}", element["data-tree-open"], "the pages the viewer reads, in the cookie's order"
     assert_equal "/cs-studio", element["data-tree-open-path"]
+    assert_equal TreeOpenSet::COOKIE, element["data-tree-open-cookie"]
     assert_equal Locales.default, element["data-tree-locale"]
 
     sign_in_as(users(:one))

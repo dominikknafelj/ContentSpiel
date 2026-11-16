@@ -1,7 +1,8 @@
-// The request behind a drag: a block move (`admin--editor--blocks#move`) and a
-// page tree move (`admin--pages--tree#save`). Both are hand-built `fetch`es -- a drop
+// The request behind a drag: a block move (`admin--editor--blocks#move`), a
+// page tree move (`admin--pages--tree#save`) and a drop on the Media screen's
+// Folders column (`admin--media--drag`). All are hand-built `fetch`es -- a drop
 // is no form submission, so Turbo Drive sends nothing -- that ask for a Turbo
-// Stream and render it themselves. This module is the part the two share:
+// Stream and render it themselves. This module is the part they share:
 // deciding whether what came back IS that stream.
 //
 // WHY. `fetch` resolves for anything that answers, and both controllers used
@@ -48,9 +49,12 @@ const ORDER_MESSAGES = {
 //   (a 500, an error page): the endpoint never processed the move.
 // The timeout is what keeps a request that never answers from holding the
 // whole screen's queue.
-export async function sendOrder(url, { headers, body }) {
+//
+// `method` is PATCH but for a drop that makes something (the Media screen's
+// image move, `POST /media/move`).
+export async function sendOrder(url, { headers, body, method = "PATCH" }) {
   try {
-    const response = await fetch(url, { method: "PATCH", headers, body, signal: AbortSignal.timeout(30000) })
+    const response = await fetch(url, { method, headers, body, signal: AbortSignal.timeout(30000) })
     if (response.redirected) return { outcome: "signedOut" }
     if (!(response.headers.get("Content-Type") || "").includes("text/vnd.turbo-stream.html")) return { outcome: "failed" }
 

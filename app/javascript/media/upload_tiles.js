@@ -49,11 +49,22 @@ export function csrfToken() {
 }
 
 // The segment counts the server sent back, written into the toolbar's spans
-// (`Admin::MediaLibrary::ToolbarComponent.count_id`).
-export function updateCounts(counts, { picker = false } = {}) {
+// (`Admin::MediaLibrary::ToolbarComponent.count_id`), and the places' counts
+// (`folders`, the answer's `folder_counts`: `{ all, none, folders: { id: n } }`)
+// into the count of every row of `tree`, the places of the screen or of the
+// picker (`FolderTreeComponent`, `data-media-place-count`). A place at 0 is
+// written empty, which the stylesheet draws as nothing.
+export function updateCounts(counts, { picker = false, folders = null, tree = null } = {}) {
   Object.entries(counts || {}).forEach(([ key, count ]) => {
     const span = document.getElementById(`media-${picker ? "picker-" : ""}count-${key}`)
     if (span) span.textContent = String(count)
+  })
+  if (!folders || !tree) return
+
+  tree.querySelectorAll("[data-media-place-count]").forEach((span) => {
+    const place = span.dataset.mediaPlaceCount
+    const count = place === "all" ? folders.all : place === "none" ? folders.none : folders.folders?.[place]
+    span.textContent = count > 0 ? String(count) : ""
   })
 }
 
