@@ -68,20 +68,27 @@ module BlockTypes
 
     # The tile's line of a closed Gallery, as parts (spec §10.5): the
     # layout's word with the number of images in the list ("Carousel · 12
-    # images"), or "Empty" with none; then, when some image has no alt in
-    # this language, the warn badge "3 without alt". An image's alt is what a
-    # visitor in this language is given (`Media::Asset#alt_text`: the
-    # override written in it, else the library's), as the Card's tile asks
-    # it; an id the library no longer holds is in the line's count and not
-    # in the badge's, since the site skips it. One query reads the images.
+    # images"), or "Empty" with none; then, when some image a visitor in this
+    # language is given no alt for, the warn badge "3 without alt". The alt
+    # counted is the one the site draws: `Media::Asset#alt_text` handed the
+    # block's overrides of every language (`{ locale => alt }`), so it walks
+    # the fallback chain over the override and the library's alt together,
+    # as the Card's tile asks it. An id that names no image, or an image
+    # whose file is gone, is in the line's count and not in the badge's,
+    # since the site skips it.
     def self.summary(block, locale:)
       settings = block.settings_object(locale: locale)
       ids = Array(settings&.images)
       return [ [ :word, :empty ] ] if ids.empty?
 
       line = [ :word, layout_of(settings.layout).to_sym, { count: ids.size } ]
-      texts = settings.texts.to_h
-      without = Media::Asset.kept.where(id: ids).count { |asset| asset.alt_text(override: texts.dig(asset.id.to_s, "alt"), locale: locale).strip.empty? }
+      translations = block.translated_settings.to_h
+      # `joins`, not `with_file`'s preload: the same images with a file, in
+      # one query, since the summary needs no blob.
+      without = Media::Asset.kept.joins(:file_attachment).where(id: ids).count do |asset|
+        overrides = translations.transform_values { |values| values.to_h.dig("texts", asset.id.to_s, "alt") }.compact
+        asset.alt_text(override: overrides, locale: locale).strip.empty?
+      end
       without.positive? ? [ line, [ :warn, :without_alt, { count: without } ] ] : [ line ]
     end
 

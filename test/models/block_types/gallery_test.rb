@@ -19,7 +19,7 @@ class BlockTypes::GalleryTest < ActiveSupport::TestCase
                  definition.fields.map { |field| [ field.name, field.type.to_s ] }
     assert definition.fields.none?(&:required?)
     assert_equal %w[label texts], definition.fields.select(&:translated?).map(&:name)
-    assert_equal %w[images], definition.media_fields.map(&:name), "the list alone names images; its texts are keyed by them"
+    assert_equal [ 7 ], definition.media_ids_in("images" => [ 7 ], "texts" => { "8" => { "caption" => "x" } }), "the list alone names images; its texts are keyed by them"
     assert_equal({ "layout" => "grid", "ratio" => "3:2" }, definition.fields.filter_map { |field| [ field.name, field.options[:default] ] if field.options.key?(:default) }.to_h)
     assert_equal BlockTypes::Gallery::MAX_IMAGES, definition.fields.find { |field| field.name == "images" }.options[:max]
     assert_equal [ "images", :media ], [ definition.icon, definition.family ]
@@ -43,11 +43,17 @@ class BlockTypes::GalleryTest < ActiveSupport::TestCase
                     translations: { "de" => { settings: { "texts" => { bare.id.to_s => { "caption" => "Nur eine Bildunterschrift" } } } } })
     assert_equal [ [ :word, :carousel, { count: 3 } ], [ :warn, :without_alt, { count: 1 } ] ], BlockTypes::Gallery.summary(block, locale: "en"),
                  "the image with neither an override nor a library alt"
-    assert_equal [ [ :word, :carousel, { count: 3 } ], [ :warn, :without_alt, { count: 2 } ] ], BlockTypes::Gallery.summary(block, locale: "de"),
-                 "the English override is not German's, and a caption is no alt"
+    assert_equal [ [ :word, :carousel, { count: 3 } ], [ :warn, :without_alt, { count: 1 } ] ], BlockTypes::Gallery.summary(block, locale: "de"),
+                 "a German visitor is given the English override through the fallback chain, as on the site; a caption is no alt"
 
     bare.update!(alt: "Nets")
     assert_equal [ [ :word, :carousel, { count: 3 } ] ], BlockTypes::Gallery.summary(block.reload, locale: "en")
+
+    # An image whose file is gone is not drawn, so it is not counted.
+    fileless = create_media_asset
+    with_fileless = gallery({ "images" => [ fileless.id ] })
+    fileless.file.purge
+    assert_equal [ [ :word, :grid, { count: 1 } ] ], BlockTypes::Gallery.summary(with_fileless, locale: "en")
 
     ActiveRecord::Base.uncached { assert_queries_count(1) { BlockTypes::Gallery.summary(block, locale: "en") } }
   end

@@ -28,8 +28,8 @@ module Blocks
       @page = page
     end
 
-    # It draws nothing: the template that draws a gallery's images is not
-    # written, and the type has no text field to fall back on.
+    # It draws nothing: it has no template that draws a gallery's images,
+    # and the type has no text of its own to draw in their place.
     def render? = false
 
     private

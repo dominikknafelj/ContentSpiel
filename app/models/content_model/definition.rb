@@ -158,11 +158,6 @@ module ContentModel
       fields.flat_map { |field| field.field_type&.media_ids&.call(values[field.name]).to_a }.uniq
     end
 
-    # The fields whose values refer to library images (`FieldType#media?`),
-    # in field order: what the tile's thumbnail asks, by the type's answer,
-    # never by its name.
-    def media_fields = fields.select { |field| field.field_type&.media? }
-
     def uses(*columns) = @uses_columns.concat(columns.map(&:to_s))
     def capability(*names) = @capabilities.concat(names)
     def capability?(name) = @capabilities.include?(name)

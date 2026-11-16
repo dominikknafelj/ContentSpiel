@@ -183,31 +183,25 @@ module Admin
 
       # The image drawn small (`Admin::Ui::LibraryImageComponent`: a width, the
       # preview or a box, as the Media grid draws it): the image column's, for
-      # a type that uses one, else the first image of the definition's media
-      # fields (`ContentModel::Definition#media_ids_in`, the Gallery's list)
-      # that the library still keeps, read in one query. An id that names no
-      # image is passed over, as the site passes it over.
+      # a type that uses one and has it, else the first image of the
+      # definition's media fields (`ContentModel::Definition#media_ids_in`, the
+      # Gallery's list) that the library still keeps, read in one query. An
+      # id that names no image is passed over, as the site passes it over;
+      # with none there is no thumbnail.
       def thumbnail_asset
         return @thumbnail_asset if defined?(@thumbnail_asset)
 
-        @thumbnail_asset =
-          if uses?("image") then asset
-          elsif media_fields? then first_listed_asset
-          end
+        @thumbnail_asset = uses?("image") ? asset : first_listed_asset
       end
 
-      # Whether the tile draws its thumbnail box (72px at 4:3, StudioGallery
-      # D5): with an image to show, or, for a type whose definition has a
-      # media field, plain and sunken with none, so a gallery's tile keeps
-      # its shape while it is empty. A type that only uses the image column
-      # draws no box without an image: its line says what it lacks.
-      def thumbnail_box? = thumbnail_asset.present? || media_fields?
+      # The `:warn` parts after the line, each a warn badge, in an element
+      # the face is described by (`BlockTileComponent#described_by`); nil
+      # without one. One drawing for every layout of the tile.
+      def badges_row
+        return if badges.empty?
 
-      # The box, its image cropped to fill it; nothing of it is read out
-      # (the image's alt is empty, and the line names the block).
-      def thumbnail_box
-        tag.span(class: "admin-block-tile__thumbnail block aspect-[4/3] w-18 shrink-0 overflow-hidden rounded-cs bg-sunken", aria: { hidden: true }) do
-          render Admin::Ui::LibraryImageComponent.new(asset: thumbnail_asset, min_width: 480, css_class: "size-full object-cover") if thumbnail_asset
+        tag.span(id: badges_id, class: "admin-block-tile__badges flex shrink-0 flex-wrap gap-1") do
+          safe_join(badges.map { |label| render(Admin::Ui::BadgeComponent.new(label: label, tone: :warn)) })
         end
       end
 
@@ -221,10 +215,8 @@ module Admin
 
       def uses?(column) = definition&.uses_columns&.include?(column) || false
 
-      def media_fields? = definition&.media_fields&.any? || false
-
       def first_listed_asset
-        ids = definition.media_ids_in(block.settings)
+        ids = definition&.media_ids_in(block.settings).to_a
         Media::Asset.kept.with_file.where(id: ids).in_order_of(:id, ids).first if ids.any?
       end
 
