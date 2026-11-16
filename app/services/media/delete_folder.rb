@@ -14,6 +14,12 @@ module Media
   # fall to "Not in a folder" by the foreign key's nullify instead of the
   # parent.
   #
+  # THE SHARED LOCK ORDER with `Media::MoveImages`: folder rows first, then
+  # image rows by id. The images are locked in one ordered statement and
+  # updated by the ids that statement returned; an unordered `update_all` would
+  # take the same rows in scan order and could deadlock with a move holding
+  # some of them.
+  #
   # The update is over every image with the folder's id, kept or trashed, so a
   # trashed image restored later comes back to the parent. It touches no
   # `updated_at` and no content version: a folder is never drawn on the site.
@@ -93,8 +99,8 @@ module Media
       renames = self.class.renames(@folder, tree)
       rename(renames)
 
-      image_ids = Media::Asset.where(folder_id: @folder.id).order(:id).pluck(:id)
-      Media::Asset.where(folder_id: @folder.id).update_all(folder_id: parent_id) # version: none (a folder is never drawn on the site)
+      image_ids = Media::Asset.where(folder_id: @folder.id).order(:id).lock("FOR UPDATE").pluck(:id)
+      Media::Asset.where(id: image_ids).update_all(folder_id: parent_id) # version: none (a folder is never drawn on the site)
       folder_ids = tree.children(@folder.id).map(&:id)
       Media::Folder.where(parent_id: @folder.id).update_all(parent_id: parent_id) # version: none (a folder is never drawn on the site)
 

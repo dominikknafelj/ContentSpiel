@@ -19,6 +19,9 @@ module Media
   # after finds the folder gone and moves nothing; no image falls to "Not in a
   # folder" through the foreign key's nullify.
   #
+  # The order is shared with `Media::DeleteFolder`: folder rows first, then
+  # image rows by id, so two writers never take the same rows crosswise.
+  #
   # FOR KEY SHARE and not FOR SHARE: it still blocks that FOR UPDATE and the
   # row's DELETE, which is all the rule needs, but not the re-parenting of the
   # folder. Deleting the target's PARENT re-parents the target (`update_all`
