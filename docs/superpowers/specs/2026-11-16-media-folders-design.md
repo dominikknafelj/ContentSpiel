@@ -1,9 +1,13 @@
 # Media folders: organising the library
 
-Status: designed, not built. The behaviour is settled here; every new screen
-element is a design request (§17) for the design agent, and nothing of its look
-is decided in this file. An answer marked **(call)** is the planner's
-recommendation, for the owner to overrule. The plan is
+Status: designed, not built. The behaviour is settled here; the looks and the
+words are the design answers D1 to D14, the card StudioMediaFolders of the CMS
+Design System v242 (version `1794813077-09f4`,
+https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT), summarised in §17; where
+the card and this file differ on a word, the card wins, on behaviour this
+file does. The owner's rulings of 2026-11-16 are §20. An answer still marked
+**(call)** is the planner's recommendation, which no ruling has settled, for
+the owner to overrule. The plan is
 `docs/superpowers/plans/2026-11-16-media-folders.md`. The Gallery block
 (`2026-11-16-gallery-block-design.md`) uses folders for one thing, "add a whole
 folder" (§18).
@@ -59,7 +63,7 @@ one per image, and tags for images stay a later, separate step (§3.1).
 
 ## 3. The model
 
-### 3.1 One folder per image (call)
+### 3.1 One folder per image (ruled, §20)
 
 `media_assets.folder_id`, nullable: an image is in at most one folder. A folder
 is a place, and a place holds a thing once; moving is then one value, deleting
@@ -69,7 +73,8 @@ photo") is what tags answer, and **library images have no tags today**: the
 tags that exist are posts' (`tags`, `post_tags`). The owner's note "tags
 already do many-to-many" holds for posts only; tags for images would be a
 table `media_asset_tags` on the existing `Tag`, a later step on the roadmap's
-row, and nothing here blocks it (§20, question 1).
+row, and nothing here blocks it. The owner ruled one folder per image and no
+tags on images yet (§20).
 
 ### 3.2 The table
 
@@ -96,12 +101,13 @@ Names are **not translated (call)**: a folder is an editors' tool, never shown
 to a visitor, and an editor reads CS Studio in one language. A plain string
 column, no Mobility.
 
-### 3.3 Nesting and its depth (call)
+### 3.3 Nesting and its depth (ruled, §20)
 
 Folders nest, **at most four levels** (`Media::Folder::MAX_DEPTH = 4`; a folder
 at the top is level 1): "Clients / Client A / 2026 / Launch" is the deepest
 place. Deeper trees are where file managers lose people; four covers a client,
-a project, a year and an event. **At most 1,000 folders** on a site
+a project, a year and an event. **At most 1,000 folders** on a site (the
+planner's number, which the owner's ruling on the limits kept)
 (`Media::Folder::MAX_FOLDERS`), which keeps the whole tree one query and one
 small value in memory (`Media::FolderTree`, §3.5), drawn whole like the Pages
 tree.
@@ -135,7 +141,11 @@ recursively in SQL.
 ## 4. The places
 
 The library has three kinds of place, chosen by one parameter, `folder`, which
-every link of the Media screen keeps beside `q`, `filter` and `page`:
+every link of the Media screen keeps beside `q`, `filter` and `page`. A link
+to *another* place (a row of the Folders column, the breadcrumb, the empty
+folder's subfolder links, the panel's Folder path, the picker's places)
+keeps `q` and `filter` and drops `page`: page 3 of one folder is no page of
+another:
 
 | Place | `folder=` | Lists |
 |---|---|---|
@@ -181,13 +191,13 @@ grid is All media, as today, and the panel opens beside it.
 `Media::Save` (the panel's autosave) does not take a folder; the panel moves
 through this service like the grid does (D9).
 
-- **Rights:** each image's edit right, as `Media::Save` judges it
+- **Rights (ruled, §20):** each image's edit right, as `Media::Save` judges it
   (`Media::Ownership`: `media.manage`, or the image's own uploader holding
   `media.upload`). **All or nothing (call):** if any chosen image is one the
   actor may not move, nothing moves and the answer says how many could not be
-  moved ("2 of these images are not yours to move."). A partial move is a
+  moved ("2 of these images are not yours to move. Nothing was moved.", D7). A partial move is a
   result a person must then read image by image to understand.
-- **At most 200 images a move** (`Media::MoveImages::MAX = 200`); more is a
+- **At most 200 images a move** (`Media::MoveImages::MAX = 200`, ruled, §20); more is a
   refusal before anything is read. The grid shows 48 a page; "select all" (D6)
   selects what is drawn.
 - **Kept images only.** A trashed id is the "doesn't exist" failure, as in
@@ -210,15 +220,23 @@ through this service like the grid does (D9).
 
 ### 5.2 Three ways to ask for it (the looks are D6 to D9)
 
-- **A menu**: "Move to…" on the image's panel and on a selection, opening the
-  move dialog (D7), a chooser of the tree plus "Not in a folder".
-- **Many at once**: a selection mode on the grid (D6) and "Move N images to…".
-- **Drag**: a tile, or the selection, dropped on a folder (or on "Not in a
-  folder") in the folder tree (D8). Drag is the mouse's shortcut, never the
-  only way: every drag has the menu's equivalent, and a coarse pointer gets the
-  menu alone. The existing window-wide file drop (`admin--media--drop`) already
-  leaves a drag that began inside the page alone, so dragging a tile never
-  shows the upload overlay.
+- **A menu**: "Move to…" on the image's panel (its Folder row, D9) and on a
+  selection's bar (D6), opening the Move to… dialog (D7): a radiogroup of
+  "Not in a folder" and the whole tree, every branch open, with its own find
+  field; the current place is marked "Current" and cannot be chosen.
+- **Many at once**: the grid's selection mode (D6), entered by "Select" in
+  the place heading and left by "Done", Escape or a visit: the tiles become
+  pressed buttons with a tick, Shift+click ticks a range, and the bar reads
+  "3 selected", "Select all 34" (what the page draws), "Clear", "Move to…",
+  "Done". The panel closes while it is on.
+- **Drag**: a tile, or the whole selection when the tile is selected,
+  dropped on a folder row or on "Not in a folder" in the Folders column (D8).
+  `draggable` is set only under `(pointer: fine)`; a coarse pointer gets the
+  menu alone. A folded row opens after 600ms of hover. The move is announced
+  in the screen's polite status ("Moved 3 images to Events."). The existing
+  window-wide file drop (`admin--media--drop`) already leaves a drag that
+  began inside the page alone, so dragging a tile never shows the upload
+  overlay.
 
 Every move is sent through `app/javascript/saving/queue.js`, as every write of
 a CS Studio screen is (CLAUDE.md, "Rules a change can break silently").
@@ -232,7 +250,7 @@ the selection mode (D6) leaves room for them.
 
 `Media::SaveFolder.call(folder_or_nil, attributes: { name:, parent_id: })`
 creates (nil) or changes one folder; `Media::DeleteFolder.call(folder)`
-deletes one. Both need **`media.manage` (call)**: shaping the library is
+deletes one. Both need **`media.manage` (ruled, §20)**: shaping the library is
 managing it, and `media.manage` is what Admin and Editor already hold; a person
 with `media.upload` alone (an author) uploads into folders and moves their own
 images (§5.1) but does not reshape the tree.
@@ -256,13 +274,29 @@ that same failure.
 
 ### 6.3 Moving a folder
 
-A folder moves with everything in it. Refused, nothing written: into itself or
+A folder moves with everything in it, by the place menu's "Move to…" (the
+dialog of D7, its own branch and the too-deep places disabled with their
+reason) or, on a fine pointer with no search typed, by its row's gutter
+handle in the Folders column (D5), dropped on a row (into it) or on "All
+media" (to the top); a row that cannot take it shows no drop target and says
+why ("too deep", "this folder", "name taken"). Refused, nothing written: into itself or
 a folder under it ("A folder can't go inside itself."); to a place where it or
 the deepest folder under it would be deeper than four levels ("That would nest
 folders more than 4 levels deep."); next to a sibling of its name. Audited as
 `media_folder.moved`, `field_changes: { "parent_id" => [old, new] }`.
 
 ### 6.4 Deleting a folder (call: its contents move up)
+
+How each write is asked for (D2 to D4, D10): the folder actions are in the
+place heading's ⋯ menu ("Folder actions": "New folder inside…", "Rename…",
+"Move to…", "Delete folder…"), never on a tree row, which keeps one link, its
+disclosure and its "+" ("New folder in %{name}", levels 1 to 3). Create and
+rename are a small dialog with the field "Name" and its errors under it,
+never typing in the tree; a created folder becomes the place, with no toast.
+Delete is the destructive confirm, whose body says what moves where, names
+each subfolder that will be renamed, and ends "This can't be undone."; then
+the place becomes the parent (or All media) and a toast says "Folder
+deleted".
 
 Deleting a folder moves its images **and** its subfolders one level up, into
 its parent, or out of every folder and to the top when it had none; then the
@@ -320,14 +354,18 @@ stored. `media.uploaded`'s metadata gains `folder_id`.
 - **It browses folders inside its dialog** (D12): the same three kinds of place,
   the same `folder` parameter on `GET /media?picker=1`, kept by its toolbar's
   form and its page links as `q` and `filter` are.
-- **It opens where you last were (call: per browser).** The picker's script
+- **Its places (D12)**: the picker's body is two columns, a 200px list of
+  the places (D1's rows, read-only: no "+", no handle, no drag) and the grid;
+  below 640px the list is a select, "Folder", above the toolbar. "Uploads go
+  into Client A" (or "into no folder") stands before Upload and describes it.
+- **It opens where you last were (ruled, §20: per browser).** The picker's script
   remembers the last place it showed in `localStorage`
   (`cs.media.picker.place`, a String: `all`, `none` or an id), read and written
   inside `try`/`catch`, and opens its frame at that place; nothing stored, or
   storage refused, is All media. A remembered folder that has gone answers All
   media (§4) and the script forgets it. Per browser, not per person: a server
-  column for a convenience is a migration and a write per press; the owner may
-  want it per person (§20, question 3).
+  column for a convenience is a migration and a write per press, and the owner
+  ruled per browser.
 - Choosing stays one image; several at once is the Gallery block's change to
   the picker.
 
@@ -381,13 +419,17 @@ changed, through `Live::Signals` (the one sender), on a library-wide stream:
   **Folders are not a record kind (call)**: no note or presence attaches to a
   folder, and the library-wide stream is open exactly to whoever may open the
   library, which is what an unscoped kind already means.
-- What a listening tab does (D13): the folder tree and the counts are fetched
-  again through the same `media.upload`-gated GET the screen loads them with
-  and replaced, keeping the open branches and the focus; **the grid is not
-  replaced under the person**: if the shown place changed, a quiet notice
-  offers to show the changes. At most one fetch per two seconds. The picker,
-  while open, does the same for its folder list; closed, it loads afresh when
-  opened.
+- What a listening tab does (D13): the Folders column's tree and the counts
+  are fetched again through the same `media.upload`-gated GET the screen
+  loads them with and replaced silently, keeping the open branches (the
+  server draws them from `cs_media_open`, §17) and the focus; **the grid is
+  not replaced under the person**: if the shown place changed, one neutral
+  compact status notice stands above the grid, "Images here changed since you
+  opened this view." with "Show changes", which reloads the place's frame and
+  removes the notice; never stacked, never in the acting tab. At most one
+  fetch per two seconds. The picker, while open, does the same for its list
+  of places and shows the same notice above its grid; closed, it loads
+  afresh when opened.
 - No Turbo page refresh or morph (the guard in `test/lib/notes_guards_test.rb`
   holds); a plain fetch and a replace of the tree's part.
 
@@ -407,7 +449,7 @@ changed, through `Live::Signals` (the one sender), on a library-wide stream:
 
 ## 13. Permissions
 
-No folder is access-controlled in this step: whoever opens the library
+No folder is access-controlled in this step (ruled, §20: no per-folder access yet): whoever opens the library
 (`media.upload`) sees every folder and every image, as today. **The later seam
 (named, not built):** a grant scope key `media_folder_ids` (as `page_ids` is for
 pages), matched against a folder and the folders under it, which turns the
@@ -431,7 +473,7 @@ column and the table).
 | Dependent | What it relies on | After folders |
 |---|---|---|
 | `/media?selected=ID` links: notes inbox (`Admin::NotePathsHelper`), the audit log (`Audit::Sentence` routes), ⌘K (`Jump::Search#media_rows`), the dashboard (`WaitingRowComponent`, `TranslationPanelComponent`), Translations (`MatrixComponent`), Trash's Undo | the panel opens from `selected` | unchanged: no `folder` is All media |
-| `Admin::Ui::MediaPickerComponent` and its openers (`Admin::Columns::MediaColumnComponent` for the hero, the Image and Card blocks; the rich-text editor's Image button) | `GET /media?picker=1` lists kept images; `media-picker:picked` hands back one `{ id, url, title, alt, caption }` | the listing gains places (§8); the event is unchanged |
+| `Admin::Ui::MediaPickerComponent` and its openers (`Admin::Columns::MediaColumnComponent` for the hero, the Image and Card blocks; the rich-text editor's Image button) | `GET /media?picker=1` lists kept images; `media-picker:picked` hands back one `{ id, url, title, alt, caption }` | the listing gains places, a 200px list beside the grid (a select below 640px), and "Uploads go into …" before Upload (§8, D12); the event is unchanged |
 | `Media::Search` (Media screen, `list_media_tool`, ⌘K) | `Media::Search.call(scope, query)` | unchanged; the place is a separate narrowing |
 | `Admin::MediaUploadResponses` (the screen's and the picker's uploads) | `counts` in the answer | gains `folder_counts` |
 | `Admin::MediaAssetsController` (the picker's upload endpoint) | `Media::Upload.call(file:)` | takes the picker's place |
@@ -440,8 +482,12 @@ column and the table).
 | `test/lib/component_screens_test.rb` | which screen each component draws | the new components are the Media screen's (`Admin::MediaLibrary::`) |
 | `Editing::Signals` (`MAP` + `SILENT` cover every action) | | the five new actions join `SILENT` |
 | `Audit::Sentence::ACTIONS`, the log's Type filter | | the new actions and "Media folder" |
-| `Admin::Shell::TreeSubjects` | "pages" and "mind_graph" | a third subject only if D1 puts the folders in the shell's tree column |
-| the Media screen's view comment ("No tree column: a library image has no tree position of its own") | | rewritten by D1's answer |
+| `Admin::Shell::TreeSubjects` | "pages" and "mind_graph" | **decided (D1):** a third subject, `media` (`fill: false`), with its six words under `admin.components.shell.tree_subject.media` in `shell.en.yml`: "Hide folders", "Show folders", "Folders width", "Folders width %{width}px. Arrow keys to resize.", the top bar's "Folders" (§17, D1), and `open`, the top bar button's name, which the card does not give: "Open folders", after "Open page tree" and "Open list". The column's width, divider, fold strip, drawer below 1024px and sticky scroll are the shell's, shared with the other two subjects |
+| the Media screen's view comment ("No tree column: a library image has no tree position of its own") | | **decided (D1):** rewritten: the Folders column is the shell's tree column (`content_for :tree`, `content_for :tree_label, "media"`), drawn for a full answer only, outside `#content`, as the Pages tree is |
+| `tree/open_set.js`, `TreeOpenSet`, `test/lib/admin_design_rules_test.rb` ("the open set has one writer") | one cookie, `cs_tree_open`, of page ids; the guard refuses `document.cookie` in any script but `open_set.js`, and `cs_tree_open` named outside the two files | a second cookie, `cs_media_open`, of folder ids, written by the same module, its name a parameter read from the tree (§17, "The folds") |
+| `Admin::Ui::TreeItemComponent`, `TreeFindComponent` | "a tree of the site's pages"; `NOUNS` `pages`, `nodes` | the row also draws a folder (its `mark` slot, the `trailings` count, `with_add`, `with_handle`), its comment says "a tree's node"; `NOUNS` gains `folders` ("Find a folder") |
+| `admin/shared/_tree_glyph`, `admin/shared/_icon` | the tree's glyphs (chevron, plus, page, home); the icon set | gain `folder`, `folder_open`, `folder_none` (tree glyphs, 14px) and `folder`, `folder_input` (icons) (D14) |
+| `Admin::Ui::DialogComponent` `WIDTHS` | `confirm` 420, `form_narrow` 460, `form` 560, `picker` 880, `viewer` 1100 | none is named `small`, the card's word: the folder and Move to… dialogs take `form_narrow`, the delete confirm `ConfirmDialogComponent`'s own (§21) |
 
 Nothing public depends on the library's shape: the public site reads images by
 id and by their recorded widths, never by where an editor keeps them. Rich text
@@ -465,62 +511,109 @@ New rules, each with its test:
 - The services' rights are behaviour-tested (`test/services/service_behaviour_contract_test.rb`,
   `EXPECTED_SERVICES` and `test/support/service_calls.rb`).
 
+- The open set keeps one writer with two cookies: `cs_tree_open` and
+  `cs_media_open` are written by `tree/open_set.js` alone and named in Ruby
+  by `TreeOpenSet` alone (`test/lib/admin_design_rules_test.rb`, "the open set
+  has one writer", widened to both names).
+
 What no test holds goes to `CLAUDE.md`'s "Rules a change can break silently"
 (the plan's last task writes it): **no guard** for a new list of images that
 forgets the place parameter when it should keep it (a link that drops `folder`
 sends a person back to All media); **no guard** that a new image-writing path
 (a future MCP upload) sets the folder through `Media::Upload`.
 
-## 17. Design requests
+## 17. The design answers (StudioMediaFolders, Design System v242)
 
-Every element below goes to the design agent before it is built. The plan's
-second part waits for the cards; where a card and the spec differ on a word,
-the card wins; on behaviour, the spec does.
+The looks, the measures and every word are the card StudioMediaFolders
+(Design System v242, version `1794813077-09f4`), with pointer lines on
+StudioTree, StudioMediaGrid, MediaPicker, StudioShell and FoundationIcons;
+this section says, by D-number, what each answer decided, and the behaviour
+stays this file's. Where a word here and the card's differ, the card wins.
 
-- **D1, where the folders stand on the Media screen.** The shell's tree column
-  (a third `Admin::Shell::TreeSubjects` subject beside "pages" and
-  "mind_graph", its fold and words, the StudioTree row with a folder mark), or
-  a column of the Media screen's own beside the grid and the rail; how the three
-  of them share the width at 1024, 1200 and 1440px, and below 760px of the
-  library. Includes the rows "All media" and "Not in a folder", the counts, the
-  selected place, folding, the empty tree.
-- **D2, creating a folder**: the control, where the new folder's name is typed
-  (in place in the tree or a dialog), its errors (taken name, too long, depth).
-- **D3, renaming a folder**: the control and its errors.
-- **D4, deleting a folder**: the confirm dialog's words, naming what moves where
-  and any subfolder that will be renamed.
-- **D5, moving a folder**: drag on the tree (drop on a folder, the "top"
-  target, refusal looks for a cycle or the depth) and the keyboard's way (a
-  "Move to…" on the folder, D7).
-- **D6, selecting several images on the grid**: the selection mode and how it
-  is entered and left, a tile's selected look (the grid's tiles are links; the
-  picker's are pressed buttons), "N selected", select all drawn, clear, the
-  actions bar ("Move to…"), and the room left for later actions (§5.3).
-- **D7, the "Move to…" dialog**: a chooser of the tree and "Not in a folder",
-  the current place marked, unreachable folders (depth, itself) for a folder
-  move, the refusal for images not yours to move (§5.1).
-- **D8, dragging images and folders**: what is dragged (one tile or the
-  selection, the count), the drop target's look, the announcement for a screen
-  reader, no drag on a coarse pointer.
-- **D9, the image panel's folder**: the line that says where the image is
-  ("Clients / Client A") and its "Move to…", for a viewer who may move it and
-  one who may not.
-- **D10, the place's heading over the grid**: the folder's path (a breadcrumb
-  or a heading), its count, whether subfolders also show in the grid as folder
-  tiles, the empty folder ("No images in this folder yet" and the upload offer).
-- **D11, search in a folder**: the offer to search All media with the same
-  words, and in All media whether a tile names its folder.
-- **D12, the picker's folders**: how places are browsed inside the 880px dialog
-  (a list beside the grid, a select, a breadcrumb), its Upload's target said.
-- **D13, the live notice**: the quiet line when another tab changed the shown
-  place, its words and its "Show changes".
-- **D14, the folder mark**: a new glyph (folder, open folder) for the tree row,
-  the move dialog and the panel, in `admin/shared/_tree_glyph` or the icon set.
+- **D1, where the folders stand.** The shell's tree column, its third
+  `Admin::Shell::TreeSubjects` subject, **`media`** (not `media_folders`):
+  "Hide folders", "Show folders", "Folders width", "Folders width %{width}px.
+  Arrow keys to resize.", the top bar's "Folders". Its head is the `h2`
+  "Folders", "+ New folder" (small secondary, `media.manage` only, at the top
+  level) and the hide button; under it `TreeFindComponent` with `noun:
+  :folders`. The rows are `TreeItemComponent`s: **All media** and **Not in a
+  folder** first, each with its count, a `cs-line` rule, then the folders in
+  natural order, each with its direct count (nothing at 0) and, for
+  `media.manage` on levels 1 to 3, the "+" "New folder in %{name}". Links go
+  to `?folder=`, keeping `q` and `filter`, dropping `page`. No folders yet:
+  "No folders yet." under the rule. Folder actions are not on the rows (D10).
+- **The folds.** Folded by default but for the path to the place, kept per
+  browser in their own cookie, **`cs_media_open`**, beside the Pages trees'
+  `cs_tree_open`. Both stay one writer: `tree/open_set.js` writes both and is
+  the only script that touches `document.cookie`; the cookie's name is a
+  parameter, read from the tree it is handed (`data-tree-open-cookie`, drawn
+  by the server from `TreeOpenSet::COOKIE` or `TreeOpenSet::MEDIA_COOKIE`),
+  and the module writes only a name on its own list of the two, so no tree
+  can make it write a third cookie; a tree without the attribute reads and
+  writes nothing, as one without `data-tree-open-path` does today. `TreeOpenSet`
+  stays the one Ruby reader of both (`parse(raw, readable_ids:)`, its
+  `readable_ids` the folder tree's ids for `cs_media_open`, and `open?` with
+  `root: false` for every folder, since the folder tree has no root), and the
+  guard of `test/lib/admin_design_rules_test.rb` is widened to both names.
+- **D2, creating** is a small dialog: "New folder", the field "Name" (at
+  most 80), where it goes ("At the top of the library" / "Inside Clients /
+  Client A"), Cancel and "Create folder"; opened by the head's button, a
+  row's "+" or the place menu; on success the new folder is the place, no
+  toast; the errors stand under the field ("Give the folder a name.", "Use at
+  most 80 characters.", "A folder named “Press” is already here.", "That
+  would nest folders more than 4 levels deep.", "That folder is gone.").
+- **D3, renaming**: the same dialog, "Rename folder", the name filled in and
+  selected, the button "Rename".
+- **D4, deleting**: the destructive confirm, "Delete “Client A”?", "Delete
+  folder", a body that says what moves where and each rename, then "This
+  can't be undone."; afterwards the parent is the place and a toast says
+  "Folder deleted".
+- **D5, moving a folder**: drag by the gutter handle (fine pointer, no search
+  typed), onto a row or onto All media (the top); refused rows show why and
+  the live region says "Can't move “Client A” there: too deep."; the
+  keyboard's and a coarse pointer's way is the place menu's "Move to…" (D7).
+- **D6, selecting**: "Select" in the place heading; tiles become
+  `aria-pressed` buttons with a tick chip; Space toggles, Shift+click ticks a
+  range; the bar, at elevation 3, sticky: "3 selected", "Select all 34" /
+  "All 34 selected", "Clear", "Move to…" (`folder_input`), "Done", with room
+  kept for "Move to trash…" and "Download" (§5.3).
+- **D7, Move to…**: a `role="radiogroup"` of the tree in a dialog ("Move 3
+  images", "Move “launch-stage.jpg”", "Move “Client A”"), its find field,
+  "Not in a folder" (images) or "Top of the library" (a folder) first, the
+  current place "Current" and disabled, a folder move's unreachable places
+  disabled with their reason as the radio's description; a refusal is a
+  danger notice that takes the focus; success is the toast "Moved 3 images to
+  “Client A”." (no Undo).
+- **D8, dragging images**: fine pointer only; one tile or the selection; a
+  pill ghost with a thumbnail and the count; the folder rows and "Not in a
+  folder" are the targets; announced "Moved 3 images to Events.".
+- **D9, the panel**: a Folder row in the facts, its path a link to that
+  place and, for a viewer who may move the image, "Move to…"; "Not in a
+  folder" otherwise.
+- **D10, the place heading**: a breadcrumb ("All media › Clients › Client
+  A"), the `h1` the place's name ("Media" stays the page's title), "34
+  images", the ⋯ "Folder actions" (`media.manage`, in a folder: "New folder
+  inside…" on levels 1 to 3, "Rename…", "Move to…", "Delete folder…"), then
+  Select and Upload images. Subfolders are not drawn in the grid. An empty
+  folder: "No images in this folder yet", "Drop images here, or use Upload
+  images: they go into Client A.", "It holds 2 folders: 2026, Press."; an
+  empty Not in a folder: "Every image is in a folder."
+- **D11, search in a folder**: "Searching in Client A." and "Search all media
+  for “logo” →" (same `q` and `filter`, no `folder`); in All media with a
+  search, a tile in a folder names it on a third line.
+- **D12, the picker**: two columns (a 200px list of places, the grid at four,
+  three or two columns), a select "Folder" below 640px, "Uploads go into
+  Client A" before Upload; the remembered place is selected and scrolled to.
+- **D13, the live notice**: §11.
+- **D14, the marks**: tree glyphs `folder`, `folder_open` (the place shown),
+  `folder_none` (Not in a folder, dashed) in `admin/shared/_tree_glyph`; All
+  media uses the `media` icon's shape at 14px; icons `folder` and
+  `folder_input` in `admin/shared/_icon`. No icon chip on a row.
 
 ## 18. With the Gallery block
 
 The Gallery block needs folders for "add a whole folder" only. **Folders first
-(call):** it is the owner's newest ask, its first part needs no card, and the
+(ruled, §20):** it is the owner's newest ask, its first part needs no card, and the
 gallery's picker work then builds on a picker that already browses places. If
 the gallery lands first, it ships without "add a whole folder" and its plan's
 last task adds it when folders merge. Either way the picker is changed by both
@@ -541,16 +634,55 @@ several images at once and "add all images in this folder".
 - No new top-level name (`Media::Folder`, `Media::FolderTree`, `Media::Place`,
   `Media::FolderCounts` and the services are under `Media::`).
 
-## 20. Only the owner can answer
+## 20. Owner rulings (2026-11-16)
 
-1. **Tags for images.** One folder per image is recommended because tags give
-   the many-to-many; but images have no tags today. Should tags for images be
-   the next step after folders, or is one folder enough for now?
-2. **Who shapes the tree.** `media.manage` (Admin, Editor) creates, renames,
-   moves and deletes folders; an author with `media.upload` alone uploads into
-   them and moves their own images. Right?
-3. **The picker's remembered place** is per browser. Per person (a column on
-   the user) instead?
-4. **Per-folder permissions** ("a group uses only Client A's images") is the
-   roadmap's argument for folders. When is it wanted? §13 keeps the seam open.
-5. The numbers: four levels, 1,000 folders, 200 images per move.
+1. **One folder per image**, nested **at most 4 levels** deep (§3.1, §3.3).
+2. **No tags on images yet.** Tags for images stay a later, separate step on
+   the roadmap's row; nothing here blocks them (§3.1).
+3. **Folder edits need `media.manage`** (create, rename, move, delete);
+   **moving an image needs its edit right** (`Media::Ownership`: `media.manage`,
+   or its own uploader holding `media.upload`) (§5.1, §6).
+4. **The picker remembers its last folder per browser** (`localStorage`,
+   §8), not per person.
+5. **No per-folder access yet.** §13's seam stays named and unbuilt.
+6. **The limits:** at most **200 images per move**, and **1,000 folders** a
+   site as the planner set (§3.3, §5.1).
+7. **Folders ship first**, before the Gallery block (§18).
+
+## 21. Checked against main 9d2ac1e1
+
+What landed on `main` since this design was written, read for what touches
+the media library, the picker, `TreeSubjects`, the shell's tree column, ⌘K or
+the audit sentence:
+
+- **Post types (#273, 9d2ac1e1).** `Audit::Sentence` gained
+  `content_type.switched_on` / `switched_off` in `SPECIAL_ACTIONS` and a
+  `content_type_parts`; `Jump::Search::SETTINGS_TITLES` gained "Settings ›
+  Post types"; `DesignSystemEntries` gained StudioPostTypes. Nothing touches
+  `COUNTED`, `OTHER_VERBS`, the media rows of ⌘K, the library, the picker or
+  `TreeSubjects`: the folder actions join `OTHER_VERBS` and `media.moved`
+  joins `COUNTED` as planned, beside the new special actions. No change.
+- **The image viewer (#272, d2687225).** `Admin::Ui::DialogComponent` gained
+  `data:` (on the `<dialog>`), a `title_aside` slot and the width `viewer`
+  (1100); its widths are `confirm`, `form_narrow`, `form`, `picker`,
+  `viewer`, and none is `small`, the card's word for the folder and Move to…
+  dialogs: they take `form_narrow` (460), the narrowest form width (a
+  ruling in the plan's report). The Move to… dialog's script may hang on the
+  dialog through `data:`. `_icon` gained `arrow_right`, `arrow_up_right` and
+  `pause`, none of the folder names; the viewer opens a note's picture and
+  does not touch the library's grid, panel or picker. No other change.
+- **Search 2 (#271, 5b745d3a).** The public site's search, its suggestions
+  and `SiteSearch`; it changes `DesignSystemEntries` only on the CMS side.
+  Nothing of `Media::Search`, the library, ⌘K's media rows or the picker.
+  No change.
+- **Read on main for this design:** `Admin::Shell::TreeSubjects` (still
+  `pages` and `mind_graph`, `WORDS` the six: `hide show open button divider
+  divider_tooltip`), `tree/open_set.js` and `TreeOpenSet` (one cookie, the
+  guard "the open set has one writer"), `Admin::Ui::TreeItemComponent` (its
+  `handle`, `mark`, `trailings` and `add` slots, `CLASSES[:drop_target]`),
+  `Admin::Ui::TreeFindComponent` (`NOUNS` `pages`, `nodes`),
+  `Admin::PostsScreen::BulkBarComponent` (the posts list's bar, a screen's
+  own: accent-tint, not the card's elevation-3 frame), the media picker's
+  template (`app/views/admin/media/picker.html.erb`, `SCREEN_FILES`) and
+  `test/support/design_system_entries.rb` (version `1794784635-1aa4`, which
+  the plan's last task stamps `1794813077-09f4`).
