@@ -147,6 +147,12 @@ class McpMediaTest < ActionDispatch::IntegrationTest
     assert_equal true, call_tool(raw, "list_media_tool", folder: "nonsense")["isError"]
   end
 
+  test "get_media's folder is nil when the folder went between two reads" do
+    gone = Media::Asset.new(folder_id: Media::Folder.maximum(:id).to_i + 1000)
+
+    assert_nil Mcp::Tools::GetMedia.send(:folder_of, gone)
+  end
+
   test "list_media and get_media name each image's folder with its path" do
     raw = token_for(users(:one), access_control_groups(:admin))
     parent = Media::Folder.create!(name: "Clients")

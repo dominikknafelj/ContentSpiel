@@ -13,6 +13,13 @@ class Media::FolderTreeTest < ActiveSupport::TestCase
     assert_equal 3, tree.size
   end
 
+  test "siblings that compare equal in natural order fall back to the id" do
+    nodes = [ Media::FolderTree::Node.new(9, nil, "a01"), Media::FolderTree::Node.new(3, nil, "a1") ]
+
+    assert_equal [ 3, 9 ], Media::FolderTree.new(nodes).roots.map(&:id)
+    assert_equal [ 3, 9 ], Media::FolderTree.new(nodes.reverse).roots.map(&:id)
+  end
+
   test "depth, height, path and descendants" do
     a = Media::Folder.create!(name: "A")
     b = Media::Folder.create!(name: "B", parent: a)

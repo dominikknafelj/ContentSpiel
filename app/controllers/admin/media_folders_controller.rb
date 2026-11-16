@@ -82,7 +82,7 @@ module Admin
       return answer(refusal.toast(sentences: [ GONE ], status: :not_found)) unless action_name == "update" && sent_name?
 
       form = Admin::MediaLibrary::FolderFormComponent.new(
-        tree: Media::FolderTree.load, folder: Media::Folder.new(id: params[:id].to_i), name: params.dig(:media_folder, :name).to_s,
+        tree: Media::FolderTree.load, folder: Media::Folder.new(id: params[:id].to_i), name: sent_folder[:name].to_s,
         errors: { base: [ GONE ] }, place: params[:place].to_s, query: shown_query
       )
       answer(refusal.answer(form: form, status: :not_found))
@@ -92,7 +92,7 @@ module Admin
     # A parent that is no number names a folder that is gone (id 0), as an
     # upload's does.
     def folder_attributes
-      sent = params.fetch(:media_folder, ActionController::Parameters.new).permit(:name, :parent_id)
+      sent = sent_folder.permit(:name, :parent_id)
       attributes = sent.to_h.symbolize_keys
       attributes[:parent_id] = (Integer(attributes[:parent_id].to_s, 10, exception: false) || 0) if attributes[:parent_id].present?
       attributes[:parent_id] = nil if attributes.key?(:parent_id) && attributes[:parent_id].blank?
@@ -112,7 +112,7 @@ module Admin
       errors = result.record.respond_to?(:errors) && result.record.errors.any? ? result.record.errors.messages : { base: result.errors }
       form = Admin::MediaLibrary::FolderFormComponent.new(
         tree: Media::FolderTree.load, folder: @folder, parent_id: (folder_attributes[:parent_id] unless @folder),
-        name: params.dig(:media_folder, :name).to_s, errors: errors, place: params[:place].to_s, query: shown_query
+        name: sent_folder[:name].to_s, errors: errors, place: params[:place].to_s, query: shown_query
       )
       answer(Admin::Answers::FolderRefused.new(view: view_context).answer(form: form, status: Admin::RefusalStatus.for(result)))
     end
@@ -128,7 +128,14 @@ module Admin
       answer(Admin::Answers::MoveRefused.new(view: view_context).answer(choices: move_choices_for({ kind: :folder, folder: folder }, refusal: sentences), status: status))
     end
 
-    def sent_name? = params[:media_folder].respond_to?(:key?) && params[:media_folder].key?(:name)
+    def sent_name? = sent_folder.key?(:name)
+
+    # `media_folder` as a form sends it; anything else (a forged plain
+    # string) is an empty form.
+    def sent_folder
+      sent = params[:media_folder]
+      sent.is_a?(ActionController::Parameters) ? sent : ActionController::Parameters.new
+    end
 
     def place_url = ->(place) { admin_media_path(**place_query(place)) }
 

@@ -48,10 +48,11 @@ module Media
     end
 
     # A subfolder keeps its name unless a folder already in the parent holds
-    # it; those that keep theirs are counted as taken first, so a suffixed
+    # it, the doomed folder itself included (its row still stands when the
+    # subfolders move, so a subfolder of its own name would collide); those that keep theirs are counted as taken first, so a suffixed
     # name never lands on one of them.
     def self.renames(folder, tree)
-      siblings = (folder.parent_id ? tree.children(folder.parent_id) : tree.roots).reject { |node| node.id == folder.id }
+      siblings = folder.parent_id ? tree.children(folder.parent_id) : tree.roots
       taken = siblings.to_set { |node| node.name.downcase }
       moving = tree.children(folder.id)
       clashing, keeping = moving.partition { |node| taken.include?(node.name.downcase) }

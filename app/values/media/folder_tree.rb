@@ -12,7 +12,7 @@ class Media::FolderTree
 
   def initialize(nodes)
     @by_id = nodes.index_by(&:id)
-    @children = nodes.group_by(&:parent_id).transform_values { |siblings| siblings.sort_by { |node| order_key(node.name) } }
+    @children = nodes.group_by(&:parent_id).transform_values { |siblings| siblings.sort_by { |node| [ order_key(node.name), node.id ] } }
   end
 
   def size = @by_id.size

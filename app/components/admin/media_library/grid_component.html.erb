@@ -3,7 +3,7 @@
     <%= render Admin::MediaLibrary::TileComponent.new(asset: asset, url: tile_url(asset), unused: !used_ids.include?(asset.id),
           selected: selected?(asset), pick: pick?, locale: locale,
           open_notes: note_counts.fetch(asset.id, 0), notes_unread: note_unread.include?(asset.id),
-          folder_path: folder_path(asset), select: select?) %>
+          folder_path: folder_path(asset), folder_name: folder_name_of(asset), select: select?) %>
   <% end %>
 </ul>
 <% if assets.empty? %>

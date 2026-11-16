@@ -84,6 +84,9 @@ module Admin
         tree.path_name(asset.folder_id).presence
       end
 
+      # The folder's own name beside its path, which may itself hold " / ".
+      def folder_name_of(asset) = (tree.find(asset.folder_id).name if folder_path(asset))
+
       def searching? = helpers.params[:q].is_a?(String) && helpers.params[:q].present?
 
       # A search or a segment is active, so an empty grid means "nothing

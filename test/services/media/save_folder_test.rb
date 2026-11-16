@@ -80,6 +80,15 @@ class Media::SaveFolderTest < ActiveSupport::TestCase
     assert_equal 2, Media::Folder.count
   end
 
+  test "a name differing from a sibling's by outer spaces and case is refused on the name" do
+    folder!("Client A")
+    result = save(name: "  client a ")
+
+    assert_not result.ok?
+    assert_equal 1, Media::Folder.count
+    assert_equal 1, result.record.errors[:name].size
+  end
+
   test "renaming records the old and the new name and is never coalesced" do
     folder = folder!("Trips")
     assert save(folder, name: "Journeys").ok?

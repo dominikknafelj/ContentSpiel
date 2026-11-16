@@ -1,7 +1,7 @@
 require "test_helper"
 
 # A move into a folder and the folder's delete on two connections at once: a
-# move holds the folder's row `FOR SHARE`, the delete takes it `FOR UPDATE`
+# move holds the folder's row `FOR KEY SHARE`, the delete takes it `FOR UPDATE`
 # after the tree's lock, so the delete waits for the move's commit and carries
 # the moved image up with the rest instead of leaving it to the foreign key's
 # nullify. Two connections need rows the other can see, so this class runs
@@ -46,7 +46,7 @@ class Media::DeleteFolderRaceTest < ActiveSupport::TestCase
     thread = nil
 
     Media::Folder.transaction do
-      Media::Folder.lock("FOR SHARE").find(doomed.id)
+      Media::Folder.lock("FOR KEY SHARE").find(doomed.id)
       asset.update_column(:folder_id, doomed.id) # version: none (a test's own rows)
       thread = Thread.new do
         ActiveRecord::Base.connection_pool.with_connection do

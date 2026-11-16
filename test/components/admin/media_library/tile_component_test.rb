@@ -149,10 +149,17 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
   end
 
   test "in All media with a search a tile in a folder names it, its path as the title" do
-    render_inline Admin::MediaLibrary::TileComponent.new(asset: create_media_asset, url: "/x", unused: false, folder_path: "Clients / Client A")
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: create_media_asset, url: "/x", unused: false, folder_path: "Clients / Client A", folder_name: "Client A")
 
     assert_selector "span.text-label.text-meta[title='Clients / Client A'] svg", count: 1
     assert_selector "span[title='Clients / Client A'] span.truncate", text: "Client A"
+  end
+
+  test "a folder name holding a slash is shown whole, not cut at it" do
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: create_media_asset, url: "/x", unused: false,
+      folder_path: "Clients / A / B", folder_name: "A / B")
+
+    assert_selector "span[title='Clients / A / B'] span.truncate", text: "A / B"
   end
 
   test "without a search no tile names its folder" do

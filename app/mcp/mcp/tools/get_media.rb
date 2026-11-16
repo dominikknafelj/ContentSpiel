@@ -82,7 +82,8 @@ module Mcp
         return nil unless asset.folder_id
 
         tree = Media::FolderTree.load
-        { id: asset.folder_id, name: tree.find(asset.folder_id).name, path: tree.path_name(asset.folder_id) }
+        node = tree.find(asset.folder_id)
+        node && { id: node.id, name: node.name, path: tree.path_name(node.id) }
       end
       private_class_method :folder_of
 

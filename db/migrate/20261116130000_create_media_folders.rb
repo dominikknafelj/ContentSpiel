@@ -5,7 +5,7 @@ class CreateMediaFolders < ActiveRecord::Migration[8.1]
   def change
     create_table :media_folders do |t|
       t.string :name, null: false
-      t.references :parent, foreign_key: { to_table: :media_folders }
+      t.references :parent, foreign_key: { to_table: :media_folders }, index: false
       t.references :created_by, foreign_key: { to_table: :users, on_delete: :nullify }
       t.timestamps
     end

@@ -54,6 +54,21 @@ class Admin::MediaFoldersTest < ActionDispatch::IntegrationTest
 
   def form_stream = streams.find { |stream| stream["target"] == "media-folder-form" }
 
+  test "a media_folder sent as a plain string is an empty form, never a 500" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+
+    post "/cs-studio/media_folders", params: { media_folder: "x" }, as: :turbo_stream
+    assert_response :unprocessable_entity
+
+    patch "/cs-studio/media_folders/#{folder.id}", params: { media_folder: "x" }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Client A", folder.reload.name
+
+    patch "/cs-studio/media_folders/#{Media::Folder.maximum(:id) + 1000}", params: { media_folder: "x" }, as: :turbo_stream
+    assert_response :not_found
+  end
+
   test "a refused name answers 422 with the field's sentence and writes nothing" do
     sign_in_as(users(:one))
 

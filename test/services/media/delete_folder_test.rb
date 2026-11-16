@@ -35,6 +35,22 @@ class Media::DeleteFolderTest < ActiveSupport::TestCase
       event.metadata.slice("parent_id", "moved_image_count", "moved_image_ids", "moved_folder_ids"))
   end
 
+  test "a subfolder of the folder's own name is renamed, at the top and nested, in any case" do
+    [ nil, folder!("Clients") ].each_with_index do |parent, index|
+      doomed = folder!(index.zero? ? "Old" : "Older", parent: parent)
+      same = folder!(index.zero? ? "old" : "OLDER", parent: doomed)
+
+      assert_equal({ same.id => "#{same.name} 2" }, Media::DeleteFolder.preview(doomed).renames)
+      result = delete(doomed)
+
+      assert result.ok?, result.errors.inspect
+      assert_equal "#{same.name} 2", same.reload.name
+      assert_equal parent&.id.to_s, same.parent_id.to_s
+      renamed = Audit::Event.where(action: "media_folder.renamed").order(:id).last
+      assert_equal same.id, renamed.subject_id
+    end
+  end
+
   test "at the top, its images go to no folder and its subfolders to the top" do
     doomed = folder!("Old")
     inner = folder!("Italy", parent: doomed)

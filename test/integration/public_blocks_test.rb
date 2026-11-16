@@ -33,6 +33,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     get "/"
     body = response.body
     etag = response.headers["ETag"]
+    assert etag.present?
     version = PublicSite.content_version
     assert_select "img[alt='A bright room']"
 

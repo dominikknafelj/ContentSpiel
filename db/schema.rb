@@ -268,7 +268,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_130000) do
     t.datetime "updated_at", null: false
     t.index "parent_id, lower((name)::text)", name: "index_media_folders_on_parent_and_name", unique: true, nulls_not_distinct: true
     t.index ["created_by_id"], name: "index_media_folders_on_created_by_id"
-    t.index ["parent_id"], name: "index_media_folders_on_parent_id"
   end
 
   create_table "media_library_migrated_assets", id: false, force: :cascade do |t|

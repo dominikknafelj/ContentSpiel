@@ -59,7 +59,8 @@ module Admin
     # `folder_path:` is the whole path of the image's folder ("Clients / Client
     # A"), the caller's to say and only for a search in All media: the tile
     # then adds a third line, the folder mark and the folder's name, truncated,
-    # with the path as its `title`.
+    # with the path as its `title`. `folder_name:` is that folder's own name,
+    # given beside the path because a name may itself hold " / ".
     #
     # `unused:` is the caller's to say, not read here: a grid answers it for a
     # whole page in one query (`GridComponent#used_ids`), which a per-tile
@@ -82,10 +83,11 @@ module Admin
 
       SELECT_ACTIONS = "admin--media--selection#toggle".freeze
 
-      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false, folder_path: nil,
+      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false, folder_path: nil, folder_name: nil,
                      select: false)
         @select = select
         @folder_path = folder_path
+        @folder_name = folder_name
         @asset = asset
         @url = url
         @unused = unused
@@ -108,8 +110,9 @@ module Admin
       # screen's tiles only, never the picker's.
       def drag_data = (pick? ? {} : { media_tile_id: asset.id, media_tile_title: asset.title })
 
-      # The folder's own name, the path's last part, which the line shows.
-      def folder_name = folder_path.split(" / ").last
+      # The folder's own name, which the line shows: given beside the path
+      # because a name may itself hold " / ".
+      attr_reader :folder_name
 
       def open_notes = @open_notes.to_i
 
