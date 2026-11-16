@@ -49,6 +49,7 @@ module Editing
       "ai.translated" => "it writes nothing: the suggestions go to the tab that asked",
       "media.uploaded" => "library images are not live in this step (spec section 9)",
       "media.updated" => "library images are not live in this step (spec section 9)",
+      "media.moved" => "library images and folders have no live editor: a move is no edit of an image's text",
       "media.trashed" => "library images are not live in this step (spec section 9)",
       "media.restored" => "library images are not live in this step (spec section 9)",
       "media.purged" => "library images are not live in this step (spec section 9)",

@@ -171,6 +171,21 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_nil sentence_for(made).subject_route
   end
 
+  test "media.moved reads moved to a folder or out of every folder, and counted for the dashboard" do
+    moved = ->(**attributes) do
+      Audit::Event.new({ action: "media.moved", channel: "admin", subject_type: "Media::Asset", subject_id: 5, subject_label: "sunset.jpg",
+        user_id: @me.id, occurred_at: Time.current, last_occurred_at: Time.current }.merge(attributes))
+    end
+    library = Audit::Sentence::Target.new(nil, Audit::Sentence.library_route)
+
+    assert_equal "You moved “sunset.jpg” to “Client A”", read(sentence_for(moved.call(metadata: { "folder_name" => "Client A" })))
+    assert_equal "You moved “sunset.jpg” out of every folder", read(sentence_for(moved.call(metadata: { "folder_name" => nil })))
+    assert_equal "You moved 12 images to “Client A”",
+      read(Audit::Sentence.build(moved.call(metadata: { "folder_name" => "Client A" }), viewer: @me, target: library, count: 12))
+    assert_equal "You moved 3 images out of every folder", read(Audit::Sentence.build(moved.call, viewer: @me, target: library, count: 3))
+    assert_includes Audit::Sentence::COUNTED, "media.moved"
+  end
+
   # A form's five actions, its name quoted as a subject.
   test "a form's actions" do
     cases = {
@@ -709,7 +724,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
 
     assert_raises(ArgumentError) { Audit::Sentence.build(published, viewer: @me, target: nil, count: 2) }
     assert_raises(ArgumentError) { Audit::Sentence.build(block, viewer: @me, target: nil, count: 2) }
-    assert_equal %w[block.created block.updated media.uploaded], Audit::Sentence::COUNTED
+    assert_equal %w[block.created block.updated media.uploaded media.moved], Audit::Sentence::COUNTED
   end
 
   # --- passkeys and recovery codes ------------------------------------------

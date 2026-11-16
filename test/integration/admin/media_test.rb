@@ -505,6 +505,22 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_no_match(/● CHANGED ELSEWHERE/, response.body)
   end
 
+  test "a panel's autosave after a move elsewhere is not stale" do
+    sign_in_as(users(:one))
+    asset = upload_asset(filename: "hero.png")
+    base = asset.updated_at.iso8601(6)
+    folder = Media::Folder.create!(name: "Client A")
+    travel 1.minute
+
+    assert Media::MoveImages.call(asset_ids: [ asset.id ], folder: folder, actor: users(:one)).ok?
+
+    patch "/cs-studio/media/#{asset.id}", params: { media_asset: { title: "Mine", alt: "", caption: "" }, base_updated_at: base }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Mine", asset.reload.title
+    assert_equal folder.id, asset.folder_id
+    assert_no_match(/ALSO CHANGED ELSEWHERE/, response.body)
+  end
+
   test "editing title, alt and caption autosaves per locale through Media::Save" do
     sign_in_as(users(:one))
     asset = upload_asset(filename: "hero.png")

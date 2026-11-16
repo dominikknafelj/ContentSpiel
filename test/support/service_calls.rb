@@ -332,6 +332,13 @@ module ServiceCalls
       { call: -> { Media::DeleteFolder.call(folder) }, permission: "media.manage", on: folder }
     },
 
+    # Moves an image into a folder: the folder column and an audit event per image.
+    "Media::MoveImages" => lambda {
+      asset = create_media_asset
+      folder = Media::Folder.create!(name: "Trips")
+      { call: -> { Media::MoveImages.call(asset_ids: [ asset.id ], folder: folder) }, permission: "media.manage", on: asset }
+    },
+
     "Media::Regenerate" => lambda {
       create_media_asset
       { call: -> { Media::Regenerate.call }, permission: "settings.manage", on: Current.site.reload,

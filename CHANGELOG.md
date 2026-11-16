@@ -4,6 +4,7 @@
 
 ### Added
 
+- `Media::MoveImages.call(asset_ids:, folder:)` moves library images into a folder or out of every folder, and is the one writer of an image's folder after an upload. Each image needs its own edit right and one image refused refuses the move ("2 of these images are not yours to move. Nothing was moved."); at most 200 images a move; a move touches neither `updated_at` nor the site's content version. Each image that moved is recorded as `media.moved` (counted on the dashboard: "moved 12 images to “Client A”").
 - Each post type is switched on or off in Settings (Settings › Post types: a switch per declared type, Resume entry and Now update together under "For a personal site", each with its post count, saved with the save bar and found in ⌘K; a switch moved and not yet saved says under it whether its posts will leave the site or come back, and a screen reader hears that line as the switch's description while it shows); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`.
 - MCP: `get_post`'s answer says `type_switched_on`.
 - Close matches for a typo, ranked below every exact match and said so ("No exact matches for … Close matches:").

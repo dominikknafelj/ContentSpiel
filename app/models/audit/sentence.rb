@@ -48,7 +48,7 @@ module Audit
     # to ...", "You uploaded 12 images"). `Dashboard::Activity` collapses a run
     # of exactly these into one row (layout points spec, decision 11); any
     # other action told with a count is a mistake and `build` refuses it.
-    COUNTED = %w[block.created block.updated media.uploaded].freeze
+    COUNTED = %w[block.created block.updated media.uploaded media.moved].freeze
 
     # Verb phrase "before <subject> after" for the actions every record kind
     # shares (`page.published`, `media.trashed`, ...).
@@ -67,7 +67,7 @@ module Audit
     CONTENT_ACTIONS = {
       "page" => %w[created updated published unpublished moved trashed restored purged translation_confirmed taken_over changes_published changes_discarded scheduled_change_cancelled],
       "post" => %w[created updated published unpublished scheduled trashed restored purged translation_confirmed taken_over changes_published changes_discarded scheduled_change_cancelled],
-      "media" => %w[uploaded updated trashed restored purged translation_confirmed],
+      "media" => %w[uploaded updated moved trashed restored purged translation_confirmed],
       "settings" => %w[translation_confirmed]
     }.freeze
 
@@ -337,6 +337,7 @@ module Audit
 
       def content_parts(verb)
         return [ text("uploaded "), Part.new(:collection, "#{@number} images") ] if @count > 1 && @action == "media.uploaded"
+        return image_moved_parts if @action == "media.moved"
 
         before, after = CONTENT_VERBS.fetch(verb)
         if verb == "scheduled" && (date = scheduled_date)
@@ -456,6 +457,17 @@ module Audit
           parent = self.class.metadata_of(event)["parent"].presence
           [ text("moved the folder "), Part.new(:subject, label), text(parent ? " into “#{parent}”" : " to the top") ]
         end
+      end
+
+      # "moved “sunset.jpg” to “Client A”", or "out of every folder"; counted,
+      # "moved 12 images to “Client A”". The folder's name is the event's own,
+      # kept as it was then; a counted run is worded by its newest event.
+      def image_moved_parts
+        folder = self.class.metadata_of(event)["folder_name"].presence
+        where = folder ? " to “#{folder}”" : " out of every folder"
+        return [ text("moved "), Part.new(:collection, "#{@number} images"), text(where) ] if @count > 1
+
+        subject_parts("moved ", where)
       end
 
       def submission_parts
