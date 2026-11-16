@@ -43,10 +43,10 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "a ticked posts row with no scope says All content types" do
+  test "a ticked posts row with no scope says All post types" do
     row("posts.read", scope: {})
 
-    assert_selector "[data-chips]", text: "All content types"
+    assert_selector "[data-chips]", text: "All post types"
     assert_selector "input[name='group[grants][posts.read][enabled]'][checked]"
     assert_selector "button:not([hidden])", text: "Edit scope"
   end
@@ -57,7 +57,7 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     assert_selector "[data-chips] .admin-scope-chip", text: "Blog"
     assert_selector "[data-chips] .admin-scope-chip", text: "Now update"
     assert_selector "[data-chips] .admin-scope-chip", text: "Own only"
-    assert_no_selector "[data-chips]", text: "All content types"
+    assert_no_selector "[data-chips]", text: "All post types"
     assert_selector "[data-chips] .admin-scope-chip span[aria-hidden]"
     assert_selector "input[type=checkbox][name='group[grants][posts.edit][content_types][]'][value=blog][checked]"
     assert_selector "input[type=checkbox][name='group[grants][posts.edit][content_types][]'][value=now_update][checked]"
@@ -70,7 +70,7 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     row("posts.edit", scope: { "own" => true })
 
     assert_selector "[data-chips] .admin-scope-chip", text: "Own only"
-    assert_no_selector "[data-chips]", text: "All content types"
+    assert_no_selector "[data-chips]", text: "All post types"
   end
 
   test "more than three chips collapse to +N" do
@@ -78,6 +78,17 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
 
     assert_selector "[data-chips] .admin-scope-chip", count: 4 # three, and +1
     assert_selector "[data-chips] .admin-scope-chip", text: "+1"
+  end
+
+  test "the permission row marks a switched-off type's chip" do
+    switch_on_content_types("blog")
+
+    row("posts.edit", scope: { "content_types" => %w[resume_entry blog] })
+
+    assert_selector "[data-chips] .admin-scope-chip", text: "Resume entry (switched off)"
+    assert_selector "[data-chips] .admin-scope-chip", text: "Blog", exact_text: true
+    assert_no_selector "[data-chips] .bg-warn-tint"
+    assert_no_text "type removed"
   end
 
   test "a removed content type is a warn chip with words and Remove, carried as a tracked hidden input" do
@@ -90,11 +101,11 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     assert_no_selector "[class*=danger]"
   end
 
-  test "only a removed type left means the chips say all content types, then the warn chip" do
+  test "only a removed type left means the chips say all post types, then the warn chip" do
     row("posts.edit", scope: { "content_types" => %w[retired_type] })
 
     chips = page.all("[data-chips] .admin-scope-chip").map(&:text)
-    assert_equal [ "All content types", "! retired_type · type removed" ], chips
+    assert_equal [ "All post types", "! retired_type · type removed" ], chips
   end
 
   test "a chosen root below another chosen root is carried as a hidden input beside its disabled box" do

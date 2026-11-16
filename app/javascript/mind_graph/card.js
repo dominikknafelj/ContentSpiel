@@ -97,6 +97,7 @@
 // with `setPinned`) and `onChange` what the notes call when they arrived or
 // one was added: the card's height changed, and the node's count may have.
 import { cardNotes } from "mind_graph/card_notes"
+import { switchedOff } from "mind_graph/graph_data"
 import { recordId } from "mind_graph/ids"
 import { markCanvas, paintMarks } from "mind_graph/swatches"
 
@@ -289,9 +290,15 @@ export function createCard(container, { text, number = String, urls, typeLabels,
   // is, its name, how many posts of it the viewer reads, and Pin. It leads
   // nowhere: the pages that list it are its neighbours on the canvas.
   function type(node) {
+    const head = heading(markCanvas(node), element("span", "text-sm text-dim", text.t("mind_graph.script.card.post_type")))
+    if (switchedOff(node)) {
+      // A switched-off type's posts are kept, so the count stays; the line says what the site does with them.
+      const kept = element("p", "m-0 text-small text-dim", counted("mind_graph.script.card.kept_posts", node.count ?? 0))
+      return [ head, title(node), parts.part("type-switched-off"), kept, actions() ]
+    }
     const counts = element("p", "m-0 flex")
     counts.append(label(counted("mind_graph.script.card.tag_posts", node.count ?? 0)))
-    return [ heading(markCanvas(node), element("span", "text-sm text-dim", text.t("mind_graph.script.card.post_type"))), title(node), counts, actions() ]
+    return [ head, title(node), counts, actions() ]
   }
 
   const CARDS = { post, page, tag, type }

@@ -195,12 +195,12 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     # A pill's row is named with its visible words first ("+92 more: …"), so
     # that someone who says what they see names it (WCAG 2.5.3).
     assert_equal [ true, true ], messages["mind_graph.script.list.more_row"].values_at("one", "other").map { |name| name.start_with?("%{words}: ") }
-    assert_equal %w[all_posts capped capped_local card.child_pages card.focus card.lists_posts card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.label_page card.notes.more
+    assert_equal %w[all_posts capped capped_local card.child_pages card.focus card.kept_posts card.lists_posts card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.label_page card.notes.more
                     card.notes.replies card.notes.sending card.notes.title card.notes.unread card.open_page card.open_post card.pin card.post_type card.related card.show_tagged
                     card.status.change_scheduled card.status.live_change_scheduled card.status.live_with_changes
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle
                     list.absent_post list.absent_retired_post list.add_post list.add_retired_post list.ancestors list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
-                    list.search_site list.search_site_heading list.select_page list.select_post list.select_tag list.select_type list.stated
+                    list.search_site list.search_site_heading list.select_page list.select_post list.select_tag list.select_type list.select_type_off list.stated
                     list.tags list.try_again list.types list.under list.unlisted list.unlisted_none load_failed loading more no_connections opened.everything_name opened.line
                     release_pinned retired_type retry search.failed search.groups.page search.groups.post search.groups.tag search.none
                     summary.all_hidden summary.around_home summary.connections summary.everything summary.hidden.page summary.hidden.post summary.hidden.tag summary.hidden.type

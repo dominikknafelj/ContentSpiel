@@ -252,7 +252,10 @@ module PostGraph
     # node. No statement: the counts are the site's readable posts. In the
     # order the list shows them (design answer H2): the types by their
     # colour slot (the order in Settings), then the retired ones by name,
-    # then "All posts" last.
+    # then "All posts" last. A type's `switched_on` is the site's setting
+    # (false for a retired type too, which the card tells by its missing
+    # colour slot): the hub keeps its hue and its count, since its posts are
+    # kept, and the card and the list row say the type is off.
     def type_nodes(lists, degree)
       targets = lists.map(&:last).uniq.reject { |target| target.start_with?("tag-") }
       place = ->(target) do
@@ -267,7 +270,7 @@ module PostGraph
         else
           name = target.delete_prefix("type-")
           definition = ContentTypes.find(name)
-          { id: target, name: name, label: definition&.label || name, colour_index: definition&.colour_index, count: @site.listings.type_count(name), degree: degree.fetch(target, 0) }
+          { id: target, name: name, label: definition&.label || name, colour_index: definition&.colour_index, switched_on: ::ContentTypes.switched_on?(name), count: @site.listings.type_count(name), degree: degree.fetch(target, 0) }
         end
       end
     end

@@ -150,7 +150,7 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
 
     # Waited for (the chips are redrawn by script after the change), and in order.
     assert_selector "#{row} [data-chips] .admin-scope-chip", count: 2
-    assert_selector "#{row} [data-chips] .admin-scope-chip:nth-of-type(1)", text: "All content types", exact_text: true
+    assert_selector "#{row} [data-chips] .admin-scope-chip:nth-of-type(1)", text: "All post types", exact_text: true
     assert_selector "#{row} [data-chips] .admin-scope-chip:nth-of-type(2)", text: "! retired_type · type removed", exact_text: true
   end
 
@@ -164,7 +164,7 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
 
     visit edit_admin_group_path(group)
     await_admin_controllers
-    assert_selector ".admin-stale-grant", text: "Limited to a content type that no longer exists (retired_type). Saving removes it;"
+    assert_selector ".admin-stale-grant", text: "Limited to a post type that no longer exists (retired_type). Saving removes it;"
     assert_button "Save group", disabled: false
     assert_no_selector ".admin-save-bar", text: /unsaved/i
 

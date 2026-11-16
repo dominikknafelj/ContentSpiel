@@ -44,7 +44,11 @@ en:
           removed_value: "%{value}: removed when you save."
           dead: "This permission was limited to %{what}, so it matched nothing. It stays off unless you tick it again."
           dead_nothing: "nothing"
-          dormant: "Limited to a content type that no longer exists (%{names}). Saving removes it; until then only someone who could grant that type can manage this group."
+          # A post type the site has switched off keeps its grant live: its name
+          # in a chip or a box reads like this, never as a removed type. Read
+          # by its full key by the scope editor and the permission row.
+          switched_off_type: "%{name} (switched off)"
+          dormant: "Limited to a post type that no longer exists (%{names}). Saving removes it; until then only someone who could grant that type can manage this group."
           unregistered: "The permission “%{key}” no longer exists and will be removed when you save."
         permission_row:
           short:
@@ -62,14 +66,14 @@ en:
           hide_scope: "Hide scope"
           chips:
             all_pages: "All pages"
-            all_types: "All content types"
+            all_types: "All post types"
             own_only: "Own only"
             more: "+%{count}"
             removed_type: "! %{name} · type removed"
             under: "Under %{title}"
             unreadable: "A page you can't open"
         scope_editor:
-          types: "Content types · none ticked = all"
+          types: "Post types · none ticked = all"
           removed_type: "%{name} · this type no longer exists"
           remove: "Remove"
           own_only: "Own only"

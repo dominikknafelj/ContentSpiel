@@ -198,6 +198,12 @@ en:
           tag_posts:
             one: "%{figure} post"
             other: "%{figure} posts"
+          # A switched-off post type's card, under its off chip: the posts are
+          # kept and no list links to them.
+          kept_posts:
+            zero: "It has no posts."
+            one: "Its %{figure} post is kept and is not on the site, so no list links to it."
+            other: "Its %{figure} posts are kept and are not on the site, so no list links to them."
           open_post: "Open post"
           open_page: "Open page"
           post_type: "Post type"
@@ -244,6 +250,11 @@ en:
           select_type:
             one: "%{title}: post type, %{figure} post. Shows it in the graph."
             other: "%{title}: post type, %{figure} posts. Shows it in the graph."
+          # A switched-off post type's row, whose end is the off chip in place
+          # of the count; the name says both, with the chip's own word.
+          select_type_off:
+            one: "%{title}: post type, switched off, %{figure} post. Shows it in the graph."
+            other: "%{title}: post type, switched off, %{figure} posts. Shows it in the graph."
           add_post: "%{title}, %{type} post, not in view. Activate to add it to the graph."
           add_retired_post: "%{title}, %{type}, retired type, not in view. Activate to add it to the graph."
           absent_post: "%{title}, %{type} post, not in view."

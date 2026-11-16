@@ -52,6 +52,13 @@ module Admin
       def removed_types = chosen_types - registered_types
       def content_type_label(name) = ContentTypes.find(name)&.label || name.to_s.humanize # i18n-ok: a registered type with no definition shows its name, humanised
 
+      # A declared type the site has switched off is still offered and its grant
+      # still live, so the words say so (never the warn "no longer exists").
+      def type_label(name)
+        label = content_type_label(name)
+        ::ContentTypes.switched_on?(name) ? label : t("admin.components.groups_screen.permission_matrix.switched_off_type", name: label)
+      end
+
       # The "!" is a sign beside the words, which say it; a screen reader skips it.
       def removed_label(name) = safe_join([ tag.span("!", aria: { hidden: true }), " ", t(".removed_type", name: name) ])
 

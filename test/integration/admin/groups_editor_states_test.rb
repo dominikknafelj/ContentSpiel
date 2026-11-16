@@ -383,7 +383,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] } }))
     get "/cs-studio/groups/#{group.id}/edit"
     assert_select "fieldset.admin-view-only[disabled]"
-    assert_select ".admin-stale-grant", text: "Limited to a content type that no longer exists (retired_type). Saving removes it; until then only someone who could grant that type can manage this group."
+    assert_select ".admin-stale-grant", text: "Limited to a post type that no longer exists (retired_type). Saving removes it; until then only someone who could grant that type can manage this group."
     before = grants_snapshot(group)
 
     assert_no_difference -> { Audit::Event.where(action: "group.updated").count } do
@@ -406,7 +406,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
     get "/cs-studio/groups/#{group.id}/edit"
     assert_select "fieldset[disabled]", count: 0
-    assert_select ".admin-stale-grant", text: "Limited to a content type that no longer exists (retired_type). Saving removes it; until then only someone who could grant that type can manage this group."
+    assert_select ".admin-stale-grant", text: "Limited to a post type that no longer exists (retired_type). Saving removes it; until then only someone who could grant that type can manage this group."
     assert_select "[data-permission='posts.read'] input[type=checkbox][name$='[enabled]'][checked]", count: 0
     # Save is live from the start, without a counted change (so leaving doesn't ask).
     assert_select "form#group-form[data-admin--saving--save-bar-always-value=true][data-admin--saving--save-bar-dirty-value=false]"

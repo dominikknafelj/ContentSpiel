@@ -18,6 +18,11 @@ const PAGE_BONUS = 0.5
 // its label ends "(retired)", in the messages' words.
 const retiredType = (type) => type.id !== ALL_POSTS && type.colour_index == null
 
+// A declared post type the site has switched off: its hub keeps its hue, and
+// the card and the list row carry the off chip. A retired type is also not
+// switched on, but it has no slot and is told by "(retired)", never by the chip.
+export const switchedOff = (node) => node.kind === "type" && node.switched_on === false && node.colour_index != null
+
 // `allPosts` is the one "All posts" node's name, `more(count)` a pill's
 // words and `retired(name)` a retired type's label: the page's messages,
 // handed in so that no word is written here.
