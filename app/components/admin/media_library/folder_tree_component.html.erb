@@ -1,0 +1,38 @@
+<%# The part a folder or move answer replaces whole, carrying the place the
+    screen goes to next (`go_to`, read once by `admin--media--folders`). %>
+<%= tag.div id: PART_ID, data: { media_go: go_to } do %>
+  <%# The tree: the list a find narrows and names (`aria-controls`). It folds
+      and unfolds the folders (`admin--tree--disclosure`), writing their folds
+      into `cs_media_open` on the admin path only, and follows the place the
+      content frame shows (`admin--media--folders`: the selected row's classes
+      handed over as Stimulus classes). %>
+  <%= tag.ul id: ID, class: ROW[:tree],
+        data: { controller: "admin--tree--disclosure admin--media--folders",
+                tree_open_path: "/#{ContentSpiel::ADMIN_PATH}", tree_open_cookie: TreeOpenSet::MEDIA_COOKIE, tree_locale: tree_locale,
+                messages: messages_data("components.ui.tree_item.fold", "components.ui.tree_item.unfold"),
+                "admin--media--folders-selected-class": ROW[:row_selected],
+                action: "turbo:frame-load@document->admin--media--folders#follow" } do %>
+    <li>
+      <%= render Admin::Ui::TreeItemComponent.new(id: self.class.row_id(Media::Place::ALL), title: t(".all"), selected: selected?(Media::Place::ALL), data: row_data(Media::Place::ALL)) do |item| %>
+        <% item.with_mark { glyph(:media) } %>
+        <% item.with_title { link(t(".all"), Media::Place::ALL) } %>
+        <% if (count = count_part(counts[:all])) %><% item.with_trailing { count } %><% end %>
+      <% end %>
+    </li>
+    <li>
+      <%= render Admin::Ui::TreeItemComponent.new(id: self.class.row_id(Media::Place::NONE), title: t(".none"), selected: selected?(Media::Place::NONE), data: row_data(Media::Place::NONE)) do |item| %>
+        <% item.with_mark { glyph(:folder_none) } %>
+        <% item.with_title { link(t(".none"), Media::Place::NONE) } %>
+        <% if (count = count_part(counts[:none])) %><% item.with_trailing { count } %><% end %>
+      <% end %>
+    </li>
+    <%# The rule between the two places of every library and its folders. %>
+    <li class="my-1.5 border-t border-line" aria-hidden="true"></li>
+    <% tree.roots.each do |node| %>
+      <%= folder_node(node, 1) %>
+    <% end %>
+  <% end %>
+  <% unless folders? %>
+    <p class="px-1 text-small text-dim"><%= t(".empty") %></p>
+  <% end %>
+<% end %>

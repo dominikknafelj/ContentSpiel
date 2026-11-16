@@ -1183,6 +1183,56 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-panel-title"
   end
 
+  # The Folders column is the shell's tree column, subject `media`: its words
+  # are the subject's, and it holds the head, the find over the folders and
+  # the tree of places.
+  test "the Media screen's column is the media subject with the Folders words" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+
+    get "/cs-studio/media"
+
+    assert_response :success
+    assert_select "aside#tree-column" do
+      assert_select "h2", text: "Folders"
+      assert_select ".admin-tree-hide[aria-label='Hide folders']"
+      assert_select ".admin-tree-fold[aria-label='Show folders']"
+      assert_select ".admin-tree-divider[aria-label='Folders width']"
+      assert_select "[role=search] input[aria-controls='media-folder-tree']"
+      assert_select "#media-folder-tree-part > ul#media-folder-tree[data-tree-open-cookie='cs_media_open']"
+      assert_select "#media-folder-tree [data-media-place='#{folder.id}']", text: /Client A/
+    end
+    assert_select "button[aria-controls='tree-column']", text: "Folders"
+    assert_select "#content #media-folder-tree", count: 0
+  end
+
+  test "a frame answer draws no column" do
+    sign_in_as(users(:one))
+    Media::Folder.create!(name: "Client A")
+
+    get "/cs-studio/media", headers: { "Turbo-Frame" => "content" }
+
+    assert_response :success
+    assert_select "#media-library"
+    assert_select "#tree-column", count: 0
+    assert_select "#media-folder-tree", count: 0
+  end
+
+  test "the content names its place and its query for the column's script" do
+    sign_in_as(users(:one))
+    folder = Media::Folder.create!(name: "Client A")
+
+    get "/cs-studio/media", params: { folder: folder.id, q: "logo", filter: "unused", page: "2" }
+
+    assert_select "#media-library[data-media-place=?]", folder.id.to_s do |library|
+      assert_equal({ "q" => "logo", "filter" => "unused" }, JSON.parse(library.first["data-media-query"]))
+    end
+    assert_select "#media-folder-tree [data-media-place='#{folder.id}'].admin-tree-row--selected a[aria-current=page]"
+
+    get "/cs-studio/media", params: { q: [ "x" ] }
+    assert_select "#media-library[data-media-place=all][data-media-query='{}']"
+  end
+
   # Decision D12: a bad `?selected=` stays a 404, and its way on is the
   # library as it was listed.
   test "a selected id that names nothing is the 404 with a link back to Media that keeps the search and the segment" do

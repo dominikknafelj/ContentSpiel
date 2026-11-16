@@ -33,7 +33,7 @@ module Admin
       return refused(result) unless result.ok?
 
       parent = result.record.parent_id && Media::Folder.find_by(id: result.record.parent_id)
-      answer(Admin::Answers::FolderDeleted.new(view: view_context, url: place_url).answer(parent: parent))
+      answer(Admin::Answers::FolderDeleted.new(view: view_context, url: place_url, column: method(:folder_column_for)).answer(parent: parent))
     end
 
     private
@@ -53,7 +53,7 @@ module Admin
 
     def saved(result, created:)
       place = shown_place(Media::FolderTree.load)
-      answer(Admin::Answers::FolderSaved.new(view: view_context, url: place_url).answer(folder: result.record, place: place, created: created))
+      answer(Admin::Answers::FolderSaved.new(view: view_context, url: place_url, column: method(:folder_column_for)).answer(folder: result.record, place: place, created: created))
     end
 
     def refused(result)

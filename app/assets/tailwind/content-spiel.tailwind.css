@@ -462,6 +462,13 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 .admin-tree-row--selected { background: var(--cs-sunken); box-shadow: inset 3px 0 0 var(--cs-accent); }
 .admin-tree-row--selected .admin-tree-row__title { font-weight: 600; }
 .admin-tree-row--selected .admin-tree-row__mark { color: var(--cs-ink); }
+/* A mark holding both folder glyphs (the Folders column's folder rows,
+   `Admin::MediaLibrary::FolderTreeComponent`) shows the open folder on the
+   selected row, the place shown, and the closed one elsewhere: the selection
+   moves by script after a frame navigation, so the swap is the selection's. */
+.admin-tree-row__mark:has(> [data-tree-glyph="folder"]) > [data-tree-glyph="folder_open"],
+.admin-tree-row--selected > .admin-tree-row__mark:has(> [data-tree-glyph="folder_open"]) > [data-tree-glyph="folder"] { display: none; }
+.admin-tree-row--selected > .admin-tree-row__mark:has(> [data-tree-glyph="folder"]) > [data-tree-glyph="folder_open"] { display: block; }
 /* A folded parent a drag opened (`admin--pages--tree`), while the pointer
    is in it: the sunken ground with a field's line inside the row's box, so
    nothing moves. */

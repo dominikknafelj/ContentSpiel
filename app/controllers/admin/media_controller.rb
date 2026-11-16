@@ -94,6 +94,8 @@ module Admin
 
       @selected = selected_asset
       @link_params = list_query
+      @place_query = shown_query
+      folder_column unless turbo_frame_request?
     end
 
     # The old detail page's URL: every link that ever pointed at it (an email, a
@@ -214,6 +216,13 @@ module Admin
       raise ActiveRecord::RecordNotFound, "Couldn't find Media::Asset" unless raw.is_a?(String)
 
       Media::Asset.kept.with_file.find(raw)
+    end
+
+    # What the Folders column draws, for a full answer only: a frame answer
+    # keeps only `#content`, and the column outlives it (`admin/media/index`).
+    def folder_column
+      @folder_counts = Media::FolderCounts.call
+      @media_open = TreeOpenSet.parse(cookies[TreeOpenSet::MEDIA_COOKIE], readable_ids: @folder_tree.ids)
     end
 
     # A `folder` that names no folder of the screen: the library as it was

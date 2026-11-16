@@ -590,6 +590,10 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     at_library(1199, "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}") do
       assert_rail_docked(false)
+      # The notes' frame is lazy, and where the rail does not dock their
+      # section stands under the image's panel, below the window's fold: it
+      # loads as a person scrolls to it.
+      scroll_to find("#media-rail-panel-notes")
       assert_selector "#media-rail-panel-notes #note-thread-#{thread.id}", visible: :visible, text: "Too dark here"
       assert_selector "#media-rail-panel-image #media-panel", visible: :visible
     end
@@ -665,7 +669,8 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
   # The window sized so that the library (`#media-library`, the rail's
   # container) is `width` wide, measured on the page itself: the sidebar,
-  # the content's padding and the scrollbar stand between the two.
+  # the Folders column, the content's padding and the scrollbar stand
+  # between the two.
   def at_library(width, path)
     at_window(width + 400) do
       visit_screen path

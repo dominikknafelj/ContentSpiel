@@ -9,16 +9,17 @@ module Admin
       TREE_TARGET = FolderTreePart::TARGET
 
       # `url` turns a `Media::Place` into the address the screen goes to
-      # (`Admin::MediaPlaces#place_query`).
-      def initialize(view:, url:)
-        @view = view
+      # (`Admin::MediaPlaces#place_query`), and `column` a place and that
+      # address into the column (`Admin::MediaPlaces#folder_column_for`).
+      def initialize(view:, url:, column:)
         @url = url
+        @column = column
         @turbo_stream = Answers.stream_builder(view)
       end
 
       def answer(folder:, place:, created:)
         go = created ? Media::Place.new(:folder, folder.id) : place
-        Answer.new(streams: [ tree_part_stream(go: @url.call(go)) ], status: created ? :created : :ok)
+        Answer.new(streams: [ tree_part_stream(go, go_to: @url.call(go)) ], status: created ? :created : :ok)
       end
     end
   end

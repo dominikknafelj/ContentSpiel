@@ -651,4 +651,54 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       assert_operator box("#tree-column")[2], :<=, box(".admin-shell__main")[2]
     end
   end
+
+  # The Media screen's Folders column stands in the same column: the width
+  # chosen on Pages is the Folders', its divider is the column's ("Folders
+  # width") and drags the same way, and "Hide folders" folds it to the strip
+  # that "Show folders" opens again.
+  test "the Folders column takes the tree's width, divider and fold" do
+    Media::Folder.create!(name: "Clients")
+    open_editor
+    focus_divider
+    keys(:right, :right)
+    assert_tree 304
+
+    visit_screen admin_media_path
+    assert_selector "#tree-column #media-folder-tree [data-tree-row]", text: "Clients"
+    assert_tree 304
+    assert_equal "Folders width", divider["aria-label"]
+
+    mouse = drag_divider(to: 364)
+    assert_tree 364
+    mouse.up
+    assert_eventually(message: "the release did not remember the width") { stored == "364" }
+    assert_equal "auto", page.evaluate_script("getComputedStyle(document.getElementById('tree-column')).overflowY"), "the column scrolls on its own"
+
+    find("#tree-column button.admin-tree-hide[aria-label='Hide folders']").click
+    assert_eventually(message: -> { "the folded column is #{tree_width}px wide" }) { (tree_width - 44).abs <= 1 }
+    assert_no_selector "#media-folder-tree"
+    find("#tree-column button.admin-tree-fold[aria-label='Show folders']").click
+    assert_tree 364
+    assert_selector "#media-folder-tree [data-tree-row]", text: "Clients"
+  ensure
+    page.execute_script("try { window.localStorage.removeItem('cs-tree-folded') } catch (error) {}")
+  end
+
+  # Below 1024px the column is the tree drawer, and on the Media screen the
+  # top bar's button for it is the Folders'.
+  test "below 1024px the folders are the drawer opened by Folders in the top bar" do
+    Media::Folder.create!(name: "Clients")
+    at_width(900) do
+      visit_screen admin_media_path
+      assert_no_selector ".admin-tree-divider"
+      assert_no_selector "#tree-column #media-folder-tree"
+
+      find("button[aria-controls='tree-column'][aria-label='Open folders']", text: "Folders").click
+      assert_selector "#tree-column[data-open]"
+      assert_eventually(message: -> { "the drawer is #{tree_width}px wide" }) { (tree_width - 272).abs <= 1 }
+      assert_selector "#tree-column #media-folder-tree [data-tree-row]", text: "Clients"
+      assert_no_selector ".admin-tree-hide"
+      assert_operator box("#tree-column")[2], :<=, box(".admin-shell__main")[2]
+    end
+  end
 end

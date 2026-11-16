@@ -17,6 +17,13 @@ en:
             no_matches: "No matches."
             no_matches_description: "No images match the current search or filter."
             clear: "Clear filters"
+        # The Folders column (`Admin::MediaLibrary::FolderTreeComponent`);
+        # `heading` is the column head's, which the Media screen's view draws.
+        folder_tree:
+          heading: "Folders"
+          all: "All media"
+          none: "Not in a folder"
+          empty: "No folders yet."
         toolbar:
           search_label: "Search images"
           search_placeholder: "Search title, alt text or filename"

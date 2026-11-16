@@ -20,6 +20,7 @@
 - MCP: `list_media_tool` takes `folder` (a folder's id, or `none`) and lists the images directly in it, and it and `get_media_tool` name each image's `folder` (`{id, name, path}`, or null); the new `list_media_folders_tool` lists the folders in tree order with `parent_id`, `path` and `image_count`. All need `media.upload`.
 - Library folders: `Media::SaveFolder` creates, renames and moves a folder (four levels deep at most, a thousand at most, one name per parent in any case, under the tree's table lock); each is recorded as `media_folder.created`, `media_folder.renamed` or `media_folder.moved`, and the audit log's Type filter offers "Media folder".
 - `Media::DeleteFolder` deletes a folder: its images (trashed ones too) and subfolders move one level up, a subfolder whose name the parent holds takes the next free " 2", " 3" and is recorded as `media_folder.renamed`, and one `media_folder.deleted` is recorded; `Media::DeleteFolder.preview` says what will move.
+- The media library's folders, in the tree column of the Media screen.
 
 ### Changed
 

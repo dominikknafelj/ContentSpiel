@@ -1,7 +1,9 @@
 module Admin
   module Ui
-    # One row of a tree of the site's pages, the one row both trees draw:
-    # Pages renders it, and the mind graph's list reads its classes
+    # One row of a tree, a page's or a library folder's, the one row every
+    # tree draws: Pages and the Media screen's Folders column
+    # (`Admin::MediaLibrary::FolderTreeComponent`) render it, and the mind
+    # graph's list reads its classes
     # (`CLASSES`, the view's `data-tree-classes`) and builds the same markup
     # in `mind_graph/node_list.js`, with the parts' glyphs
     # (`Admin::MindGraphScreen::PartsComponent`); `test/system/admin/
@@ -31,7 +33,8 @@ module Admin
     # handle does, never by the selection.
     #
     # `path:` is the page's address, for a find that starts with "/"
-    # (`data-tree-path`), and `node_id:` the bare page id (`data-tree-id`).
+    # (`data-tree-path`), and `node_id:` the node's bare id, a page's or a
+    # folder's (`data-tree-id`), which the open set stores.
     # `data:` is merged onto the row for the screen's behaviour hooks.
     class TreeItemComponent < AdminComponent
       include Admin::Ui::Contract

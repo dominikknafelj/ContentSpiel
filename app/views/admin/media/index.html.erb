@@ -8,17 +8,42 @@
   <meta name="turbo-cache-control" content="no-cache">
   <meta name="turbo-prefetch" content="false">
 <% end %>
+<%# THE FOLDERS COLUMN: the shell's tree column, subject `media` (its words:
+    "Hide folders", the strip's, the divider's and the top bar's "Folders"),
+    outside `#content`, so a frame navigation keeps it. Like the Pages tree it
+    is drawn for a full answer only: a frame answer keeps only `#content`, and
+    a column drawn into one would be read and sent for nothing. It holds the
+    head (the heading and the column's hide button), the find field over the
+    folders and the tree of places (`Admin::MediaLibrary::FolderTreeComponent`,
+    whose part every folder or move answer replaces). Its selection follows the
+    place this view names (`admin--media--folders`, from `data-media-place`
+    below), and its rows' links the search it names (`data-media-query`).
+    Below 1024px the column is the tree drawer, opened by the top bar's
+    "Folders". %>
+<% unless turbo_frame_request? %>
+  <% content_for :tree_label, "media" %>
+  <% content_for :tree do %>
+    <div class="mb-2 flex items-center gap-2 px-1">
+      <h2 class="flex-1 text-sm font-semibold text-ink"><%= t("admin.components.media_library.folder_tree.heading") %></h2>
+      <%= render Admin::Ui::TreeHideComponent.new(subject: "media") %>
+    </div>
+    <%= render Admin::Ui::TreeFindComponent.new(controls: Admin::MediaLibrary::FolderTreeComponent::ID, noun: :folders) %>
+    <%= render Admin::MediaLibrary::FolderTreeComponent.new(tree: @folder_tree, counts: @folder_counts, place: @place, query: @place_query,
+          open_set: @media_open, manage: can?("media.manage")) %>
+  <% end %>
+<% end %>
 <%# The Media module: the header with "Upload images", the drop zone, the
     toolbar (search and segments with counts) and the grid, with the chosen
     image's rail beside it. Choosing a tile is a link into the `content` frame
-    that keeps the search, the segment, the page and the language, so Back
-    returns to the previous choice. No tree column (a library image has no tree
-    position of its own, the same reason Tags/Posts render plain content frames).
+    that keeps the search, the segment, the place, the page and the language,
+    so Back returns to the previous choice.
 
     `#media-library` is a container (`admin-media`), so the rail is laid out by
     the room the library has, never the window's
-    (content-spiel.tailwind.css, "THE MEDIA RAIL"). %>
-<div id="media-library" class="admin-media-library">
+    (content-spiel.tailwind.css, "THE MEDIA RAIL"). It names the place and the
+    search it lists (`data-media-place`, `data-media-query`: a JSON object of
+    `q` and `filter`) for the Folders column's script. %>
+<div id="media-library" class="admin-media-library" data-media-place="<%= @place.to_param %>" data-media-query="<%= @place_query.to_json %>">
 <div class="admin-media-library__head">
 <%# Uploading: the wrapper carries `admin--media--drop` (a file drag
     anywhere on the screen shows the overlay below and a drop hands its files to
