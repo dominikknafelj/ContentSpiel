@@ -104,6 +104,10 @@ module Admin
 
       attr_reader :folder_path
 
+      # What `admin--media--drag` picks up and the ghost says: the Media
+      # screen's tiles only, never the picker's.
+      def drag_data = (pick? ? {} : { media_tile_id: asset.id, media_tile_title: asset.title })
+
       # The folder's own name, the path's last part, which the line shows.
       def folder_name = folder_path.split(" / ").last
 

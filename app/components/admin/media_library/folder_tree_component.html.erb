@@ -5,10 +5,12 @@
       and unfolds the folders (`admin--tree--disclosure`), writing their folds
       into `cs_media_open` on the admin path only, and follows the place the
       content frame shows (`admin--media--folders`: the selected row's classes
-      handed over as Stimulus classes). %>
+      handed over as Stimulus classes). `data-media-drag-tree` and the deepest
+      level are the drop hooks `admin--media--drag` reads from outside. %>
   <%= tag.ul id: ID, class: ROW[:tree],
         data: { controller: "admin--tree--disclosure admin--media--folders",
                 tree_open_path: "/#{ContentSpiel::ADMIN_PATH}", tree_open_cookie: TreeOpenSet::MEDIA_COOKIE, tree_locale: tree_locale,
+                media_drag_tree: true, media_drag_max_depth: Media::Folder::MAX_DEPTH,
                 messages: messages_data("components.ui.tree_item.fold", "components.ui.tree_item.unfold"),
                 "admin--media--folders-selected-class": ROW[:row_selected],
                 action: "turbo:frame-load@document->admin--media--folders#follow" } do %>

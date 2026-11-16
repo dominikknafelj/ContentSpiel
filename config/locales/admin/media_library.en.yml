@@ -37,6 +37,21 @@ en:
           # row's "+", which creates inside that folder.
           new_folder: "+ New folder"
           add: "New folder in %{name}"
+        # Dragging images and folders onto the Folders column
+        # (`admin--media--drag`): the ghost's words for several images
+        # (`count`; one is its title), what the screen's polite status says
+        # after a drop (`moved`) or over a row that cannot take a folder
+        # (`refused`, with one of the three reasons, which also stands in the
+        # row's count).
+        drag:
+          count: "%{count} images"
+          moved:
+            one: "Moved “%{title}” to %{folder}."
+            other: "Moved %{count} images to %{folder}."
+          refused: "Can't move “%{name}” there: %{reason}."
+          too_deep: "too deep"
+          this_folder: "this folder"
+          name_taken: "name taken"
         # The New folder and Rename folder dialog
         # (`Admin::MediaLibrary::FolderDialogComponent`, its form
         # `FolderFormComponent`); `admin--media--folder-dialog` words it for

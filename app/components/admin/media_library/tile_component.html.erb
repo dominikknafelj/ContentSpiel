@@ -28,7 +28,7 @@
     <% end %>
   </span>
 <% end %>
-<li id="<%= dom_id %>">
+<%= tag.li id: dom_id, data: drag_data do %>
   <% if pick? %>
     <%= tag.button face, type: "button", class: PICK_CARD, aria: { pressed: "false" }, data: pick_data %>
   <% elsif select? %>
@@ -36,4 +36,4 @@
   <% else %>
     <%= link_to face, url, class: CARD, aria: { current: (selected? ? "true" : nil) }, data: { turbo_frame: "content", turbo_action: "advance", action: "click->admin--media--panel#choose" } %>
   <% end %>
-</li>
+<% end %>

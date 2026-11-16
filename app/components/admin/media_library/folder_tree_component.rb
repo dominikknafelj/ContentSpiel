@@ -43,6 +43,15 @@ module Admin
     # the folder and its path as the trigger's params (`.add_params`). The
     # column head's "+ New folder" (the Media screen's view) is the same
     # trigger for the top. `mode:` is `:screen`, the Media screen's own column.
+    #
+    # DRAGGING ONTO THE COLUMN (the card's D5 and D8) is `admin--media--drag`'s,
+    # on the Media screen's library, which reaches this tree by its id: an
+    # image is dropped on a folder row or Not in a folder, a folder (by its
+    # row's gutter handle, drawn for `manage:`) on a folder row or All media.
+    # Which row can take a folder is read from the rows'
+    # `data-media-folder-*` and the tree's `data-media-drag-max-depth`
+    # (`Media::Folder::MAX_DEPTH`), so a refusal is said before anything is
+    # sent; the server judges again.
     class FolderTreeComponent < AdminComponent
       ID = "media-folder-tree"
       PART_ID = "media-folder-tree-part"
@@ -114,6 +123,14 @@ module Admin
 
       def glyph(name) = render("admin/shared/tree_glyph", name: name)
 
+      # A folder's drag handle, in the row's gutter (`admin--media--drag`).
+      # A part for the pointer only, as the block tile's grip is: the
+      # keyboard's way to move a folder is the place menu's Move to…, so the
+      # handle is no Tab stop and says nothing to a screen reader. Drawn
+      # only where a pointer is fine and no find narrows the tree (the
+      # stylesheet, `.admin-tree[data-media-drag-tree]`).
+      def handle = tag.span("⠿", class: ROW[:handle], aria: { hidden: true }, data: { media_drag_handle: true })
+
       def children_list_id(node) = "media-folder-children-#{node.id}"
 
       def folded?(node) = tree.children(node.id).any? && !open_set.open?(node.id, root: false, on_path: path_ids.include?(node.id))
@@ -142,6 +159,7 @@ module Admin
           if manage && depth < Media::Folder::MAX_DEPTH
             row_item.with_add(label: t("admin.components.media_library.folder_tree.add", name: node.name), data: self.class.add_params(node.id, tree.path_name(node.id)))
           end
+          row_item.with_handle { handle } if manage
         end
         list = tag.ul(id: children_list_id(node), class: ROW[:children], hidden: folded, data: { tree_children: true }) do
           safe_join(children.map { |child| folder_node(child, depth + 1) })

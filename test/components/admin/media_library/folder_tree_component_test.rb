@@ -168,4 +168,25 @@ class Admin::MediaLibrary::FolderTreeComponentTest < ViewComponent::TestCase
     render_tree(place: place(deepest), manage: false)
     assert_no_selector ".admin-tree-row__add", visible: :all
   end
+
+  # The handle is a part for the pointer only, in each folder row's gutter:
+  # no Tab stop and nothing heard (the keyboard moves a folder by Move to…).
+  # All media and Not in a folder never move. The tree names the deepest
+  # level, which the drag judges a row by.
+  test "the handle is drawn for media.manage only" do
+    clients = folder("Clients")
+    client_a = folder("Client A", clients)
+
+    render_tree
+    assert_selector "ul#media-folder-tree[data-media-drag-tree][data-media-drag-max-depth='#{Media::Folder::MAX_DEPTH}']"
+    [ clients, client_a ].each do |each|
+      handle = row(each.id).find("span.admin-tree-node__handle[data-media-drag-handle]", visible: :all)
+      assert_equal "true", handle["aria-hidden"]
+      assert_nil handle["tabindex"]
+    end
+    assert_no_selector "[data-media-place='all'] .admin-tree-node__handle, [data-media-place='none'] .admin-tree-node__handle", visible: :all
+
+    render_tree(manage: false)
+    assert_no_selector ".admin-tree-node__handle", visible: :all
+  end
 end

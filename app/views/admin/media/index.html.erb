@@ -53,9 +53,33 @@
     In selection mode (`select=1`) it carries `admin--media--selection`,
     which holds the selection of this page's tiles and the bar's state: the
     bar stands between the head and the grid, a child of the library so it
-    stays stuck over the whole grid. %>
-<% selection = (@selecting ? { controller: "admin--media--selection", action: "keydown.esc@document->admin--media--selection#escape" } : {}) %>
-<%= tag.div id: "media-library", class: "admin-media-library", data: { media_place: @place.to_param, media_query: @place_query.to_json, **selection } do %>
+    stays stuck over the whole grid.
+
+    It always carries `admin--media--drag`: a tile (or, in selection mode,
+    the selection, from a ticked tile) dragged onto a row of the Folders
+    column, and a folder by its row's handle, which the controller reaches
+    by the tree's id (the column stands outside the content frame). The
+    ghost that follows the pointer is the `<template>` below, the drop's
+    words its `data-messages`, and what it says goes into the screen's
+    polite status, the upload's line. %>
+<% selection = (@selecting ? { action: "keydown.esc@document->admin--media--selection#escape" } : {}) %>
+<% drag_messages = messages_data("components.media_library.drag.count", "components.media_library.drag.moved", "components.media_library.drag.refused", "components.media_library.drag.too_deep", "components.media_library.drag.this_folder", "components.media_library.drag.name_taken") %>
+<%= tag.div id: "media-library", class: "admin-media-library",
+      data: { media_place: @place.to_param, media_query: @place_query.to_json, controller: [ "admin--media--drag", ("admin--media--selection" if @selecting) ].compact.join(" "),
+              "admin--media--drag-move-url-value": admin_media_move_path(**admin_url_options),
+              "admin--media--drag-folder-url-value": admin_media_folder_path("FOLDER_ID", **admin_url_options),
+              "admin--media--drag-drop-class": Admin::Ui::TreeItemComponent::CLASSES[:drop_target],
+              messages: drag_messages, **selection } do %>
+<%# The drag's ghost: a pill at elevation 4 with the dragged tile's
+    thumbnail, the title or "%{count} images", and the count when it is more
+    than one. Never heard: the polite status says what a drop did. %>
+<template data-admin--media--drag-target="ghost">
+  <div class="admin-media-drag-ghost" aria-hidden="true">
+    <img alt="" class="admin-media-drag-ghost__thumb" data-media-drag-thumb>
+    <span class="admin-media-drag-ghost__label" data-media-drag-label></span>
+    <span class="admin-media-drag-ghost__count" data-media-drag-count hidden></span>
+  </div>
+</template>
 <div class="admin-media-library__head">
 <%# Uploading: the wrapper carries `admin--media--drop` (a file drag
     anywhere on the screen shows the overlay below and a drop hands its files to
@@ -88,8 +112,10 @@
           hint: t(".hint", mb: ImageSettings.current.max_upload_mb),
           data: { "admin--media--upload-target": "input", action: "change->admin--media--upload#filesSelected" }) %>
   <% end %>
-  <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>
-  <p class="sr-only" role="status" aria-live="polite" data-admin--media--upload-target="status"></p>
+  <%# What each file's tile says, for a screen reader: uploaded, or not and
+      why; and what a drag's drop did (`admin--media--drag`): the screen's
+      polite status. %>
+  <p class="sr-only" role="status" aria-live="polite" data-admin--media--upload-target="status" data-admin--media--drag-target="status"></p>
   <%# Centred by flex over the whole window, translucent (the page stays
       visible behind it, as in the mock), and never in the way of the drop
       itself (`pointer-events-none`: the drag keeps its real target). %>

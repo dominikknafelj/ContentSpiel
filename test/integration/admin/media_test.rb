@@ -1293,7 +1293,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { folder: client_a.id, select: "1", selected: assets.last.id }
     assert_response :success
     assert_select "#media-rail", count: 0
-    assert_select "#media-library[data-controller='admin--media--selection']"
+    assert_select "#media-library[data-controller='admin--media--drag admin--media--selection']"
     assert_select "#media-library > [data-media-selection-bar]"
     assert_select "[data-media-selection-bar] button", text: "Select all 48"
     assert_select "#media-library ul.admin-media-grid > li > button[aria-pressed=false][data-asset-id]", count: 48
@@ -1312,7 +1312,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-library form[action$='/cs-studio/media'] input[name=select]", count: 0
 
     get "/cs-studio/media", params: { folder: clients.id }
-    assert_select "#media-library[data-controller]", count: 0
+    assert_select "#media-library[data-controller='admin--media--drag']"
     assert_select "#media-library ul.admin-media-grid button[aria-pressed]", count: 0
   end
 end

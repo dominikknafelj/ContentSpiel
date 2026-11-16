@@ -473,6 +473,27 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
    is in it: the sunken ground with a field's line inside the row's box, so
    nothing moves. */
 .admin-tree-drop-target > .admin-tree-row { background: var(--cs-sunken); box-shadow: inset 0 0 0 1.5px var(--cs-field-line); }
+/* THE FOLDERS COLUMN AS A DROP (`admin--media--drag`, the card
+   StudioMediaFolders' D5 and D8). The row under a dragged image or folder
+   that takes it carries the drop target's class on the row itself (never on
+   its node, which is the Pages tree's): the accent's tint with a 1px accent
+   edge inside the row's box, the mark in accent and the open folder. A row
+   that cannot take a dragged folder (`data-media-drop-refused`) shows no
+   target: its title and mark turn meta, and the script puts the reason
+   where its count stood. */
+.admin-tree-row.admin-tree-drop-target { background: var(--cs-accent-tint); box-shadow: inset 0 0 0 1px var(--cs-accent); }
+.admin-tree-row.admin-tree-drop-target > .admin-tree-row__mark { color: var(--cs-accent); }
+.admin-tree-row.admin-tree-drop-target > .admin-tree-row__mark:has(> [data-tree-glyph="folder_open"]) > [data-tree-glyph="folder"] { display: none; }
+.admin-tree-row.admin-tree-drop-target > .admin-tree-row__mark:has(> [data-tree-glyph="folder"]) > [data-tree-glyph="folder_open"] { display: block; }
+.admin-tree-row[data-media-drop-refused] > :is(.admin-tree-row__mark, .admin-tree-row__title),
+.admin-tree-row[data-media-drop-refused] > .admin-tree-row__title > a { color: var(--cs-meta); }
+.admin-tree-row[data-media-drop-refused] [data-media-drop-reason] { font-weight: 400; }
+/* A folder's handle (`FolderTreeComponent#handle`) is for a fine pointer
+   alone, where the folders' drag is made: a coarse one moves a folder by
+   the place menu's Move to…, and is shown no handle that drags nothing. */
+@media not all and (pointer: fine) {
+  .admin-tree[data-media-drag-tree] .admin-tree-node__handle { display: none; }
+}
 /* A find's match keeps the title's own ink on the accent's tint. */
 .admin-tree mark { background: var(--cs-accent-tint); color: inherit; border-radius: var(--cs-radius); }
 @media (prefers-reduced-motion: reduce) { .admin-tree-row__disclosure svg { transition: none; } }
@@ -1464,6 +1485,21 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    offset over the whole grid; over the tiles (`sticky`), centred with them
    past 1200px. */
 .admin-media-selection-bar { position: sticky; top: var(--admin-top-offset); z-index: var(--cs-z-sticky); margin-bottom: var(--cs-sp-4); }
+/* A dragged image's ghost (`admin--media--drag`, the view's `<template>`):
+   a pill at elevation 4 that follows the pointer, with a 32x24 thumbnail,
+   the title or the count's words, and the accent count when more than one
+   goes. It stands over everything and takes no pointer, so what is under
+   the pointer stays the drop's. SortableJS's own clone of the tile
+   (`admin-media-drag-fallback`) is kept, since SortableJS follows it, but
+   never seen: its opacity is SortableJS's inline style, so it is hidden by
+   its visibility. */
+.admin-media-drag-ghost { position: fixed; z-index: var(--cs-z-toast); display: inline-flex; align-items: center; gap: 8px; max-width: 280px; padding: 6px 10px 6px 6px;
+  border-radius: var(--cs-radius-tile); background: var(--cs-popover); box-shadow: var(--cs-shadow-4); color: var(--cs-ink);
+  font-size: var(--cs-t-small); font-weight: 600; white-space: nowrap; pointer-events: none; }
+.admin-media-drag-ghost__thumb { flex: none; width: 32px; height: 24px; border-radius: 6px; object-fit: cover; background: var(--cs-sunken); }
+.admin-media-drag-ghost__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.admin-media-drag-ghost__count { flex: none; padding: 0 6px; border-radius: 999px; background: var(--cs-accent); color: var(--cs-on-accent); font-size: var(--cs-t-count); }
+.admin-media-drag-fallback { visibility: hidden; }
 .admin-media-library__grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--cs-sp-6); }
 .admin-media-library__main { min-width: 0; }
 .admin-media-library__main:only-child { grid-column: 1 / -1; }
