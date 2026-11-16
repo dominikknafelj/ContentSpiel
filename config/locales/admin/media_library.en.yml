@@ -222,6 +222,11 @@ en:
           roles:
             hero: "Hero image"
             block_image: "Image block"
+            # A block field's image (a Gallery's), named by the block's type
+            # (`%{type}` is its label), and a block whose type is gone. These
+            # words are not on the design card.
+            block_field: "%{type} block"
+            block_field_unknown: "Block"
             rich_text: "Rich text"
             published: "Published version"
           # Why Move to trash is disabled, by the kept places that use the image.

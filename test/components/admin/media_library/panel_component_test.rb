@@ -8,6 +8,7 @@ require "test_helper"
 # `trashed_at` directly the same way `test/models/media/usage_test.rb` does.
 class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
   include ContentHelper
+  include TestTypes
 
   test "the trash-only message names only the trashed owners the viewer may read" do
     asset = create_media_asset
@@ -210,6 +211,23 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_selector "#media-trash-help.text-dim", text: "In use on 1 page. Remove it there first."
     assert_selector "#media-trash-help a[href='#media-used-on']", text: "See where it's used"
     assert_selector "#media-used-on"
+  end
+
+  # A block field's image is named by the block's type, as an Image block's
+  # is ("Image block"); a block whose type is no longer registered is a block.
+  test "Used on names a block field's image by its block type, and a block of a gone type as a block" do
+    asset = create_media_asset
+    page = create_page(title: "Gallery page")
+    with_media_list_type do
+      media_list_block(page, [ asset.id ])
+
+      render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en")
+      assert_selector "a", exact_text: "Media list block — page “Gallery page”"
+    end
+
+    render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en")
+    assert_selector "a", exact_text: "Block — page “Gallery page”"
+    assert_no_text "block_field"
   end
 
   # The shared zone with no heading: named by the trigger's words, the cost
