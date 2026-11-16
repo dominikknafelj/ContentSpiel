@@ -57,6 +57,29 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_selector "#media-count-all", text: "2"
   end
 
+  # The Folders column's counts follow an upload's answer (`folder_counts`),
+  # a folder's from nothing at 0 to 1 too.
+  test "an upload into a folder moves the Folders column's counts, a folder's from 0 to 1" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    create_media_asset(filename: "wide.png")
+    shoots = Media::Folder.create!(name: "Shoots")
+    sign_in_via_form(users(:one))
+    visit_screen "/cs-studio/media?folder=#{shoots.id}"
+
+    count = ->(place) { "#media-folder-tree [data-media-place-count='#{place}']" }
+    assert_selector count.call(shoots.id), text: "", visible: :all
+    assert_selector count.call("all"), text: "1", visible: :all
+    assert_selector count.call("none"), text: "1", visible: :all
+
+    attach_file("media-upload-input", file_fixture("tiny.png").to_s, visible: :all)
+    assert_selector count.call(shoots.id), exact_text: "1", visible: :all, wait: 10
+    assert_selector count.call("all"), exact_text: "2", visible: :all
+    assert_selector count.call("none"), exact_text: "1", visible: :all
+    # The row's count shows where it was nothing: the place shown is the selected row.
+    assert_selector count.call(shoots.id), exact_text: "1"
+    assert_equal shoots.id, Media::Asset.order(:id).last.folder_id
+  end
+
   test "choosing a tile opens the panel and advances the URL; typing an alt text takes No alt off the tile and drops the Missing alt count" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de], default: "en")

@@ -54,14 +54,27 @@ class Admin::MediaLibrary::FolderTreeComponentTest < ViewComponent::TestCase
     assert_no_selector "p", text: "No folders yet."
   end
 
-  test "a folder with no images draws no count" do
+  # Nothing at 0, but the count's hook is drawn empty, so an upload's answer
+  # (`updateCounts`, `media/upload_tiles.js`) can write a row's count into it,
+  # from 0 to 1 too; the stylesheet draws an empty count as nothing.
+  test "a folder with no images draws no count, and every place's count has its hook" do
     empty = folder("Empty")
+    full = folder("Full")
 
-    render_tree(counts: { all: 0, none: 0, folders: {} })
+    render_tree(counts: { all: 2, none: 0, folders: { full.id => 2 } })
 
-    assert_no_selector "[data-media-place='#{empty.id}'] .admin-tree-row__count", visible: :all
-    assert_no_selector "[data-media-place='all'] .admin-tree-row__count", visible: :all
+    { "all" => "2", "none" => "", empty.id.to_s => "", full.id.to_s => "2" }.each do |place, text|
+      count = row(place).find(".admin-tree-row__trailing > span.admin-tree-row__count[data-media-place-count='#{place}']", visible: :all)
+      assert_equal text, count.text(:all), "the count of #{place}"
+    end
     assert_selector "[data-media-place='#{empty.id}']", text: "Empty"
+    stylesheet = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    assert_includes stylesheet, ".admin-tree-row__count:empty { display: none; }"
+    assert_includes stylesheet, ".admin-tree-row__trailing:not(:has(> :not(.admin-tree-row__count:empty))) { display: none; }"
+
+    render_tree(counts: { all: 2, none: 0, folders: { full.id => 2 } }, mode: :picker)
+    assert_selector "#media-picker-folder-tree [data-media-place-count='#{empty.id}']", text: "", visible: :all
+    assert_selector "#media-picker-folder-tree [data-media-place-count='all']", text: "2", visible: :all
   end
 
   test "the place shown is the selected row and its mark is the open folder" do
@@ -213,7 +226,7 @@ class Admin::MediaLibrary::FolderTreeComponentTest < ViewComponent::TestCase
     end
     assert_no_selector "#media-folder-tree, #media-folder-tree-part", visible: :all
     assert_no_selector ".admin-tree-row__add, .admin-tree-node__handle, [data-media-drag-handle]", visible: :all
-    assert_no_selector "[data-admin--media--folders-target]", visible: :all
+    assert_no_selector "[data-admin--media--folders-target], [data-media-folder-depth], [data-media-folder-height], [data-media-folder-parent], [data-media-folder-name]", visible: :all
 
     links = page.all("#media-picker-folder-tree a[data-tree-focus][data-turbo-frame='media-picker-grid']", visible: :all).to_h { |link| [ link.text, link[:href] ] }
     assert_equal "/cs-studio/media?filter=unused&picker=1&q=logo", links.fetch("All media")

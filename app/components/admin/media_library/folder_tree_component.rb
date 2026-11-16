@@ -168,9 +168,13 @@ module Admin
         link_to text, place_href(each), id: "#{row_id(each)}-link", data: link_data, aria: (selected?(each) ? { current: "page" } : {})
       end
 
-      # A count, shown at rest; nothing at 0.
-      def count_part(count)
-        tag.span(count, class: ROW[:count], data: { media_place_count: true }) if count.to_i.positive?
+      # A place's count, shown at rest; nothing at 0. The span is drawn at 0
+      # too, empty (the stylesheet draws an empty count, and a trailing
+      # holding only one, as nothing), so an upload's answer can write the
+      # place's new count into it (`updateCounts`, `media/upload_tiles.js`,
+      # by `data-media-place-count`: `all`, `none` or the folder's id).
+      def count_part(count, place)
+        tag.span((count if count.to_i.positive?), class: ROW[:count], data: { media_place_count: place.to_param })
       end
 
       def glyph(name) = render("admin/shared/tree_glyph", name: name)
@@ -182,6 +186,15 @@ module Admin
       # only where a pointer is fine and no find narrows the tree (the
       # stylesheet, `.admin-tree[data-media-drag-tree]`).
       def handle = tag.span("⠿", class: ROW[:handle], aria: { hidden: true }, data: { media_drag_handle: true })
+
+      # What `admin--media--drag` judges a folder row by; the picker's rows
+      # take no drop.
+      def drag_data(node, depth)
+        return {} if picker?
+
+        { media_folder_depth: depth, media_folder_height: tree.height(node.id),
+          media_folder_parent: node.parent_id.to_s, media_folder_name: node.name.downcase }
+      end
 
       def children_list_id(node) = "#{picker? ? 'media-picker' : 'media'}-folder-children-#{node.id}"
 
@@ -197,8 +210,7 @@ module Admin
         item = Admin::Ui::TreeItemComponent.new(
           id: row_id(folder_place), title: node.name, parent: children.any?, folded: folded,
           controls: children_list_id(node), selected: selected?(folder_place), node_id: node.id,
-          data: row_data(folder_place).merge(media_folder_depth: depth, media_folder_height: tree.height(node.id),
-                                             media_folder_parent: node.parent_id.to_s, media_folder_name: node.name.downcase)
+          data: row_data(folder_place).merge(drag_data(node, depth))
         )
         row = render(item) do |row_item|
           # Both marks: the stylesheet shows the open folder on the selected
@@ -206,8 +218,8 @@ module Admin
           # swaps them too.
           row_item.with_mark { safe_join([ glyph(:folder), glyph(:folder_open) ]) }
           row_item.with_title { link(node.name, folder_place) }
-          count = count_part(counts.fetch(:folders, {})[node.id])
-          row_item.with_trailing { count } if count
+          count = count_part(counts.fetch(:folders, {})[node.id], folder_place)
+          row_item.with_trailing { count }
           if manage && depth < Media::Folder::MAX_DEPTH
             row_item.with_add(label: t("admin.components.media_library.folder_tree.add", name: node.name), data: self.class.add_params(node.id, tree.path_name(node.id)))
           end

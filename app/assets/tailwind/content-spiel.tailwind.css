@@ -403,6 +403,11 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
    keeps a figure's width from the start, so a cut title's ellipsis does not
    move when the row is hovered; one that rests clipped is 1px until shown. */
 .admin-tree-row__count:not(.admin-tree-row__reveal) { min-width: 14px; }
+/* A library place's count at 0 is drawn empty, for an upload's answer to
+   fill (`data-media-place-count`): it shows nothing, and a trailing that
+   holds nothing else takes no room. */
+.admin-tree-row__count:empty { display: none; }
+.admin-tree-row__trailing:not(:has(> :not(.admin-tree-row__count:empty))) { display: none; }
 /* WHAT RESTS OUT OF SIGHT. A marker, a count and presence (`__reveal`) are
    clipped at rest, never `hidden` and never removed, so a screen reader
    still hears "3 subpages" and they take no room; they show on the row's

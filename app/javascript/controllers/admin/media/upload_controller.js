@@ -69,20 +69,24 @@ export default class extends Controller {
   }
 
   // The grid's state (search, segment, page), so the counts that come back are for
-  // the search and the finished tile's link keeps all three.
+  // the search and the finished tile's link keeps all three, and the place the
+  // screen shows (`data-media-place` in `#content`), whose folder the file goes
+  // into (none for All media and Not in a folder).
   get fields() {
     const fields = {}
     const q = document.querySelector("#content input[type=search][name=q]")?.value
     const filter = document.querySelector("#content input[type=radio][name=filter]:checked")?.value
     const page = new URL(window.location.href).searchParams.get("page")
+    const place = document.querySelector("#content [data-media-place]")?.dataset.mediaPlace
     if (q) fields.q = q
     if (filter) fields.filter = filter
     if (page) fields.page = page
+    if (place && place !== "all") fields.folder = place
     return fields
   }
 
   uploaded({ json }) {
-    updateCounts(json.counts)
+    updateCounts(json.counts, { folders: json.folder_counts, tree: document.getElementById("media-folder-tree") })
   }
 
   announce(text) {

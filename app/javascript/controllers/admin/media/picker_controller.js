@@ -128,7 +128,10 @@ export default class extends Controller {
     this.frameTarget.replaceChildren()
     const address = new URL(this.gridUrlValue, window.location.href)
     const place = rememberedPlace()
-    if (place !== "all") address.searchParams.set("folder", place)
+    // A load that opens All media says so at once: an upload sent before it
+    // arrives goes into no folder, as the sentence says.
+    if (place === "all") this.showAllMedia()
+    else address.searchParams.set("folder", place)
     const url = address.toString()
     if (this.frameTarget.src === url) {
       this.frameTarget.reload()
@@ -183,6 +186,11 @@ export default class extends Controller {
     const select = this.frameTarget.querySelector("#media-picker-place-select")
     const control = select?.checkVisibility() ? select : row?.querySelector("a")
     control?.focus({ preventScroll: true })
+  }
+
+  showAllMedia() {
+    this.shownPlace = "all"
+    this.uploadIntoTarget.textContent = messages(this.element).t("components.ui.media_picker.upload_nowhere")
   }
 
   // Only the list scrolls: the dialog and the page behind it stay put
@@ -325,7 +333,7 @@ export default class extends Controller {
   // A finished upload: the counts follow it, and the first of the batch is the
   // selection -- selected, not chosen: the editor confirms.
   uploaded({ json, tile }) {
-    updateCounts(json.counts, { picker: true })
+    updateCounts(json.counts, { picker: true, folders: json.folder_counts, tree: this.frameTarget.querySelector("#media-picker-folder-tree") })
     if (!this.selectNextUpload || !tile) return
 
     const raw = tile.querySelector("[data-admin--media--select-asset-param]")?.getAttribute("data-admin--media--select-asset-param")

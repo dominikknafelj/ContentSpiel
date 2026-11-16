@@ -243,7 +243,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
   # The picker draws the library's tile class and keeps its own fixed columns,
   # which follow the window, not a container.
-  test "the picker's tiles are the library's: a pressed tile has the accent outline, and the columns stay 2 to 6" do
+  test "the picker's tiles are the library's: a pressed tile has the accent outline, and the grid takes 4, 3 or 2 columns by the window" do
     visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Choose image" }
@@ -668,8 +668,15 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
       assert_place client_a.id
       upload = find_button("Upload")
       assert_equal "Uploads go into Client A", find("##{upload['aria-describedby']}").text
+      count = ->(place) { "#media-picker-folder-tree [data-media-place-count='#{place}']" }
+      assert_selector count.call(client_a.id), text: "", visible: :all
+      assert_selector count.call("all"), exact_text: "1", visible: :all
       attach_file "Image file", file_fixture("tiny.png").to_s
       assert_text "1 selected", wait: 10
+      # The places' counts follow the answer, Client A's from nothing to 1.
+      assert_selector count.call(client_a.id), exact_text: "1"
+      assert_selector count.call("all"), exact_text: "2", visible: :all
+      assert_selector count.call("none"), exact_text: "1", visible: :all
     end
     uploaded = Media::Asset.where.not(id: @asset.id).sole
     assert_equal client_a.id, uploaded.folder_id
