@@ -86,22 +86,80 @@ class SwitchedOffTypesTest < ActionDispatch::IntegrationTest
   end
 
   test "a switched-off type's post is out of MCP's list, the dashboard and Translations, and in the posts list, the Trash, the Mind graph and ⌘K" do
+    mark_for_the_work_surfaces
+    work_surfaces(on: true)
+
+    switch_off
+    work_surfaces(on: false)
+  end
+
+  test "switching the type on again brings every one of them back, at the same address" do
+    mark_for_the_work_surfaces
+    switch_off
+    switch_on("blog", "resume_entry")
+    work_surfaces(on: true)
+    host! "www.example.com"
+
+    # The work surfaces held the post scheduled; the public site serves it once it is live.
+    @post.update_columns(published_at: 1.hour.ago) # version: none (a test marks one post) # changes: none (a test marks one post)
+    @paths.each do |locale, path|
+      assert_equal path, PublicSite::Urls.new.path_for(@post.reload, locale)
+      get path
+      assert_response :ok, path
+      assert_includes response.body, "Resume role"
+    end
+    paths = sitemap_paths
+    @paths.each_value { |path| assert_includes paths, path }
+
+    get "/resume"
+    assert_includes response.body, "Resume role"
+    get "/everything"
+    assert_includes response.body, "Resume role"
+    get "/linker"
+    assert_select ".content-block--rich-text a[href=?]", @path, text: /the role/
+
+    assert_equal [ @post.id ], found(WORD).map(&:id)
+
+    sign_in_as users(:one)
+    get "/cs-studio/preview#{@path}"
+    assert_response :ok
+  end
+
+  private
+
+  # A scheduled post with unpublished changes and an outdated German copy is
+  # what the dashboard's going-live, waiting and needs-translation lists and the
+  # Translations matrix hold; the second post is in the Trash.
+  def mark_for_the_work_surfaces
     @post.update_columns(published_at: 3.days.from_now, unpublished_changes_at: Time.current) # version: none (a test marks one post) # changes: none (a test marks one post)
+    Translations::StateIndex.rebuild_all
     Translations::State.where(record_type: "Post", record_id: @post.id, locale: "de")
       .update_all(state: "outdated", outdated_count: 1, missing_count: 0)
     as_owner { assert Trash::Move.call(@trashed).ok? }
-    switch_off
+  end
+
+  # What the work surfaces answer with the type switched on (`on: true`) or off:
+  # the dashboard's lists and the Translations matrix drop the post with its
+  # type, and the posts list, the Trash, the Mind graph and ⌘K keep it.
+  def work_surfaces(on:)
+    host! "www.example.com"
     sign_in_as users(:one)
+    state = on ? "on" : "off"
+    link = "/cs-studio/posts/#{@post.id}?locale=de"
 
     get admin_root_path
     assert_response :ok
-    assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Resume role", count: 0
-    assert_select "turbo-frame#dashboard-waiting a", text: "Resume role", count: 0
-    assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@post.id}?locale=de", count: 0
+    assert_select "section[aria-labelledby=dashboard-going-live-next] a", { text: "Resume role", count: on ? 1 : 0 }, "going live, #{state}"
+    assert_select "turbo-frame#dashboard-waiting a", { text: "Resume role", count: on ? 1 : 0 }, "waiting for you, #{state}"
+    assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", link, { count: on ? 1 : 0 }, "needs translation, #{state}"
+
+    get admin_translations_path
+    assert_response :ok
+    assert_select "th[scope=row] a", { text: "Resume role", count: on ? 1 : 0 }, "the Translations matrix, #{state}"
+    assert_select "th[scope=row] a", text: "Blog kept"
     de = Dashboard::TranslationNeeds.new(actor: users(:one), channel: :admin).entries.find { |entry| entry.locale == "de" }
-    switched_on = [ Post.of_switched_on_types.kept ]
-    assert_equal Translations::StateIndex.summary("de", [ Page.kept, *switched_on, Media::Asset.kept ])[:total], de.total
-    assert_empty Dashboard::WaitingForYou.new(actor: users(:one), filter: nil, channel: :admin).rows.select { |row| row.record == @post }
+    posts = on ? Post.kept : Post.of_switched_on_types.kept
+    assert_equal Translations::StateIndex.summary("de", [ Page.kept, posts, Media::Asset.kept ])[:total], de.total
 
     get "/cs-studio/posts"
     assert_select "tbody tr", /Resume role/
@@ -123,40 +181,8 @@ class SwitchedOffTypesTest < ActionDispatch::IntegrationTest
     _token, raw = ApiToken.generate!(users(:one), group: access_control_groups(:admin))
     ids = call_tool(raw, "list_posts_tool")["structuredContent"].map { |item| item["id"] }
     assert_includes ids, @blog_post.id
-    assert_not_includes ids, @post.id
+    assert_equal on, ids.include?(@post.id), "MCP list_posts, #{state}"
   end
-
-  test "switching the type on again brings every one of them back, at the same address" do
-    switch_off
-    switch_on("blog", "resume_entry")
-
-    @paths.each do |locale, path|
-      assert_equal path, PublicSite::Urls.new.path_for(@post.reload, locale)
-      get path
-      assert_response :ok, path
-      assert_includes response.body, "Resume role"
-    end
-    assert_includes sitemap_paths, @path
-
-    get "/resume"
-    assert_includes response.body, "Resume role"
-    get "/everything"
-    assert_includes response.body, "Resume role"
-    get "/linker"
-    assert_select ".content-block--rich-text a[href=?]", @path, text: /the role/
-
-    assert_equal [ @post.id ], found(WORD).map(&:id)
-
-    sign_in_as users(:one)
-    get "/cs-studio/preview#{@path}"
-    assert_response :ok
-
-    host! "127.0.0.1"
-    _token, raw = ApiToken.generate!(users(:one), group: access_control_groups(:admin))
-    assert_includes call_tool(raw, "list_posts_tool")["structuredContent"].map { |item| item["id"] }, @post.id
-  end
-
-  private
 
   def add_list_block(page, settings)
     assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: settings }).ok?
