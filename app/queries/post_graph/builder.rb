@@ -66,7 +66,7 @@ module PostGraph
     # apart: the rows have moved on, or a change is scheduled.
     CHANGES = { live_with_changes: "unpublished", live_change_scheduled: "scheduled" }.freeze
 
-    Plan = Struct.new(:post_ids, :page_ids, :related, :by_tag, :tag_counts, :lists, :more, :edges, keyword_init: true)
+    Plan = Struct.new(:post_ids, :page_ids, :related, :by_tag, :tag_counts, :lists, :hubs, :more, :edges, keyword_init: true)
 
     def initialize(site:, locale:, url_for:, now: Time.current)
       @site = site
@@ -92,7 +92,7 @@ module PostGraph
     #   TARGET (design answer H1), each hanging off its own hub or tag by the
     #   same faint line and counting only what that target brings in.
     # - a tree line needs both pages drawn, and the parent readable (`Tree`).
-    def plan(post_ids:, relations:, tag_links:, tag_counts:, min_tag_edges:, page_ids: [], lists: [], brought: [], keep_tag: nil, more: [])
+    def plan(post_ids:, relations:, tag_links:, tag_counts:, min_tag_edges:, page_ids: [], lists: [], hubs: nil, brought: [], keep_tag: nil, more: [])
       drawn = post_ids.to_set
       pages = page_ids.to_set
       related = relations.select { |post_id, related_id| drawn.include?(post_id) && drawn.include?(related_id) }
@@ -111,7 +111,7 @@ module PostGraph
               lists.map { |page_id, target| { source: page.call(page_id), target: target, kind: "lists" } } +
               brought.map { |target, post_id| { source: target, target: post.call(post_id), kind: "brings" } } +
               more.map { |pill| { source: pill[:target], target: PostGraph.node_id(MORE, pill[:target]), kind: "brings" } }
-      Plan.new(post_ids: post_ids, page_ids: page_ids, related: related, by_tag: by_tag, tag_counts: tag_counts, lists: lists, more: more, edges: edges)
+      Plan.new(post_ids: post_ids, page_ids: page_ids, related: related, by_tag: by_tag, tag_counts: tag_counts, lists: lists, hubs: hubs || lists.map(&:last), more: more, edges: edges)
     end
 
     # THE NODES ARE READ FIRST, AND WHAT WENT BETWEEN THE TWO READS GOES
@@ -148,7 +148,7 @@ module PostGraph
         nodes: posts.map { |node| node.merge(degree: degree.fetch(node[:id], 0), related_count: related_count.fetch(record_id[node[:id]], 0), tag_count: tag_count.fetch(record_id[node[:id]], 0)) },
         tags: names.map { |tag_id, name| tag_node(tag_id, name, plan, degree, lost[tag_id]) }.sort_by { |tag| [ tag[:name].to_s.downcase, tag[:id] ] },
         pages: page_nodes(plan.page_ids, degree),
-        types: type_nodes(plan.lists, degree),
+        types: type_nodes(plan.hubs, degree),
         edges: edges
       }
       pills = plan.more.reject { |pill| gone.include?(pill[:target]) }
@@ -256,8 +256,8 @@ module PostGraph
     # (false for a retired type too, which the card tells by its missing
     # colour slot): the hub keeps its hue and its count, since its posts are
     # kept, and the card and the list row say the type is off.
-    def type_nodes(lists, degree)
-      targets = lists.map(&:last).uniq.reject { |target| target.start_with?("tag-") }
+    def type_nodes(hubs, degree)
+      targets = hubs.uniq.reject { |target| target.start_with?("tag-") }
       place = ->(target) do
         next [ 2, 0, "" ] if target == ALL_POSTS
 

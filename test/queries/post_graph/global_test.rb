@@ -365,7 +365,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
   test "a retired type a block names is a type node with no colour" do
     list_block(create_page(title: "Old"), content_type: "gone/thing")
 
-    assert_equal [ { id: "type-gone/thing", name: "gone/thing", label: "gone/thing", colour_index: nil, switched_on: false, count: 0, degree: 1 } ], graph[:types]
+    assert_equal [ { id: "type-gone/thing", name: "gone/thing", label: "gone/thing", colour_index: nil, switched_on: false, count: 0, degree: 0 } ], graph[:types]
   end
 
   test "a switched-off type's hub says so, and an undeclared one stays retired" do
@@ -384,6 +384,20 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     assert_equal ContentTypes.fetch("resume_entry").colour_index, off[:colour_index], "the hub keeps its hue"
     retired = types.fetch("type-gone/thing")
     assert_nil retired[:colour_index], "an undeclared type has no slot, which is how the card knows it is retired"
+  end
+
+  test "a list block filtered to a switched-off type draws its hub but no lists line, and switched on it draws both" do
+    page = create_page(title: "Lists")
+    list_block(page, content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    off = graph
+    assert_equal [ "type-resume_entry" ], off[:types].map { |type| type[:id] }
+    assert_empty off[:edges].select { |edge| edge[:kind] == "lists" }
+    assert_equal 0, off[:types].first[:degree]
+
+    switch_on_content_types("blog", "resume_entry")
+    assert_equal [ "type-resume_entry" ], graph[:edges].select { |edge| edge[:kind] == "lists" }.map { |edge| edge[:target] }
   end
 
   # Design answer H2: the order the list's "Post types" group shows.

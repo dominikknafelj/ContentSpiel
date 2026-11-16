@@ -103,8 +103,18 @@ module PostGraph
       @kinds = kinds.keys
     end
 
+    # A page's lines to what it lists. A block filtered to a post type the
+    # site has switched off, or one no code declares, lists nothing on the
+    # public site (`BlockTypes::PostList.matches?`), so it draws no line and
+    # has no pill: the graph says what the site does. Its hub still stands
+    # (`hubs`), so the type's card and list row can say it is off.
     def edges
       @edges ||= @settings.flat_map { |page_id, all| all.filter_map { |settings| target(settings) }.uniq.map { |target| [ page_id, target ] } }
+    end
+
+    # Every post type hub a block names, a switched-off or retired type's too.
+    def hubs
+      @hubs ||= @settings.values.flatten.filter_map { |settings| (type, tag = self.class.key(settings); PostGraph.node_id(:type, type) if type && !tag) }.uniq
     end
 
     def targets(page_id) = (@targets ||= edges.group_by(&:first).transform_values { |rows| rows.map(&:last) }).fetch(page_id, [])
@@ -170,7 +180,7 @@ module PostGraph
     def target(settings)
       type, tag = self.class.key(settings)
       if tag then (id = @tag_id[tag]) && PostGraph.node_id(:tag, id)
-      elsif type then PostGraph.node_id(:type, type)
+      elsif type then PostGraph.node_id(:type, type) if ::ContentTypes.switched_on?(type)
       else ALL_POSTS
       end
     end

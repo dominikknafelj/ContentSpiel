@@ -106,13 +106,32 @@ class PostGraph::ListingsTest < ActiveSupport::TestCase
     assert_equal [ "type-blog" ], listings.targets(@page.id)
   end
 
-  test "a retired type a block names is still a target, and lists no post" do
+  test "a block filtered to a switched-off type draws no line and no pill, and switched on it does; the hub stays" do
+    list_block(@page, content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    off = listings
+    assert_empty off.targets(@page.id)
+    assert_empty off.edges
+    assert_empty off.pages_of("type-resume_entry")
+    assert_empty off.left_out(@page.id)
+    assert_equal [ "type-resume_entry" ], off.hubs, "the type's hub stands, so its card can say it is off"
+    assert_equal 1, off.type_count("resume_entry")
+
+    switch_on_content_types("blog", "resume_entry")
+    on = listings
+    assert_equal [ "type-resume_entry" ], on.targets(@page.id)
+    assert_equal [ [ @page.id, "type-resume_entry" ] ], on.edges
+  end
+
+  test "a retired type a block names draws no line, and lists no post" do
     list_block(@page, content_type: "gone/thing")
     @plain.update_column(:content_type, "gone/thing")
 
     result = listings
 
-    assert_equal [ "type-gone/thing" ], result.targets(@page.id)
+    assert_empty result.targets(@page.id)
+    assert_equal [ "type-gone/thing" ], result.hubs
     assert_empty result.posts_of(@page.id)
     assert_equal 1, result.type_count("gone/thing")
     assert_equal 4, result.post_count, "All posts counts every post, one of a retired type included (design answer H2: the site total)"
