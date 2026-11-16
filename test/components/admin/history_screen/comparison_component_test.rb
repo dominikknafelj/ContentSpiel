@@ -12,7 +12,7 @@ class Admin::HistoryScreen::ComparisonComponentTest < ViewComponent::TestCase
     publish_changes(@pricing)
   end
 
-  def draw(version: 2, with: "previous", locale: "en", restore_offered: false, &block)
+  def draw(version: 2, with: "previous", locale: "en", restore_offered: false)
     history = Publishing::History.new(@pricing.reload)
     chosen = history.find(version)
     previous = history.previous(version)
@@ -20,7 +20,7 @@ class Admin::HistoryScreen::ComparisonComponentTest < ViewComponent::TestCase
     as(users(:one)) do
       render_inline(Admin::HistoryScreen::ComparisonComponent.new(record: @pricing, version: chosen, previous: previous, with: with, numbers: history.numbers,
         changes: Publishing::Changes.between(@pricing, from: other, to: chosen), locale: locale, form_url: "/h", hidden: { version: version, page: nil },
-        restore_offered: restore_offered), &block)
+        restore_offered: restore_offered))
     end
   end
 
@@ -46,11 +46,11 @@ class Admin::HistoryScreen::ComparisonComponentTest < ViewComponent::TestCase
     assert_text "No differences."
   end
 
-  test "Restore stands in its slot only where it is offered" do
-    draw(restore_offered: true) { |comparison| comparison.with_restore { "RESTORE" } }
-    assert_selector "[data-history-restore]", text: "RESTORE"
+  test "Restore stands only where it is offered, a plain button that opens the restore dialog" do
+    draw(restore_offered: true)
+    assert_selector "[data-history-restore] button[type=button][data-admin--ui--dialog-id-param=history-restore]", text: "Restore version 2…"
 
-    draw(restore_offered: false) { |comparison| comparison.with_restore { "RESTORE" } }
+    draw(restore_offered: false)
     assert_no_selector "[data-history-restore]"
   end
 end

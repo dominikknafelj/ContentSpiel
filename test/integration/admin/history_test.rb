@@ -204,4 +204,117 @@ class Admin::HistoryTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "a[href=?]", admin_page_history_path(page), count: 0
   end
+
+  # Restoring (version history spec R3, R4, R12, R16): the dialog drawn with
+  # the screen, its `_top` form, and the action that calls the service.
+
+  def restore_form = Nokogiri::HTML(response.body).at_css("dialog form[action='#{admin_publishing_restore_path(kind: "page", id: @restored.id)}']")
+
+  # Pricing (version 1), then "Pricing and plans" (version 2, on the site).
+  def two_versions
+    @restored = create_page(title: "Pricing")
+    publish_title(@restored, "Pricing and plans")
+    @restored
+  end
+
+  def press_restore(record, number: 1, shown: record.reload.updated_at.iso8601(6), headers: {})
+    post admin_publishing_restore_path(kind: record.is_a?(Page) ? "page" : "post", id: record.id), params: { number: number, shown_updated_at: shown }, headers: headers
+  end
+
+  def english_title(record) = Mobility.with_locale(:en) { record.reload.title }
+
+  test "an owner on a live page is offered Restore, which opens the dialog with its form" do
+    page = two_versions
+    sign_in_as users(:one)
+
+    get admin_page_history_path(page, version: 1)
+
+    trigger = comparison.at_css("[data-history-restore] button[type=button]")
+    assert_equal "Restore version 1…", trigger.text.strip
+    dialog = Nokogiri::HTML(response.body).at_css("dialog#history-restore")
+    assert dialog, "the dialog is drawn with the screen"
+    assert_nil dialog.ancestors("form").first, "the dialog's form stands outside the comparison's GET form"
+    assert_equal "1", restore_form.at_css("input[name=number]")["value"]
+    assert_equal page.reload.updated_at.iso8601(6), restore_form.at_css("input[name=shown_updated_at]")["value"]
+  end
+
+  test "someone with edit and not publish sees a live page's history with no Restore, and a forged restore is refused and audited" do
+    page = two_versions
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: {})
+    sign_in_as users(:editor_branch)
+
+    get admin_page_history_path(page, version: 1)
+
+    assert_response :success
+    assert_nil comparison.at_css("[data-history-restore]")
+    assert_select "dialog#history-restore", count: 0
+
+    press_restore(page)
+
+    assert_response :forbidden
+    assert_equal "Pricing and plans", english_title(page)
+    assert_equal "pages.publish", Audit::Event.where(action: "access.denied", subject: page).sole.metadata["permission"]
+    assert_empty Audit::Event.where(action: "page.version_restored")
+  end
+
+  test "restore writes the version into the rows, publishes nothing, and lands in the editor with the toast" do
+    page = two_versions
+    content_version = PublicSite.content_version
+    sign_in_as users(:one)
+
+    press_restore(page)
+
+    assert_redirected_to admin_page_path(page)
+    assert_equal "Version 1 restored as unpublished changes. Publish changes… puts it on the site.", flash[:notice]
+    assert_equal "Pricing", english_title(page)
+    assert_equal 2, Publishing.current(page).number, "the site keeps showing version 2"
+    assert_equal content_version, PublicSite.content_version
+    assert Publishing::State.of(page).changes?
+    assert Audit::Event.where(action: "page.version_restored", subject: page).exists?
+  end
+
+  test "restore is refused while another tab holds a block of the page, and nothing is written" do
+    page = two_versions
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }).record
+    publish_changes(page)
+    users(:two).update!(name: "Dana Weiss")
+    reserve(block, page, users(:two), "tab-bbbbbbbb")
+    sign_in_as users(:one)
+
+    press_restore(page, headers: { "X-Notes-Tab" => "tab-aaaaaaaa" })
+
+    assert_redirected_to admin_page_history_path(page, version: 1)
+    assert_match(/Dana Weiss is editing/, flash[:alert])
+    assert_equal "Pricing and plans", english_title(page)
+    assert ContentBlock.exists?(block.id)
+    assert_empty Audit::Event.where(action: "page.version_restored")
+  end
+
+  test "a restore pressed after a colleague's save is refused as stale" do
+    page = two_versions
+    sign_in_as users(:one)
+    shown = page.reload.updated_at.iso8601(6)
+    travel 1.second
+    assert as(users(:two)) { Pages::Save.call(page.reload, translations: { "en" => { title: "Pricing for teams" } }) }.ok?
+
+    press_restore(page, shown: shown)
+
+    assert_redirected_to admin_page_history_path(page, version: 1)
+    assert_equal "This page changed since you opened this. Look at the differences again.", flash[:alert]
+    assert_equal "Pricing for teams", english_title(page)
+    assert_empty Audit::Event.where(action: "page.version_restored")
+  end
+
+  test "restoring a draft's version says Version N restored." do
+    page = two_versions
+    assert Pages::Save.call(page.reload, attributes: { published: false }).ok?
+    sign_in_as users(:one)
+
+    press_restore(page)
+
+    assert_redirected_to admin_page_path(page)
+    assert_equal "Version 1 restored.", flash[:notice]
+    assert_equal "Pricing", english_title(page)
+    assert_nil page.reload.published_at
+  end
 end

@@ -1,6 +1,7 @@
 module Admin
-  # Publishing a page's or post's changes, discarding them and withdrawing a
-  # scheduled change (drafts spec §4.3). A class, never a namespace:
+  # Publishing a page's or post's changes, discarding them, withdrawing a
+  # scheduled change (drafts spec §4.3) and restoring a version (version
+  # history spec R3). A class, never a namespace:
   # `Admin::Publishing` would shadow `Publishing::` for every bare reference
   # inside `module Admin`.
   #
@@ -72,6 +73,29 @@ module Admin
       forbidden_or(result) { redirect_to editor_path, status: :see_other, alert: result.errors.to_sentence }
     end
 
+    # Restores a version from the History screen's dialog (version history
+    # spec R3, R12): the rows become version `number`, as unpublished
+    # changes, and the editor opens on them. Refused, as a discard is, while
+    # another tab holds any part of the record: it writes every part. The
+    # dialog's form carries the record's `updated_at` as the dialog read it
+    # (`shown_updated_at`), and the service refuses a press made after a save
+    # since; an absent or unreadable value is nil, refused the same way, as
+    # no dialog showed what such a press would change.
+    #
+    # A refusal goes back to the History screen on the version pressed, with
+    # its sentence: the comparison there is what a person looks at again.
+    def restore
+      number = Integer(params[:number].to_s, 10, exception: false)
+      back = history_path(number)
+      return if refuse_discard_under_hold(@record, to: back)
+
+      result = ::Publishing::RestoreVersion.call(@record, number: number, shown_updated_at: shown_updated_at)
+      return forbidden_or(result) { redirect_to back, status: :see_other, alert: result.errors.to_sentence } unless result.ok?
+
+      restored = t("admin.components.history_screen.#{@record.published_at ? "restored" : "restored_draft"}", number: result.value[:number])
+      redirect_to editor_path, status: :see_other, notice: [ restored, (t("admin.components.history_screen.left_behind", sentence: result.notice) if result.notice) ].compact.join(" ")
+    end
+
     # Withdraws the change that waits for its time. It writes no row an
     # editor holds, so it asks no hold either.
     def cancel_scheduled_change
@@ -88,6 +112,16 @@ module Admin
     end
 
     def kind = @record.is_a?(Page) ? "page" : "post"
+
+    def history_path(number)
+      public_send(@record.is_a?(Page) ? :admin_page_history_path : :admin_post_history_path, @record, **admin_url_options, version: number)
+    end
+
+    def shown_updated_at
+      Time.iso8601(params[:shown_updated_at].to_s)
+    rescue ArgumentError
+      nil
+    end
 
     def editor_path
       @record.is_a?(Page) ? admin_page_path(@record, **admin_url_options) : admin_post_path(@record, **admin_url_options)

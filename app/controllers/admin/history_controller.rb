@@ -37,7 +37,12 @@ module Admin
       from, to = other == :working || other.number > @version.number ? [ @version, other ] : [ other, @version ]
       @changes = ::Publishing::Changes.between(@record, from: from, to: to)
       @may_restore = may_restore?
-      @restore_offered = @may_restore && !(other == :working ? @changes : ::Publishing::Changes.between(@record, from: @version, to: :working)).none?
+      # What a restore changes in the working version, for its dialog, read
+      # with the screen: nothing here autosaves, so no save can be on its way
+      # that the overview would miss, and the press carries the record's
+      # `updated_at` as read here, which the service checks.
+      @restore_changes = ::Publishing::Changes.between(@record, from: :working, to: @version) if @may_restore
+      @restore_offered = @may_restore && !@restore_changes.none?
     end
 
     private

@@ -13,15 +13,15 @@ module Admin
     # a choice keeps the rest of the address. The language is the admin's own
     # `locale` parameter, so the editor linked from the screen opens in it.
     #
-    # `restore` is the slot of the one primary action, "Restore version 5…",
-    # drawn only when `restore_offered` (the viewer may restore and the
-    # version differs from the working version): the caller fills it.
+    # The one primary action, "Restore version 5…", opens the restore dialog
+    # (`RestoreDialogComponent`, which the screen draws beside this card,
+    # outside its GET form): drawn only when `restore_offered` (the viewer
+    # may restore and the version differs from the working version). It is a
+    # plain button, so pressing it never submits the comparison's form.
     #
     # A record never published has no version: `.empty(record:)` draws the
     # empty state in the comparison's place ("No versions yet").
     class ComparisonComponent < Admin::AdminComponent
-      renders_one :restore
-
       def self.empty(record:) = new(record: record, version: nil, previous: nil, with: nil, numbers: [], changes: nil, locale: ::Locales.default, form_url: nil)
 
       # `with`: "previous", "working" or another version's number, as a String.
@@ -50,7 +50,9 @@ module Admin
 
       def hidden_values = @hidden.compact_blank
 
-      def restore_shown? = @restore_offered && restore?
+      def restore_shown? = @restore_offered
+
+      def restore_trigger = helpers.dialog_trigger(RestoreDialogComponent::ID)
 
       def with_options
         options = []

@@ -1,0 +1,33 @@
+<%= render Admin::Ui::DialogComponent.new(id: id, title: t(".title", number: number), width: :form, steady: true) do |dialog| %>
+  <% if nothing? %>
+    <p class="text-sm text-dim"><%= t(".nothing", number: number) %></p>
+  <% else %>
+    <p class="mb-4 text-sm text-ink"><%= sentence %></p>
+    <%# The overview is what changes; it is the region a screen reader reads, so the notices below take no role (`role: nil`). %>
+    <div class="mb-4">
+      <%= render Admin::Ui::ChangesOverviewComponent.new(record: record, changes: changes, holds: nil, locale: locale, detail: :names) %>
+    </div>
+    <% if (lines = warnings).any? %>
+      <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, class: "mb-3", data: { restore_warnings: "" }) do %>
+        <% lines.each do |line| %>
+          <p><%= line %></p>
+        <% end %>
+      <% end %>
+    <% end %>
+    <% if (line = schedule_line) %>
+      <%= render Admin::Ui::NoticeComponent.new(tone: :neutral, size: :compact, data: { restore_schedule: "" }).with_content(line) %>
+    <% end %>
+    <%= form_with url: url, method: :post, id: form_id, data: queue_hold do %>
+      <%= hidden_field_tag :number, number, id: nil %>
+      <%= hidden_field_tag :shown_updated_at, shown_updated_at, id: nil %>
+    <% end %>
+  <% end %>
+  <% dialog.with_footer do %>
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(nothing? ? ".close" : ".cancel"), variant: nothing? ? :secondary : :tertiary, type: "submit") %>
+    <% end %>
+    <% unless nothing? %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".confirm", number: number), variant: :primary, type: "submit", form: form_id) %>
+    <% end %>
+  <% end %>
+<% end %>

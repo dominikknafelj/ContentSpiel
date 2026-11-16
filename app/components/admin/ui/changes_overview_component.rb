@@ -123,7 +123,10 @@ module Admin
 
       def language_names = changes.locales.map { |code| ::Locales.name(code) }
 
-      def scheduled_baseline? = changes.version&.live_at&.future? || false
+      # Whether the rows are compared with a copy still waiting for its
+      # time. The restore dialog compares from the working version
+      # (`Changes.between(from: :working)`), whose was side is no copy.
+      def scheduled_baseline? = changes.version.is_a?(::Publishing::Version) && changes.version.live_at.future?
 
       def baseline_time = I18n.l(changes.version.live_at.in_time_zone(Current.site.effective_time_zone), format: :"admin.datetime")
 

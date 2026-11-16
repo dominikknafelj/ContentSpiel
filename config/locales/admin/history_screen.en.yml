@@ -62,7 +62,47 @@ en:
             other: "%{languages} are the same"
           separator: "; "
           line: "%{parts}."
+          restore: "Restore version %{number}…"
           empty_title: "No versions yet"
           empty_body:
             page: "A version is kept each time this page is published."
             post: "A version is kept each time this post is published."
+        # `Admin::HistoryScreen::RestoreDialogComponent`, "Restore version 5?".
+        restore_dialog:
+          title: "Restore version %{number}?"
+          # "Pricing’s working version becomes version 5 as it went live on 3 Nov 2026. Nothing is published: …"
+          sentence: "%{becomes} %{site}"
+          becomes:
+            went: "%{title}’s working version becomes version %{number} as it went live on %{date}."
+            goes: "%{title}’s working version becomes version %{number} as it goes live on %{date}."
+          site:
+            shown: "Nothing is published: the site keeps showing version %{number} until you publish the changes."
+            none: "Nothing is published."
+          untitled: "Untitled"
+          back:
+            one: "1 block that comes back has no notes: its notes stayed with the block that was removed."
+            other: "%{count} blocks that come back have no notes: their notes stayed with the blocks that were removed."
+          # One block that goes, carrying `count` open notes.
+          going_one:
+            one: "1 block that goes carries 1 note; it closes with it."
+            other: "1 block that goes carries %{count} notes; they close with it."
+          # Several blocks that go, carrying `count` open notes between them.
+          going_many:
+            one: "%{blocks} blocks that go carry %{count} note; it closes with them."
+            other: "%{blocks} blocks that go carry %{count} notes; they close with them."
+          images:
+            one: "1 image is no longer in the library: its block comes back empty."
+            other: "%{count} images are no longer in the library: their blocks come back empty."
+          tags:
+            one: "1 tag no longer exists and is left off."
+            other: "%{count} tags no longer exist and are left off."
+          schedule: "The change scheduled for %{time} stays scheduled."
+          nothing: "Version %{number} is the same as the working version. There is nothing to restore."
+          cancel: "Cancel"
+          close: "Close"
+          confirm: "Restore version %{number}"
+        # The toast after a restore (`Admin::PublishingController#restore`),
+        # with what could not come back after it.
+        restored: "Version %{number} restored as unpublished changes. Publish changes… puts it on the site."
+        restored_draft: "Version %{number} restored."
+        left_behind: "%{sentence}."

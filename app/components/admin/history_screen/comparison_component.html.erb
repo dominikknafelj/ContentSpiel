@@ -13,7 +13,9 @@
       <%= label_tag "history-with", t(".compared_with"), class: "text-sm text-dim" %>
       <%= select_tag :with, options_for_select(with_options, with_value), id: "history-with", class: setup_select_class %>
       <% if restore_shown? %>
-        <div class="ml-auto" data-history-restore><%= restore %></div>
+        <div class="ml-auto" data-history-restore>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".restore", number: version.number), variant: :primary, type: "button", data: restore_trigger) %>
+        </div>
       <% end %>
     </div>
     <% if several_languages? %>
