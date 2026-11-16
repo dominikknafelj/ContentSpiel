@@ -41,6 +41,9 @@ class Media::Asset < ApplicationRecord
 
   belongs_to :created_by, class_name: "User", optional: true
 
+  # The library folder this image sits in; nil is "Not in a folder".
+  belongs_to :folder, class_name: "Media::Folder", optional: true
+
   # Where this asset is actually used (design spec §3.2) -- entirely
   # derived, rebuilt wholesale by `Media::UsageIndex.refresh(owner)`
   # whenever an owner's own state might have changed, never written to

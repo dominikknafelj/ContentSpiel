@@ -47,6 +47,7 @@
 
 - `20261115120000_search_two`: enables `pg_trgm` and checks the character type (stopping with a message when either is missing); `search_entries.title` with its expression index; `search_words`, the site's words per language, with a trigram index. All of it is in `db/schema.rb`.
 - `20261116090000_add_content_types_to_site_settings`: the column `site_settings.content_types`, the post types switched on (a new site: Blog); an existing site keeps all three on.
+- `20261116130000_create_media_folders`: the table `media_folders` and `media_assets.folder_id`; every existing image starts in no folder.
 
 ### For a gem or an outside caller
 
