@@ -58,8 +58,7 @@ module Mcp
 
         # One read of the tree serves the place, the folder named in each
         # entry and its path. `folder` arrives as an Integer or a String;
-        # `Media::Place.parse` takes the String form of either, and "all" is
-        # no MCP value: absent is every image.
+        # `Media::Place.parse` takes the String form of either.
         tree = Media::FolderTree.load
         place = Media::Place.parse(folder.nil? ? nil : folder.to_s, tree: tree)
         return folder_not_found unless place

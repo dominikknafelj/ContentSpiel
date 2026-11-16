@@ -16,7 +16,7 @@ module Mcp
 
       description "List the media library's folders in tree order. Each has an `id` (for list_media_tool's " \
         "`folder`), its `name`, its `parent_id` (null for a top folder), its `path` (\"Clients / Acme\") and " \
-        "`image_count`, the images directly in it (subfolders' not included, trashed ones never). Requires " \
+        "`image_count`, the kept images directly in it (subfolders' not included, trashed ones never). Requires " \
         "the media.upload permission."
       input_schema(properties: {})
       annotations(read_only_hint: true, idempotent_hint: true, destructive_hint: false, open_world_hint: false,

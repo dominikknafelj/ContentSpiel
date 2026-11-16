@@ -143,7 +143,7 @@ class McpMediaTest < ActionDispatch::IntegrationTest
     assert_includes everything, inside.id
     assert_includes everything, loose.id
     assert_equal true, unknown["isError"]
-    assert_includes text_of(unknown), "Folder not found"
+    assert_includes text_of(unknown), "No such folder"
     assert_equal true, call_tool(raw, "list_media_tool", folder: "nonsense")["isError"]
   end
 
