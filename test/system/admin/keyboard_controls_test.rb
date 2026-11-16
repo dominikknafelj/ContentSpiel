@@ -109,10 +109,10 @@ class Admin::KeyboardControlsSystemTest < ApplicationSystemTestCase
 
     page.find("p", text: "Before").click
     stop_on("input[value=scheduled]")
-    page.send_keys(:arrow_down)
+    page.send_keys(:down)
     assert find("input[value=later]").checked?
     assert_equal "later", page.evaluate_script("document.activeElement.value")
-    page.send_keys(:arrow_up)
+    page.send_keys(:up)
     assert find("input[value=scheduled]").checked?
     page.send_keys(:tab)
     assert_equal "After", focused_text
