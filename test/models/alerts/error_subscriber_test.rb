@@ -103,6 +103,16 @@ class Alerts::ErrorSubscriberTest < ActiveSupport::TestCase
     assert_no_enqueued_jobs
   end
 
+  test "a span event that raises loses no alert: the job is queued first" do
+    with_singleton_override(Telemetry, :error_event, ->(**) { raise "span failed" }) do
+      capture_log do
+        with_error_alerts { assert_nil Rails.error.report(raised(RuntimeError.new("x"))) }
+      end
+    end
+
+    assert_enqueued_jobs 1, only: Alerts::RecordErrorJob
+  end
+
   test "off in tests unless asked" do
     log = capture_log { Rails.error.report(raised(RuntimeError.new("x"))) }
 

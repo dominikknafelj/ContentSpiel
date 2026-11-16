@@ -26,8 +26,12 @@ module Alerts
     RECENT = 7.days
     RECENT_LIMIT = 10
 
-    # What the drawing side translates: the kind is the key, the values are
-    # the interpolations, picked from `details`.
+    # What the drawing side translates, chosen here once for every surface
+    # (System status, the digest mail), each with its own keys: `key` names
+    # the wording (the kind, or its variant: `error_nowhere`, `owner_made_by`,
+    # `token_issued`), `values` are the interpolations, picked from `details`,
+    # with the window's `minutes` and the `count` a plural wording takes. No
+    # words here.
     Sentence = Data.define(:key, :values)
 
     VALUE_KEYS = {
@@ -38,6 +42,10 @@ module Alerts
       "access_denied_burst" => %w[denied actors],
       "request_limited" => %w[limited limits]
     }.freeze
+    # The kinds counted over WINDOW, whose sentences say its minutes.
+    WINDOW_KINDS = %w[sign_in_failures access_denied_burst request_limited].freeze
+    # The value a kind's plural wording counts by.
+    COUNTED_BY = { "access_denied_burst" => :actors, "request_limited" => :limited }.freeze
 
     validates :kind, inclusion: { in: KINDS }
 
@@ -68,9 +76,23 @@ module Alerts
     def security? = SECURITY_KINDS.include?(kind)
 
     def sentence
-      values = VALUE_KEYS.fetch(kind).index_with { |key| details[key] }
-      values["limits"] = Array(values["limits"]).join(", ") if kind == "request_limited"
-      Sentence.new(key: kind, values: values.symbolize_keys)
+      values = VALUE_KEYS.fetch(kind).index_with { |key| details[key] }.symbolize_keys
+      values[:limits] = Array(values[:limits]).join(", ") if kind == "request_limited"
+      values[:minutes] = WINDOW.in_minutes.to_i if WINDOW_KINDS.include?(kind)
+      count = values[COUNTED_BY[kind]] if COUNTED_BY.key?(kind)
+      values[:count] = count if count
+      Sentence.new(key: sentence_key(values), values: values)
+    end
+
+    private
+
+    def sentence_key(values)
+      case kind
+      when "error" then values[:place] ? "error" : "error_nowhere"
+      when "owner_changed" then "owner_#{values[:now_owner] ? "made" : "removed"}#{"_by" if values[:actor_name]}"
+      when "token_issued" then values[:actor_name] ? "token_issued_by" : "token_issued"
+      else kind
+      end
     end
   end
 end

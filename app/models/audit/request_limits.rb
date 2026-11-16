@@ -30,7 +30,7 @@ module Audit
         "door" => "#{controller.controller_path}##{controller.action_name}"
       })
     rescue => error
-      Rails.logger.error("[Audit::RequestLimits] not recorded: #{error.class}")
+      Rails.logger.error("[ContentSpiel] Request limit not recorded: #{error.class}")
     end
   end
 end

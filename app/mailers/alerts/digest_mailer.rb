@@ -44,17 +44,7 @@ module Alerts
 
     def alert_sentence(alert)
       sentence = alert.sentence
-      values = sentence.values
-      key = case sentence.key
-      when "error" then values[:place] ? "error" : "error_nowhere"
-      when "owner_changed" then "#{values[:now_owner] ? "owner_made" : "owner_removed"}#{"_by" if values[:actor_name]}"
-      when "token_issued" then values[:actor_name] ? "token_issued_by" : "token_issued"
-      else sentence.key
-      end
-      options = values.merge(minutes: Alert::WINDOW.in_minutes.to_i)
-      count = { "request_limited" => values[:limited], "access_denied_burst" => values[:actors] }[sentence.key]
-      options[:count] = count if count
-      t("mail.alerts_mailer.digest.sentences.#{key}", **options)
+      t("mail.alerts_mailer.digest.sentences.#{sentence.key}", **sentence.values)
     end
 
     def digest_every = Alert::DIGEST_EVERY.in_minutes.to_i

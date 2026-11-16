@@ -100,8 +100,8 @@ class HostSettingsStackTest < ActiveSupport::TestCase
     assert_equal 403, get("https://docs.example.org", "https://10.0.0.5/ready/x").status
   end
 
-  test "only /up is the health check: beside it and under it nothing is answered by IP" do
-    [ "/up/x", "/up/", "/UP", "/up.json" ].each do |path|
+  test "beside and under the health paths nothing is answered by IP" do
+    [ "/up/x", "/up/", "/UP", "/up.json", "/ready/", "/READY", "/ready.json" ].each do |path|
       assert_equal 403, get("https://docs.example.org", "https://10.0.0.5#{path}").status, path
     end
   end

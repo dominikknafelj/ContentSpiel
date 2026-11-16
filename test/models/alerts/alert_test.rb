@@ -74,20 +74,32 @@ class Alerts::AlertTest < ActiveSupport::TestCase
     assert_equal now, Alerts::Alert.last_mailed_at
   end
 
-  test "a sentence is the kind and its values, and nothing else from details" do
+  test "a sentence is its wording's key and its values, and nothing else from details" do
     extra = { secret: "x", handled: false, source: "s" }
     cases = {
-      "error" => [ { error_class: "RuntimeError", place: "app/a.rb:1" }, { error_class: "RuntimeError", place: "app/a.rb:1" } ],
-      "sign_in_failures" => [ { failed: 21, locked: 2 }, { failed: 21, locked: 2 } ],
-      "owner_changed" => [ { subject_label: "Ana", actor_name: "Ben", now_owner: true }, { subject_label: "Ana", actor_name: "Ben", now_owner: true } ],
-      "token_issued" => [ { token_name: "T", group_name: "G", actor_name: "Ben" }, { token_name: "T", group_name: "G", actor_name: "Ben" } ],
-      "access_denied_burst" => [ { denied: 20, actors: 3 }, { denied: 20, actors: 3 } ],
-      "request_limited" => [ { limited: 4, limits: %w[forms search] }, { limited: 4, limits: "forms, search" } ]
+      "error" => [ { error_class: "RuntimeError", place: "app/a.rb:1" }, "error", { error_class: "RuntimeError", place: "app/a.rb:1" } ],
+      "sign_in_failures" => [ { failed: 21, locked: 2 }, "sign_in_failures", { failed: 21, locked: 2, minutes: 15 } ],
+      "owner_changed" => [ { subject_label: "Ana", actor_name: "Ben", now_owner: true }, "owner_made_by", { subject_label: "Ana", actor_name: "Ben", now_owner: true } ],
+      "token_issued" => [ { token_name: "T", group_name: "G", actor_name: "Ben" }, "token_issued_by", { token_name: "T", group_name: "G", actor_name: "Ben" } ],
+      "access_denied_burst" => [ { denied: 20, actors: 3 }, "access_denied_burst", { denied: 20, actors: 3, minutes: 15, count: 3 } ],
+      "request_limited" => [ { limited: 4, limits: %w[forms search] }, "request_limited", { limited: 4, limits: "forms, search", minutes: 15, count: 4 } ]
     }
-    cases.each do |kind, (details, values)|
+    cases.each do |kind, (details, key, values)|
       sentence = make(kind: kind, **details, **extra).sentence
-      assert_equal kind, sentence.key
+      assert_equal key, sentence.key, kind
       assert_equal values, sentence.values, kind
+    end
+  end
+
+  test "a sentence's key is the variant its values ask for" do
+    {
+      [ "error", { error_class: "RuntimeError", place: nil } ] => "error_nowhere",
+      [ "owner_changed", { subject_label: "Ana", actor_name: nil, now_owner: true } ] => "owner_made",
+      [ "owner_changed", { subject_label: "Ana", actor_name: "Ben", now_owner: false } ] => "owner_removed_by",
+      [ "owner_changed", { subject_label: "Ana", actor_name: nil, now_owner: false } ] => "owner_removed",
+      [ "token_issued", { token_name: "T", group_name: "G", actor_name: nil } ] => "token_issued"
+    }.each do |(kind, details), key|
+      assert_equal key, make(kind: kind, **details).sentence.key, details.inspect
     end
   end
 end

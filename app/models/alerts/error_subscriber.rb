@@ -31,15 +31,16 @@ module Alerts
     # Rails' subscriber interface. It never raises: a subscriber that raises
     # takes the reporter's own error path, and the database an enqueue needs
     # may be the very thing that is down. A failure is one log line with the
-    # two classes.
+    # two classes. The job is queued before the span event, so a span that
+    # fails costs the span and never the alert.
     def report(error, handled:, severity:, context:, source:)
       return if answered_with_4xx?(error) || alerts_job?(context)
 
       place = self.class.place_for(error)
       Rails.logger.public_send(handled ? :warn : :error,
         "[ContentSpiel] Error reported: #{error.class.name}#{" at #{place}" if place} (#{source})")
-      Telemetry.error_event(error_class: error.class.name, place: place)
       RecordErrorJob.perform_later(error_class: error.class.name, place: place, source: source, handled: handled, at: Time.current)
+      Telemetry.error_event(error_class: error.class.name, place: place)
     rescue StandardError => failure
       Rails.logger.error("[ContentSpiel] Error report not recorded: #{error.class.name} (#{failure.class.name})")
     end

@@ -52,8 +52,7 @@ class Audit::RequestLimitsTest < ActiveSupport::TestCase
         Audit::RequestLimits.heard(payload(door(Admin::PasswordsController, "create")))
       end
     end
-    assert_equal 1, lines.size
-    assert_no_match(/hunter2/, lines.first)
+    assert_equal [ "[ContentSpiel] Request limit not recorded: RuntimeError" ], lines
   end
 
   test "a payload with no controller records nothing and does not raise" do
