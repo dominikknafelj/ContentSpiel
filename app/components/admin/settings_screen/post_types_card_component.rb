@@ -64,11 +64,12 @@ module Admin
 
       def description(definition) = (t("admin.content_types.descriptions.#{definition.description}") if definition.description)
 
-      # The ids the switch is described by: the description, then the line the
-      # row says when its switch is changed.
+      # The switch is described by its description alone. The changed-state
+      # lines are NOT named: a `hidden` element that `aria-describedby` names
+      # is still read, so a switch at rest would announce "leave the site when
+      # you save", which is false until the switch is changed.
       def describedby(definition)
-        [ ("#{switch_id(definition)}-description" if definition.description),
-          ("#{switch_id(definition)}-line" if count(definition).positive?) ].compact.join(" ")
+        ("#{switch_id(definition)}-description" if definition.description)
       end
     end
   end

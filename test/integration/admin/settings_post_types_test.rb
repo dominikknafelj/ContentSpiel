@@ -56,16 +56,34 @@ class Admin::SettingsPostTypesTest < ActionDispatch::IntegrationTest
     create_post(title: "Role", content_type: "resume_entry")
     create_post(title: "Gone").update!(trashed_at: Time.current)
 
-    statements = []
-    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
-      statements << payload[:sql] if payload[:sql].match?(/FROM "posts"/) && payload[:sql].include?("GROUP BY") && payload[:sql].include?("content_type")
-    end
     get "/cs-studio/settings"
-    ActiveSupport::Notifications.unsubscribe(subscriber)
-
-    assert_equal 1, statements.size
     assert_select "[data-post-type=blog] [data-post-count]", text: "2 posts"
     assert_select "[data-post-type=resume_entry] [data-post-count]", text: "1 post"
     assert_select "[data-post-type=now_update] [data-post-count]", 0
+
+    counting = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      counting << payload[:sql] if payload[:sql].match?(/FROM "posts"/) && payload[:sql].include?("COUNT") && payload[:sql].include?(%("content_type"))
+    end
+    get "/cs-studio/settings"
+    ActiveSupport::Notifications.unsubscribe(subscriber)
+    assert_equal 1, counting.size, counting.join("\n")
+  end
+
+  test "a viewer's counts leave out the posts their read grant does not reach" do
+    create_post(title: "One")
+    create_post(title: "Role", content_type: "resume_entry")
+    create_post(title: "Role two", content_type: "resume_entry")
+    group = access_control_groups(:branch_editors)
+    user = users(:editor_branch)
+    AccessControl::Grant.create!(group: group, permission: "settings.manage", scope: {})
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "content_types" => [ "resume_entry" ] })
+    AccessControl::Membership.create!(user: user, group: group) unless user.groups.exists?(group.id)
+    sign_in_as(user)
+
+    get "/cs-studio/settings"
+
+    assert_select "[data-post-type=resume_entry] [data-post-count]", text: "2 posts"
+    assert_select "[data-post-type=blog] [data-post-count]", 0
   end
 end

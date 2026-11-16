@@ -34,7 +34,8 @@ class Admin::SettingsScreen::PostTypesCardComponentTest < ViewComponent::TestCas
 
     hidden = page.find("input[type=hidden][name='site_setting[content_types][]']", visible: :all)
     assert_equal "", hidden.value
-    assert_operator page.native.to_html.index(hidden["id"].to_s.presence || 'type="hidden"'), :<, page.native.to_html.index("cs-toggle")
+    html = page.native.to_html
+    assert_operator html.index(%(type="hidden" name="site_setting[content_types][]")), :<, html.index('class="cs-toggle')
   end
 
   test "the post count says 12 posts, 1 post, or nothing" do
@@ -60,7 +61,7 @@ class Admin::SettingsScreen::PostTypesCardComponentTest < ViewComponent::TestCas
     line = row.find("[data-leaving]", visible: :all)
     assert line[:hidden], "the line is hidden at rest"
     assert_equal "Its 6 posts leave the site when you save. They are kept, and come back when you switch it on again.", line.text(:all).strip
-    assert_includes row.find(SWITCH, visible: :all)["aria-describedby"].split, line[:id]
+    assert_not_includes row.find(SWITCH, visible: :all)["aria-describedby"].to_s.split, line[:id], "a hidden line named by aria-describedby would be read at rest"
     assert_no_selector "[data-post-type=blog] [data-returning]", visible: :all
   end
 
@@ -81,7 +82,7 @@ class Admin::SettingsScreen::PostTypesCardComponentTest < ViewComponent::TestCas
     line = row.find("[data-returning]", visible: :all)
     assert line[:hidden]
     assert_equal "Its 6 posts come back to the site when you save.", line.text(:all).strip
-    assert_includes row.find(SWITCH, visible: :all)["aria-describedby"].split, line[:id]
+    assert_not_includes row.find(SWITCH, visible: :all)["aria-describedby"].to_s.split, line[:id], "a hidden line named by aria-describedby would be read at rest"
     assert_no_selector "[data-post-type=resume_entry] [data-leaving]", visible: :all
     assert_no_selector "[data-post-type=resume_entry] #{SWITCH}[checked]", visible: :all
   end

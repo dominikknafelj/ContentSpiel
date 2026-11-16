@@ -81,7 +81,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/settings"
 
     assert_select "nav[aria-label='Settings sections'] a", 9
-    %w[site languages publishing forms ai mail sign_in images].each do |id|
+    %w[site languages post_types publishing forms ai mail sign_in images].each do |id|
       assert_select "nav[aria-label='Settings sections'] a[href='##{id}']"
       assert_select "##{id}"
     end
