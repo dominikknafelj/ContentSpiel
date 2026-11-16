@@ -39,6 +39,13 @@ class Tag < ApplicationRecord
   # The tags whose name contains this text; a typed `%` or `_` is a character
   # to find, not a wildcard (`SqlNodes.like_pattern`).
   scope :name_containing, ->(text) { where(SqlNodes.like(lowered_name, SqlNodes.like_pattern(text.to_s.downcase))) }
+  # The tags whose name begins with this text, a typed `%` or `_` only
+  # itself. The pattern is a bind named `q`, since the text can be a
+  # visitor's (the suggestions while typing, `SiteSearch::TagSuggestions`),
+  # which no statement's text or log line holds.
+  scope :name_starting, ->(text) {
+    where(SqlNodes.like(lowered_name, SqlNodes.bound(SqlNodes.like_pattern(text.to_s.downcase, prefix: true), name: "q")))
+  }
   # Ordering: the tags whose name STARTS with this text ahead of the rest
   # (`(LOWER(name) LIKE 'text%') DESC`: true sorts before false).
   scope :name_starting_first, ->(text) {

@@ -36,6 +36,10 @@ class Theme::ContractLedgerTest < ActiveSupport::TestCase
     assert_ledger
   end
 
+  test "the scripts a theme drives by their markup are the ledger's" do
+    assert_equal SCRIPTS, Theme::Contract.scripts, "a script's target, value, part, state or answer key added, renamed or removed is a release note"
+  end
+
   test "the page templates' locals are the ledger's" do
     assert_equal PAGE_TEMPLATE_LOCALS, Theme::Contract::PAGE_TEMPLATE_LOCALS, "a local a page template is handed added, renamed or removed is a release note"
     assert_equal PAGE_TEMPLATES, Theme::Contract::PAGE_TEMPLATES

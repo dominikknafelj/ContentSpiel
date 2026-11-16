@@ -32,7 +32,17 @@ module ContractLedger
     # tokens below, and what each of its results answers (`title`,
     # `url_path`, `kind`, `where`, `date`, `snippet`;
     # docs/reference/theming.md, "The Search block").
-    "blocks/search_component" => %w[block page label query state results total pagination action live_note? string],
+    # Release note (search 2): added `close_matches?`, `correction`,
+    # `correction_path` and `suggest_url` to the Search block's line, `tags`
+    # (each with `name` and `matched?`) and `close?` to what each result
+    # answers, and sixteen words: `close_matches`, `did_you_mean`,
+    # `tagged`, `tags_separator`, `matched_tag`, `matched_tag_before`,
+    # `matched_tag_after`, `suggestions`, `no_suggestions`,
+    # `suggestions_limited`, `suggestions_unavailable`,
+    # `suggestions_loading`, `suggestions_label`, `kind_page`, `kind_post`
+    # and `kind_tag`; and the themed token `search-active` below.
+    "blocks/search_component" => %w[block page label query state results total pagination action live_note?
+                                     close_matches? correction correction_path suggest_url string],
     "blocks/card_component" => %w[block page title text link icon icon_name image],
     "blocks/post_list_component" => %w[block page list_component],
     "blocks/section_component" => %w[block page columns layout background width style anchor],
@@ -60,6 +70,21 @@ module ContractLedger
     "img[data-image-empty]" => "an image with neither widths nor a preview: no `src`, a box of the image's size"
   }.freeze
 
+  # The CMS's own scripts a theme's template drives by their markup
+  # (`Theme::Contract::SCRIPTS`).
+  # Release note (search 2): added the `search-suggest` script: its targets,
+  # values, the option template's parts, its states and the keys of the
+  # suggestions' JSON (docs/reference/theming.md, "Scripts").
+  SCRIPTS = {
+    "search-suggest" => {
+      targets: %w[input listbox popup message option status loading],
+      values: %w[url unavailable],
+      parts: %w[label kind where],
+      states: %w[closed loading open empty limited unavailable],
+      answer: %w[state status suggestions kind kind_label label where url marks]
+    }
+  }.freeze
+
   # The locals every page template is handed, and the folder of the templates
   # (`Theme::Contract::PAGE_TEMPLATE_LOCALS`, `PAGE_TEMPLATES`).
   PAGE_TEMPLATE_LOCALS = %w[page post list_block].freeze
@@ -80,7 +105,7 @@ module ContractLedger
     note-warning-ground note-warning-line note-warning-ink note-warning-border
     table-rule table-line table-head table-caption table-ground
     form-field-ground form-field-line form-field-focus form-error form-done-ground form-done-line
-    search-mark search-mark-ink
+    search-mark search-mark-ink search-active
     card-ground card-line card-icon
   ].freeze
 

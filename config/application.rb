@@ -45,9 +45,10 @@ require_relative "../lib/telemetry"
 require_relative "../lib/telemetry/path_scrubber"
 require_relative "../lib/telemetry/work_sampler"
 
-# And this one because the middleware stack below names it while the
+# And these two because the middleware stack below names them while the
 # application is configured.
 require_relative "../lib/content_spiel/diagram_font_cors"
+require_relative "../lib/content_spiel/suggest_gate"
 
 module ContentSpiel
   class Application < Rails::Application
@@ -65,6 +66,12 @@ module ContentSpiel
     # stands after it: production's precompiled files and development's
     # served ones answer with the header alike.
     config.middleware.insert_before ActionDispatch::Static, ContentSpiel::DiagramFontCors, prefix: config.assets.prefix
+
+    # The suggestions' body (`POST /search/suggestions`) is capped and parsed
+    # before Rails parses it, so a body too large or malformed is refused
+    # without its text in a log line (lib/content_spiel/suggest_gate.rb).
+    # After the request's log line, which names the path alone.
+    config.middleware.insert_after Rails::Rack::Logger, ContentSpiel::SuggestGate
 
     # Turbo's historical-location routes answer a native client's redirect; this app has none, so they are unreachable.
     config.turbo.draw_routes = false

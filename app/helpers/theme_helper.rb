@@ -148,6 +148,15 @@ module ThemeHelper
     @search_page = SiteSearch::SearchPage.new.page
   end
 
+  # Where the suggestions while typing are asked (`POST /search/suggestions`,
+  # search 2 spec §4.1), or nil, which offers none: in the preview, where
+  # the suggestions would be the live site's and lead out of the preview,
+  # and on a site with no search page, whose header box draws no form. The one rule for the Search block
+  # (`Blocks::SearchComponent#suggest_url`) and a theme's header box.
+  def search_suggest_url
+    search_suggestions_path unless public_urls.preview? || search_page.nil?
+  end
+
   def home_url_path
     theme_root_page ? page_url_path(theme_root_page) : "/"
   end

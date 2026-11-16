@@ -456,4 +456,40 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     assert_nil response.headers["X-Robots-Tag"]
     assert_not_equal "origin", response.headers["Referrer-Policy"]
   end
+
+  # Search 2 spec §4.2: a suggestion answer is the visitor's own, as a
+  # results page is, and the endpoint is a third public door behind the wall.
+  def post_suggestion(suggest: "home")
+    post "/search/suggestions", params: { suggest: suggest, language: "en" }.to_json,
+      headers: { "Content-Type" => "application/json", "Sec-Fetch-Site" => "same-origin" }
+  end
+
+  test "a suggestion answer is no-store with no ETag and noindex" do
+    post_suggestion
+    assert_response :ok
+    assert_equal "private, no-store", response.headers["Cache-Control"]
+    assert_nil response.headers["ETag"]
+    assert_equal "noindex", response.headers["X-Robots-Tag"]
+    assert_includes [ nil, "" ], response.headers["Vary"]
+
+    post "/search/suggestions", params: "{", headers: { "Content-Type" => "application/json" }
+    assert_response :bad_request
+    assert_equal "private, no-store", response.headers["Cache-Control"], "a refusal too"
+    assert_nil response.headers["ETag"]
+  end
+
+  test "the suggestions door is cookieless, like the two public controllers" do
+    sign_in_as(users(:one))
+    get "/cs-studio"
+    before = cookies.to_hash
+    assert before.any?, "signed in with a cookie"
+
+    post_suggestion
+    assert_response :ok
+    assert_nil response.headers["Set-Cookie"]
+    assert_equal before, cookies.to_hash
+    source = Rails.root.join("app/controllers/site_search/suggestions_controller.rb").read
+    first_line = source.lines.drop_while { !_1.start_with?("class ") }.drop(1).map(&:strip).reject { _1.empty? || _1.start_with?("#") }.first
+    assert_equal "include Cookieless", first_line
+  end
 end

@@ -35,13 +35,31 @@ module DbTriggers
     end
   end
 
+  # The same hook holds the database requirements on the primary
+  # database (`SiteSearch::Postgres::Requirements`): Postgres's own error at
+  # `enable_extension "pg_trgm"` names the extension but not the
+  # requirement, so it is raised again as the requirement's message, and
+  # after the load the character type is probed, which no statement of the
+  # schema fails on.
   module AfterSchemaLoad
     def load_schema(db_config, *)
-      super.tap do
-        # Only the primary database has these tables; production's
-        # cache/queue databases load their own schemas through here too.
-        migration_connection_pool.with_connection { |connection| DbTriggers.apply!(connection) } if db_config.name == "primary"
+      # Only the primary database has these tables; production's
+      # cache/queue databases load their own schemas through here too.
+      return super unless db_config.name == "primary"
+
+      begin
+        result = super
+      rescue ActiveRecord::StatementInvalid => error
+        requirements = SiteSearch::Postgres::Requirements
+        raise unless error.message.include?("pg_trgm") && requirements.unavailable?(error)
+
+        raise SiteSearch::Postgres::DatabaseRequirementMissing, requirements.message_for(missing: "pg_trgm", cause: requirements.cause_of(error))
       end
+      migration_connection_pool.with_connection do |connection|
+        DbTriggers.apply!(connection)
+        SiteSearch::Postgres::Requirements.check_loaded!(connection)
+      end
+      result
     end
   end
 end

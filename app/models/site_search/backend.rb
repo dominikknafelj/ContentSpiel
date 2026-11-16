@@ -28,7 +28,9 @@ module SiteSearch
   # - `search(query, deadline:)` answers `SiteSearch::Results` for a
   #   `SiteSearch::Query`: the documents in `query.language` only, in view at
   #   `query.now` (`shown_from <= now`, and `shown_until` nil or after it),
-  #   matching the words of `query.text` in any field, a title's match
+  #   matching EVERY word of `query.text`, each in any field (never a
+  #   document by one word of two: ContentSpiel checks a correction by
+  #   such a search, `SiteSearch.kept_correction`), a title's match
   #   ranking above a body's; `query.per_page` hits from `query.offset`, and
   #   `total` counting every match. Each hit's snippet is plain text with
   #   `[start, length]` marks on the query's words, never markup; the page
@@ -46,6 +48,48 @@ module SiteSearch
   #   is answered empty (no hits, a total of 0), never sent as an empty or
   #   placeholder query, which some engines answer with every document
   #   (Meilisearch's placeholder search).
+  #
+  #   CLOSE MATCHES AND A CORRECTION (spec §7.1), both optional: a backend
+  #   that offers neither answers every hit `close: false` and no
+  #   correction, and passes.
+  #   `query.close_matches` is true for a visitor's search, on which the
+  #   backend MAY add close matches, by its own rule and when it judges
+  #   them due (a word one typo away, an engine's fuzzy operator applied to
+  #   words it has already escaped, its spellcheck); false for
+  #   ContentSpiel's verifying search, which it answers with exact and
+  #   stemmed matches only. A close hit is `Hit#close` true and matches
+  #   each query word or a close variant of it; NO CLOSE HIT STANDS BEFORE
+  #   AN EXACT HIT, and `total` counts both. `Results#correction` is the
+  #   query with its words corrected, as plain words (never the engine's
+  #   syntax), at most `Query::MAX_LENGTH` characters, offered only on an
+  #   answer with no exact hit, or nil. ContentSpiel normalises it, drops
+  #   it when blank, too long, the query again or made of no words, and
+  #   draws it only when a search for it finds a page a visitor sees now
+  #   (`SiteSearch.search`): a correction is never trusted for visibility.
+  #   `Results#close_outcome` says what a close pass did when it found no
+  #   close hit: nil (none found, or no close pass at all), `"timeout"`
+  #   (out of time, the exact answer standing) or `"skipped"` (it ran none);
+  #   anything else is an answer of the wrong shape. A backend never writes
+  #   on ContentSpiel's span: `search.close` is read from the answer.
+  #
+  #   SUGGESTIONS WHILE TYPING (search 2 spec §7.2), optional
+  #   (`OPTIONAL_METHODS`): a backend without `suggest` gives no title
+  #   suggestions; the tags are still suggested (they are ContentSpiel's
+  #   own, `SiteSearch::TagSuggestions`), and System status says the
+  #   suggestions offer tags only. `suggest(suggest_query, deadline:)`
+  #   answers `SiteSearch::Suggestions` for a `SiteSearch::SuggestQuery`
+  #   (`text`, `language`, `now`, `limit`): up to `limit`
+  #   `SiteSearch::Suggestion`s (`record_type`, `record_id`, `copy_id`,
+  #   `rank`), best first, of the documents in `language` only, in view at
+  #   `now`, whose title has a word that begins with each word of `text`.
+  #   The same rules as `search`: `text` is plain words as typed, which the
+  #   engine escapes in its own syntax (a prefix query on escaped words, or
+  #   a field built for "as you type"; never a raw query string with `*`
+  #   appended), and text left with no words answers no items; answered or
+  #   raised by the deadline; a failure scrubbed to its class, the prefix
+  #   never logged. An item names a copy and carries no text: what is drawn
+  #   is read again from the copy in force, as a hit is. An answer of
+  #   another shape is a failure.
   # - `health(deadline:)` answers `SiteSearch::Health`: `status` `:ok`,
   #   `:warn` or `:failed`, and `detail` one plain sentence for a person or
   #   nil. System status shows the detail as it is handed (its first line,
@@ -66,5 +110,9 @@ module SiteSearch
   # that may be used from several threads, or one per thread.
   module Backend
     METHODS = %i[index remove prune_record clear search health].freeze
+
+    # Asked only of a backend that answers them (`respond_to?`), so a
+    # backend written before them still passes `Backends.built`.
+    OPTIONAL_METHODS = %i[suggest].freeze
   end
 end

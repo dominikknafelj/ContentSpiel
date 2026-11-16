@@ -22,7 +22,8 @@ class TailwindSourcesTest < ActiveSupport::TestCase
   # there is nothing in it for the build to find. Each entry says which.
   HAND_WRITTEN_ONLY = {
     "app/javascript/saving/promotion_hold.js" => "`admin-spinner`, defined in content-spiel.tailwind.css",
-    "app/javascript/diagram/frame.js" => "`admin-mermaid-field__renderer`, defined in content-spiel.tailwind.css"
+    "app/javascript/diagram/frame.js" => "`admin-mermaid-field__renderer`, defined in content-spiel.tailwind.css",
+    "app/javascript/controllers/search_suggest_controller.js" => "`search-suggest__option--first-tag`, defined in the default theme's search.css"
   }.freeze
 
   def sources

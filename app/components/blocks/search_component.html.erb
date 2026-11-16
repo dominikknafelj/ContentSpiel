@@ -1,21 +1,43 @@
 <%# The Search block (search spec §7.2; the SiteSearch card): a GET form to the page it stands on, with
     role=search, a real label for a type=search field named q, and a button; then, for a request with a
     query, its outcome: the preview's note, the count and the results with their pager, or one message.
-    The count and every message are role=status. A sentence that quotes the query hands it to `string` in
-    a <q> (`tag.q`), so a language's own quote marks come from its `quotes`, and the query is escaped
-    inside it. The pager's links keep q and set page, on the page's own address, and are never
-    prefetched: a hovered link would run a search, and count it, before anyone pressed it. The field's
-    id is written from `block`, so two blocks on a page have their own; the arrows are this template's
-    and hidden from a screen reader. The class names are the default theme's own (search.css), not a
-    promise. Everything printed goes through ERB's own escaping; `result.snippet` is already escaped,
-    with its marks. %>
+    The form carries the suggestions' markup (search 2 spec §8.2; the SiteSearchSuggest card): the
+    `search-suggest` controller, its values, its targets and the option's template. With no `suggest_url`
+    (the preview, a site with no search page) the value is empty and the script does nothing, and without
+    the script the field is the plain one; the live region is hidden by search.css, as the tag's words are.
+    The count, the close-matches line (which stands in the count's place) and every message are role=status;
+    "Did you mean" stands first, above the close-matches line or above Nothing found, its correction a link
+    to the block's own address (`correction_path`, encoded as the pager's links are) handed to `string` as
+    markup, never prefetched. A post result's tags are one line of text under its date, a matched one in
+    <mark> with words a screen reader hears, hidden by search.css's `search__hidden` (never a utility a
+    theme's build may not make); the comma and the parentheses are words of the language too. A tag's block
+    variable is `result_tag`, never `tag`, which would hide Action View's helper. A sentence that quotes the
+    query hands it to `string` in a <q> (`tag.q`), so a language's own quote marks come from its `quotes`,
+    and the query is escaped inside it. The pager's links keep q and set page, on the page's own address,
+    and are never prefetched: a hovered link would run a search, and count it, before anyone pressed it.
+    The field's id is written from `block`, so two blocks on a page have their own, and so is the
+    listbox's; the arrows are this template's and hidden from a screen reader. The class names are the
+    default theme's own (search.css), not a promise. Everything printed goes through ERB's own escaping;
+    `result.snippet` is already escaped, with its marks. %>
 <% field_id = "search-#{block.id}-q" %>
 <% link_to_page = ->(number) { "#{action}?#{URI.encode_www_form(q: query, page: number)}" } %>
 <div class="content-block content-block--search">
-  <form class="search__form" role="search" method="get" action="<%= action %>">
+  <form class="search__form" role="search" method="get" action="<%= action %>" data-controller="search-suggest"
+        data-search-suggest-url-value="<%= suggest_url %>" data-search-suggest-unavailable-value="<%= string(:suggestions_unavailable) %>">
     <label class="search__label" for="<%= field_id %>"><%= label %></label>
     <div class="search__row">
-      <input class="search__input" id="<%= field_id %>" type="search" name="q" maxlength="<%= SiteSearch::Query::MAX_LENGTH %>" value="<%= query %>">
+      <div class="search-suggest">
+        <input class="search__input" id="<%= field_id %>" type="search" name="q" maxlength="<%= SiteSearch::Query::MAX_LENGTH %>" value="<%= query %>" data-search-suggest-target="input">
+        <span class="search-suggest__loading" data-search-suggest-target="loading" hidden><%= string(:suggestions_loading) %></span>
+        <div class="search-suggest__list" data-search-suggest-target="popup" hidden>
+          <ul id="search-<%= block.id %>-suggestions" data-search-suggest-target="listbox" aria-label="<%= string(:suggestions_label) %>"></ul>
+          <p class="search-suggest__message" data-search-suggest-target="message" hidden></p>
+        </div>
+        <template data-search-suggest-target="option">
+          <li class="search-suggest__option"><span class="search-suggest__label" data-part="label"></span><span class="search-suggest__kind" data-part="kind"></span><span class="search-suggest__where" data-part="where"></span></li>
+        </template>
+        <span class="search__hidden" data-search-suggest-target="status" role="status" aria-live="polite"></span>
+      </div>
       <button class="search__button" type="submit"><%= string(:button) %></button>
     </div>
   </form>
@@ -23,8 +45,15 @@
     <% if live_note? %>
       <p class="search__note"><%= string(:live_note) %></p>
     <% end %>
+    <% if correction && %i[results none].include?(state) %>
+      <p class="search__correction"><%= string(:did_you_mean, correction: link_to(correction, correction_path, data: { turbo_prefetch: "false" })) %></p>
+    <% end %>
     <% if state == :results %>
-      <p class="search__summary" role="status"><%= string(:results, count: total, query: tag.q(query)) %><% if pagination.page > 1 %> <span class="search__page">· <%= string(:page, page: pagination.page) %></span><% end %></p>
+      <% if close_matches? %>
+        <p class="search__close" role="status"><%= string(:close_matches, query: tag.q(query)) %></p>
+      <% else %>
+        <p class="search__summary" role="status"><%= string(:results, count: total, query: tag.q(query)) %><% if pagination.page > 1 %> <span class="search__page">· <%= string(:page, page: pagination.page) %></span><% end %></p>
+      <% end %>
       <ol class="search__results"<% if pagination.first_item > 1 %> start="<%= pagination.first_item %>"<% end %>>
         <% results.each do |result| %>
           <li class="search__result">
@@ -33,6 +62,9 @@
               <p class="search__where search__where--date"><%= result.date %></p>
             <% elsif result.where %>
               <p class="search__where"><%= result.where %></p>
+            <% end %>
+            <% if result.tags.any? %>
+              <p class="search__tags"><%= string(:tagged) %> <% result.tags.each_with_index do |result_tag, index| %><%= string(:tags_separator) if index.positive? %><% if result_tag.matched? %><mark class="search__tag-matched"><%= result_tag.name %><span class="search__hidden"><%= string(:matched_tag_before) %><%= string(:matched_tag) %><%= string(:matched_tag_after) %></span></mark><% else %><span class="search__tag"><%= result_tag.name %></span><% end %><% end %></p>
             <% end %>
             <p class="search__snippet"><%= result.snippet %></p>
           </li>

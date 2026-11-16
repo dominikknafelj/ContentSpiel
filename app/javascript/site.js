@@ -1,14 +1,16 @@
 // The public site's entry point (theming spec §4, "Scripts"): `application`
 // (Turbo and the site's own controllers) plus the theme's controllers, which
-// config/importmap.rb pins under controllers/theme/. Only the public layout
+// config/importmap.rb pins under controllers/theme/, and the site's own that
+// a visitor's page alone runs (`PUBLIC_ONLY`: the Search block's
+// suggestions). Only the public layout
 // loads it (layouts/application.html.erb), as only CS Studio's layout loads
 // `admin`: a theme's script is never imported on a CS Studio screen, on
 // sign-in or in setup, because `controllers/index.js` registers neither
 // CS Studio's controllers nor a theme's by itself.
 import "application"
-import { registerControllers } from "controllers"
+import { registerControllers, PUBLIC_ONLY } from "controllers"
 
-registerControllers((path) => path.startsWith("controllers/theme/"))
+registerControllers((path) => path.startsWith("controllers/theme/") || PUBLIC_ONLY.includes(path))
 
 // A LINK TO AN ANCHOR OF THE PAGE IS THE BROWSER'S, NOT A TURBO VISIT. Turbo 8 (turbo-rails 2.0.23) draws such a link
 // again from the server: `findLinkFromClickTarget` skips a link whose

@@ -4,11 +4,42 @@
 
 ### Added
 
+- Close matches for a typo, ranked below every exact match and said so ("No exact matches for … Close matches:").
+- "Did you mean …?", verified against the live site.
+- Japanese, Chinese, Thai and Korean pages found by the text they contain.
+- Suggestions while typing: up to eight live titles and tags, asked by `POST /search/suggestions`, a path no page can take since every page route is a GET. The request is cookieless and takes no CSRF token, and it is refused from another site's page (`Sec-Fetch-Site`, `Origin`, JSON only). The body is capped at 1 KB, before Rails parses any of it (`ContentSpiel::SuggestGate`, a middleware). The limits are 120 a minute per visitor and 3,000 across the site, and at most 2 suggestions are answered at once per process (`SiteSearch::SuggestLimit::IN_FLIGHT`, below Puma's default three threads): one that finds both slots taken answers `limited` at once, so a flood never holds every thread the pages and CS Studio need. The answer is `no-store`, and the prefix is in no log line and no front server's access log (`suggest` joins `filter_parameters` by its whole name). Without the script the form is the plain GET it was.
+- A post's tags on its result, the matched ones marked.
+- System status's notes on the limited languages and on a backend without title suggestions.
+- The span `search.suggest` and the attributes `search.close` and `search.correction`; a refused or limited suggestion request writes `search.outcome` on the request's span.
+- `docs/reference/hosting.md`, "Database requirements": the Postgres version, the extensions (`plpgsql`, `pg_trgm`) and the encoding and character type.
 - The image viewer (`Admin::Ui::ImageViewerComponent`): a note's picture opens over CS Studio, fitted to the window, with its name and facts in the head, arrows to step through the message's pictures, the position, Open original and Download. Escape, Close or the backdrop close it. The Dialog has a `viewer` width, a `title_aside` slot and a `data:` option, and a GIF is one shared part, `Admin::Ui::GifComponent` (`docs/reference/design-system.md`, "Shared components"; `docs/reference/notes.md`, "Files").
 
 ### Changed
 
+- A post's tags rank as its title (weight A; an outside engine sees the `tags` field at `:a`).
+- A page's meta title and the slugs are searched (B).
+- The index rebuilds itself once after the upgrade (`Documents::REVISION` 2), with System status showing the progress. Title suggestions start when it is done.
+- The Search block's `limits:` sentence reads "No filter, and no sort; suggestions as one types with a script, none without; ten results to a page."
 - A plain click on a note's picture opens it in the image viewer; a click with ⌘, Ctrl or Shift, a middle click and the viewer's Open original open it in a tab.
+
+### Fixed
+
+- Draw diagrams reached by a link inside CS Studio (System status's "Draw diagrams →") did nothing when Draw all was pressed: Turbo's copy of the page it had just drawn took its renderer frame back and nothing built it again. The screen, and the Diagram card in the same case, build their frame again once the copy is made.
+
+### Breaking
+
+- ContentSpiel requires the Postgres extension `pg_trgm` and a database with encoding `UTF8` and a UTF-8 character type (not `C` or `POSIX`), besides Postgres 15 or later and `plpgsql` (built into every Postgres database). The four are one list, `docs/reference/hosting.md`, "Database requirements". The stack ContentSpiel ships (`postgres:17`, the site template's databases) meets all four, and the migration enables the extension itself. On a managed database, allow `pg_trgm` before upgrading. Where the migration cannot enable it, or the character type is `C`, the migration stops with a message naming the requirement, that section and the guide's "What ContentSpiel asks of its host"; a serving process whose database lost it does not start.
+- The search backend contract's test has a case for what `search` always meant: a document is found only when it holds every word of the query. A gem's backend that passed 0.7.0's contract test by ORing the words (Solr's default `q.op`) now fails that case; set the default operator to AND.
+
+### Migrations
+
+- `20261115120000_search_two`: enables `pg_trgm` and checks the character type (stopping with a message when either is missing); `search_entries.title` with its expression index; `search_words`, the site's words per language, with a trigram index. All of it is in `db/schema.rb`.
+
+### For a gem or an outside caller
+
+- The backend contract: `Query#close_matches`, `Hit#close`, `Results#correction` and `Results#close_outcome`, each with a default or read only by a backend, so a 0.7.0 backend passes unchanged, but for the every-word case under Breaking; the optional `suggest(suggest_query, deadline:)` (`SiteSearch::Backend::OPTIONAL_METHODS`), with `SuggestQuery`, `Suggestions` and `Suggestion`. `suggest` is not breaking: `METHODS` stays the six, a backend without it gives tags only, and the contract test's new cases pass for a 0.7.0 backend (the suggest cases run only for a backend that answers it). One new case spells out what `search` always meant: a document is found only when it holds every word of the query, since ContentSpiel checks a correction by such a search; an engine that ORs the words (Solr's default `q.op`) sets AND.
+- The theme contract: the Search block's `close_matches?`, `correction`, `correction_path` and `suggest_url`; a result's `tags` (each with `name` and `matched?`) and `close?`; sixteen new words under `public.blocks.search` (`close_matches`, `did_you_mean`, `tagged`, `tags_separator`, `matched_tag`, `matched_tag_before`, `matched_tag_after`, `suggestions`, `no_suggestions`, `suggestions_limited`, `suggestions_unavailable`, `suggestions_loading`, `suggestions_label`, `kind_page`, `kind_post`, `kind_tag`); the themed token `--th-search-active` (the active suggestion's ground, re-valued by a strong band); the helper `ThemeHelper#search_suggest_url`, for a theme's own header box; and the `search-suggest` script, its targets, values, option parts and states, and its endpoint's JSON keys. All are new names an older template does not call.
+- No new top-level name.
 
 ## 0.7.0 (2026-11-15)
 

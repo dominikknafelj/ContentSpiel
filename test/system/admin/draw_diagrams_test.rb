@@ -42,6 +42,20 @@ class Admin::DrawDiagramsSystemTest < ApplicationSystemTestCase
 
   def visit_list = visit_screen(admin_diagram_drawings_path)
 
+  # What Turbo keeps of the page: `turbo:before-cache`, then the clone one
+  # event-loop tick later (`View#cacheSnapshot`), read at that moment.
+  def cached_copy
+    page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      document.dispatchEvent(new Event("turbo:before-cache"))
+      setTimeout(() => {
+        const copy = document.body.cloneNode(true)
+        done({ frames: copy.querySelectorAll("[data-draw-frame], iframe").length,
+               chips: [...copy.querySelectorAll("[data-draw-row] [data-part='state']")].map((chip) => chip.textContent.trim().replace(/\\s+/g, " ")) })
+      }, 0)
+    JS
+  end
+
   def row(block, locale = "en") = "#draw-#{block.id}-#{locale}"
 
   def chip(block, locale = "en") = find("#{row(block, locale)} [data-part='state']").text.squish
@@ -259,9 +273,10 @@ class Admin::DrawDiagramsSystemTest < ApplicationSystemTestCase
     assert_chip third, "Drawn"
     assert_selector "[data-admin--diagram--draw-all-target='publish']"
 
-    page.execute_script("document.dispatchEvent(new Event('turbo:before-cache'))")
-    assert_no_selector "iframe", visible: :all
-    assert_no_selector "[data-draw-frame]", visible: :all
+    copy = cached_copy
+    assert_equal 0, copy["frames"], "the copy Turbo keeps holds no frame"
+    assert_equal [ "Not drawn yet" ] * 3, copy["chips"], "the copy holds the server's chips"
+    assert_selector "[data-draw-frame] iframe", visible: :all, count: 1
     [ first, second, third ].each { |block| assert_chip block, "Not drawn yet", wait: 0 }
     assert_equal "", reason(first)
     assert_no_selector "[data-draw-row] [data-part='reason']:not([hidden])"
@@ -274,5 +289,20 @@ class Admin::DrawDiagramsSystemTest < ApplicationSystemTestCase
     assert_equal "Draw all", start_button.text
     assert_not start_button.disabled?
     assert_equal Admin::Ui::ButtonComponent.classes(:primary), start_button[:class]
+  end
+
+  # A link inside `#content` caches the page it has just drawn: the
+  # take-back lands on the screen still showing, which builds its frame again
+  # once the copy is made, so Draw all draws.
+  test "reached by a link, draw all draws" do
+    block = diagram(FLOW)
+    visit_screen(admin_system_status_path)
+    click_link "Draw diagrams →"
+    assert_selector "h1", text: "Draw diagrams"
+    assert_selector "[data-draw-frame] iframe", visible: :all, count: 1
+    press "Draw all"
+    assert_chip block, "Drawn"
+    assert_current_drawing block, FLOW
+    assert_equal 1, @saves.size
   end
 end

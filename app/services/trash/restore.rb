@@ -80,7 +80,8 @@ module Trash
         free_slugs
         @record.assign_attributes(trashed_at: nil, trashed_by: nil, **(page? ? { trash_root_id: nil } : {}))
         @record.save!
-        SiteSearch::Indexing.record_changed(@record) if page? || @record.is_a?(Post)
+        # A slug freed to a suffix above is a word of the record's documents.
+        SiteSearch::Indexing.record_changed(@record, slug: @slug_changes.any?) if page? || @record.is_a?(Post)
         restore_referenced_assets(branch_ids)
         record_event("#{event_prefix}.restored", subject: @record, metadata: event_metadata(branch_ids))
         PublicSite.bump_version! if @record.is_a?(Forms::Form)

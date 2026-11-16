@@ -17,7 +17,7 @@ module DesignSystemEntries
     FoundationFocus FoundationIcons FoundationLayout FoundationMotion Gif GroupFields IconChip ImageField ImageViewer Mails MediaPicker Menu NoteMarker Notice
     PasswordField PatternDestructiveActions PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation PatternNotifications PatternSaving Person
     PrefixInput PresenceMarker PublicDiagramBlock RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage
-    SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSearch SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
+    SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSearch SiteSearchMatches SiteSearchSuggest SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
     StudioBlockCard StudioCommandPalette StudioDashboardCards StudioDrawDiagrams StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms
     StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioRail
     StudioSectionTile StudioSessions StudioSettings StudioShell StudioSignIn StudioSingleSignOn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations

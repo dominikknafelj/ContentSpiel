@@ -28,25 +28,135 @@ module SiteSearch
   # arithmetic holds exactly.
   MAX_TOTAL = 2**53
 
+  # What `search.close` says of a search's close matches (spec §9.1):
+  # `none` asked and none found, `found` a close hit answered, `skipped`
+  # not asked (`close_matches: false`, or a backend's own reason: a
+  # language it finds no close match in, a query that is not plain words),
+  # `timeout` the backend's close pass out of time, the exact answer
+  # standing.
+  CLOSE_OUTCOMES = %w[none found skipped timeout].freeze
+
+  # The outcomes a backend may answer itself (`Results#close_outcome`):
+  # the rest ContentSpiel reads from the query and the hits.
+  BACKEND_CLOSE_OUTCOMES = %w[skipped timeout].freeze
+
+  # The suggestions while typing (search 2 spec §4.2, §4.3): the whole
+  # answer has `SUGGEST_TIMEOUT` seconds, of which the backend's `suggest`
+  # gets `SUGGEST_BACKEND_SHARE`, and ContentSpiel's re-check, tags and
+  # addresses what is left. A prefix of `MIN_PREFIX` to `MAX_PREFIX`
+  # characters is asked; up to `SUGGEST_LIMIT` suggestions, up to
+  # `TITLE_SUGGESTIONS` titles then up to `TAG_SUGGESTIONS` tags, each kind
+  # filling the places the other leaves. The backend is asked for
+  # `SUGGEST_LIMIT` titles, so titles can fill what tags leave.
+  SUGGEST_TIMEOUT = 0.3
+  SUGGEST_BACKEND_SHARE = 0.2
+  SUGGEST_LIMIT = 8
+  TITLE_SUGGESTIONS = 5
+  TAG_SUGGESTIONS = 3
+  MIN_PREFIX = 2
+  MAX_PREFIX = 100
+
   module_function
 
   # The one caller of a backend's `search` (spec §5.7): the chosen backend's
-  # `SiteSearch::Results` for `query`, or `UNAVAILABLE`. Nothing it meets
-  # raises out of it. A failure is reported through `SiteSearch::Reports`
-  # (at most once a minute) as a `SiteSearch::Unavailable`, the backend's
-  # name and the error's class, and is scrubbed to that inside the
-  # `search.query` span, which is never handed an error: the exception event
-  # a span writes holds the error's message, and an engine's message holds
-  # the address it asked, which holds the query. The span records the
-  # backend, the outcome, the total and the page, and never the query (spec
-  # §9).
+  # `SiteSearch::Results` for `query`, its correction verified (`verified`),
+  # or `UNAVAILABLE`. Nothing it meets raises out of it. A failure is
+  # reported through `SiteSearch::Reports` (at most once a minute) as a
+  # `SiteSearch::Unavailable`, the backend's name and the error's class,
+  # and is scrubbed to that inside the `search.query` span, which is never
+  # handed an error: the exception event a span writes holds the error's
+  # message, and an engine's message holds the address it asked, which
+  # holds the query. The span records the backend, the outcome, the total,
+  # the page, `search.close` and whether a correction is drawn, and never
+  # the query or the correction (spec §9).
+  #
+  # ONE DEADLINE, `TIMEOUT` from here, holds the search and its verifying
+  # search. The span is ContentSpiel's alone: a backend says what its close
+  # pass did in its answer (`Results#close_outcome`), never on the span.
   def search(query)
     backend = Backends.current_name
+    deadline = clock + TIMEOUT
     Telemetry.in_span("search.query", attributes: { "search.backend" => backend, "search.page" => query.page }) do |span|
-      answer = ask(query, backend)
-      Telemetry.record(span, "search.outcome" => outcome_of(answer), "search.results" => answer == UNAVAILABLE ? 0 : answer.total)
+      answer = ask(query, backend, deadline)
+      answer = verified(query, answer, deadline: deadline) unless answer == UNAVAILABLE
+      Telemetry.record(span, "search.outcome" => outcome_of(answer), "search.results" => answer == UNAVAILABLE ? 0 : answer.total,
+        "search.close" => close_of(query, answer), "search.correction" => answer != UNAVAILABLE && !answer.correction.nil?)
       answer
     end
+  end
+
+  # The suggestions for what a visitor has typed so far (search 2 spec
+  # §4.3), a `SiteSearch::SuggestAnswer`: `:ok` with its items, or
+  # `:unavailable` with none. Nothing it meets raises out of it.
+  #
+  # A prefix normalised (`Query.normalise`) to under `MIN_PREFIX`, over
+  # `MAX_PREFIX` or nothing answers `:ok` with no items and asks nothing.
+  # Otherwise the backend's `suggest`, when it has one (`OPTIONAL_METHODS`:
+  # without it the titles are none and the tags still come), with a
+  # deadline `SUGGEST_BACKEND_SHARE` from now, scrubbed by
+  # `Unavailable.scrubbing` and checked for its shape; an answer after the
+  # deadline is a failure, as a search's. Then ContentSpiel's part, under
+  # what is left of `SUGGEST_TIMEOUT` (`SuggestAnswer.build`). Any failure
+  # answers `:unavailable` and is reported through `Reports.report_suggest`,
+  # a minute of its own.
+  #
+  # THE PREFIX travels only as binds and as the backend's query: the span
+  # `search.suggest` records the backend, the outcome and the count, never
+  # the prefix, its length or a digest. A backend never writes on it.
+  def suggest(text:, language:, now:)
+    backend = Backends.current_name
+    started = clock
+    Telemetry.in_span("search.suggest", attributes: { "search.backend" => backend }) do |span|
+      answer = suggest_answer(Query.normalise(text), language.to_s, now, backend, started)
+      Telemetry.record(span, "search.outcome" => answer.state.to_s, "search.suggestions" => answer.items.size)
+      answer
+    end
+  end
+
+  def suggest_answer(prefix, language, now, backend, started)
+    return SuggestAnswer.new(state: :ok, items: []) if prefix.nil? || !(MIN_PREFIX..MAX_PREFIX).cover?(prefix.length)
+
+    Unavailable.scrubbing(backend: backend) do
+      titles = suggested_titles(SuggestQuery.new(text: prefix, language: language, now: now, limit: SUGGEST_LIMIT), started + SUGGEST_BACKEND_SHARE)
+      SuggestAnswer.build(prefix: prefix, titles: titles, language: language, now: now, deadline: started + SUGGEST_TIMEOUT)
+    end
+  rescue Unavailable => error
+    Reports.report_suggest(backend: backend, error: error)
+    SuggestAnswer.new(state: :unavailable, items: [])
+  end
+
+  # The backend's suggestions, checked, or none when it has no `suggest`.
+  def suggested_titles(query, deadline)
+    current = Backends.current
+    return [] unless current.respond_to?(:suggest)
+
+    answer = current.suggest(query, deadline: deadline)
+    raise Timeout::Error if clock > deadline
+
+    checked_suggestions(answer).first(query.limit)
+  end
+
+  # `answer.items` when it is what the contract says (`SiteSearch::Suggestions`,
+  # an Array of `SiteSearch::Suggestion`s with Integer ids); raises
+  # `TypeError` otherwise, which the caller scrubs to its class.
+  def checked_suggestions(answer)
+    raise TypeError, "a backend's suggest answers SiteSearch::Suggestions" unless answer.is_a?(Suggestions)
+    raise TypeError, "suggestions are an Array" unless answer.items.is_a?(Array)
+    answer.items.each do |item|
+      raise TypeError, "a suggestion is a SiteSearch::Suggestion with Integer ids" unless item.is_a?(Suggestion) && item.record_id.is_a?(Integer) && item.copy_id.is_a?(Integer)
+    end
+    answer.items
+  end
+
+  # `search.close` (`CLOSE_OUTCOMES`), read from the verified answer:
+  # `skipped` for a query without `close_matches`, `found` when a hit is
+  # close, else the backend's own `close_outcome`, else `none`.
+  def close_of(query, answer)
+    return "skipped" unless query.close_matches
+    return "none" if answer == UNAVAILABLE
+    return "found" if answer.hits.any?(&:close)
+
+    answer.close_outcome || "none"
   end
 
   # The backend's answer, or `UNAVAILABLE` with the failure reported. An
@@ -55,9 +165,8 @@ module SiteSearch
   # the wrong shape (`checked`), inside the scrubbed path, since the page
   # would otherwise raise on it while drawing, a 500; and every snippet is
   # cut to `SNIPPET_LENGTH`.
-  def ask(query, backend)
+  def ask(query, backend, deadline)
     Unavailable.scrubbing(backend: backend) do
-      deadline = clock + TIMEOUT
       results = Backends.current.search(query, deadline: deadline)
       raise Timeout::Error if clock > deadline
 
@@ -68,17 +177,66 @@ module SiteSearch
     UNAVAILABLE
   end
 
+  # `results` with its correction kept only when a search for it finds a
+  # page a visitor sees now (spec §3.5), whatever the backend: an outside
+  # engine's spellcheck reads its whole index, scheduled copies included,
+  # and the built-in's vocabulary keeps a word a pending or purged copy
+  # held, so this search is what keeps a word that is not public yet from
+  # being offered. A verifying search that fails is reported as any
+  # failure and drops the correction; the answer stands.
+  def verified(query, results, deadline:)
+    return results if results.correction.nil?
+
+    results.with(correction: kept_correction(query, results, deadline))
+  end
+
+  # The correction normalised (`Query.normalise`), or nil, the cheap
+  # checks first and the verifying search last. It is weighed only on the
+  # first page of an answer with no exact hit: one with no match at all
+  # (`total` 0, on any page), or a page 1 whose first hit is close (no close
+  # hit stands before an exact one, so it holds none); never on a later
+  # page, nor on an empty page past the end of exact hits. It is dropped,
+  # unasked, when it is blank, longer than `Query::MAX_LENGTH`, the query
+  # again ignoring case, or made of syntax (no letter or digit, as `*:*`:
+  # that an engine escapes it to nothing is not relied on), and when no
+  # time is left. Otherwise one exact search (`close_matches: false`, page
+  # 1, one hit) in the query's language and view, under the same deadline,
+  # must answer an exact hit that `Shown` keeps.
+  def kept_correction(query, results, deadline)
+    return nil unless results.total.zero? || (query.page == 1 && results.hits.first&.close == true)
+
+    text = Query.normalise(results.correction)
+    return nil if text.nil? || text.length > Query::MAX_LENGTH
+    return nil if text.casecmp?(query.text) || !text.match?(/[\p{L}\p{N}]/)
+    return nil if clock >= deadline
+    return nil unless shown_exact?(query.with(text: text, page: 1, per_page: 1, close_matches: false), deadline)
+
+    text
+  end
+
+  def shown_exact?(query, deadline)
+    found = ask(query, Backends.current_name, deadline)
+    return false if found == UNAVAILABLE
+
+    Shown.for(found.with(hits: found.hits.reject(&:close)), locale: query.language, now: query.now).any?
+  end
+
   # `results` when it is what the contract says (`SiteSearch::Results`, an
-  # Integer total from 0 below `MAX_TOTAL`, an Array of `SiteSearch::Hit`s with Integer ids, each
-  # snippet nil or plain text with `[start, length]` pairs of Integers);
+  # Integer total from 0 below `MAX_TOTAL`, an Array of `SiteSearch::Hit`s
+  # with Integer ids and a Boolean `close`, each snippet nil or plain text
+  # with `[start, length]` pairs of Integers, a correction nil or a String,
+  # a close outcome nil or one of `BACKEND_CLOSE_OUTCOMES`);
   # raises `TypeError` otherwise, which the caller scrubs to its class.
   def checked(results)
     raise TypeError, "a search backend answers SiteSearch::Results" unless results.is_a?(Results)
     raise TypeError, "a total is an Integer from 0 below 2**53" unless results.total.is_a?(Integer) && (0...MAX_TOTAL).cover?(results.total)
     raise TypeError, "hits are an Array" unless results.hits.is_a?(Array)
+    raise TypeError, "a correction is nil or a String" unless results.correction.nil? || results.correction.is_a?(String)
+    raise TypeError, "a close outcome is nil, skipped or timeout" unless results.close_outcome.nil? || BACKEND_CLOSE_OUTCOMES.include?(results.close_outcome)
 
     results.hits.each do |hit|
       raise TypeError, "a hit is a SiteSearch::Hit with Integer ids" unless hit.is_a?(Hit) && hit.record_id.is_a?(Integer) && hit.copy_id.is_a?(Integer)
+      raise TypeError, "a hit's close is true or false" unless hit.close == true || hit.close == false
       raise TypeError, "a snippet is plain text with pairs of Integers" unless hit.snippet.nil? || snippet?(hit.snippet)
     end
     results
@@ -134,5 +292,5 @@ module SiteSearch
   # video or a rule ("[image]"), which are no words of the page.
   def paragraphs(document) = document.plain_paragraphs - RichText::Document::PLAIN_PLACEHOLDERS.values
 
-  private_class_method :ask, :checked, :snippet?, :cut_snippets, :outcome_of, :clock
+  private_class_method :suggest_answer, :suggested_titles, :checked_suggestions, :ask, :close_of, :verified, :kept_correction, :shown_exact?, :checked, :snippet?, :cut_snippets, :outcome_of, :clock
 end

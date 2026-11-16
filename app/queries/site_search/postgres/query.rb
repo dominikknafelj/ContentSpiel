@@ -1,21 +1,23 @@
 module SiteSearch
   class Postgres
     # The built-in backend's answer to a `SiteSearch::Query` (search spec
-    # §6.3): the entries of the query's language that match its words and
-    # that a visitor sees at `query.now`, best first, a page of them with
-    # their snippets, and how many there are.
+    # §6.3, search 2 spec §3.3, §3.4): the entries of the query's language
+    # that match its words and that a visitor sees at `query.now`
+    # (`Visible`), best first, a page of them with their snippets, and how
+    # many there are.
     #
-    # What a visitor sees is decided here, from the site's own tables at the
-    # query's `now`, and never by a job at a copy's time: an entry is of the
-    # copy in force (`in_force`), of a record with a current address in the
-    # language (`addressed`), kept and published (`kept_and_published`), and
-    # under no page that is not published (`visible`). So a scheduled copy is
-    # found at its `live_at` and a scheduled record at its `published_at`,
-    # with nothing written then.
+    # Up to two passes. The exact pass is `websearch_to_tsquery` over the
+    # entries. Then, in a language `simple` splits into words, the close
+    # pass (`Close`) when the exact pass found fewer than `CLOSE_BELOW`, the
+    # query asks for close matches and is plain words; in a `LIMITED`
+    # language, always, the contains pass (`Contains`), whose hits follow the
+    # exact pass's in one list. Each second pass runs in a savepoint of its
+    # own, held to `CLOSE_SHARE` of the deadline, and one that runs out of
+    # time leaves the exact answer standing.
     #
-    # The visitor's words reach the database only as the bind `q`
+    # The visitor's words reach the database only as binds named `q`
     # (`SqlNodes.bound`), never in the statement's text, so no log line holds
-    # them. Both statements run in a transaction of their own, each under a
+    # them. Every statement runs in a transaction of its own, each under a
     # statement timeout of the time left before the deadline when it starts
     # (`in_time_left`), and that transaction is rolled back, so the timeout
     # ends with it whatever transaction the caller is in (a `SET LOCAL`
@@ -36,6 +38,12 @@ module SiteSearch
         [ (seconds_left * 1000).floor, 1 ].max
       end
 
+      def self.clock = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      # The deadline of a second pass that starts now: `CLOSE_SHARE` from
+      # now, or the search's own deadline when that is sooner.
+      def self.share_of(deadline) = [ deadline, clock + CLOSE_SHARE ].min
+
       def initialize(query, deadline:)
         @query = query
         @deadline = deadline
@@ -44,8 +52,8 @@ module SiteSearch
       def results
         answer = nil
         Entry.transaction(requires_new: true) do
-          hits = in_time_left { page_of_hits }
-          answer = Results.new(hits: hits, total: in_time_left { total })
+          exact = Results.new(hits: hits_for(tsquery, close: false), total: total_for(tsquery))
+          answer = with_second_pass(exact)
           raise ActiveRecord::Rollback
         end
         answer
@@ -57,71 +65,49 @@ module SiteSearch
       # matches nothing.
       def tsquery = SqlNodes.function("websearch_to_tsquery", regconfig, SqlNodes.bound(@query.text, name: "q"))
 
-      # The entries a visitor at `now` finds by these words.
-      def matches
-        Entry.where(locale: @query.language)
-          .where(Arel::Nodes::InfixOperation.new("@@", entries[:document], tsquery))
-          .where(in_force).where(addressed).where(kept_and_published).where(visible)
-      end
+      # `document @@ tsquery`: the entry holds the words of `tsquery`.
+      def held_by(tsquery) = Arel::Nodes::InfixOperation.new("@@", entries[:document], tsquery)
 
-      # The entry is of the copy in force: its own time has come, and no
-      # entry of the same record and language is of a later copy whose time
-      # has come too. Copies' ids and `live_at` rise together; the pair is
-      # compared, so two copies of one moment still name one.
-      def in_force
-        later = entries.alias("later")
-        newer = Arel::SelectManager.new(later).project(1).where(
-          later[:record_type].eq(entries[:record_type])
-            .and(later[:record_id].eq(entries[:record_id]))
-            .and(later[:locale].eq(entries[:locale]))
-            .and(later[:live_at].lteq(now))
-            .and(SqlNodes.row(later[:live_at], later[:published_version_id]).gt(SqlNodes.row(entries[:live_at], entries[:published_version_id])))
-        )
-        entries[:live_at].lteq(now).and(newer.exists.not)
-      end
-
-      # The record has a current address in the entry's language.
-      def addressed
-        SqlNodes.exists(PublicPath.where(current: true).where(path_of_entry).select(:id))
-      end
-
-      # The record is not in the trash and its publication time has come.
-      def kept_and_published
-        [ Page, Post ].map do |model|
-          kept = model.where(trashed_at: nil, published_at: ..@query.now).where(model.arel_table[:id].eq(entries[:record_id])).select(:id)
-          entries[:record_type].eq(model.polymorphic_name).and(SqlNodes.exists(kept))
-        end.reduce(:or)
-      end
-
-      # No page above the record is unpublished (the resolver's rule,
-      # `PublicSite::Resolver.visible_among`): a page's own chain, or the
-      # chain of the page that gives a post its address in this language.
-      def visible
-        paths = PublicPath.arel_table
-        host = PublicPath.where(current: true).where(path_of_entry).where.not(listed_on_id: nil).where(hidden_above(paths[:listed_on_id]).not).select(:id)
-        page = entries[:record_type].eq(Page.polymorphic_name).and(hidden_above(entries[:record_id]).not)
-        post = entries[:record_type].eq(Post.polymorphic_name).and(SqlNodes.exists(host))
-        page.or(post)
+      # The entries a visitor at `now` finds by `tsquery`.
+      def matches(tsquery = self.tsquery)
+        Entry.where(locale: @query.language).where(held_by(tsquery)).where(Visible.new(now: @query.now).all)
       end
 
       # `ts_rank_cd(weights, document, tsquery, 1)`: a title's match outranks
       # a summary's, a body's and a code's.
-      def rank = SqlNodes.function("ts_rank_cd", SqlNodes.cast(WEIGHTS, "real[]"), entries[:document], tsquery, NORMALISATION)
+      def rank(tsquery = self.tsquery) = SqlNodes.function("ts_rank_cd", SqlNodes.cast(WEIGHTS, "real[]"), entries[:document], tsquery, NORMALISATION)
 
       # `ts_headline` over a hit's text, the matched words between the two
       # marks.
-      def headline(text) = SqlNodes.function("ts_headline", regconfig, text, tsquery, HEADLINE)
+      def headline(text, tsquery = self.tsquery) = SqlNodes.function("ts_headline", regconfig, text, tsquery, HEADLINE)
 
-      def total = matches.count
+      # The page's hits for `tsquery`, each `close` as handed, under the time
+      # left: ranked and cut in the inner query, and only those rows given a
+      # headline, which is the expensive part.
+      def hits_for(tsquery, close:)
+        in_time_left do
+          ranked = matches(tsquery)
+            .select(entries[:record_type], entries[:record_id], entries[:published_version_id], entries[:text], rank(tsquery).as("rank"))
+            .order(rank(tsquery).desc, entries[:record_type].asc, entries[:record_id].asc)
+            .limit(@query.per_page).offset(@query.offset)
+          page = entries.alias("hits")
+          Entry.from(ranked, :hits)
+            .order(page[:rank].desc, page[:record_type].asc, page[:record_id].asc)
+            .pluck(page[:record_type], page[:record_id], page[:published_version_id], page[:rank], headline(page[:text], tsquery))
+            .map do |record_type, record_id, copy_id, rank, headline|
+              Hit.new(record_type: record_type, record_id: record_id, copy_id: copy_id, language: @query.language,
+                snippet: Postgres.snippet_of(headline), rank: rank, close: close)
+            end
+        end
+      end
 
-      private
+      def total_for(tsquery) = in_time_left { matches(tsquery).count }
 
       # The block's statement under a timeout of the time left now: Postgres
-      # times each statement on its own, so the page and the count are each
-      # held to what is left when they start, and neither starts once nothing
-      # is, which raises before the database is asked. Inside the search's
-      # own transaction (a lazy one: a raise before the first statement sends
-      # nothing at all).
+      # times each statement on its own, so each is held to what is left
+      # when it starts, and none starts once nothing is, which raises before
+      # the database is asked. Inside the search's own transaction (a lazy
+      # one: a raise before the first statement sends nothing at all).
       def in_time_left
         timeout = self.class.timeout_in_ms(@deadline - clock)
         raise ActiveRecord::QueryCanceled, "the search's deadline passed before the database was asked" unless timeout
@@ -131,42 +117,40 @@ module SiteSearch
         yield
       end
 
-      def clock = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-
-      # The page's hits: ranked and cut in the inner query, and only those
-      # rows given a headline, which is the expensive part.
-      def page_of_hits
-        ranked = matches
-          .select(entries[:record_type], entries[:record_id], entries[:published_version_id], entries[:text], rank.as("rank"))
-          .order(rank.desc, entries[:record_type].asc, entries[:record_id].asc)
-          .limit(@query.per_page).offset(@query.offset)
-        page = entries.alias("hits")
-        Entry.from(ranked, :hits)
-          .order(page[:rank].desc, page[:record_type].asc, page[:record_id].asc)
-          .pluck(page[:record_type], page[:record_id], page[:published_version_id], page[:rank], headline(page[:text]))
-          .map do |record_type, record_id, copy_id, rank, headline|
-            Hit.new(record_type: record_type, record_id: record_id, copy_id: copy_id, language: @query.language,
-              snippet: Postgres.snippet_of(headline), rank: rank)
-          end
-      end
-
-      # A current address of the entry's record in the entry's language.
-      def path_of_entry
-        paths = PublicPath.arel_table
-        paths[:record_type].eq(entries[:record_type]).and(paths[:record_id].eq(entries[:record_id])).and(paths[:locale].eq(entries[:locale]))
-      end
-
-      # `EXISTS` a page above `page_id`, or the page itself, that is not
-      # published at `now`.
-      def hidden_above(page_id)
-        hierarchy = PageHierarchy.arel_table
-        SqlNodes.exists(PageHierarchy.where(hierarchy[:descendant_id].eq(page_id))
-          .where.not(ancestor_id: Page.where(published_at: ..@query.now).select(:id)).select(:ancestor_id))
-      end
-
       def regconfig = SqlNodes.cast(Postgres.config_for(@query.language), "regconfig")
 
-      def now = SqlNodes.quoted(@query.now)
+      private
+
+      # The exact answer with the second pass's: the contains pass in a
+      # `LIMITED` language, the close pass where it is due. With
+      # `CLOSE_BELOW` 1 the close pass runs only when the exact pass found
+      # nothing, so its page is the query's own and its correction is
+      # offered only on an answer with no exact hit.
+      def with_second_pass(exact)
+        return contained(exact) if LIMITED.include?(@query.language)
+        return exact unless @query.close_matches && exact.total < CLOSE_BELOW
+
+        close = Close.new(@query, deadline: @deadline)
+        return exact.with(close_outcome: "skipped") unless close.plain?
+
+        found = close.results
+        exact.with(hits: exact.hits + found.hits, total: exact.total + found.total, correction: found.correction)
+      rescue ActiveRecord::QueryCanceled
+        exact.with(close_outcome: "timeout")
+      end
+
+      # The contains pass's hits after the exact pass's, never one twice,
+      # and the total both. No close pass runs in these languages, so the
+      # answer says it skipped one, and a contains pass out of time leaves
+      # the exact answer.
+      def contained(exact)
+        found = Contains.new(@query, deadline: @deadline, exclude: held_by(tsquery), after: exact.total).results
+        exact.with(hits: exact.hits + found.hits, total: exact.total + found.total, close_outcome: "skipped")
+      rescue ActiveRecord::QueryCanceled
+        exact.with(close_outcome: "skipped")
+      end
+
+      def clock = self.class.clock
 
       def entries = Entry.arel_table
     end

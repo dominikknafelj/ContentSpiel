@@ -21,6 +21,14 @@ class SiteSearch::QueryTest < ActiveSupport::TestCase
     assert_predicate SiteSearch::Query.normalise("a\xFFb".b), :valid_encoding?
   end
 
+  # A bidi override echoed in "Nothing found for …" would make the site's
+  # own sentence read as other text; the joiners stay, since a word of
+  # Persian or Hindi and an emoji sequence are written with them.
+  test "normalise takes out the bidi controls and zero-width spaces, and keeps the joiners" do
+    assert_equal "abcdefg", SiteSearch::Query.normalise("a\u202Eb\u2066c\u200Fd\u200Be\uFEFFf\u061Cg")
+    assert_equal "\u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645 \u{1F469}\u200D\u{1F4BB}", SiteSearch::Query.normalise("\u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645 \u{1F469}\u200D\u{1F4BB}")
+  end
+
   test "normalise keeps a long query whole: the length is judged after it" do
     text = "a" * (SiteSearch::Query::MAX_LENGTH + 1)
     assert_equal text, SiteSearch::Query.normalise(text)
