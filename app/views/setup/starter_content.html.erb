@@ -2,7 +2,7 @@
 <h1 class="text-h1 font-semibold"><%= t(".heading") %> <span class="text-label text-meta"><%= t("setup.layout.optional") %></span></h1>
 <p class="mt-2 text-dim"><%= t(".intro_html", path: tag.code("/", class: "font-cs-mono")) %></p>
 <ul class="mt-4 list-disc space-y-1 pl-5 text-dim">
-  <li><%= t(".pages_html", blog: tag.strong(t(".blog"), class: "text-ink"), resume: tag.strong(t(".resume"), class: "text-ink"), now: tag.strong(t(".now"), class: "text-ink")) %></li>
+  <li><%= t(".pages_html", pages: safe_join(starter_page_titles.map { |title| tag.strong(title, class: "text-ink") }, t("setup.list_separator"))) %></li>
   <li><%= t(".posts") %></li>
 </ul>
 
