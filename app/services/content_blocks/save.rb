@@ -60,6 +60,16 @@ module ContentBlocks
       image_refusal = media_choice_result(@block, :media_asset_id, :image)
       return image_refusal if image_refusal
 
+      # Before the transaction and before anything is assigned: a read that
+      # takes no lock, so the first lock stays `ContentTypes.hold!` in
+      # `lock_owner`. An image trashed between this check and the write is
+      # stored and skipped when drawn, as a hero's is; no lock is added.
+      # The type is the one about to be assigned: a new block has none yet.
+      if @attributes.key?(:settings)
+        list_refusal = media_fields_choice_result(@block, BlockTypes.find(@attributes[:block_type] || @block.block_type), @attributes[:settings])
+        return list_refusal if list_refusal
+      end
+
       # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
       # (rescued below) mustn't abort the caller's transaction.
       saved = ContentBlock.transaction(requires_new: true) do

@@ -1,6 +1,8 @@
 require "test_helper"
 
 class ContentBlocks::SaveTest < ActiveSupport::TestCase
+  include TestTypes
+
   test "appends to the end of the page's blocks when position is nil" do
     page = create_page(title: "Page")
 
@@ -505,6 +507,83 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert_raises(Mobility::InvalidLocale) do
       ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" },
         translations: { "xx" => { caption: "C" } })
+    end
+  end
+
+  # --- A media list's images (Review Focus 2) ---
+
+  def list_editor_without_media
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: {})
+    users(:editor_branch)
+  end
+
+  def save_images(actor, block, images)
+    as(actor) { ContentBlocks::Save.call(block, attributes: { settings: { "images" => images } }) }
+  end
+
+  test "a new id needs media.upload and a kept image, and a reorder or removal needs neither" do
+    with_media_list_type do
+      first = create_media_asset
+      second = create_media_asset
+      gone = create_media_asset.tap { |asset| asset.update_columns(trashed_at: Time.current) } # version: none (a test trashes the image)
+      page = create_page(title: "Page", published: false)
+      block = as_owner { media_list_block(page, [ first.id, second.id ]) }
+      editor = list_editor_without_media
+      denials = Audit::Event.where(action: "access.denied")
+
+      # A new id without the permission: one denial, nothing written.
+      assert_difference -> { denials.count }, 1 do
+        result = save_images(editor, block, [ first.id, second.id, create_media_asset.id ])
+        assert result.denied?
+        assert_equal [ "You don't have permission to upload media" ], result.errors
+      end
+      assert_equal [ first.id, second.id ], block.reload.settings["images"]
+
+      # A reorder and a removal need neither the permission nor a lookup.
+      assert save_images(editor, block, [ second.id, first.id ]).ok?
+      assert_equal [ second.id, first.id ], block.reload.settings["images"]
+      assert save_images(editor, block, [ first.id ]).ok?
+      assert_equal [ first.id ], block.reload.settings["images"]
+
+      # With the permission, a trashed id and a missing id are the field's error.
+      [ gone.id, Media::Asset.maximum(:id) + 1000 ].each do |bad|
+        result = save_images(users(:one), ContentBlock.find(block.id), [ first.id, bad ])
+        assert_not result.ok?
+        assert_equal [ "Images has an image that doesn't exist" ], result.errors
+        assert_equal [ first.id ], block.reload.settings["images"]
+      end
+
+      # A kept new id is saved.
+      assert save_images(users(:one), block, [ first.id, second.id ]).ok?
+      assert_equal [ first.id, second.id ], block.reload.settings["images"]
+    end
+  end
+
+  test "every id of a new block is new, so a duplicate-shaped create needs media.upload" do
+    with_media_list_type do
+      page = create_page(title: "Page", published: false)
+      result = as(list_editor_without_media) do
+        ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "test_media_list", settings: { "images" => [ create_media_asset.id ] } })
+      end
+
+      assert result.denied?
+      assert_equal 0, page.content_blocks.count
+    end
+  end
+
+  test "the permission is asked before any image is looked up" do
+    with_media_list_type do
+      page = create_page(title: "Page", published: false)
+      block = as_owner { media_list_block(page, []) }
+      queries = []
+      watcher = ->(*, payload) { queries << payload[:sql] if payload[:sql].include?("media_assets") }
+
+      result = ActiveSupport::Notifications.subscribed(watcher, "sql.active_record") do
+        save_images(list_editor_without_media, block, [ 999_999 ])
+      end
+
+      assert result.denied?
+      assert_empty queries
     end
   end
 end

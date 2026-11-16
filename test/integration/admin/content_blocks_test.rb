@@ -1906,4 +1906,19 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=update][target='block-#{block.id}-hold'] template [role=alert]", text: /is editing this block\. Your changes weren't saved\./
     assert_equal "#{DIAGRAM_SOURCE}\n  B --> C", block.reload.translated_settings.dig("en", "source")
   end
+
+  test "a forged list in a block form answers 422 with the field's error and writes nothing" do
+    with_media_list_type do
+      block = media_list_block_as_owner
+      patch "#{blocks_path}/#{block.id}", params: { block: { settings: { images: [ (Media::Asset.maximum(:id).to_i + 1000).to_s ] } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+
+      assert_response :unprocessable_entity
+      assert_includes response.body, "has an image that doesn&#39;t exist"
+      assert_equal [], block.reload.settings["images"].to_a
+    end
+  end
+
+  def media_list_block_as_owner
+    as_owner { media_list_block(@page, []) }
+  end
 end

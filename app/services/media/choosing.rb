@@ -57,6 +57,38 @@ module Media
       failure(record)
     end
 
+    # The images a block's `:media_list` fields gain (`ContentBlocks::Save`,
+    # called with the new settings before the transaction and before
+    # anything is assigned). Only an id the stored settings do not already
+    # hold is a choice: a reorder, a removal and a resend need nothing
+    # beyond the edit right, and every id of a new block is new, so a
+    # duplicate needs `media.upload` as an Image block's does. The
+    # permission is asked before any image is looked up (no probing of
+    # which ids exist); a trashed or missing id is that field's error.
+    #
+    # A read, no lock: the transaction's first lock stays the settings row
+    # (`ContentTypes.hold!` in `lock_owner`). An image trashed between this
+    # check and the write is stored and skipped when drawn, as a hero's is,
+    # and no lock is added for it.
+    def media_fields_choice_result(record, definition, new_settings)
+      return unless definition && new_settings.respond_to?(:to_h)
+
+      stored = definition.media_ids_in(record.settings_in_database)
+      gained = definition.media_ids_in(new_settings) - stored
+      return if gained.empty?
+      return denied("media.upload", record) unless authorize!("media.upload", record)
+
+      kept = Media::Asset.kept.where(id: gained).pluck(:id)
+      values = new_settings.to_h.stringify_keys
+      definition.fields.each do |field|
+        ids = field.field_type&.media_ids&.call(values[field.name]).to_a
+        next if ((ids & gained) - kept).empty?
+
+        record.errors.add("settings.#{field.name}", "has an image that doesn't exist")
+      end
+      failure(record) if record.errors.any?
+    end
+
     # The failure for a save the FK refused (see the module comment). The
     # transaction has rolled back; the refused reference is still assigned
     # in memory, so it tells the two cases apart: the record's own
