@@ -64,6 +64,15 @@ module ThemeTestHelper
 
   def with_card_theme(&block) = Theme.with(card_theme, &block)
 
+  # An eleventh theme (`test/fixtures/themes/gallery`): its own template for
+  # the Gallery block, written from the reference's section alone
+  # (docs/reference/theming.md, "The Gallery block"), and a stylesheet for it.
+  GALLERY = Rails.root.join("test/fixtures/themes/gallery")
+
+  def gallery_theme = Theme.load(ThemeFolder.new(GALLERY))
+
+  def with_gallery_theme(&block) = Theme.with(gallery_theme, &block)
+
   # A ninth theme (`test/fixtures/themes/form`): its own template for the
   # Form block and for a short text answer, written from the reference's
   # section alone (docs/reference/theming.md, "The Form block"), and a

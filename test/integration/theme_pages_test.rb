@@ -734,6 +734,45 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_select "div.content-block--card svg", count: 0
   end
 
+  test "a theme replaces the Gallery's template from the contract's names alone, and a theme that does not is drawn the default one" do
+    walks = create_page(title: "Walks")
+    assets = Array.new(3) { create_media_asset }
+    assets.each_with_index { |asset, index| asset.update!(alt: "Library alt #{index + 1}") }
+    texts = { assets.first.id.to_s => { "caption" => "<b>Pier</b> & sea" } }
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: walks),
+      attributes: { block_type: "gallery", settings: { "layout" => "carousel", "label" => "<i>Harbour</i>", "images" => assets.map(&:id), "texts" => texts } })
+    assert result.ok?, result.errors.to_sentence
+    block = result.record
+    publish_changes(walks)
+
+    with_gallery_theme { get "/walks" }
+
+    assert_response :success
+    assert_select "div.content-block--gallery", count: 0
+    assert_select "section.reel[data-block='#{block.id}'][data-page='#{walks.id}'][aria-roledescription=carousel][aria-label='<i>Harbour</i>']" do
+      assert_select "[data-controller=gallery-carousel][data-gallery-carousel-position-value='%{index} of %{count}'][data-gallery-carousel-moved-value='Image %{index} of %{count}']", count: 1
+      assert_select "[data-gallery-carousel-target=controls][hidden]", count: 1
+      assert_select "button[data-gallery-carousel-target=previous][data-action='gallery-carousel#previous'][aria-label='Previous image'][aria-controls='gallery-#{block.id}-track']", count: 1
+      assert_select "button[data-gallery-carousel-target=next][data-action='gallery-carousel#next'][aria-label='Next image']", count: 1
+      assert_select "div.reel__track#gallery-#{block.id}-track[tabindex='0'][aria-label=Images][data-gallery-carousel-target=track]", count: 1
+      assert_select "div.reel__slide[role=group][aria-roledescription=slide][data-gallery-carousel-target=slide]", count: 3
+      assert_select "div.reel__slide:nth-child(2)[aria-label='2 of 3']", count: 1
+      assert_select "div.reel__slide:first-child figcaption", text: "<b>Pier</b> & sea"
+      assert_select "figcaption b", count: 0
+      assert_select "button[data-gallery-carousel-target=pick][data-action='gallery-carousel#show']", count: 3
+      assert_select "button[data-gallery-carousel-target=pick][data-gallery-carousel-index-param='3'][aria-label='Show image 3']", count: 1
+      assert_select "[data-gallery-carousel-target=position]", text: "1 of 3"
+      assert_select "[data-gallery-carousel-target=status][aria-live=polite][hidden]", count: 1
+      assert_select "img[alt='Library alt 1']", count: 1
+    end
+
+    with_plain_theme { get "/walks" }
+
+    assert_response :success
+    assert_select "section.content-block--gallery--carousel .content-block--gallery__track", count: 1
+    assert_select "section.reel", count: 0
+  end
+
   test "a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one" do
     guide = create_page(title: "Guide")
     result = ContentBlocks::Save.call(ContentBlock.new(owner: guide), attributes: { block_type: "note", settings: { "kind" => "warning", "title" => "<b>Mind</b>" } },

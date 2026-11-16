@@ -337,6 +337,12 @@ Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothi
 | `--th-on-band-strong` | text on the strong band |
 | `--th-on-band-strong-dim` | secondary text on the strong band |
 | `--th-on-band-strong-accent` | links on the strong band |
+| `--th-gallery-stage` | a Gallery: the ground behind an image shown whole |
+| `--th-gallery-control` | a Gallery: a Previous or Next button's ground |
+| `--th-gallery-control-ink` | a Gallery: a button's arrow |
+| `--th-gallery-control-edge` | a Gallery: a button's edge, a 1px ring of `box-shadow` (3:1) |
+| `--th-gallery-pick` | a Gallery: a picker dot's ring at rest (3:1) |
+| `--th-gallery-pick-current` | a Gallery: the current dot |
 | `--th-syn-comment` | code: comments |
 | `--th-syn-keyword` | code: keywords |
 | `--th-syn-string` | code: string literals |
@@ -412,6 +418,7 @@ Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothi
 | `--th-radius-pill` | a pill's radius |
 | `--th-ease` | the easing of transitions |
 | `--th-diagram-font` | a diagram's face: the one its boxes were measured in |
+| `--th-gallery-gap` | a Gallery grid's gap (`--th-sp-3`, 14px) |
 
 `--th-preview-bg`, `--th-preview-ink`, `--th-ph-a`, `--th-ph-b` and `--th-diagram-dark-1` … `-6` are the CMS's own (the preview bar, the image placeholder, a diagram's dark series grounds; `Theme::Contract::OWN_TOKENS`) and not in the contract. The default theme's styles and templates hold no colour literal: `tokens.css` is the one place.
 
@@ -481,6 +488,7 @@ Under the theme's `components/`, as `<path>.html.erb`. The methods are what the 
 | `blocks/form_component` | `block`, `page`, `form_name`, `fields`, `action`, `locale`, `page_id`, `drawn`, `honeypot`, `submit_label`, `thank_you`, `unavailable`, `string` |
 | `blocks/search_component` | `block`, `page`, `label`, `query`, `state`, `results`, `total`, `pagination`, `action`, `live_note?`, `close_matches?`, `correction`, `correction_path`, `suggest_url`, `string` |
 | `blocks/card_component` | `block`, `page`, `title`, `text`, `link`, `icon`, `icon_name`, `image` |
+| `blocks/gallery_component` | `block`, `page`, `layout`, `ratio`, `fit`, `label`, `items`, `sizes`, `string`, `pattern` |
 | `blocks/post_list_component` | `block`, `page`, `list_component` |
 | `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width`, `style`, `anchor` |
 | `blocks/form_fields/short_text_component` | `field`, `value`, `error` |
@@ -583,8 +591,11 @@ The CMS's own scripts that a theme's template drives by writing their markup (`T
 | Script | Its markup and its answer |
 |---|---|
 | `search-suggest` | the suggestions while typing (`app/javascript/controllers/search_suggest_controller.js`; search 2 spec §4.5, §8.2), on a `<form>` with `data-controller="search-suggest"`. Values: `url` (the endpoint, `suggest_url` or `search_suggest_url`; empty or absent offers no suggestions) and `unavailable` (`string(:suggestions_unavailable)`, the words for a failure). Targets: `input` (the `type="search"` field), `listbox` (an element with an id, given `role="listbox"`, named by its `aria-label`), `popup` (the `hidden` frame around the listbox and the message), `message` (a `hidden` row for none, limited and unavailable, which is no option), `option` (a `<template>` holding one option), `status` (a visually hidden polite live region) and `loading` (a `hidden` word shown after 300 ms without an answer). The option's parts: `label`, `kind` and, optionally, `where` (`[data-part="…"]`). States: `closed`, `loading`, `open`, `empty`, `limited`, `unavailable`. The answer (`POST`, `docs/reference/search.md`, "Suggestions"): `state`, `status` (the sentence a screen reader hears), and `suggestions`, each with `kind`, `kind_label`, `label`, `where`, `url` and `marks` (`[start, length]` ranges on `label`, in characters) |
+| `gallery-carousel` | a Gallery carousel's Previous and Next, picker, position and status (`app/javascript/controllers/gallery_carousel_controller.js`; gallery block spec §7.5, §8), on the carousel's own element with `data-controller="gallery-carousel"`. Values: `position` (`pattern(:position)`) and `moved` (`pattern(:moved)`), the two sentences with their `%{index}` and `%{count}` left in. Targets: `controls`, `track`, `slide`, `previous`, `next`, `position`, `pick`, `status`. Actions: `previous` and `next` (on the buttons), `show` (on a pick, with its place in `data-gallery-carousel-index-param`) and `keydown` (on the track and on the controls). States: `first`, `middle`, `last`. No part is cloned and no endpoint is asked; the answer has no keys |
 
 **A theme's own header box** offers suggestions with the same markup: its form keeps `action="<%= page_url_path(search_page) %>"` (no form at all when `search_page` is nil), writes `data-controller="search-suggest"`, `data-search-suggest-url-value="<%= search_suggest_url %>"` and the `unavailable` value, and the targets and option template above, and the script does the rest. The language is the page's (`<html lang>`), and choosing a suggestion goes to its address. Its list may be wider than a narrow header field: that is the theme's stylesheet's.
+
+**Release note (gallery):** Added the `gallery-carousel` script: its two values, its eight targets, its four actions with the `index` param and its three states.
 
 **Release note (search 2):** Added the `search-suggest` script: its values `url` and `unavailable`, its targets, the option template's parts, its six states and the suggestions' JSON keys.
 
@@ -761,6 +772,83 @@ A tile of an image, an icon, a title, a short plain text and a link (theme choic
 - Style the shapes with classes in `theme.css`: an icon's `style` element and `style` attribute are both refused (write presentation attributes, `fill` and `stroke`, or a class).
 
 The eighth theme (`test/fixtures/themes/card`, "In tests") is a template and an icon written from this section alone: `test/integration/theme_pages_test.rb` ("a theme replaces the Card's template from the contract's names alone, and a theme that does not is drawn the default one").
+
+### The Gallery block
+
+An ordered set of library images, drawn as a grid or as a carousel, each with a caption of its own (gallery block spec §7 and §8; the block itself is in `docs/reference/content-blocks-and-types.md`). What a theme can do with it, from the least work to the most:
+
+1. **Re-colour it: re-colour the base tokens**, or declare the six themed `--th-gallery-*` tokens again under both selectors (`:root, [data-theme="light"]` and `[data-theme="dark"]`). `--th-gallery-stage` is the ground behind an image shown whole (`--th-sunken` in the default theme), `--th-gallery-control` a Previous or Next button's ground (`--th-surface` at 92%, over the image), `--th-gallery-control-ink` its arrow (`--th-ink`), `--th-gallery-control-edge` its edge (`--th-ink`, drawn as a 1px ring of `box-shadow`), `--th-gallery-pick` a dot's ring at rest (`--th-meta`) and `--th-gallery-pick-current` the current dot (`--th-ink`). `--th-gallery-gap` (`--th-sp-3`, 14px) is the grid's gap and has one value. A tinted band re-values `--th-gallery-pick` (to `--th-dim`), and a strong band re-values `--th-gallery-stage`, `--th-gallery-pick` and `--th-gallery-pick-current` (`sections.css`); the control and its edge are the same there, since they stand on the image. So a theme's own values on the root do not reach those in a band, whose declaration is nearer the block: a theme that wants its own there writes a rule for `.content-section--tinted` or `.content-section--strong` and answers for the contrast itself. The default theme's contrast is measured (the arrow on its ground at 4.5:1, an edge and a ring at 3:1, on the page, a tinted band and a strong band, in both schemes: `test/integration/design_tokens_test.rb`); **nothing measures a theme's own values**.
+2. **Restyle it: rules of its own** under `.content-block--gallery`, which come after the default's in the one stylesheet. The default template's class names (`content-block--gallery--grid`, `--carousel`, `--ratio-3-2`, `--fit`, and the parts `__grid`, `__item`, `__track`, `__slide`, `__frame`, `__caption`, `__controls`, `__button`, `__foot`, `__picks`, `__pick`, `__position`, `__status`) are the default theme's own, not on a list, and a theme that styles them follows the default template through upgrades.
+3. **Replace its template**: `components/blocks/gallery_component.html.erb`, written from the tables below. The script works under it as long as the markup of the last table is there.
+
+**What the template is handed** (`Theme::Contract.components`, the row above). The component draws nothing when no image can be drawn (`render?`), so a template never meets an empty gallery.
+
+| Method | What it answers |
+|---|---|
+| `block` | the block: a published view on the site, the rows in a preview. `block.id` tells two galleries of a page apart (the track's `id`) |
+| `page` | the page the block is drawn on |
+| `layout` | `"grid"` or `"carousel"` |
+| `ratio` | the stored ratio: `"3:2"`, `"4:3"`, `"1:1"` or `"16:9"`, a String a template builds a class from (`ratio.tr(":", "-")`) |
+| `fit` | true when the editor chose "Show whole images", else false |
+| `label` | the gallery's name in the language shown, with the site's fallback, else the visitor's word for it ("Image gallery") |
+| `items` | an Array, in the gallery's order, of the images that can be drawn: an id that names no image, an image in the trash and an image whose file is gone are not in it. Each item answers `index` (1-based, among those drawn), `picture` (a Hash whose keys are those `Media::PictureComponent` takes, so a key is never added without it: `<%= render Media::PictureComponent.new(**item.picture) %>`; `picture[:asset]` is the library image, `picture[:alt]` the gallery's text for it in the language shown, else the library's, `picture[:sizes]` the width it is drawn at for the default layout) and `caption` (the gallery's own caption in the language shown, with the site's fallback, or nil: the library's caption is never a default) |
+| `sizes(per_row:)` | a `sizes` attribute for a picture drawn `per_row` to a row: an Integer, or a Hash of the block's least width in pixels to the count a row holds from there (`{ 0 => 1, 360 => 2, 640 => 3 }`: one below 360px, two from 360px, three from 640px). The `picture[:sizes]` of `items` is that answer for the default grid (a carousel's is one to a row); a template whose own grid has other columns draws `Media::PictureComponent.new(**item.picture, sizes: sizes(per_row: { 0 => 1, 500 => 4 }))` and says the same columns in its stylesheet, or its images are fetched wider or narrower than they are drawn |
+| `string(key)` | one of the nine words below, in the language shown, in English where that language has no `config/locales/public.<locale>.yml` |
+| `pattern(key)` | `position` or `moved`: the sentence with its `%{index}` and `%{count}` left in, for the script's two values; no other key |
+
+**What `string` is asked for.** The nine keys below and no other (`Blocks::GalleryComponent::STRINGS`), as a Symbol or a String. **Any other key is a mistake in the template and never a word on the page**: in development and test it raises (`ArgumentError`, naming the nine), in production it answers an empty string, and the log has one line for that key for the life of the process. `theme:check` does not see it: the check reads names, not arguments. A word with a `%{…}` takes its values, and none may be left out (`string(:show, index: 3)`, `string(:position, index: 2, count: 5)`).
+
+| Word | What it is |
+|---|---|
+| `string(:label)` | the gallery's name when the editor gave none: "Image gallery" |
+| `string(:carousel)` | the carousel's role description: "carousel" |
+| `string(:slide)` | a slide's role description: "slide" |
+| `string(:position)` | a slide's name and the position, with `index` and `count`: "2 of 5" |
+| `string(:track)` | the track's name: "Images" |
+| `string(:previous)` | the Previous button's name: "Previous image" |
+| `string(:next)` | the Next button's name: "Next image" |
+| `string(:show)` | a picker dot's name, with `index`: "Show image 3" |
+| `string(:moved)` | what the status says after a move, with `index` and `count`: "Image 3 of 5" |
+
+The two sentences the script fills in itself are `pattern(:position)` (`%{index} of %{count}`) and `pattern(:moved)` (`Image %{index} of %{count}`): the same words as `string(:position)` and `string(:moved)`, left unfilled.
+
+**What a template should keep.**
+
+- **The texts are text.** Print the label, each caption and the alt (which `Media::PictureComponent` prints) through ERB's escaping and never mark one safe: they are what an editor typed. No check reads a theme's template for this.
+- **A grid is a list**: an element with `role="list"` named by `label` (Safari drops a list's role with its markers), an item per image, each a `figure` holding the picture and, only when there is one, a `figcaption`. Give the picture's frame its height before the image arrives (`aspect-ratio` from `ratio`), so nothing shifts when the image does.
+- **A carousel of two or more images is the APG's carousel**: an element with `aria-roledescription` `string(:carousel)`, named by `label`; a track that takes the focus (`tabindex="0"`), is named by `string(:track)` and says `role="group"`, so the arrow keys scroll it with no script; in it a slide per image, each `role="group"` with `aria-roledescription` `string(:slide)` and the name `string(:position, index:, count:)`, holding nothing the keyboard can reach; Previous and Next, each `aria-controls` the track's id (`gallery-<block.id>-track`) and named by `string(:previous)` and `string(:next)`; a picker of one button per image, **only when there are twelve images or fewer** (`BlockTypes::Gallery::PICKER_MAX`: above that the dots do not fit, and the position and the buttons alone say where it is), each named by `string(:show, index:)`, the first with `aria-current="true"`; the position, written as `string(:position, index: 1, count: items.size)`; and a status with `aria-live="polite"`. The controls come before the track in the document, so the keyboard meets them first.
+- **A carousel of one image is its figure alone**, with no controller, no buttons and no track: there is nothing to move.
+- **What only the script makes work is `hidden` in the markup.** The controls, the status and the element that holds the position and the picks (an ancestor of them inside the carousel that does not hold the track) are written `hidden`, and the script shows them when it connects, so without it a carousel is its track, which a person scrolls, swipes or moves with the arrow keys. A stylesheet that gives one of them a `display` keeps it hidden under `[hidden]` (`.foot[hidden] { display: none }`). A template that puts the position straight into the carousel's own element has nothing of it to hide or show.
+- **The track is a scroll-snap row**: `display: flex`, `overflow-x: auto`, `scroll-snap-type: x mandatory`, and slides that are each the track's whole width (`flex: 0 0 100%`, `scroll-snap-align: start`, `scroll-snap-stop: always`: without the last, Chrome stops a scroll to a slide two away at the first it passes), and a visible focus ring on the track. The script reads where the track is from the slides' rectangles, so a track that does not rest on whole slides says "1 of 5" for good. A move is smooth only under `prefers-reduced-motion: no-preference`, by the script's own `behavior`, so a stylesheet's `scroll-behavior` is not what decides it.
+- **Nothing moves by itself, and nothing wraps** from the last image to the first: the script disables Previous on the first and Next on the last. There is no enlarged view.
+
+**The carousel script's markup** (`gallery-carousel`, "Scripts" above; `app/javascript/controllers/gallery_carousel_controller.js`), registered on every public page as the `theme` controller is. A template that wants the carousel to work writes this, and one that wants none writes the carousel with no controller, which is its track alone:
+
+| Markup | Where, and what the script does with it |
+|---|---|
+| `data-controller="gallery-carousel"` | on the element around everything below: the carousel's own |
+| `data-gallery-carousel-position-value` | `pattern(:position)`: the sentence the script writes into the position |
+| `data-gallery-carousel-moved-value` | `pattern(:moved)`: the sentence the status says after a move |
+| `data-gallery-carousel-target="controls"` | the element that holds Previous and Next, **rendered `hidden`**. Required: without it the script raises when it connects |
+| `data-gallery-carousel-target="track"` | the scrolling row. Required |
+| `data-gallery-carousel-target="slide"` | each slide, a child of the track. The script observes them and scrolls to them |
+| `data-gallery-carousel-target="previous"` | the Previous button. Required: the script disables it on the first slide |
+| `data-gallery-carousel-target="next"` | the Next button. Required: the script disables it on the last slide |
+| `data-gallery-carousel-target="position"` | the element whose text is the position; the script writes the sentence into it. Optional |
+| `data-gallery-carousel-target="pick"` | each picker button; the script marks the current one `aria-current="true"`. None with more than twelve images |
+| `data-gallery-carousel-target="status"` | the polite live region, **rendered `hidden`**, empty. Optional; the script says a move there only when a button, a pick or a key made it |
+| `data-action="gallery-carousel#previous"` | on the Previous button |
+| `data-action="gallery-carousel#next"` | on the Next button |
+| `data-action="gallery-carousel#show"` | on each pick |
+| `data-gallery-carousel-index-param` | on each pick: the image's 1-based place (`item.index`), which `show` moves to |
+| `data-action="keydown->gallery-carousel#keydown"` | on the track and on the controls: Left and Right move one image, Home and End go to the ends, and in a right-to-left row Left is the next image |
+| `data-gallery-carousel-state` | written by the script on the carousel's element, not by the template: `first`, `middle` or `last`, for a stylesheet to read (the default hides the track's scrollbar under it) |
+
+What the script writes into the page it takes back itself (its status, the position, `aria-current`, the buttons and `hidden` on what it showed) when it is taken off its element, and a template does nothing for that; the script's file says when and why. A theme that wants another behaviour writes a controller of its own (`controllers/theme/…`) and leaves this markup out.
+
+**Release note (gallery):** Added the Gallery block's line of the components, its six themed tokens and the fixed `--th-gallery-gap`, and the `gallery-carousel` script's markup.
+
+The eleventh theme (`test/fixtures/themes/gallery`, "In tests") is a template written from this section alone: `test/integration/theme_pages_test.rb` ("a theme replaces the Gallery's template from the contract's names alone, and a theme that does not is drawn the default one"), `test/system/gallery_block_test.rb` ("the carousel script drives a theme's own template") and `test/lib/theming_reference_test.rb` ("the Gallery block's tables name exactly the methods of its entry, its nine words and what the carousel script reads") hold it to the code.
 
 ### The Table block
 
@@ -1193,6 +1281,7 @@ A change to a file of the theme reloads the application at the next request, as 
 - **A fifth theme, `test/fixtures/themes/table`** (`with_table_theme`), is a Table template written from "The Table block" alone and a stylesheet for it.
 - **A sixth theme, `test/fixtures/themes/choices`** (`with_choices_theme`), is a `theme.yml` of two section styles (one labelled in two languages), the two page templates and a third of its own (`project`, with its file), and one icon of its own; **a seventh, `test/fixtures/themes/section_grid`** (`with_section_grid_theme`), declares one style and replaces the Section's template to draw that style's blocks as a grid of its own, written from the Section's row alone. `with_page_templates(*names)` is the default theme with other page templates, for a test of a dropped or added name. `docs/reference/theme-choices.md`, "In tests", says what each is for.
 - **An eighth theme, `test/fixtures/themes/card`** (`with_card_theme`), is a Card template written from "The Card block" alone, one icon of its own drawn with classes, a filled dot, its own size and a gradient its `_frame` defines, and a stylesheet that declares the Card's tokens for both schemes.
+- **An eleventh theme, `test/fixtures/themes/gallery`** (`with_gallery_theme`), is a Gallery template written from "The Gallery block" alone, with its own element names (`section.reel`), and a stylesheet for it. Its browser test puts the stylesheet into the page as text after the built one.
 - **A ninth theme, `test/fixtures/themes/form`** (`with_form_theme`), is a Form template and a short text input's written from "The Form block" alone, and a stylesheet for them.
 - **A tenth theme, `test/fixtures/themes/diagram`** (`with_diagram_theme`), is a Diagram template written from "The Diagram block" alone and a stylesheet for it.
 - **The second theme, `test/fixtures/themes/plain`**: plain CSS, no utilities but one. It replaces `_frame`, `_title`, `_icons`, `_head`, `pages/show`, the Rich text block's template and one post list (`posts/blog_list_component`); it changes `--th-accent` for both schemes; it brings two partials under `views/theme/`, one controller (`hello_controller.js`) and one image. Its frame and page draw the section's tree, the crumbs, a table of contents and previous and next on every page, which is why the canary and the trash test can ask it. **It deliberately does not replace the header, the footer, the Image block, the Code block or the 404**, so every test of it is also a test of the fallback. Any file added to it changes its fingerprint; no test pins the value.

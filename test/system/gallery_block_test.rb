@@ -352,4 +352,62 @@ class GalleryBlockSystemTest < ApplicationSystemTestCase
     now = state
     assert_equal({ state: nil, position: "1 of 3", status: "", current: [ "true", nil, nil ], previous: false, next: false, hidden: [ true, true, true, true ] }, now)
   end
+
+  # A theme that replaces the template writes the documented markup, with
+  # other elements and classes, and the script works under it: that is what
+  # makes the reference's table a promise. The suite's stylesheet is the
+  # default theme's, so the fixture's own is put into the page after it, where
+  # the build puts a theme's (its track is the one rule the browser needs).
+  test "the carousel script drives a theme's own template" do
+    add_carousel(3)
+    publish_changes(@page)
+    css = ThemeTestHelper::GALLERY.join("assets/stylesheets/theme.css").read
+    reel = "section.reel"
+    track = "#{reel} [data-gallery-carousel-target=track]"
+    connected = "(() => { const reel = document.querySelector('#{reel}'); return Boolean(window.Stimulus && reel && window.Stimulus.getControllerForElementAndIdentifier(reel, 'gallery-carousel')) })()"
+    shown = <<~JS.strip
+      (() => {
+        const track = document.querySelector("#{track}")
+        const box = track.getBoundingClientRect()
+        const slides = Array.from(track.querySelectorAll("[data-gallery-carousel-target=slide]"))
+        return slides.findIndex((slide) => Math.abs(slide.getBoundingClientRect().left - box.left) < 1) + 1
+      })()
+    JS
+    read = <<~JS.strip
+      (() => {
+        const reel = document.querySelector("#{reel}")
+        const part = (name) => reel.querySelector(`[data-gallery-carousel-target=${name}]`)
+        const picks = Array.from(reel.querySelectorAll("[data-gallery-carousel-target=pick]"))
+        return { state: reel.dataset.galleryCarouselState || null, position: part("position").textContent, status: part("status").textContent,
+                 current: picks.map((pick) => pick.getAttribute("aria-current")), previous: part("previous").disabled, next: part("next").disabled,
+                 hidden: [ part("controls").hidden, part("position").parentElement.hidden, part("status").hidden ] }
+      })()
+    JS
+
+    with_gallery_theme do
+      visit PublicSite::Urls.new.path_for(@page, "en")
+      assert_no_selector CAROUSEL
+      page.execute_script("const style = document.createElement('style'); style.id = 'eleventh-theme'; style.textContent = arguments[0]; document.head.append(style)", css)
+      await_js(connected, message: "the carousel's script never connected under the theme's template")
+
+      now = page.evaluate_script(read)
+      assert_equal({ "state" => "first", "position" => "1 of 3", "status" => "", "current" => [ "true", nil, nil ], "previous" => true, "next" => false,
+                     "hidden" => [ false, false, false ] }, now)
+
+      find("#{reel} button[aria-label='Next image']").click
+      await_js("#{shown} === 2", message: "slide 2 never stood in the track")
+      now = page.evaluate_script(read)
+      assert_equal [ "middle", "2 of 3", "Image 2 of 3", [ nil, "true", nil ] ], now.values_at("state", "position", "status", "current")
+
+      find("#{reel} button[aria-label='Show image 3']").click
+      await_js("#{shown} === 3", message: "slide 3 never stood in the track")
+      now = page.evaluate_script(read)
+      assert_equal [ "last", "3 of 3", "Image 3 of 3", true ], now.values_at("state", "position", "status", "next")
+
+      page.execute_script("document.querySelector('#{track}').focus()")
+      find(track).send_keys(:home)
+      await_js("#{shown} === 1", message: "Home never brought the first slide back")
+      assert_equal [ "first", "1 of 3" ], page.evaluate_script(read).values_at("state", "position")
+    end
+  end
 end
