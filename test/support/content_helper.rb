@@ -107,6 +107,11 @@ module ContentHelper
     PublicSite::Paths.rebuild!
   end
 
+  # Switches on every registered post type, for a test that registers a type of
+  # its own and writes posts of it: a post of a type the site has not switched
+  # on is dormant and refused every write.
+  def switch_on_registered_types = switch_on_content_types(*ContentTypes.all.map { |definition| definition.name.to_s })
+
   def with_locales(codes, default:)
     site_settings(:default).update!(locales: codes.map { |code| { "code" => code } }, default_locale: default)
     PublicSite::Paths.rebuild!

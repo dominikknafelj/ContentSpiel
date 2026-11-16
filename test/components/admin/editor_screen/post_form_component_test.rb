@@ -102,6 +102,7 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
       t.field :source, :code, max: 100, label: "Source code"
     end
     with_locales(%w[en de], default: "en") do
+      switch_on_registered_types
       saved = Posts::Save.call(attributes: { content_type: "test/snippet", fields: { source: "  a = 1" } }, translations: { "en" => { title: "Snippet" } })
       assert saved.ok?, saved.errors.to_sentence
 
@@ -157,6 +158,7 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
       t.field :venue, :string
     end
     with_locales(%w[en de], default: "en") do
+      switch_on_registered_types
       saved = Posts::Save.call(attributes: { content_type: "test/event" }, translations: { "en" => { title: "Gig" } })
       assert saved.ok?, saved.errors.to_sentence
 

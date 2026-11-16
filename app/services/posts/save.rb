@@ -86,6 +86,15 @@ module Posts
     end
 
     def call
+      # A state, not a right: before `authorize!`, so no `access.denied`. An
+      # existing post is judged by its stored type and by the one it would
+      # change to; a new one by the type it asks for, unless that name is not
+      # declared at all, which the model's validation reports.
+      dormant = switched_off_refusal(@post) if @post.persisted?
+      asked = @attributes[:content_type]
+      dormant ||= switched_off_refusal(probe(asked)) if asked.present? && (@post.persisted? || ContentTypes.find(asked))
+      return dormant if dormant
+
       if publish_only?
         return denied("posts.publish", @post) unless authorize!("posts.publish", @post)
       elsif @post.persisted?
@@ -147,6 +156,9 @@ module Posts
     end
 
     private
+
+    # A throwaway post of the asked type, only to ask whether it is switched on.
+    def probe(content_type) = Post.new(content_type: content_type)
 
     # A save that publishes or schedules takes the copy the public site will
     # show (drafts spec §4.3), after the tags are written (related posts are

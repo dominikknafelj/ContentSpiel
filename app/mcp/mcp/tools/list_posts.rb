@@ -22,12 +22,12 @@ module Mcp
 
       # Overrides the reader rather than calling the `input_schema(...)`
       # macro -- see the identical comment on CreatePost#input_schema_value
-      # for why `content_type`'s enum has to come from `ContentTypes.names`
+      # for why `content_type`'s enum has to come from `ContentTypes.switched_on_names`
       # at read time rather than being frozen at class-load time.
       def self.input_schema_value
         MCP::Tool::InputSchema.new(
           properties: {
-            content_type: { type: "string", enum: ContentTypes.names, description: "Only list posts of this type." },
+            content_type: { type: "string", enum: ContentTypes.switched_on_names, description: "Only list posts of this type." },
             locale: { type: "string", enum: Locales::SUPPORTED.keys }
           }
         )
@@ -42,7 +42,7 @@ module Mcp
         # token's group intersected with its user's rights. An unreadable
         # post isn't listed, and nothing here reports a total that would
         # count it.
-        readable = AccessControl.scope(Current.actor, "posts.read", Post.all)
+        readable = AccessControl.scope(Current.actor, "posts.read", Post.of_switched_on_types)
         scope = content_type.present? ? readable.where(content_type: content_type) : readable
 
         # A summary, not the full record: a body-per-post dump would bloat every

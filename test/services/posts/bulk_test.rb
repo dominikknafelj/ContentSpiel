@@ -109,8 +109,9 @@ class Posts::BulkTest < ActiveSupport::TestCase
     assert_equal [ broken ], result.failed
     assert_not_empty result.reasons.fetch(broken.id)
 
-    denied = as(users(:author), channel: :admin) { Posts::Bulk.call(action: "publish", ids: [ broken.id ]) }
-    assert_equal [ broken ], denied.refused
+    other = create_post(title: "Other", published: false)
+    denied = as(users(:author), channel: :admin) { Posts::Bulk.call(action: "publish", ids: [ other.id ]) }
+    assert_equal [ other ], denied.refused
     assert_empty denied.failed
   end
 

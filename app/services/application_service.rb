@@ -132,6 +132,20 @@ class ApplicationService
   def success(record, notice: nil) = Result.success(record, notice: notice)
   def failure(record, errors = record.errors.full_messages) = Result.failure(record, errors)
 
+  # The refusal of a write to a dormant post (one whose type the site has
+  # switched off, or that is no longer declared), or nil when the type is on or
+  # the record is no `Post`. A 422 failure, asked BEFORE `authorize!` and never
+  # recorded as `access.denied`: it is a state of the site, not a missing right,
+  # and it holds for an owner too. The sentence names the type by its label, or
+  # by its stored name when the type is undeclared.
+  def switched_off_refusal(post)
+    return nil unless post.is_a?(Post)
+    return nil if post.type_switched_on?
+
+    label = post.definition&.label || post.content_type
+    Result.failure(post, [ I18n.t("admin.posts.switched_off", type: label, raise: true) ])
+  end
+
   # The refusal of a key under a language that a save would drop (#147), or nil
   # for none. `ContentBlocks::Save`, `Posts::Save` and `Pages::Save` read only the
   # keys they know, so any other was dropped without a word and the save answered

@@ -37,10 +37,22 @@ module AccessControlHelper
   # rendered "View only" (§5).
   def can_edit?(record)
     prefix = permission_prefix(record)
+    return false if dormant_post?(record)
+
     can?("#{prefix}.edit", record) && (record.published_at.nil? || can?("#{prefix}.publish", record))
   end
 
+  # May the actor publish, unpublish, schedule or cancel a change of this page
+  # or post: `publish`, and not for a dormant post (view only for everyone).
+  def can_publish_record?(record)
+    !dormant_post?(record) && can?("#{permission_prefix(record)}.publish", record)
+  end
+
   private
+
+  # A post of a switched-off or undeclared type is view only for everyone: the
+  # services refuse its writes (`ApplicationService#switched_off_refusal`).
+  def dormant_post?(record) = record.is_a?(Post) && !record.type_switched_on?
 
   def permission_prefix(record)
     case record

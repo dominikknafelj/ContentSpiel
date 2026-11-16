@@ -228,8 +228,9 @@ DevelopmentShowcase.call(root: root, image: root.reload.hero_media_asset)
 # was taken when it was published, before its blocks and hero were added
 # above: publish what the seed built. Only a record whose one copy is the
 # first (a second run of the seed finds more and adds none), through the same
-# trusted actor the services above ran as.
-[ *Page.where.not(published_at: nil), *Post.where.not(published_at: nil) ].each do |record|
+# trusted actor the services above ran as. A post of a type the site has
+# switched off is dormant and refused every write.
+[ *Page.where.not(published_at: nil), *Post.of_switched_on_types.where.not(published_at: nil) ].each do |record|
   next unless Publishing::Version.of(record).count == 1
 
   published = Publishing::PublishChanges.call(record)

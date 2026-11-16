@@ -10,6 +10,19 @@ class Mcp::Tools::CreatePostTest < ActiveSupport::TestCase
     @user = User.create!(email_address: "agent@example.com", password: "password12345")
   end
 
+  test "create_post offers and accepts only switched-on types" do
+    switch_on_content_types("blog")
+
+    assert_equal [ "blog" ], Mcp::Tools::CreatePost.input_schema_value.to_h[:properties][:content_type][:enum]
+
+    response = nil
+    assert_no_difference "Post.count" do
+      response = call_tool(content_type: "resume_entry", title: "Nope")
+    end
+    assert response.error?
+    assert_match(/Resume entry is switched off/, response.content.first[:text])
+  end
+
   test "creates a post and returns it" do
     response = nil
 

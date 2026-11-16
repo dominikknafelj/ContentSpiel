@@ -57,6 +57,7 @@ class Mcp::Tools::UpdatePostTest < ActiveSupport::TestCase
         t.detail_component Posts::DetailComponent
         t.field :company, :string, required: true
       end
+      switch_on_registered_types
       post = Post.create!(content_type: "test/required_company", title: "Role", metadata: { "company" => "Acme" })
 
       response = call_tool(id: post.id, fields: { company: "" })

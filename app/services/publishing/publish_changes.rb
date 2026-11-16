@@ -21,6 +21,10 @@ module Publishing
     end
 
     def call
+      # A state, not a right: no `access.denied` (`ApplicationService#switched_off_refusal`).
+      dormant = switched_off_refusal(@record)
+      return dormant if dormant
+
       key = "#{prefix}s.publish"
       return denied(key, @record) unless authorize!(key, @record)
 

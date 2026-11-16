@@ -264,6 +264,7 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       t.field :note, :string
       t.field :samples, :groups, of: "test/sample"
     end
+    switch_on_registered_types
     saved = Posts::Save.call(attributes: { content_type: "test/snippet", fields: { source: "a = 1", note: "n", samples: [ { name: "s", listing: "b = 2" } ] } },
       translations: { "en" => { title: "Snippet" } })
     assert saved.ok?, saved.errors.to_sentence

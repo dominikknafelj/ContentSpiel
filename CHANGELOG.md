@@ -10,6 +10,10 @@
 
 - A new site starts with Blog alone; Resume entry and Now update are switched on in Settings. The public site reads the post types a site has switched on (`ContentTypes.switched_on`): a post of a switched-off type is kept, with no address, in no list, search or sitemap, offered no starter section, and opens view only. The search index is built once more after the upgrade, in the background, as a switch of post types asks for it.
 
+### For a gem or an outside caller
+
+- MCP: `create_post` and `list_posts` offer the switched-on post types, and `get_post`'s answer says `type_switched_on`.
+
 ## 0.7.0 (2026-11-15)
 
 ### Added

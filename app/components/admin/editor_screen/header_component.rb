@@ -155,7 +155,7 @@ module Admin
         "#{hint} It is #{live? ? "live" : "scheduled"}, and changing a #{live? ? "live" : "scheduled"} #{type} needs the right to publish."
       end
 
-      def may_publish? = can?("#{type}s.publish", record)
+      def may_publish? = can_publish_record?(record)
 
       # `?review=publish` (the dashboard's "Review and publish…") asks for the
       # Publish changes dialog open on a live record that has something to

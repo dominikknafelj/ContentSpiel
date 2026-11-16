@@ -317,6 +317,7 @@ class Translations::StatusTest < ActiveSupport::TestCase
       saved = ContentTypes.all.dup
       begin
         ContentTypes.register("test/interview") { |t| t.label "Interview"; t.field :quote, :string, required: true, translated: true }
+        switch_on_registered_types
 
         post = Posts::Save.call(Post.new, attributes: { content_type: "test/interview", fields: { quote: "Hallo" } },
           translations: { "de" => { title: "Start" }, "en" => { title: "Launch" } }).record

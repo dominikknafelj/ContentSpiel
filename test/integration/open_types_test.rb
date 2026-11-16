@@ -67,6 +67,7 @@ class OpenTypesTest < ActionDispatch::IntegrationTest
       t.field :chair, :group, of: "test/host"
     end
 
+    switch_on_registered_types
     bad = Posts::Save.call(attributes: { content_type: "test/talk", fields: { hosts: [ { name: "" } ], chair: { name: "" } } }, translations: { "en" => { title: "Bad" } })
 
     assert_not bad.ok?

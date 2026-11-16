@@ -91,6 +91,7 @@ module TestTypes
       t.field :speakers, :groups, of: "test/speaker"
     end
 
+    switch_on_registered_types
     yield
   ensure
     Rails.application.reloader.prepare!

@@ -73,7 +73,7 @@ module Admin
       def discard_url = helpers.admin_publishing_discard_path(kind: type, id: record.id, **url_options)
       def cancel_url = helpers.admin_publishing_cancel_scheduled_change_path(kind: type, id: record.id, **url_options)
 
-      def may_publish? = can?("#{type}s.publish", record)
+      def may_publish? = can_publish_record?(record)
       def may_discard? = can_edit?(record)
       # Withdrawing a scheduled change is the state's own action, and needs
       # the right that scheduled it.

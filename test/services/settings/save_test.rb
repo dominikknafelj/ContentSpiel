@@ -592,8 +592,8 @@ class Settings::SaveTest < ActiveSupport::TestCase
   end
 
   test "switching on a type whose post's address is taken saves and reports the clash" do
-    switch_on_content_types("blog")
     update = create_post(title: "Team", content_type: "now_update")
+    switch_on_content_types("blog")
     assert_not PublicPath.current.exists?(record: update)
     holder = create_post(title: "Team")
     taken = PublicPath.current.find_by!(record: holder)

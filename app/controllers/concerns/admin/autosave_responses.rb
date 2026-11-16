@@ -71,7 +71,13 @@ module Admin
       toast_id = "toast-#{error_prefix}"
       streams << turbo_stream.remove(toast_id)
       unless result.ok?
-        message = result.denied? ? "You don't have permission to make this change." : "Couldn't save your changes."
+        # A refusal no field owns (the record carries no error of its own: a post
+        # whose type was switched off) has no slot to read its reason in, so the
+        # toast says it.
+        message = if result.denied? then "You don't have permission to make this change."
+        elsif result.record.respond_to?(:errors) && result.record.errors.empty? then result.errors.first
+        else "Couldn't save your changes."
+        end
         streams << toast_stream(message, kind: :error, id: toast_id)
       end
 

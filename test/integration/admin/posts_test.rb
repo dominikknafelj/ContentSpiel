@@ -199,6 +199,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
         t.detail_component Posts::DetailComponent
         t.field :company, :string, required: true
       end
+      switch_on_registered_types
       post_record = Post.create!(content_type: "test/required_company", title: "Role", metadata: { "company" => "Acme" })
       patch "/cs-studio/posts/#{post_record.id}",
         params: { post: { fields: { company: "" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
@@ -541,6 +542,33 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_select_in_stream "post-related_post_ids-errors", /don.t exist/
   end
 
+  test "an autosave of a post whose type was switched off meanwhile is refused with the sentence and writes nothing" do
+    switch_on_content_types("blog", "resume_entry")
+    post_record = create_post(title: "Role", content_type: "resume_entry")
+    base = post_record.updated_at.iso8601(6)
+    switch_on_content_types("blog")
+    events = Audit::Event.count
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { post: { title: "Typed" }, base_updated_at: base }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Resume entry is switched off. Switch it on in Settings to change this post."
+    assert_equal "Role", post_record.reload.title
+    assert_equal events, Audit::Event.count
+  end
+
+  test "a dormant post's editor is view only and offers no publishing action" do
+    switch_on_content_types("blog", "resume_entry")
+    post_record = create_post(title: "Role", content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    get admin_post_path(post_record)
+
+    assert_response :success
+    assert_select "form[data-controller~='admin--saving--autosave']", count: 0
+    assert_select "button", text: /\A\s*(Publish|Unpublish|Publish changes|Schedule)/, count: 0
+  end
+
   # Review Focus 4: a read-only user's forged autosave PATCH -- the editor
   # never sends one for them (Task 7), but the service refuses it anyway,
   # changes nothing, and however often it's repeated logs one coalesced
@@ -642,6 +670,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
         t.field :venue, :string
         t.field :capacity, :integer
       end
+      switch_on_registered_types
       yield
     end
   end

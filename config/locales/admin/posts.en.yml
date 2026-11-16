@@ -5,6 +5,10 @@
 en:
   admin:
     posts:
+      # The refusal of a write to a post whose type is switched off or no longer
+      # declared (`ApplicationService#switched_off_refusal`); `%{type}` is the
+      # type's label, or its stored name when undeclared.
+      switched_off: "%{type} is switched off. Switch it on in Settings to change this post."
       index:
         title: "Posts"
         # The split button's halves and its menu's items: "New post (Blog)".

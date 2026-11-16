@@ -19,8 +19,6 @@ class ContentTypeSetsTest < ActiveSupport::TestCase
     "app/services/settings/save.rb" => "the switch is normalised against the declared names",
     "db/seeds.rb" => "development switches every declared type on",
     "app/models/site_setting.rb" => "the at-least-one rule counts declared names",
-    "app/mcp/mcp/tools/list_posts.rb" => "the tool's enum is the declared set today",
-    "app/mcp/mcp/tools/create_post.rb" => "the tool's enum is the declared set today",
     "app/components/admin/editor_screen/new_post_form_component.rb" => "the New post dialog offers the declared types today",
     "app/components/admin/fields/content_type_field.rb" => "the select offers the declared types today"
   }.freeze
