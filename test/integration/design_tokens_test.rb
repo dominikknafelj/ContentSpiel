@@ -512,15 +512,19 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_equal 24, pairs
   end
 
-  SEARCH_TOKENS = %w[--th-search-mark --th-search-mark-ink].freeze
+  SEARCH_TOKENS = %w[--th-search-mark --th-search-mark-ink --th-search-active].freeze
 
   # The Search block's mark: the warn hue mixed into the page (never the
-  # accent, a result's link), and the text colour on it, in both schemes.
+  # accent, a result's link), and the text colour on it, in both schemes;
+  # the active suggestion's ground, the accent's tint, and on a strong band
+  # the band's text mixed into the band.
   test "the search mark's tokens are defined from the theme's base tokens in both schemes, never a literal, and search.css draws with them" do
     theme_tokens.each do |theme, tokens|
       assert_match(/\Acolor-mix\(in srgb, var\(--th-warn\) \d+%, var\(--th-paper\)\)\z/, tokens.fetch("--th-search-mark") { flunk("--th-search-mark is not defined for #{theme}") })
       assert_equal "var(--th-ink)", tokens.fetch("--th-search-mark-ink")
+      assert_equal "var(--th-accent-tint)", tokens.fetch("--th-search-active") { flunk("--th-search-active is not defined for #{theme}") }
     end
+    assert_match(/\Acolor-mix\(in srgb, var\(--th-on-band-strong\) \d+%, var\(--th-band-strong\)\)\z/, band_values("strong").fetch("--th-search-active"))
     assert_equal SEARCH_TOKENS.map { |name| name.delete_prefix("--th-") }, BlockTypes.fetch(:search).themed_tokens
     bare = Rails.root.join("app/assets/tailwind/themes/default/search.css").read.gsub(%r{/\*.*?\*/}m, "")
     refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, bare)
@@ -545,6 +549,22 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
       end
     end
     assert_equal 6, pairs
+  end
+
+  # A suggestion's active row (--th-search-active): the accent's tint on the
+  # page, the band's text 11% into a strong band; the row's label (--th-ink)
+  # and its kind (--th-meta) at 4.5:1 on it, the accent's bar at 3:1, in
+  # both schemes: 6 places.
+  test "a suggestion's active row is readable on the page, a tinted band and a strong band, in both themes" do
+    places = 0
+    each_scheme_and_band do |tokens, inside, outside|
+      active = resolve_colour(tokens, "--th-search-active", inside: inside, under: outside)
+      assert_operator contrast(active, resolve_colour(tokens, "--th-ink", inside: inside, under: active)), :>=, 4.5
+      assert_operator contrast(active, resolve_colour(tokens, "--th-meta", inside: inside, under: active)), :>=, 4.5
+      assert_operator contrast(active, resolve_colour(tokens, "--th-accent", inside: inside, under: active)), :>=, 3.0
+      places += 1
+    end
+    assert_equal 6, places
   end
 
   test "the measuring reads a colour mixed of two tokens as the two mixed" do
@@ -963,6 +983,17 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
       fixed = values.(css[/^:root \{(.*?)\}/m, 1])
       { light: css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1], dark: css[/\[data-theme="dark"\]\s*\{(.*?)\}/m, 1] }
         .transform_values { |block| fixed.merge(values.(block)) }
+    end
+
+    # Each scheme's tokens with each place a block stands: the page, a tinted
+    # band and a strong band, as `tokens`, `inside` (what the band re-values)
+    # and `outside` (the place's ground, resolved).
+    def each_scheme_and_band
+      theme_tokens.each_value do |tokens|
+        [ [ {}, "--th-paper" ], [ band_values("tinted"), "--th-band-tinted" ], [ band_values("strong"), "--th-band-strong" ] ].each do |inside, around|
+          yield tokens, inside, resolve_colour(tokens, around, inside: inside)
+        end
+      end
     end
 
     # The custom properties a band gives what is inside it

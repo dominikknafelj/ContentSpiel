@@ -45,6 +45,11 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { SqlNodes.array_contains(@pages[:id], [ "7}'; --" ]) }
   end
 
+  test "array_contains_column asks whether an integer array holds a column's id, cast to integer" do
+    assert_equal %("published_versions"."tag_ids" @> array_append(CAST('{}' AS integer[]), CAST("tags"."id" AS integer))),
+      sql(SqlNodes.array_contains_column(Arel::Table.new(:published_versions)[:tag_ids], Arel::Table.new(:tags)[:id]))
+  end
+
   test "cast names the type" do
     assert_equal %(CAST("pages"."title" AS text)), sql(SqlNodes.cast(@pages[:title], "text"))
     assert_equal "CAST('{}' AS jsonb)", sql(SqlNodes.cast("{}", "jsonb"))
@@ -79,6 +84,11 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_equal %(LOWER("pages"."content_type") LIKE 'bl\\%%'), sql(SqlNodes.like(@pages[:content_type].lower, SqlNodes.like_pattern("bl%", prefix: true)))
   end
 
+  test "ilike ignores case and takes a value or a bind" do
+    assert_equal %("pages"."content_type" ILIKE '%50\\%%'), sql(SqlNodes.ilike(@pages[:content_type], SqlNodes.like_pattern("50%")))
+    assert_equal %("pages"."content_type" ILIKE $1), sql(SqlNodes.ilike(@pages[:content_type], SqlNodes.bound("%a%", name: "q")))
+  end
+
   test "any_json_value tests the values of a jsonb object, not its keys" do
     node = SqlNodes.any_json_value(@pages[:title]) { |value| value.matches("%x%") }
 
@@ -94,6 +104,16 @@ class SqlNodesTest < ActiveSupport::TestCase
     sql, binds = ActiveRecord::Base.connection.send(:to_sql_and_binds, Page.where(SqlNodes.function("lower", node).eq(@pages[:content_type])).arel)
     assert_not_includes sql, "albatross"
     assert_equal [ "q" ], binds.map(&:name)
+  end
+
+  test "bound_text_array sends a list of strings as one text[] bind, never as statement text" do
+    words = [ "it's", "a,b", %(x"y), "back\\slash", "{brace}" ]
+    statement = Arel::SelectManager.new.project(SqlNodes.function("unnest", SqlNodes.bound_text_array(words, name: "words")))
+    sql, binds = ActiveRecord::Base.connection.send(:to_sql_and_binds, statement)
+
+    assert_equal "SELECT unnest(CAST($1 AS text[]))", sql
+    assert_equal [ "words" ], binds.map(&:name)
+    assert_equal words, ActiveRecord::Base.connection.select_values(statement)
   end
 
   private

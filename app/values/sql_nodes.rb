@@ -21,6 +21,12 @@ module SqlNodes
   # `q`).
   def bound(value, name:) = Arel::Nodes::BindParam.new(ActiveRecord::Relation::QueryAttribute.new(name.to_s, value, ActiveModel::Type::Value.new))
 
+  # `CAST($1 AS text[])`: a list of strings sent as one bind named `name`,
+  # Postgres's array literal of them, so no element is ever statement text.
+  def bound_text_array(values, name:)
+    Arel::Nodes::NamedFunction.new("CAST", [ Arel::Nodes::As.new(bound(PG::TextEncoder::Array.new.encode(values.map(&:to_s)), name: name), Arel::Nodes::SqlLiteral.new("text[]")) ])
+  end
+
   # `NAME(a, b)`: a SQL function over nodes and values.
   def function(name, *arguments) = Arel::Nodes::NamedFunction.new(name, arguments.map { |argument| quoted(argument) })
 
@@ -64,6 +70,16 @@ module SqlNodes
     Arel::Nodes::InfixOperation.new("@>", column, cast("{#{values.map { |value| Integer(value) }.join(",")}}", "integer[]"))
   end
 
+  # `column @> ARRAY[other::integer]`, `column` an integer array and
+  # `other` an id column of the statement around a subquery (a correlated
+  # test, which the GIN index on `column` serves row by row; a `bigint` id
+  # is cast, since `integer[] @> bigint[]` is no operator). Spelled
+  # `array_append('{}'::integer[], …)`: Arel has no node for an array
+  # constructor.
+  def array_contains_column(column, other)
+    Arel::Nodes::InfixOperation.new("@>", column, function("array_append", cast("{}", "integer[]"), cast(other, "integer")))
+  end
+
   # `CAST(value AS type)`; `type` is a constant type name, never user text.
   def cast(value, type) = Arel::Nodes::NamedFunction.new("CAST", [ quoted(value).as(type) ])
 
@@ -86,6 +102,11 @@ module SqlNodes
   # `value LIKE 'pattern'`, case-sensitive (Arel's own `matches` is ILIKE on
   # Postgres); the pattern is `like_pattern`'s.
   def like(value, pattern) = value.matches(pattern, nil, true)
+
+  # `value ILIKE pattern`, ignoring case; the pattern is `like_pattern`'s,
+  # whose escape is Postgres's own (`\`), handed as a value or a node (a
+  # bind: a visitor's text, `bound`).
+  def ilike(value, pattern) = Arel::Nodes::Matches.new(value, quoted(pattern), nil, false)
 
   # `EXISTS (SELECT 1 FROM jsonb_each_text(column) AS t WHERE <the block's
   # condition on t.value>)`: whether any VALUE of a jsonb object satisfies it

@@ -1,0 +1,12 @@
+# Typos the built-in's close pass finds (search 2 spec §3.3, §11), each
+# measured on Postgres 17: the typo stems to a word no entry holds, so the
+# exact pass finds nothing, and `similarity(typo, correction)` is 0.3 or
+# more (deploymnet 0.47, serch 0.44, recieve 0.33, mangement 0.62,
+# kubernetis 0.57, strase 0.40). German's stemmer folds "strasse" and
+# "straße" to one stem, an exact match, so the German row is "strase".
+- { typo: deploymnet, page: "Zero-downtime deployment", correction: deployment }
+- { typo: serch,      page: "Site search",              correction: search }
+- { typo: recieve,    page: "How to receive mail",      correction: receive }
+- { typo: mangement,  page: "Content management",       correction: management }
+- { typo: kubernetis, page: "Kubernetes hosting",       correction: kubernetes }
+- { typo: strase,     page: "Die Straße",               correction: straße, language: de }

@@ -55,9 +55,9 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     index = Rails.root.join("app/javascript/controllers/index.js").read
     site = Rails.root.join("app/javascript/site.js").read
 
-    assert_includes index, %(registerControllers((path) => !path.startsWith("controllers/admin/") && !path.startsWith("controllers/theme/")))
+    assert_includes index, %(registerControllers((path) => !path.startsWith("controllers/admin/") && !path.startsWith("controllers/theme/") && !PUBLIC_ONLY.includes(path)))
     assert_includes site, %(import "application")
-    assert_includes site, %(registerControllers((path) => path.startsWith("controllers/theme/")))
+    assert_includes site, %(registerControllers((path) => path.startsWith("controllers/theme/") || PUBLIC_ONLY.includes(path)))
   end
 
   test "CS Studio loads the admin entry point and preloads the editor stack" do
@@ -322,6 +322,43 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
       assert modulepreloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on a page with a Form block"
     end
     assert_select "[data-controller*='admin--']", count: 0
+  end
+
+  # Search 2 spec §4.5: the suggestions' script is the site's own, at the
+  # top level like `code-copy`, but a visitor's page alone runs it: `site`
+  # registers it (`PUBLIC_ONLY` in `controllers/index.js`, which the site's
+  # own registration leaves out), and no CS Studio screen, sign-in or setup
+  # imports it. It is preloaded with the rest of `controllers/` (importmap
+  # gives a directory's files one preload, and a pin of one of them is
+  # overridden by the directory), so the import is what is held.
+  test "search_suggest is registered by site.js and imported on no CS Studio screen" do
+    page = create_page(title: "Help")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "search" }).ok?
+    publish_changes(page)
+
+    get PublicSite::Urls.new.path_for(page, "en")
+    assert_response :success
+    assert_select "form[role=search][data-controller='search-suggest'][data-search-suggest-url-value='/search/suggestions']"
+    assert modulepreloads.any? { |href| href.include?("controllers/search_suggest_controller") }, "the suggestions' controller is preloaded on a public page"
+
+    index = Rails.root.join("app/javascript/controllers/index.js").read
+    assert_includes index, %(export const PUBLIC_ONLY = [ "controllers/search_suggest_controller" ])
+
+    assert_includes index, %(&& !PUBLIC_ONLY.includes(path)), "the site's own registration, which every entry point runs, leaves it out"
+    assert_includes Rails.root.join("app/javascript/site.js").read, %(|| PUBLIC_ONLY.includes(path)), "the site entry point registers it"
+
+    get admin_sign_in_path
+    assert_not_includes entry_point_script, "search_suggest"
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    [ "/cs-studio", "/cs-studio/pages/#{page.id}" ].each do |path|
+      get path
+      assert_response :success
+      assert_not_includes entry_point_script, "search_suggest"
+      assert_not_includes entry_point_script, %(import "site")
+    end
+    scripts = Dir[Rails.root.join("app/javascript/**/*.js")].reject { |file| file.end_with?("controllers/index.js", "search_suggest_controller.js") }
+    assert_empty scripts.select { |file| File.read(file).include?("search_suggest") }, "no other script imports the suggestions' controller"
   end
 
   test "a public page with a Note block needs no script: it carries no controller of its own and no admin script" do

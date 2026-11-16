@@ -8,6 +8,7 @@ module SiteSearch
   module Reports
     KEY = "site_search_unavailable".freeze
     BLOCK_TEXT_KEY = "site_search_block_text".freeze
+    SUGGEST_KEY = "site_search_suggest_unavailable".freeze
     WITHIN = 1.minute
 
     module_function
@@ -17,6 +18,14 @@ module SiteSearch
     def report(backend:, error:)
       error = Unavailable.new(backend: backend, error_class: error.class.name) unless error.is_a?(Unavailable)
       report_once(KEY, error)
+    end
+
+    # A suggestion's failure (search 2 spec §4.2), as `SiteSearch::Unavailable`,
+    # with a minute of its own: a visitor types several prefixes a second,
+    # and a search's failure must still be reported in the same minute.
+    def report_suggest(backend:, error:)
+      error = Unavailable.new(backend: backend, error_class: error.class.name) unless error.is_a?(Unavailable)
+      report_once(SUGGEST_KEY, error)
     end
 
     # A block type's `search_text` that raised, as `SiteSearch::BlockTextFailed`.

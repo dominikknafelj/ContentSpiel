@@ -21,6 +21,14 @@ class SiteSearch::ShownTest < ActiveSupport::TestCase
 
   def shown(text, now: Time.current) = SiteSearch::Shown.for(results(text), locale: "en", now: now)
 
+  # The item drawn for `record` in a search for "albatross".
+  def shown_item_of(record) = shown("albatross").find { |item| item.record.id == record.id && item.record.class == record.class }
+
+  # What `SiteSearch::Shown.for` costs, whatever the number of hits, a
+  # post's tags read included (`test "ten hits cost a constant number of
+  # statements"`): a statement added is a decision, not a drift.
+  SHOWN_STATEMENTS = 16
+
   def listing
     page = create_page(title: "Blog", published: false)
     result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
@@ -116,6 +124,36 @@ class SiteSearch::ShownTest < ActiveSupport::TestCase
     assert_equal [ first.id, second.id ], shown("albatross").map { |item| item.record.id }
   end
 
+  test "a post result lists its copy's tags in order" do
+    listing
+    post = index(create_post(title: "Albatross", tags: %w[seabirds deployments ocean]))
+
+    assert_equal %w[seabirds deployments ocean], shown_item_of(post).tags
+  end
+
+  test "a page result has none" do
+    assert_equal [], shown_item_of(index(create_page(title: "Albatross"))).tags
+  end
+
+  test "a renamed tag shows its old name until the post is published" do
+    listing
+    post = index(create_post(title: "Albatross", tags: %w[gull]))
+    assert Tags::Rename.call(Tag.named("gull").first, name: "seagull").ok?
+
+    assert_equal %w[gull], shown_item_of(post).tags
+    index(publish_changes(post))
+    assert_equal %w[seagull], shown_item_of(post).tags
+  end
+
+  test "an item is close when its hit is" do
+    page = index(create_page(title: "Albatross"))
+    hit = results("albatross").hits.first
+    close = SiteSearch::Results.new(hits: [ hit.with(close: true) ], total: 1)
+
+    assert_equal false, shown_item_of(page).close
+    assert_equal true, SiteSearch::Shown.for(close, locale: "en", now: Time.current).first.close
+  end
+
   test "ten hits cost a constant number of statements" do
     listing
     section = create_page(title: "Seabirds")
@@ -131,13 +169,16 @@ class SiteSearch::ShownTest < ActiveSupport::TestCase
       count = 0
       counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
       items = ActiveRecord::Base.uncached do
-        ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { SiteSearch::Shown.for(answer, locale: "en", now: Time.current) }
+        ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
+          SiteSearch::Shown.for(answer, locale: "en", now: Time.current).each(&:tags)
+        end
       end
       assert_equal answer.hits.size, items.size
       count
     end
 
     assert_equal counts.first, counts.last, "a page and a post cost what five of each do"
+    assert_equal SHOWN_STATEMENTS, counts.last, "SiteSearch::Shown's statements, a post's tags read included"
   end
 
   # The agreement of the built-in's query with the re-check (spec §5.6, "with
@@ -164,5 +205,23 @@ class SiteSearch::ShownTest < ActiveSupport::TestCase
 
     assert_equal [ [ "Page", visible.id ], [ "Post", post.id ] ].sort, found.hits.map { |hit| [ hit.record_type, hit.record_id ] }.sort
     assert_equal found.hits.map { |hit| [ hit.record_type, hit.record_id ] }, items.map { |item| [ item.record.class.polymorphic_name, item.record.id ] }
+
+    # The close pass, for a typo, and the contains pass, in Japanese, by the
+    # same rules.
+    typo = postgres_results(query("albatros"))
+    assert typo.hits.any? && typo.hits.all?(&:close), "the typo finds close hits"
+    assert_equal [ [ "Page", visible.id ], [ "Post", post.id ] ].sort, typo.hits.map { |hit| [ hit.record_type, hit.record_id ] }.sort
+    assert_equal typo.hits.size, SiteSearch::Shown.for(typo, locale: "en", now: query.now).size
+
+    with_locales(Locales.enabled | %w[ja], default: Locales.default)
+    live = create_page(title: "Japanese live", translations: { "ja" => { title: "検索エンジン", slug: "japanese-live" } })
+    create_page(title: "Japanese draft", published: false, translations: { "ja" => { title: "検索エンジン案", slug: "japanese-draft" } })
+    create_page(title: "Japanese below", parent: hidden, translations: { "ja" => { title: "検索エンジン下", slug: "japanese-below" } })
+    japanese = query("エンジン").with(language: "ja")
+    contained = postgres_results(japanese)
+    assert_equal [ [ "Page", live.id ] ], contained.hits.map { |hit| [ hit.record_type, hit.record_id ] }
+    assert_equal 1, SiteSearch::Shown.for(contained, locale: "ja", now: japanese.now).size
   end
+
+  def postgres_results(query) = SiteSearch::Postgres::Query.new(query, deadline: Process.clock_gettime(Process::CLOCK_MONOTONIC) + 3).results
 end

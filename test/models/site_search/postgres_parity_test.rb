@@ -54,11 +54,39 @@ class SiteSearch::PostgresParityTest < ActiveSupport::TestCase
     end
     assert kept.values.any?(&:present?), step
     assert_equal fresh, kept, "after #{step}, a search over the kept entries finds what it finds over a re-index"
+    assert_vocabulary(step)
   end
 
   def assert_parity(step)
     assert_not_empty rows, step
     assert_equal reindexed, rows, "after #{step}, search_entries is what search:reindex would write"
+    assert_vocabulary(step)
+  end
+
+  # The documents of every entry's copy and language, built again.
+  def current_documents
+    now = Time.current
+    SiteSearch::Entry.distinct.pluck(:published_version_id, :locale).group_by(&:first).flat_map do |copy_id, pairs|
+      languages = pairs.map(&:last)
+      SiteSearch::Documents.for(Publishing::Version.find(copy_id), now: now).select { |doc| languages.include?(doc.language) }
+    end
+  end
+
+  # The words an entry of `language` holds by the vocabulary's one rule
+  # (`document @@ plainto_tsquery(config, word)`), asked one by one.
+  def held_words(language, words)
+    config = SiteSearch::Postgres.config_for(language)
+    words.select do |word|
+      SiteSearch::Entry.where(locale: language)
+        .where(SiteSearch::Entry.sanitize_sql_array([ "document @@ plainto_tsquery(CAST(? AS regconfig), ?)", config, word ])).exists?
+    end
+  end
+
+  # A superset: the words of entries that are gone may stay until a prune.
+  def assert_vocabulary(step)
+    expected = current_documents.flat_map { |doc| held_words(doc.language, SiteSearch::Postgres::Vocabulary.words_of(doc)).map { [ doc.language, it ] } }
+    assert_not_empty expected, step
+    assert_empty expected - SiteSearch::Word.pluck(:locale, :word), "after #{step}, every word an entry holds is in search_words"
   end
 
   def ok(result)
@@ -99,6 +127,18 @@ class SiteSearch::PostgresParityTest < ActiveSupport::TestCase
     ok Trash::Restore.call(child.reload)
     assert_parity "a page trashed and restored"
 
+    ok Pages::Save.call(page.reload, translations: { "en" => { slug: "lantern" } })
+    assert_parity "a parent's slug changed, its subpages' addresses moved and their slugs kept"
+
+    ok Posts::Save.call(post.reload, translations: { "en" => { slug: "anchorage" } })
+    assert_parity "a live post's slug changed"
+
+    ok Trash::Move.call(child.reload)
+    namesake = create_page(title: "Other keeper", parent: blog.reload, translations: { "en" => { title: "Other keeper", slug: child.reload.slug } })
+    ok Trash::Restore.call(child.reload)
+    assert_not_equal namesake.slug, child.reload.slug, "the restore freed the slug to a suffix"
+    assert_parity "a page restored with its slug freed to a suffix"
+
     ok Trash::Move.call(child.reload)
     assert_view_parity "a page trashed"
 
@@ -111,6 +151,13 @@ class SiteSearch::PostgresParityTest < ActiveSupport::TestCase
     ok Pages::Save.call(page.reload, attributes: { published: true })
     assert_parity "a page unpublished and published again"
     assert_view_parity "a page unpublished and published again"
+
+    update = create_post(title: "Tide table", content_type: "now_update")
+    news = create_page(title: "News")
+    ok ContentBlocks::Save.call(ContentBlock.new(owner: news), attributes: { block_type: "post_list", settings: { "content_type" => "now_update" } })
+    publish_changes(news)
+    assert PublicSite::Urls.new.path_for(update.reload, "en"), "the listing gave the post an address"
+    assert_parity "a listing published after its posts"
 
     ok Tags::Merge.call(Tag.find_by!(name: "seafaring"), into: Tag.find_by!(name: "maritime"))
     assert_parity "a tag merged"

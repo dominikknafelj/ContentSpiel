@@ -25,12 +25,13 @@ module SiteSearch
       # SHA-256 of the enabled languages, each with its fallback chain (by
       # which a document's every field is read), `Documents::REVISION` and,
       # for the built-in, `Postgres::CONFIGS` (the configuration each
-      # language's words are stemmed with). The languages are sorted: the
+      # language's words are stemmed with) and `Postgres::REVISION` (what the
+      # built-in stores of a document). The languages are sorted: the
       # documents are one per language, so their order moves nothing that
       # the chains do not already say.
       def fingerprint(name, site: Current.site)
         parts = { "languages" => languages(site), "revision" => Documents::REVISION }
-        parts["configs"] = Postgres::CONFIGS if name.to_s == Backends::BUILT_IN
+        parts.merge!("configs" => Postgres::CONFIGS, "postgres_revision" => Postgres::REVISION) if name.to_s == Backends::BUILT_IN
         Digest::SHA256.hexdigest(JSON.generate(parts))
       end
 

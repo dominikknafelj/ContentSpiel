@@ -66,15 +66,20 @@ module BlockTypes
         # how many there are in all; `pagination` the `Pagination`; `action`
         # the shown page's own address, which the form is sent to;
         # `live_note?` whether the block says its results are the live
-        # site's (the preview's); `string(key, **options)` one of the
-        # block's words. The markup a template should keep is in
+        # site's (the preview's); `close_matches?` whether the results are
+        # close matches; `correction` the verified corrected search, plain
+        # text, or nil; `correction_path` the block's own address searching
+        # for it; `suggest_url` the suggestions endpoint, or nil for none;
+        # `string(key, **options)` one of the block's words. The markup a template should keep is in
         # docs/reference/theming.md, "The Search block".
-        t.theme_methods :block, :page, :label, :query, :state, :results, :total, :pagination, :action, :live_note?, :string
-        # The mark around a match in a snippet: its ground and its text,
-        # from the base tokens in `tokens.css`, re-valued by a strong band in
-        # `sections.css` (test/integration/design_tokens_test.rb holds the
-        # pair).
-        t.tokens themed: %w[search-mark search-mark-ink]
+        t.theme_methods :block, :page, :label, :query, :state, :results, :total, :pagination, :action, :live_note?,
+                        :close_matches?, :correction, :correction_path, :suggest_url, :string
+        # The mark around a match in a snippet and a matched tag: its ground
+        # and its text; and the ground of the active suggestion. From the
+        # base tokens in `tokens.css`, re-valued by a strong band in
+        # `sections.css` (test/integration/design_tokens_test.rb holds each
+        # against what is drawn on it).
+        t.tokens themed: %w[search-mark search-mark-ink search-active]
         t.stylesheet "search.css"
         t.sample translations: { "en" => { label: "Search the guide" }, "de" => { label: "Search label de" }, "es" => { label: "Search label es" } },
                  shows: [ "Search the guide" ]

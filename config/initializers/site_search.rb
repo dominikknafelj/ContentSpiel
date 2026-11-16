@@ -28,15 +28,19 @@ Rails.application.config.to_prepare do
 end
 
 # The boot names the chosen backend, and in a process that serves requests
-# enqueues the index check, which builds the index when it is empty or stale
-# (`SiteSearch::BootCheck`, spec §6.6). After the `to_prepare` above, which
-# filled the registry. A boot never fails because of search: `run` rescues
-# its own enqueue, and the line is skipped if it cannot be written.
+# holds the database requirements and enqueues the index check, which builds
+# the index when it is empty or stale (`SiteSearch::BootCheck`, spec §6.6).
+# After the `to_prepare` above, which filled the registry. A database that
+# lost `pg_trgm` or has a `C` character type stops the boot with its message
+# (`SiteSearch::Postgres::Requirements.check_at_boot`, not rescued here), as a
+# missing `SECRET_KEY_BASE` does; nothing else of search fails a boot: `run`
+# rescues its own enqueue, and the line is skipped if it cannot be written.
 Rails.application.config.after_initialize do
   begin
     Rails.logger.info(SiteSearch::BootCheck.log_line)
   rescue StandardError
     nil
   end
+  SiteSearch::Postgres::Requirements.check_at_boot
   SiteSearch::BootCheck.run
 end

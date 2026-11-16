@@ -183,6 +183,10 @@
      test/integration/design_tokens_test.rb holds the ink on the mark. */
   --th-search-mark: color-mix(in srgb, var(--th-warn) 22%, var(--th-paper));
   --th-search-mark-ink: var(--th-ink);
+  /* The ground of the suggestion a visitor's arrow keys are on: the
+     accent's tint, under --th-ink and --th-meta at 4.5:1 and the accent's
+     bar at 3:1 (test/integration/design_tokens_test.rb). */
+  --th-search-active: var(--th-accent-tint);
 }
 
 [data-theme="dark"] {
@@ -302,6 +306,8 @@
      barely shows on the dark page. */
   --th-search-mark: color-mix(in srgb, var(--th-warn) 30%, var(--th-paper));
   --th-search-mark-ink: var(--th-ink);
+  /* The active suggestion's ground again: the dark accent's tint. */
+  --th-search-active: var(--th-accent-tint);
 }
 
 :root {

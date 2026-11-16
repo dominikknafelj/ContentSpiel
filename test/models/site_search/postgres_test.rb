@@ -65,8 +65,8 @@ class SiteSearch::PostgresTest < ActiveSupport::TestCase
     english = entry_of(copy, "en")
     spanish = entry_of(copy, "es")
     assert_equal [ "english", "spanish" ], [ english.config, spanish.config ]
-    assert_equal "'run':1A", english.document, "English stems the title"
-    assert_equal "'running':1A", spanish.document, "the Spanish entry holds the English title, parsed as Spanish"
+    assert_equal "'run':1A,2B", english.document, "English stems the title and the slug"
+    assert_equal "'running':1A,2B", spanish.document, "the Spanish entry holds the English title and slug, parsed as Spanish"
     assert_equal 1, backend.entry_count
   end
 

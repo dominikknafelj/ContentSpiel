@@ -10,7 +10,9 @@ module Trash
   # No transaction around the whole run, on purpose: each purge commits (or
   # rolls back) on its own, and an image's file is only purged after its
   # own delete commits -- one long transaction would hold every file until
-  # the very end and lose the lot on an unexpected error.
+  # the very end and lose the lot on an unexpected error. The search's
+  # vocabulary is pruned once for the run (`SiteSearch::Indexing.one_prune`),
+  # not once per purge.
   class Empty < ApplicationService
     attr_reader :purged_count, :skipped
 
@@ -24,6 +26,15 @@ module Trash
       # `trash.empty` is an admin-area key: no subject, so a nil record.
       return denied("trash.empty", nil) unless authorize!("trash.empty", nil)
 
+      SiteSearch::Indexing.one_prune { purge_each }
+      record_event("trash.emptied", metadata: { purged: @purged_count, skipped: @skipped.size })
+
+      success(nil)
+    end
+
+    private
+
+    def purge_each
       Trash.each_root do |record|
         result = Purge.call(record, actor: @actor)
         if result.ok?
@@ -42,9 +53,6 @@ module Trash
         Rails.logger.error("[trash] couldn't purge #{record.class.name}##{record.id}: #{e.class}: #{e.message}")
         @skipped << { record:, errors: [ "Couldn't be deleted: #{e.class.name}" ] }
       end
-      record_event("trash.emptied", metadata: { purged: @purged_count, skipped: @skipped.size })
-
-      success(nil)
     end
   end
 end

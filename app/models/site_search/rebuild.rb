@@ -42,7 +42,10 @@ module SiteSearch
   # Then the row is marked `ready` with the fingerprint read at the start
   # and the languages indexed: a change of the languages made during the
   # build leaves the row stale, and the job that ran it sees it
-  # (`ReindexJob`).
+  # (`ReindexJob`). Before that the built-in's vocabulary is pruned
+  # (`Postgres::Vocabulary.prune`), so a build ends with no word that no
+  # entry holds: the words of records gone, of copies superseded and of the
+  # languages just dropped.
   #
   # Every call to the backend is scrubbed (`Unavailable.scrubbing`): a
   # failure comes out as `SiteSearch::Unavailable`, the row left `building`.
@@ -93,11 +96,24 @@ module SiteSearch
 
       prune_unkept
       drop_languages(Array(indexed_before || SUPPORTED_LOCALES.keys) - Locales.enabled)
+      prune_words if @inline
       state.ready!(fingerprint, languages: Locales.enabled.sort, done: done)
       done
     end
 
     def kept(model) = model.kept.where.not(published_at: nil)
+
+    # The built-in's vocabulary pruned at the build's end. The entries stand
+    # without it, so a prune that waited `Vocabulary::LOCK_TIMEOUT` for the
+    # writes in flight is left to `PruneWordsJob`, which retries, and never
+    # makes the whole build fail and run again.
+    def prune_words
+      Unavailable.scrubbing(backend: @name) do
+        Postgres::Vocabulary.prune
+      rescue ActiveRecord::LockWaitTimeout
+        PruneWordsJob.perform_later
+      end
+    end
 
     def send_batch(model, ids)
       Telemetry.in_span("search.index", attributes: { "search.backend" => @name }) do |span|
