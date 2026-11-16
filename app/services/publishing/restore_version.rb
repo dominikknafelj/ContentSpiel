@@ -13,9 +13,10 @@ module Publishing
   #
   # WHAT IT LEAVES ALONE: every copy, the pending one included (a scheduled
   # change stays scheduled, R3: unlike a discard, nothing is withdrawn),
-  # `published_at`, the slug and the tree. THE MARK is what the save
-  # services leave: set on a live or scheduled record when they write
-  # content, never on a draft, and never cleared here.
+  # `published_at`, the slug and the tree. THE MARK follows what is true
+  # after the return, as after a discard: set on a live or scheduled record
+  # whose rows now differ from its newest copy, cleared when they are that
+  # copy (the version restored was the newest), never set on a draft.
   #
   # THE DIALOG'S RECORD. A version never changes, but the rows can: the
   # confirmation showed what would change between them and the version as
@@ -29,7 +30,7 @@ module Publishing
   # image needs what choosing one needs (`Media::Choosing`, `media.upload`,
   # asked by the save service). That refusal comes from a step inside the
   # transaction, which takes its `access.denied` away with the rollback;
-  # it is recorded again here, outside, once (R7).
+  # it is recorded again outside, once (`ReturnTo#refused_inside`, R7).
   #
   # One transaction, `lock_owner` first (the settings row, then the
   # record's row), then the block services, which take the page's row again
@@ -77,6 +78,14 @@ module Publishing
         # and no event says a restore happened.
         next false unless @wrote
 
+        # THE MARK FOLLOWS WHAT IS TRUE NOW, read again under the lock, as
+        # after a discard: the rows against the newest copy (`Changes.of`),
+        # set when they differ and cleared when the version restored is
+        # that copy. A draft carries no mark.
+        if @record.published_at
+          Changes.of(@record).none? ? Publishing.clear_changes(@record) : Publishing.note_change(@record)
+        end
+
         record_event("#{kind}.version_restored", subject: @record, coalesce: false, snapshot: nil,
           metadata: { "number" => version.number, "images_missing" => outcome.images_missing, "tags_missing" => outcome.tags_missing }
             .reject { |key, count| key != "number" && count.zero? })
@@ -87,6 +96,11 @@ module Publishing
       return success(@record, notice: @left.join(". ").presence, value: @value) if done
       return refused_inside if @denied
 
+      # Past the refusals and a failed step, nothing was written although
+      # the rows differed from the version: what differs is only what a
+      # return cannot put back (an image gone since, counted even where the
+      # row is already empty; a tag deleted or renamed since), so `@left`
+      # names it and is never empty here.
       failure(@record, @errors.presence || [ @refusal ].compact.presence || @left)
     end
 
@@ -106,13 +120,6 @@ module Publishing
       return false if @shown_updated_at.equal?(NOT_ASKED)
 
       @shown_updated_at&.floor(6) != @record.updated_at.floor(6)
-    end
-
-    # Which permission refused the step: the owner's keys were all held a
-    # moment ago and are asked once more in case that changed; otherwise
-    # what a step refuses is the choice of an image (`Media::Choosing`).
-    def refused_inside
-      denied(AccessControl::OwnerRule.refusal(@record) { |key| authorize!(key, @record) } || "media.upload", @record)
     end
   end
 end

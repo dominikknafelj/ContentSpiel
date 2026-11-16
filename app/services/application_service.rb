@@ -23,8 +23,13 @@ class ApplicationService
   # needs more than the record to say what happened (a restore's version
   # number, its counts, the time of a change still scheduled); nil for every
   # other result.
-  Result = Data.define(:record, :errors, :denied, :notice, :refusal, :value) do
-    def initialize(record:, errors:, denied: false, notice: nil, refusal: nil, value: nil) = super
+  #
+  # `permission` is the key a denial was refused for (`#denied`), so a
+  # caller that drove the refused service inside a transaction it rolls
+  # back can record the same `access.denied` again outside it; nil for
+  # every other result.
+  Result = Data.define(:record, :errors, :denied, :notice, :refusal, :value, :permission) do
+    def initialize(record:, errors:, denied: false, notice: nil, refusal: nil, value: nil, permission: nil) = super
 
     def self.success(record, notice: nil, value: nil) = new(record:, errors: [], notice:, value:)
 
@@ -104,7 +109,7 @@ class ApplicationService
     metadata["subject_type"] = record.class.polymorphic_name if record.is_a?(ActiveRecord::Base) && subject.nil?
 
     as_actor { Audit.record("access.denied", subject:, metadata:) }
-    Result.new(record:, errors: [ message || "You don't have permission to #{permission.label.downcase}" ], denied: true)
+    Result.new(record:, errors: [ message || "You don't have permission to #{permission.label.downcase}" ], denied: true, permission: permission.key)
   end
 
   # Writes to the audit log (access-control design spec §4.2) through

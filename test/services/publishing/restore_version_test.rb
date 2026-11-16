@@ -69,6 +69,37 @@ class Publishing::RestoreVersionTest < ActiveSupport::TestCase
     assert_nil result.notice
   end
 
+  test "restoring the newest version clears the mark, restoring an older one sets it" do
+    publish_two
+    assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
+    assert @page.reload.unpublished_changes?
+
+    restore(@page, 2)
+
+    assert_equal "Two", title(@page)
+    assert_nil @page.unpublished_changes_at, "the rows are the newest copy again"
+
+    restore(@page, 1)
+
+    assert @page.reload.unpublished_changes?
+  end
+
+  # Translation bookkeeping is not copied back from the version: it is what
+  # the save services leave when the text is written back (spec §11).
+  test "where the original's text goes back, a translation confirmed for the later text reads outdated" do
+    publish_two
+    assert Translations::Confirm.call(@page.reload, field: "title", locale: "de").ok?
+    assert_equal :current, @page.reload.translation_state("title", "de")
+    changed_at = @page.translation_original_changed_at["title"]
+
+    travel(1.minute) { restore(@page, 1) }
+
+    assert_equal "Pricing", title(@page)
+    assert_equal "Preise", Mobility.with_locale(:de) { @page.title }, "the translation's own text is the same in both versions"
+    assert_equal :outdated, @page.translation_state("title", "de")
+    assert_not_equal changed_at, @page.translation_original_changed_at["title"], "the time is the services', not the version's"
+  end
+
   test "a block deleted since comes back as a new block, one added since goes" do
     assert ContentBlocks::Destroy.call(@first).ok?
     added = add("Added")
@@ -251,6 +282,7 @@ class Publishing::RestoreVersionTest < ActiveSupport::TestCase
     assert_equal later.id, image.reload.media_asset_id
     denial = Audit::Event.where(action: "access.denied").sole
     assert_equal "media.upload", denial.metadata["permission"]
+    assert_equal @page, denial.subject
     assert_equal users(:editor_branch).id, denial.actor_id
     assert_empty Audit::Event.where(action: "page.version_restored")
   end

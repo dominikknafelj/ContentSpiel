@@ -89,6 +89,7 @@ module Publishing
       end
       return failure(@record, [ MOVED ]) if @moved
       return success(@record, notice: @left.join(". ").presence) if done
+      return refused_inside if @denied
 
       failure(@record, @errors.presence || @left.presence || [ NOTHING ])
     end

@@ -97,7 +97,8 @@ module Publishing
     private
 
     def return_to!(version)
-      @wrote = @denied = false
+      @wrote = false
+      @denied = nil
       @tags_missing = 0
       @gone_images = Set.new
       @kept_images = kept_images(version)
@@ -142,9 +143,9 @@ module Publishing
 
       @errors = result.errors
       # A refusal's `access.denied` was written inside the transaction this
-      # rollback takes away; `@denied` lets the caller record it again
-      # outside (`RestoreVersion`).
-      @denied = result.denied?
+      # rollback takes away; `@denied` keeps its key so the caller records
+      # it again outside (`#refused_inside`).
+      @denied = result.permission if result.denied?
       raise ActiveRecord::Rollback
     end
 
@@ -158,6 +159,15 @@ module Publishing
       kept = Media::Asset.kept
       kept.where(id: ids.compact.uniq).or(kept.where(id: ContentBlock.where(owner: @record).select(:media_asset_id))).pluck(:id).to_set
     end
+
+    # The answer to a return a step refused for a missing right (in
+    # practice `media.upload`, which `Media::Choosing` asks of an image put
+    # back): that step's `access.denied` went with the caller's rollback, so
+    # it is recorded again here, outside the transaction, once, for the key
+    # the step was refused for, on the record returned (version history
+    # spec R7). The caller answers it when `@denied` is set after its
+    # transaction.
+    def refused_inside = denied(@denied, @record)
 
     # Whether a copy's image id names an image that is gone or in the trash.
     def gone_image?(id) = !id.nil? && !@kept_images.include?(id)

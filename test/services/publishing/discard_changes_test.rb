@@ -625,6 +625,31 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_empty Audit::Event.where(action: "page.changes_discarded")
   end
 
+  # R7: putting an image back asks what choosing one asks (`Media::Choosing`),
+  # and the refusal, which a step inside the transaction makes, is audited.
+  test "someone without media.upload whose discard would bring back a changed image is refused, and the refusal is audited" do
+    shown = create_media_asset
+    later = create_media_asset
+    image = add(nil, block_type: "image", media_asset_id: shown.id)
+    publish_changes(@page)
+    assert ContentBlocks::Save.call(image, attributes: { media_asset_id: later.id }).ok?
+    assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
+    %w[pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: {}) }
+    before = shape
+
+    result = as(users(:editor_branch)) { Publishing::DiscardChanges.call(@page.reload) }
+
+    assert result.denied?
+    assert_equal before, shape
+    assert_equal later.id, image.reload.media_asset_id
+    denial = Audit::Event.where(action: "access.denied").sole
+    assert_equal "media.upload", denial.metadata["permission"]
+    assert_equal users(:editor_branch).id, denial.actor_id
+    assert_equal @page, denial.subject
+    assert_empty Audit::Event.where(action: "page.changes_discarded")
+    assert @page.reload.unpublished_changes?
+  end
+
   test "a draft and a record with no copy have nothing to discard" do
     draft = create_page(title: "Draft", published: false)
 
