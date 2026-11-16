@@ -182,6 +182,42 @@ class Admin::MediaFolderMovesSystemTest < ApplicationSystemTestCase
     [ first, second, third ].each { |asset| assert_no_selector "#media-asset-#{asset.id}" }
     assert_selector "#{bar} strong", text: "0 selected"
     assert find("#{bar} button", text: "Move to…").disabled?
+    # The dialog closed onto a Move to… with nothing left to move: the focus
+    # is on Select all, never lost to <body>.
+    assert_eventually(message: "the focus is on Select all, counting the one tile left") { focused_text == "Select all 1" }
+  end
+
+  test "a move in All media unticks the images it moved, which stay drawn" do
+    first, second = images_in_client_a(2)
+    enter_selection("/cs-studio/media")
+    find(tile(first)).click
+    find(tile(second)).click
+    find(tile(@logo)).click
+    assert_selector "#{bar} strong", text: "3 selected"
+
+    within(bar) { press "Move to…" }
+    within(dialog) { choose "Events" }
+    move_here.click
+
+    assert_no_selector dialog
+    assert_selector "#toasts", text: "Moved 3 images to “Events”."
+    assert_selector "#{bar} strong", text: "0 selected"
+    [ first, second, @logo ].each { |asset| assert_selector "#{tile(asset)}[aria-pressed=false]" }
+    assert_no_selector "#{dialog}"
+  end
+
+  test "Back to selection mode starts with nothing ticked" do
+    enter_selection
+    find(tile(@logo)).click
+    assert_selector "#{bar} strong", text: "1 selected"
+    click_frame_link { within(bar) { press "Done" } }
+    assert_no_selector bar
+
+    page.go_back
+    assert_selector "#{bar} strong", text: "0 selected"
+    assert_selector "#{tile(@logo)}[aria-pressed=false]"
+    assert_no_selector "ul.admin-media-grid button[aria-pressed=true]"
+    assert_not find("#{tile(@logo)} [data-media-tick] input", visible: :all).checked?
   end
 
   test "Shift+click ticks a range in grid order" do

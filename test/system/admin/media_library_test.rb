@@ -701,6 +701,22 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     page.execute_script("window.__releaseUploads()")
   end
 
+  test "a file dropped in selection mode is refused: no overlay, no upload" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form(users(:one))
+    create_media_asset
+    visit_screen "/cs-studio/media?select=1"
+    assert_selector "[data-media-selection-bar]"
+
+    dispatch_file_drag("dragenter", "tiny.png")
+    assert_no_selector "[data-admin--media--drop-target=overlay]", visible: :visible
+    assert_no_difference -> { Media::Asset.count } do
+      dispatch_file_drop("tiny.png")
+      await_frames
+      assert_no_selector "[data-upload-tile]"
+    end
+  end
+
   # A `DataTransfer` carrying real `File`s built from fixture bytes, in the page.
   def files_script(*names)
     builders = names.map do |name|

@@ -17,7 +17,8 @@ import { messages } from "i18n/messages"
 // the grid's), and makes it the anchor. A tile's state is its `aria-pressed`,
 // which the stylesheet draws as the accent outline (`.admin-tile`), and the
 // tick in its chip follows it. A tile that leaves the page (a move's answer
-// takes the moved tiles out of a folder's grid) leaves the selection.
+// takes the moved tiles out of a folder's grid) leaves the selection and the
+// count Select all says.
 //
 // THE BAR. "N selected" and the status beside the bar say the count (the
 // status only on a change, so a screen reader hears what a press did);
@@ -28,11 +29,22 @@ import { messages } from "i18n/messages"
 // the ticked ids and, for one, its title, as the selection changes, so the
 // dialog opens on exactly what is ticked.
 //
+// AFTER A MOVE. A move the dialog sent that succeeded (`turbo:submit-end` of
+// its form, `media-move-form`) unticks the images it moved: they leave a
+// folder's grid, and in All media they stay drawn, unticked. When the dialog
+// then closes onto a Move to… that the emptied selection disabled, the focus
+// would fall to <body>; it goes to Select all instead.
+//
+// TURBO'S SNAPSHOT. Whatever this writes into the tiles and the bar (the
+// pressed state, the ticks, Move to…'s params) is taken back before Turbo
+// caches the page, so Back to a `select=1` entry starts with nothing ticked.
+//
 // LEAVING. Done is a content-frame link to the place without `select`; Escape
 // presses it, unless something on the page takes Escape first (an open
 // dialog or menu, a field: their keydown happens inside them, and a dialog's
 // own Escape closes the dialog).
 const PARAM = "data-admin--media--move-"
+const MOVE_FORM = "media-move-form"
 
 export default class extends Controller {
   static targets = ["tile", "count", "status", "selectAll", "move", "done"]
@@ -40,7 +52,17 @@ export default class extends Controller {
   connect() {
     this.anchor = null
     this.announced = 0
+    this.handlers = {
+      "turbo:before-cache": () => this.reset(),
+      "turbo:submit-end": (event) => this.moved(event),
+      "admin--ui--dialog:opening": (event) => this.opening(event)
+    }
+    Object.entries(this.handlers).forEach(([name, handler]) => document.addEventListener(name, handler))
     this.sync()
+  }
+
+  disconnect() {
+    Object.entries(this.handlers).forEach(([name, handler]) => document.removeEventListener(name, handler))
   }
 
   toggle(event) {
@@ -57,6 +79,7 @@ export default class extends Controller {
   }
 
   selectAll() {
+    if (this.hasSelectAllTarget && this.selectAllTarget.getAttribute("aria-disabled") === "true") return
     this.tileTargets.forEach((tile) => this.press(tile, true))
     this.sync()
   }
@@ -80,10 +103,41 @@ export default class extends Controller {
   // nothing left to say.
   tileTargetDisconnected(tile) {
     if (this.anchor === tile) this.anchor = null
-    if (this.element.isConnected && this.pressed(tile)) this.sync()
+    if (this.element.isConnected) this.sync()
   }
 
   // private
+
+  reset() {
+    this.tileTargets.forEach((tile) => this.press(tile, false))
+    this.anchor = null
+    this.sync()
+    if (this.hasStatusTarget) this.statusTarget.textContent = ""
+    this.announced = 0
+  }
+
+  moved(event) {
+    const form = event.target
+    if (!(form instanceof HTMLFormElement) || form.id !== MOVE_FORM || !event.detail?.success) return
+
+    const ids = new Set(Array.from(form.querySelectorAll("input[name='asset_ids[]']"), (input) => input.value))
+    this.tileTargets.forEach((tile) => { if (ids.has(tile.dataset.assetId)) this.press(tile, false) })
+    this.sync()
+  }
+
+  // The dialog opened from Move to…: when it closes, a focus left on
+  // nothing, or on the disabled Move to…, goes to Select all. Checked a frame
+  // after `close`, once the browser has put the focus where it puts it.
+  opening(event) {
+    const { dialog, trigger } = event.detail || {}
+    if (!dialog || !this.hasMoveTarget || trigger !== this.moveTarget) return
+
+    dialog.addEventListener("close", () => requestAnimationFrame(() => {
+      const active = document.activeElement
+      const lost = !active || active === document.body || active === this.moveTarget || active.getClientRects().length === 0
+      if (lost && this.moveTarget.disabled && this.hasSelectAllTarget) this.selectAllTarget.focus()
+    }), { once: true })
+  }
 
   pressed(tile) {
     return tile.getAttribute("aria-pressed") === "true"
