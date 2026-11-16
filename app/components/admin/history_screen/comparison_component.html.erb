@@ -1,0 +1,35 @@
+<% if empty? %>
+  <div class="rounded-card bg-surface shadow-1" data-history-empty>
+    <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty_title"), description: empty_body) %>
+  </div>
+<% else %>
+<%= tag.section class: "rounded-card bg-surface p-5 shadow-1", aria: { labelledby: heading_id }, data: { history_comparison: "" } do %>
+  <%= form_with(**form_options) do %>
+    <% hidden_values.each do |name, value| %>
+      <%= hidden_field_tag name, value, id: nil %>
+    <% end %>
+    <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2">
+      <h2 id="<%= heading_id %>" class="text-h2 font-semibold text-ink"><%= t(".version", number: version.number) %></h2>
+      <%= label_tag "history-with", t(".compared_with"), class: "text-sm text-dim" %>
+      <%= select_tag :with, options_for_select(with_options, with_value), id: "history-with", class: setup_select_class %>
+      <% if restore_shown? %>
+        <div class="ml-auto" data-history-restore>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".restore", number: version.number), variant: :primary, type: "button", data: restore_trigger) %>
+        </div>
+      <% end %>
+    </div>
+    <% if several_languages? %>
+      <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2">
+        <%= label_tag "history-locale", t(".language"), class: "text-label text-meta" %>
+        <%= select_tag :locale, options_for_select(language_options, locale), id: "history-locale", class: setup_select_class %>
+        <% if (line = others_line).present? %>
+          <span class="text-small text-meta"><%= line %></span>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+  <div class="mt-5">
+    <%= render Admin::Ui::ChangesOverviewComponent.new(record: record, changes: changes, holds: nil, locale: locale, detail: :diffs) %>
+  </div>
+<% end %>
+<% end %>

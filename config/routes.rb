@@ -239,6 +239,13 @@ Rails.application.routes.draw do
         end
       end
 
+      # A page's or a post's History screen (`Admin::HistoryController`): its
+      # published versions and the comparison of one with another. Under the
+      # record's own address, as the editor's crumbs are; a GET whose choices
+      # (`version`, `with`, `locale`, `page`) are its query.
+      get "pages/:id/history", to: "history#show", defaults: { kind: "page" }, constraints: { id: /\d+/ }, as: :page_history
+      get "posts/:id/history", to: "history#show", defaults: { kind: "post" }, constraints: { id: /\d+/ }, as: :post_history
+
       # The Tags module: a flat list with no `:new`/`:create` of its own -- a
       # tag has no editor screen, only an inline rename (`:update`), a delete
       # (`:destroy`) and a merge into another tag (`merge`, `Tags::Merge`) from
@@ -506,6 +513,9 @@ Rails.application.routes.draw do
         post "changes", to: "publishing#changes", as: :publishing_changes
         post "discard", to: "publishing#discard", as: :publishing_discard
         post "cancel_scheduled_change", to: "publishing#cancel_scheduled_change", as: :publishing_cancel_scheduled_change
+        # Restoring a version from the History screen: the rows become it, as
+        # unpublished changes (`Publishing::RestoreVersion`).
+        post "restore", to: "publishing#restore", as: :publishing_restore
       end
       # Notes on content. Everything about one record's
       # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,

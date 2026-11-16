@@ -9,7 +9,7 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794828751-4e8a".freeze
+  VERSION = "1794863706-141f".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
@@ -19,7 +19,7 @@ module DesignSystemEntries
     PrefixInput PresenceMarker PublicDiagramBlock RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage
     SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSearch SiteSearchMatches SiteSearchSuggest SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
     StudioBlockCard StudioCommandPalette StudioDashboardCards StudioDrawDiagrams StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms
-    StudioGroups StudioHeldStrip StudioListTable StudioMediaFolders StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioPostTypes StudioRail
+    StudioGroups StudioHeldStrip StudioHistory StudioListTable StudioMediaFolders StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioPostTypes StudioRail
     StudioSectionTile StudioSessions StudioSettings StudioShell StudioSignIn StudioSingleSignOn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations
     StudioTrash StudioTree StudioUsers StudioWizard TableGrid Tabs TextFields Toast Tooltip
   ].freeze
@@ -31,7 +31,9 @@ module DesignSystemEntries
     "Admin::Ui::ActorAvatarComponent" => "Person",
     "Admin::Ui::AvatarComponent" => "Person",
     "Admin::Ui::BlockIconComponent" => "IconChip",
+    "Admin::Ui::ChangesOverviewComponent" => "StudioHistory",
     "Admin::Ui::ChannelChipComponent" => "Badge",
+    "Admin::Ui::ChoiceTileComponent" => "ChoiceFields",
     "Admin::Ui::CheckboxComponent" => "ChoiceFields",
     "Admin::Ui::ConfirmDialogComponent" => "Dialog",
     "Admin::Ui::ConfirmIdentityDialogComponent" => "StudioPasskeys",

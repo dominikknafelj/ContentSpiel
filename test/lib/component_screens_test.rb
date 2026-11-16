@@ -124,6 +124,10 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/groups
       app/controllers/admin/groups_controller.rb
     ],
+    "history_screen" => %w[
+      app/views/admin/history
+      app/controllers/admin/history_controller.rb
+    ],
     "media_library" => %w[
       app/views/admin/media
       app/controllers/admin/media_controller.rb

@@ -7,12 +7,25 @@ module Admin
   module PublishingState
     private
 
+    # The pending copy the dialog showed when the press was made (its id, nil
+    # for none): each dialog's form carries it in `pending`, filled from the
+    # answer it got when it opened, and the service refuses when it is no
+    # longer so (`Publishing::ShownSchedule`). A request without the field (a
+    # script) showed nothing and is not checked.
+    def shown_pending
+      params.key?(:pending) ? params[:pending].presence&.to_i : ::Publishing::ShownSchedule::NOT_ASKED
+    end
+
     # The toast of "Publish now". A scheduled record goes live as it was
     # scheduled (its copy is taken when it is scheduled; later edits are
     # unpublished changes, drafts spec §3: typing never publishes), so when it
     # has such changes the person is told that they are not on the site.
     # `was_scheduled` is read BEFORE the save: it moves `published_at`.
-    def published_now_notice(record, was_scheduled:)
+    # Published with the changes saved since, the rows are on the site and
+    # there is nothing left to warn about (`Publishing::PublishNow`).
+    def published_now_notice(record, was_scheduled:, with_changes: false)
+      return I18n.t("admin.components.editor_screen.publishing.published_with_changes") if with_changes
+
       current = record.class.find_by(id: record.id)
       return "Published" unless was_scheduled && current && ::Publishing::State.of(current).changes?
 

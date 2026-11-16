@@ -475,6 +475,141 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal @published, shape
   end
 
+  # An image a copy in force shows cannot be trashed through the services
+  # (`Media::UsageIndex`, role `published`), but one can go behind them, and
+  # an older version's image may be gone (version history, R7): the copy's
+  # id is never written, the image is left empty, and the difference stays
+  # marked.
+  test "a discard of a copy whose image is in the trash leaves the image empty and succeeds" do
+    asset = create_media_asset
+    image = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "image", media_asset_id: asset.id },
+      translations: { "en" => { caption: "Shown" } }).record
+    publish_changes(@page)
+    assert ContentBlocks::Save.call(image.reload, translations: { "en" => { caption: "Typed" } }).ok?
+    asset.update_columns(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+
+    result = Publishing::DiscardChanges.call(@page.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_nil image.reload.media_asset_id
+    assert_equal "Shown", Mobility.with_locale(:en) { image.caption }, "the text is the copy's"
+    assert_includes result.notice, Publishing::DiscardChanges::IMAGES_GONE
+    assert_not_includes result.notice, Publishing::DiscardChanges::REMAINS, "no tag stayed behind"
+    assert @page.reload.unpublished_changes?, "the empty image is a difference from the copy"
+  end
+
+  # The shared reconciliation on its own, as a restore drives it: inside the
+  # caller's transaction and lock, returning what it could not bring back.
+  class ReturnToCopy < ApplicationService
+    include ContentBlocks::Structure
+    include Publishing::ReturnTo
+
+    def initialize(record) = (@record = record)
+
+    def call
+      @record.class.transaction do
+        lock_owner(@record)
+        @record.reload
+        return_to!(Publishing.current(@record))
+      end
+    end
+  end
+
+  test "a hero and a deleted block's image that are gone come back empty, a block made again included, and each is counted" do
+    hero = create_media_asset
+    shown = create_media_asset
+    assert Pages::Save.call(@page, attributes: { hero_media_asset_id: hero.id }).ok?
+    image = add(nil, block_type: "image", media_asset_id: shown.id)
+    publish_changes(@page)
+    assert ContentBlocks::Destroy.call(image).ok?
+    assert Pages::Save.call(@page.reload, attributes: { hero_media_asset_id: nil }).ok?
+    Media::Asset.where(id: [ hero.id, shown.id ]).update_all(trashed_at: Time.current) # version: none (a test trashes images the copy shows)
+
+    outcome = ReturnToCopy.call(@page.reload)
+
+    assert_equal Publishing::ReturnTo::Outcome.new(images_missing: 2, tags_missing: 0), outcome
+    assert_nil @page.reload.hero_media_asset_id
+    made = @page.content_blocks.find_by!(block_type: "image")
+    assert_not_equal image.id, made.id
+    assert_nil made.media_asset_id
+    assert @page.unpublished_changes?, "the reconciliation leaves the mark as the save services leave it"
+  end
+
+  test "a tag deleted since is counted: a post's, and a list block's filter" do
+    list = add(nil, block_type: "post_list", settings: { "content_type" => "blog", "tag" => "alpha" })
+    post = live_post(%w[alpha gamma])
+    publish_changes(@page)
+    assert Tags::Destroy.call(Tag.find_by!(name: "alpha")).ok?
+
+    assert_equal Publishing::ReturnTo::Outcome.new(images_missing: 0, tags_missing: 1), ReturnToCopy.call(post.reload)
+    assert_equal Publishing::ReturnTo::Outcome.new(images_missing: 0, tags_missing: 1), ReturnToCopy.call(@page.reload)
+    assert_equal "alpha", list.reload.settings["tag"]
+  end
+
+  test "an image named twice that went is counted once" do
+    gone = create_media_asset
+    assert Pages::Save.call(@page, attributes: { hero_media_asset_id: gone.id }).ok?
+    add(nil, block_type: "image", media_asset_id: gone.id)
+    publish_changes(@page)
+    gone.update_columns(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+
+    assert_equal Publishing::ReturnTo::Outcome.new(images_missing: 1, tags_missing: 0), ReturnToCopy.call(@page.reload)
+  end
+
+  test "a gone image is written empty where the row has another image since" do
+    gone = create_media_asset
+    other = create_media_asset
+    image = add(nil, block_type: "image", media_asset_id: gone.id)
+    publish_changes(@page)
+    assert ContentBlocks::Save.call(image.reload, attributes: { media_asset_id: other.id }).ok?
+    gone.update_columns(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+
+    result = Publishing::DiscardChanges.call(@page.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_nil image.reload.media_asset_id
+    assert_equal Publishing::DiscardChanges::IMAGES_GONE, result.notice
+  end
+
+  test "a block made again without its gone image is that block: a second discard keeps it and its notes" do
+    gone = create_media_asset
+    image = add(nil, block_type: "image", media_asset_id: gone.id)
+    publish_changes(@page)
+    assert ContentBlocks::Destroy.call(image).ok?
+    Media::Asset.where(id: gone.id).update_all(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+    first = Publishing::DiscardChanges.call(@page.reload)
+    assert first.ok?, first.errors.to_sentence
+    back = @page.content_blocks.find_by!(block_type: "image")
+    assert_nil back.media_asset_id
+    assert_equal [ :changed ], Publishing::Changes.of(@page.reload).blocks.map(&:kind), "the overview pairs it with the copy's block"
+    as(users(:two)) { assert Notes::Start.call(back, body: "A note").ok? }
+    assert ContentBlocks::Save.call(@first.reload, translations: { "en" => { body: rich_doc("Typed") } }).ok?
+
+    second = Publishing::DiscardChanges.call(@page.reload)
+
+    assert second.ok?, second.errors.to_sentence
+    assert ContentBlock.exists?(back.id), "kept, not made once more"
+    assert_equal [ back ], Notes::Thread.all.map(&:subject)
+    assert_equal Publishing::DiscardChanges::IMAGES_GONE, second.notice
+  end
+
+  test "a renamed tag and a gone image are both said" do
+    list = add(nil, block_type: "post_list", settings: { "content_type" => "blog", "tag" => "alpha" })
+    live_post(%w[alpha])
+    gone = create_media_asset
+    add(nil, block_type: "image", media_asset_id: gone.id)
+    publish_changes(@page)
+    assert Tags::Rename.call(Tag.find_by!(name: "alpha"), name: "alphas").ok?
+    assert ContentBlocks::Save.call(@first.reload, translations: { "en" => { body: rich_doc("Typed") } }).ok?
+    gone.update_columns(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+
+    result = Publishing::DiscardChanges.call(@page.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal "alphas", list.reload.settings["tag"]
+    assert_equal [ Publishing::DiscardChanges::IMAGES_GONE, Publishing::DiscardChanges::REMAINS ].join(". "), result.notice
+  end
+
   test "a discard that fails half way leaves the rows as they were" do
     add("Added")
     assert ContentBlocks::Destroy.call(@first).ok?
@@ -488,6 +623,31 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal before, shape
     assert @page.reload.unpublished_changes?
     assert_empty Audit::Event.where(action: "page.changes_discarded")
+  end
+
+  # R7: putting an image back asks what choosing one asks (`Media::Choosing`),
+  # and the refusal, which a step inside the transaction makes, is audited.
+  test "someone without media.upload whose discard would bring back a changed image is refused, and the refusal is audited" do
+    shown = create_media_asset
+    later = create_media_asset
+    image = add(nil, block_type: "image", media_asset_id: shown.id)
+    publish_changes(@page)
+    assert ContentBlocks::Save.call(image, attributes: { media_asset_id: later.id }).ok?
+    assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
+    %w[pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: {}) }
+    before = shape
+
+    result = as(users(:editor_branch)) { Publishing::DiscardChanges.call(@page.reload) }
+
+    assert result.denied?
+    assert_equal before, shape
+    assert_equal later.id, image.reload.media_asset_id
+    denial = Audit::Event.where(action: "access.denied").sole
+    assert_equal "media.upload", denial.metadata["permission"]
+    assert_equal users(:editor_branch).id, denial.actor_id
+    assert_equal @page, denial.subject
+    assert_empty Audit::Event.where(action: "page.changes_discarded")
+    assert @page.reload.unpublished_changes?
   end
 
   test "a draft and a record with no copy have nothing to discard" do

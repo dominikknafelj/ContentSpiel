@@ -1,8 +1,9 @@
 require "test_helper"
 
 # The overview the publish dialog shows (drafts spec §3), worded from
-# `Publishing::Changes`.
-class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCase
+# `Publishing::Changes`, and, with `detail: :diffs`, the History screen's
+# comparison with each entry's words (version history spec §3).
+class Admin::Ui::ChangesOverviewComponentTest < ViewComponent::TestCase
   include ContentHelper
 
   # `@pricing`, not `@page`: `render_inline` keeps its result in `@page`.
@@ -25,11 +26,30 @@ class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCas
     assert Pages::Save.call(@pricing, translations: { "de" => { subtitle: "Preise und Pläne" } }).ok?
   end
 
-  def overview(record = @pricing, lost: [], moved: [], viewer: @me)
+  def overview(record = @pricing, lost: [], moved: [], viewer: @me, **options)
     as(viewer) do
-      render_inline Admin::EditorScreen::ChangesOverviewComponent.new(record: record.reload, changes: Publishing::Changes.of(record), lost: lost, moved: moved,
-        holds: Editing::Holds.on(record, viewer: viewer, tab: "tab-aaaaaaaa"), locale: "en")
+      render_inline Admin::Ui::ChangesOverviewComponent.new(record: record.reload, changes: Publishing::Changes.of(record), lost: lost, moved: moved,
+        holds: Editing::Holds.on(record, viewer: viewer, tab: "tab-aaaaaaaa"), locale: "en", **options)
     end
+  end
+
+  # The History screen's comparison: no holds (nothing is published from it).
+  def diffs(record = @pricing, locale: "en")
+    as(@me) do
+      render_inline Admin::Ui::ChangesOverviewComponent.new(record: record.reload, changes: Publishing::Changes.of(record), holds: nil, locale: locale, detail: :diffs)
+    end
+  end
+
+  test "the default detail is :names: the same markup as asking for it, the dialog's overview with no words" do
+    edit
+    reserve(@changed, @pricing, @dana, "tab-bbbbbbbb")
+    plain = overview.to_html
+    named = overview(detail: :names).to_html
+
+    assert_equal plain, named
+    assert_selector "[data-change]", count: 3
+    assert_selector "[data-changed-fields]", text: "Subtitle"
+    assert_no_selector "[data-diff]"
   end
 
   test "each changed, added, removed and moved block is one row with its kind and its type" do
@@ -250,7 +270,7 @@ class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCas
 
   test "the schedule alone is the facts and no overview" do
     publish_changes(@pricing, at: 2.days.from_now) if edit
-    as(@me) { render_inline Admin::EditorScreen::ChangesOverviewComponent.schedule_only(record: @pricing.reload) }
+    as(@me) { render_inline Admin::Ui::ChangesOverviewComponent.schedule_only(record: @pricing.reload) }
 
     assert_selector "[data-publishing-schedule][data-pending-id='#{Publishing.pending(@pricing).id}']", visible: :all
     assert_no_selector "[data-publishing-overview]", visible: :all
@@ -264,5 +284,99 @@ class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCas
 
     assert_no_selector "[data-publishing-held] b"
     assert_selector "[data-publishing-held]", text: "<b>Dana</b>"
+  end
+
+  # -- detail: :diffs ----------------------------------------------------------------
+
+  test "the diffs detail draws each changed field's words, struck and added" do
+    edit
+    assert Pages::Save.call(@pricing, translations: { "en" => { title: "Prices and plans" } }).ok?
+    diffs
+
+    assert_selector "h3", text: "Page fields"
+    field = page.find("[data-diff-field]", text: "Title")
+    assert field.has_css?("[data-diff] del", text: "Pricing")
+    assert field.has_css?("[data-diff] ins", text: "Prices and plans")
+    assert field.has_css?("[data-diff].bg-paper.rounded-tile")
+    # The subtitle changed in German only: nothing of it differs in English.
+    assert_no_selector "[data-diff-field]", text: "Subtitle"
+
+    assert_selector "h3", text: "Blocks"
+    changed = page.find("[data-change=changed]")
+    assert changed.has_css?("[data-block-icon]")
+    assert changed.has_css?("[data-diff] ins", text: "changed")
+    assert_selector "[data-change=added]", text: "Four"
+    assert_no_selector "[data-change=added] [data-diff]"
+    assert_no_selector "[data-changed-languages]"
+    assert_no_selector "[data-publishing-schedule]", visible: :all
+  end
+
+  test "the diffs detail compares the chosen language: German shows the subtitle's words" do
+    edit
+    diffs(locale: "de")
+
+    assert_selector "[data-diff-field]", text: "Subtitle"
+    assert_selector "[data-diff-field] [data-diff] ins", text: "Preise und Pläne"
+  end
+
+  test "a formatting-only change reads Formatting changed" do
+    assert ContentBlocks::Save.call(@changed, translations: { "en" => { body: rich_doc("**One**") } }).ok?
+    diffs
+
+    assert_selector "[data-change=changed] [data-diff-formatting]", text: "Formatting changed"
+    assert_no_selector "[data-diff]"
+  end
+
+  test "a text past the comparison's limit says it is too long" do
+    assert ContentBlocks::Save.call(@changed, translations: { "en" => { body: rich_doc((%w[word] * 4001).join(" ")) } }).ok?
+    diffs
+
+    assert_selector "[data-change=changed] [data-diff-too-long]", text: "The text is too long to compare word by word."
+  end
+
+  test "a moved block says where it went" do
+    assert ContentBlocks::Reorder.call(@pricing, [ @stays.id, @changed.id, @removed.id ]).ok?
+    diffs
+
+    assert_selector "[data-change=moved]", count: 1
+    assert_selector "[data-change=moved]", text: "Moved"
+    assert_selector "[data-change=moved] [data-moved-places]", text: "now 1st, was 3rd"
+  end
+
+  test "a post's changed tags are a field with their names" do
+    post = create_post(title: "Post", tags: %w[one])
+    assert Posts::Save.call(post, attributes: { tag_names: %w[one two] }).ok?
+    diffs(post)
+
+    assert_selector "h3", text: "Post fields"
+    assert_selector "[data-diff-field]", text: "Tags"
+    assert_selector "[data-diff-field] ins", text: "two"
+  end
+
+  test "a removed block's row stands where it stood, between the blocks of the later side" do
+    edit
+    diffs
+
+    assert_equal %w[changed removed added], page.all("[data-change]").map { |row| row["data-change"] }
+    assert_selector "[data-change=removed]", text: "Two"
+  end
+
+  test "a block changed only in another language is no difference in this one, and shows its words in that one" do
+    assert ContentBlocks::Save.call(@changed, translations: { "de" => { body: rich_doc("Eins") } }).ok?
+    diffs
+    assert_selector "p", text: "No differences."
+    assert_no_selector "[data-change]"
+
+    diffs(locale: "de")
+    assert_no_text "No differences."
+    assert_selector "[data-change=changed] [data-diff] ins", text: "Eins"
+  end
+
+  test "no differences says so" do
+    diffs
+
+    assert_selector "p", text: "No differences."
+    assert_no_selector "[data-change], [data-diff-field]"
+    assert_no_text "Nothing to publish"
   end
 end

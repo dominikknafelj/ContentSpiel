@@ -25,22 +25,74 @@ module Publishing
     BLOCK_TRANSLATED = %w[translated_settings body caption alt].freeze
     TRANSLATED = { "Page" => %w[title subtitle meta_title meta_description hero_alt], "Post" => %w[title excerpt body translated_metadata] }.freeze
 
-    attr_reader :record, :version, :fields, :blocks, :locales
+    # `version` is the was side of an overview (`of`, `new`); `between` names
+    # both. Each side is a `Publishing::Version` or `:working`, the rows as
+    # `Snapshot.of` reads them. No version at all compares the rows with
+    # themselves.
+    attr_reader :record, :version, :fields, :blocks, :locales, :sides
 
     def self.of(record) = new(record, Publishing.baseline(record))
 
-    def initialize(record, version)
+    # What `to` changed from `from`, whichever is the later: the names are the
+    # same either way round, and a block only one side has is added or removed
+    # as the direction says. Stand-ins (`stand_ins`) pair a block that came
+    # back under a new id, so two old copies compare as a copy and the rows do.
+    def self.between(record, from:, to:) = new(record, from, to: to)
+
+    def initialize(record, version, to: :working)
       @record = record
       @version = version
       @changed_locales = Set.new
-      now = Snapshot.of(record) # reads the rows fresh and takes no lock: the overview must not hold a row
-      was = version ? { "fields" => version.snapshot.fetch("fields", {}), "tags" => version.snapshot.fetch("tags", []), "blocks" => version.blocks } : now
+      @was_source = version || :working
+      @now_source = to
+      now = side(to)
+      was = version ? side(version) : now
+      @sides = [ was, now ]
+      @block_sides = {}.compare_by_identity
+      @block_places = {}.compare_by_identity
       @fields = changed_fields(was, now)
       @blocks = changed_blocks(was.fetch("blocks", []), now.fetch("blocks", []))
       @locales = @changed_locales.to_a.sort
     end
 
+    # The stored form of one block of this comparison on each side, `[was,
+    # now]`, a side nil where the block is not on it: the text of a changed
+    # block is read from these (`Publishing::TextDiff`), never from the row,
+    # which is the working version's whatever the sides are.
+    def sides_of(change) = @block_sides.fetch(change.block)
+
+    # Where one block of this comparison stands on each side, `[was, now]`:
+    # its place in the side's reading order, counted from 1 among all its
+    # blocks (a section's inner blocks included), nil where it is not on a
+    # side. What a move is worded with ("now 4th, was 2nd").
+    def places_of(change) = @block_places.fetch(change.block)
+
     def none? = fields.empty? && blocks.empty?
+
+    # NONE, OR NOTHING BUT IMAGES THAT WENT: what "nothing to restore" means
+    # (`Publishing::RestoreVersion`, the History screen's Restore). A return
+    # writes a library image that is gone or in the trash as none
+    # (`Publishing::ReturnTo`), so a hero or a block whose only difference
+    # is such an image on one side and none on the other is a difference no
+    # restore can make: every press would end in `ReturnTo::IMAGES_GONE`.
+    # Read as `stand_ins` reads it, an image that is not kept is nil on both
+    # sides. One statement for the kept images, and only when something
+    # differs.
+    def none_but_gone_images?
+      return true if none?
+
+      kept = kept_images_of_sides
+      heroes = sides.map { |side| side.fetch("fields", {})["hero_media_asset_id"] }
+      return false unless (fields - %w[hero_media_asset_id]).empty?
+      return false if fields.include?("hero_media_asset_id") && heroes.map { |id| id if kept.include?(id) }.uniq.size > 1
+
+      blocks.all? do |entry|
+        next false unless entry.kind == :changed
+
+        was, now = sides_of(entry)
+        self.class.same_content?(self.class.without_gone_image(was, kept), self.class.without_gone_image(now, kept))
+      end
+    end
 
     # What publishing the rows of `record` at `now` would do to the ADDRESSES
     # of live records, the record's own among them, as data
@@ -91,24 +143,47 @@ module Publishing
     # column of the same container, a section itself being judged this way
     # first), each once, in reading order.
     #
+    # AN IMAGE THAT WENT IS NO IMAGE. A return writes a block whose library
+    # image is gone or in the trash with none (`Publishing::ReturnTo`), so
+    # here an image id that is not a kept library image reads as nil on both
+    # sides: the block made again without it stands for the copy's block,
+    # and the next return keeps it, and its notes, instead of making it once
+    # more. `kept_images` is the set of kept ids among both sides' (the
+    # return hands in the one it read; read here in one statement when not).
+    #
     # `{ the row's id => the copy's id }` for such pairs, from the two sides
     # in the form a copy stores blocks in. For `changed_blocks` and for the
-    # discard, which must agree on which block is which.
-    def self.stand_ins(was, now)
+    # return, which must agree on which block is which.
+    def self.stand_ins(was, now, kept_images: nil)
       known = now.map { |block| block["id"] }.to_set
       lost = was.reject { |block| known.include?(block["id"]) }
       return {} if lost.empty?
 
+      kept_images ||= kept_images_among(was + now)
+      lost = lost.map { |block| without_gone_image(block, kept_images) }
       copied = was.map { |block| block["id"] }.to_set
       stands_for = {}
       # Top-level blocks (the sections among them) before the blocks inside.
       now.reject { |block| copied.include?(block["id"]) }.partition { |block| block["section_id"].nil? }.flatten.each do |block|
         place = [ stands_for.fetch(block["section_id"], block["section_id"]), block["section_column"] ]
-        twin = lost.find { |old| old.values_at("section_id", "section_column") == place && same_content?(old, block) } or next
+        twin = lost.find { |old| old.values_at("section_id", "section_column") == place && same_content?(old, without_gone_image(block, kept_images)) } or next
         lost.delete(twin)
         stands_for[block["id"]] = twin["id"]
       end
       stands_for
+    end
+
+    # The kept library images (`Media::Asset.kept`) among the blocks' image
+    # ids, in one statement.
+    def self.kept_images_among(blocks)
+      ids = blocks.filter_map { |block| block["media_asset_id"] }.uniq
+      ids.empty? ? Set.new : Media::Asset.kept.where(id: ids).pluck(:id).to_set
+    end
+
+    # The stored block with an image that is not kept read as none.
+    def self.without_gone_image(block, kept_images)
+      id = block["media_asset_id"]
+      id.nil? || kept_images.include?(id) ? block : block.merge("media_asset_id" => nil)
     end
 
     def self.same_content?(one, other)
@@ -120,6 +195,26 @@ module Publishing
     end
 
     private
+
+    # The kept library images among both sides' heroes and blocks.
+    def kept_images_of_sides
+      ids = sides.flat_map { |side| [ side.fetch("fields", {})["hero_media_asset_id"], *side.fetch("blocks", []).map { |block| block["media_asset_id"] } ] }.compact.uniq
+      ids.empty? ? Set.new : Media::Asset.kept.where(id: ids).pluck(:id).to_set
+    end
+
+    # reads the rows fresh and takes no lock: the overview must not hold a row
+    def side(source)
+      return Snapshot.of(record) if source == :working
+
+      { "fields" => source.snapshot.fetch("fields", {}), "tags" => source.snapshot.fetch("tags", []), "blocks" => source.blocks }
+    end
+
+    # The blocks of one side as `ContentBlock`s, by id.
+    def block_rows(source, ids)
+      return ContentBlock.where(id: ids).index_by(&:id) if source == :working
+
+      Snapshot.blocks_from(source, record).index_by(&:id)
+    end
 
     def changed_fields(was, now)
       translated = TRANSLATED.fetch(record.class.polymorphic_name)
@@ -142,7 +237,7 @@ module Publishing
     end
 
     def changed_blocks(was, now)
-      rows = ContentBlock.where(id: now.map { |block| block["id"] }).index_by(&:id)
+      rows = block_rows(@now_source, now.map { |block| block["id"] })
       stands_for = self.class.stand_ins(was, now)
       rows = rows.transform_keys { |id| stands_for.fetch(id, id) }
       now = now.map { |block| block.merge("id" => stands_for.fetch(block["id"], block["id"]), "section_id" => stands_for.fetch(block["section_id"], block["section_id"])) }
@@ -153,7 +248,8 @@ module Publishing
       stayed = ->(id) { before[id] && after[id] && before[id].values_at("section_id", "section_column") == after[id].values_at("section_id", "section_column") }
       settled = unmoved(was.map { |block| block["id"] }.select(&stayed), now.map { |block| block["id"] }.select(&stayed))
 
-      entries = now.filter_map do |block|
+      was_places = was.each_with_index.to_h { |block, index| [ block["id"], index + 1 ] }
+      entries = now.each_with_index.filter_map do |block, index|
         id = block["id"]
         old = before[id]
         kind =
@@ -161,11 +257,21 @@ module Publishing
           elsif content_differs?(old, block) then :changed
           elsif old.values_at("section_id", "section_column") != block.values_at("section_id", "section_column") || !settled.include?(id) then :moved
           end
-        Block.new(kind:, block: rows.fetch(id)) if kind
+        next unless kind
+
+        Block.new(kind:, block: rows.fetch(id)).tap do |entry|
+          @block_sides[entry.block] = [ old, block ]
+          @block_places[entry.block] = [ was_places[id], index + 1 ]
+        end
       end
       gone = was.reject { |block| after.key?(block["id"]) }
-      removed = gone.any? ? Snapshot.blocks_from(version, record).index_by(&:id) : {}
-      entries + gone.map { |block| note_languages(block) && Block.new(kind: :removed, block: removed.fetch(block["id"])) }
+      removed = gone.any? ? block_rows(@was_source, gone.map { |block| block["id"] }) : {}
+      entries + gone.map { |block| note_languages(block) && Block.new(kind: :removed, block: removed.fetch(block["id"])).tap { |entry| record_removed(entry, block, was_places) } }
+    end
+
+    def record_removed(entry, block, was_places)
+      @block_sides[entry.block] = [ block, nil ]
+      @block_places[entry.block] = [ was_places[block["id"]], nil ]
     end
 
     def content_differs?(old, block)

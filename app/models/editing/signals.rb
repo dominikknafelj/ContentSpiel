@@ -38,6 +38,9 @@ module Editing
       # writes no row an editor shows, but the chip and the buttons of every
       # open header follow it.
       "page.changes_discarded" => SAVED, "post.changes_discarded" => SAVED,
+      # A restore likewise: its services signal what they write; this is the
+      # read of the form and the chip once more when it is done.
+      "page.version_restored" => SAVED, "post.version_restored" => SAVED,
       "page.scheduled_change_cancelled" => SAVED, "post.scheduled_change_cancelled" => SAVED
     }.freeze
 

@@ -1,0 +1,39 @@
+<% if answer? %>
+  <%# What is scheduled now, the `pending` the form sends back. In the choice it is said again inside the overview: the script reads the first. %>
+  <%= render Admin::Ui::ChangesOverviewComponent.schedule_only(record: record) %>
+  <%= tag.div class: "space-y-4", data: { publishing_overview: "", publish_now: gone? ? "gone" : (choice? ? "choice" : "plain") } do %>
+    <% if gone? %>
+      <p class="text-sm text-ink"><%= t(".gone.#{type}") %></p>
+    <% elsif choice? %>
+      <p class="text-sm text-dim"><%= t(".changed_since", time: scheduled_time) %></p>
+      <%= tag.div role: "radiogroup", aria: { label: t(".what_goes_live") }, class: "flex flex-col gap-2", data: { action: "change->admin--editor--publish-dialog#chose" } do %>
+        <%= render choice_tile("0", "scheduled", checked: true) %>
+        <%= render choice_tile("1", "with_changes", checked: false) %>
+      <% end %>
+      <details>
+        <summary class="<%= disclosure_class %>"><%= t(".what_changed") %></summary>
+        <div class="mt-2"><%= render overview %></div>
+      </details>
+    <% else %>
+      <p class="text-sm text-ink"><%= t(".instead", time: scheduled_time) %></p>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: title, width: :form, steady: true, data: dialog_data) do |dialog| %>
+    <%# Filled when the dialog opens (see the class comment): never the form. %>
+    <p class="text-sm text-dim" data-admin--editor--publish-dialog-target="loading"><%= t(".loading") %></p>
+    <p class="text-sm text-danger-ink" role="alert" hidden data-admin--editor--publish-dialog-target="failed"><%= t(".failed") %></p>
+    <div aria-live="polite" data-admin--editor--publish-dialog-target="overview"></div>
+    <%= form_with url: publish_url, method: :post, id: form_id, data: queue_hold do %>
+      <%# The scheduled change this dialog shows (its id, or none): set by the script from each answer, checked by the server. %>
+      <%= hidden_field_tag :pending, pending_id.to_s, id: nil %>
+    <% end %>
+    <% dialog.with_footer do %>
+      <%= tag.form method: "dialog" do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, type: "submit") %>
+      <% end %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".confirm"), variant: :primary, type: "submit", form: form_id,
+            data: { admin__editor__publish_dialog_target: "confirm" }) %>
+    <% end %>
+  <% end %>
+<% end %>

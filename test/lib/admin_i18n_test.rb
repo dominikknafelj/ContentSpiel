@@ -353,6 +353,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/record_chip_component.rb
     app/components/admin/ui/actor_avatar_component.rb
     app/components/admin/ui/word_diff_component.rb
+    app/components/admin/ui/changes_overview_component.rb
+    app/components/admin/ui/changes_overview_component.html.erb
     app/components/admin/notes_screen/media_section_component.rb
     app/components/admin/notes_screen/media_section_component.html.erb
     app/components/admin/ui/rail_tabs_component.rb
