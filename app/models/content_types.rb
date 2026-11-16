@@ -23,6 +23,34 @@ module ContentTypes
 
   def self.switched_on?(name, site: Current.site) = switched_on_names(site: site).map(&:to_s).include?(name.to_s)
 
+  # HOLDS THE SWITCHES for the rest of the caller's transaction: the settings
+  # row is read `FOR SHARE`, which waits for a `Settings::Save` in flight (it
+  # holds the row `FOR UPDATE` from its first statement to its commit) and
+  # keeps the next one from committing a switch until this transaction ends.
+  # So what a write decides from the switch (a post's refusal, its address in
+  # `PublicSite::Paths`, its documents in `SiteSearch::Documents`) is the
+  # switch as it stands at the write's commit, and a switch-off's refresh
+  # never runs beside a write that still sees the type on.
+  #
+  # THE ORDER: the settings row before any `public_paths` row or search entry.
+  # A switch writes those after its own lock and writes no page or post row,
+  # so a writer that already holds its record's row (`take!`, a save's
+  # UPDATE) waits here without a cycle.
+  #
+  # `Current.site` becomes the row read when it was written since the memo
+  # was loaded (a switch committed since the request began); a memo with
+  # changes not yet saved is this transaction's own write of the row and is
+  # kept as it is. Outside a transaction the lock ends with its statement.
+  # Answers nil.
+  def self.hold!
+    site = Current.site
+    return nil if site.new_record? || site.has_changes_to_save?
+
+    held = SiteSetting.lock("FOR SHARE").find(site.id)
+    Current.site = held unless held.updated_at == site.updated_at
+    nil
+  end
+
   # One component, one line of the theme contract (`Theme::Contract
   # .post_components` is keyed by the component's path): a type that declares
   # a component another registered type declares already must declare the same

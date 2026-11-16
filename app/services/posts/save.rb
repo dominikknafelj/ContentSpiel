@@ -86,13 +86,8 @@ module Posts
     end
 
     def call
-      # A state, not a right: before `authorize!`, so no `access.denied`. An
-      # existing post is judged by its stored type and by the one it would
-      # change to; a new one by the type it asks for, unless that name is not
-      # declared at all, which the model's validation reports.
-      dormant = switched_off_refusal(@post) if @post.persisted?
-      asked = @attributes[:content_type]
-      dormant ||= switched_off_refusal(probe(asked), record: @post) if asked.present? && (@post.persisted? || ContentTypes.find(asked))
+      # A state, not a right: before `authorize!`, so no `access.denied`.
+      dormant = dormant_refusal
       return dormant if dormant
 
       if publish_only?
@@ -107,6 +102,14 @@ module Posts
       # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
       # (rescued below) mustn't abort the caller's transaction.
       saved = Post.transaction(requires_new: true) do
+        # The switches held, before the post's row is written, and the
+        # refusal asked again against them: a switch-off that committed after
+        # the question above is the one this save stands under, and none can
+        # commit until it does (`ContentTypes.hold!`).
+        ContentTypes.hold!
+        dormant = dormant_refusal
+        raise ActiveRecord::Rollback if dormant
+
         was_unpublished = @post.published_at_in_database.nil?
         related_before = related_state
         assign
@@ -139,6 +142,7 @@ module Posts
         true
       end
 
+      return dormant if dormant
       if refused
         discard_refused_changes
         return denied(refused, @post)
@@ -161,6 +165,17 @@ module Posts
 
     # A throwaway post of the asked type, only to ask whether it is switched on.
     def probe(content_type) = Post.new(content_type: content_type)
+
+    # The refusal of a save to a dormant post, or nil. An existing post is
+    # judged by its stored type and by the one it would change to; a new one
+    # by the type it asks for, unless that name is not declared at all, which
+    # the model's validation reports.
+    def dormant_refusal
+      dormant = switched_off_refusal(@post) if @post.persisted?
+      asked = @attributes[:content_type]
+      dormant ||= switched_off_refusal(probe(asked), record: @post) if asked.present? && (@post.persisted? || ContentTypes.find(asked))
+      dormant
+    end
 
     # A save that publishes or schedules takes the copy the public site will
     # show (drafts spec §4.3), after the tags are written (related posts are

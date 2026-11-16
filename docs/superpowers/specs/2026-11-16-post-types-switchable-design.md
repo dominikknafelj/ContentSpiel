@@ -326,6 +326,21 @@ as `Current.site`); when another object is passed, the service assigns
 `Current.site = @site` for the refresh, and a test holds that the addresses
 follow the saved list, not a copy loaded earlier in the request.
 
+**A write beside a switch.** Every write that decides from a switch holds the
+settings row `FOR SHARE` before the rows it writes (`ContentTypes.hold!`):
+`Posts::Save` and `Publishing::PublishChanges` at the top of their transaction,
+asking the switched-off refusal again under it; `Publishing::Version.take!`
+before the record's row; `PublicSite::Paths.refresh` before any address or
+due copy it marks (a refresh of nothing only when one is due); and
+`SiteSearch::Indexing` before the built-in's entries. `Settings::Save` takes the
+row `FOR UPDATE` first, so a publish in flight finishes before a switch-off's
+refresh reads its post, and a publish that arrives during a switch-off waits for
+its commit and is refused. The order is the settings row, then the record's row,
+the addresses and the entries; a switch writes no page or post row, so a writer
+that holds its record's row first waits with no cycle.
+(`test/services/posts/switch_hold_test.rb`, statement order;
+`test/services/settings/switch_race_test.rb`, both orders on two connections.)
+
 ### 7.3 The audit
 
 One event per type switched (owner's decision that it is audited; my call on

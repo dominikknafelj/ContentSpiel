@@ -195,6 +195,13 @@ module PublicSite
     # `write_posts`'.
     def refresh(pages: [], posts: [], everything: false, report_taken: false, now: Time.current)
       PublicPath.transaction do
+        # The switches are held (`ContentTypes.hold!`) before any address is
+        # written or any due copy is marked: a post's address follows its
+        # type's switch, and a switch's own refresh marks due copies too. A
+        # refresh of nothing holds them only when something is due, so it
+        # stays one statement.
+        asked = everything || !(pages.is_a?(Array) && pages.empty?) || !(posts.is_a?(Array) && posts.empty?)
+        ContentTypes.hold! if asked
         # FIRST, so that no derivation acts on a picture the clock has made
         # stale: the copies that began to show with no write
         # (`Publishing::Version.settle!` marks them, once: a change whose
@@ -203,7 +210,7 @@ module PublicSite
         # is the whole of "it went live by the clock". There is no window
         # and no sweep. A pass of its own, ahead of the caller's: the caller
         # is answered what ITS records made yield.
-        due = Publishing::Version.settle!(now)
+        due = Publishing::Version.settle!(now, before_marking: (-> { ContentTypes.hold! } unless asked))
         of = ->(type) { due.filter_map { |_, record_type, id| id if record_type == type.polymorphic_name } }
         settled = due.empty? ? [] : refresh_touched(of.call(Page), of.call(Post), now)
 

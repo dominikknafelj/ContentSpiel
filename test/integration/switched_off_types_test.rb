@@ -85,6 +85,30 @@ class SwitchedOffTypesTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  # Search 2's readers: the title suggestions, the tag suggestions (a tag only
+  # the dormant post carries), the close matches for a typo and the "Did you
+  # mean" correction. Each reads only what has a current address, which a
+  # switch-off takes away in its own transaction.
+  test "a switched-off type's post is in no suggestion, close match or correction" do
+    search = create_page(title: "Search")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: search), attributes: { block_type: "search" }).ok?
+    publish_changes(search)
+    assert_includes suggested("Resume ro"), [ :post, "Resume role" ], "the premise: suggested while on"
+    assert_includes suggested("care"), [ :tag, "career" ], "the premise: its tag is suggested while on"
+    assert_equal [ @post.id ], found("#{WORD[0..-2]}x").map(&:id), "the premise: a close match while on"
+
+    switch_off
+
+    assert_empty suggested("Resume ro")
+    assert_empty suggested("care")
+    assert_empty SiteSearch::TagSuggestions.new(text: "care", language: "en", now: Time.current, limit: 3).tags
+    answer = answer_for("#{WORD[0..-2]}x")
+    assert_empty answer.results
+    assert_nil answer.correction
+    assert_empty found(WORD)
+    assert_includes suggested("Blog ke"), [ :post, "Blog kept" ], "a switched-on type's post is still suggested"
+  end
+
   test "a switched-off type's post is out of MCP's list, the dashboard and Translations, and in the posts list, the Trash, the Mind graph and ⌘K" do
     mark_for_the_work_surfaces
     work_surfaces(on: true)
@@ -199,9 +223,11 @@ class SwitchedOffTypesTest < ActionDispatch::IntegrationTest
     Current.reset
   end
 
-  def found(words)
-    SiteSearch::Answer.for(raw_query: words, raw_page: nil, locale: :en, limited: false, live_note: false).results.map(&:record)
-  end
+  def answer_for(words) = SiteSearch::Answer.for(raw_query: words, raw_page: nil, locale: :en, limited: false, live_note: false)
+
+  def found(words) = answer_for(words).results.map(&:record)
+
+  def suggested(text) = SiteSearch.suggest(text: text, language: "en", now: Time.current).items.map { |item| [ item.kind, item.label ] }
 
   def sitemap_paths
     Dir.mktmpdir do |dir|
