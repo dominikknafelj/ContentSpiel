@@ -68,4 +68,22 @@ class Admin::Ui::MediaPickerComponentTest < ViewComponent::TestCase
     assert_selector "dialog.admin-media-picker", visible: :all
     assert_match(/\.admin-media-picker \{ margin-top: 7\.5vh; \}/, Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read)
   end
+
+  # The card's D12: Upload's target, said before the button and naming it.
+  # The script rewrites the words for each place the frame shows; drawn,
+  # before any place is, they say "no folder", where an upload from All media
+  # lands.
+  test "Upload says where its files go and is described by it" do
+    as(users(:one)) { render_inline Admin::Ui::MediaPickerComponent.new }
+
+    into = page.find("p#media-picker-upload-into.text-small.text-meta[data-admin--media--picker-target=uploadInto]", text: "Uploads go into no folder", visible: :all)
+    upload = page.find("button[data-action='admin--media--picker#browse']", visible: :all)
+    assert_equal into[:id], upload["aria-describedby"]
+    # The sentence stands before the button, in the header.
+    assert_selector "p#media-picker-upload-into + button[aria-describedby='media-picker-upload-into']", visible: :all
+
+    words = JSON.parse(page.find("dialog", visible: :all)["data-messages"])
+    assert_equal "Uploads go into %{name}", words.fetch("components.ui.media_picker.upload_into")
+    assert_equal "Uploads go into no folder", words.fetch("components.ui.media_picker.upload_nowhere")
+  end
 end

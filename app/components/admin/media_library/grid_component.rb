@@ -130,8 +130,10 @@ module Admin
 
       def note_marks = @note_marks ||= pick? ? [ {}, Set.new ] : helpers.media_note_marks(assets.map(&:id))
 
+      # The picker's grid stands beside its list of places (the card's D12):
+      # four columns from 1024px, three from 768px, two below.
       def grid_class
-        pick? ? "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6" : "grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-3"
+        pick? ? "grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4" : "grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-3"
       end
 
       private

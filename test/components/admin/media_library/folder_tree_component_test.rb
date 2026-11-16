@@ -7,11 +7,11 @@ require "test_helper"
 class Admin::MediaLibrary::FolderTreeComponentTest < ViewComponent::TestCase
   def folder(name, parent = nil) = Media::Folder.create!(name: name, parent: parent)
 
-  def render_tree(place: Media::Place::ALL, counts: { all: 0, none: 0, folders: {} }, query: {}, cookie: nil, go_to: nil, manage: true)
+  def render_tree(place: Media::Place::ALL, counts: { all: 0, none: 0, folders: {} }, query: {}, cookie: nil, go_to: nil, manage: true, mode: :screen)
     tree = Media::FolderTree.load
     render_inline Admin::MediaLibrary::FolderTreeComponent.new(
       tree: tree, counts: counts, place: place, query: query,
-      open_set: TreeOpenSet.parse(cookie, readable_ids: tree.ids), manage: manage, go_to: go_to
+      open_set: TreeOpenSet.parse(cookie, readable_ids: tree.ids), manage: manage, go_to: go_to, mode: mode
     )
   end
 
@@ -189,4 +189,68 @@ class Admin::MediaLibrary::FolderTreeComponentTest < ViewComponent::TestCase
     render_tree(manage: false)
     assert_no_selector ".admin-tree-node__handle", visible: :all
   end
+
+  # The picker's places (the card's D12): D1's rows, read-only, in the
+  # picker's own frame. Their folds are a view state: the path to the place
+  # is open, every other folder folded, and nothing is read from or written
+  # to `cs_media_open` (no `data-tree-open-cookie`, so `tree/open_set.js`
+  # has no cookie to write).
+  test "in the picker the rows are read-only, keep no folds and load the picker's frame" do
+    clients = folder("Clients")
+    client_a = folder("Client A", clients)
+    folder("2026", client_a)
+    team = folder("Team")
+    folder("Portraits", team)
+
+    # Team opened in the cookie: the picker reads none.
+    render_tree(place: place(client_a), query: { q: "logo", filter: "unused", page: "2" }, cookie: team.id.to_s, mode: :picker,
+                counts: { all: 9, none: 2, folders: { client_a.id => 4 } })
+
+    tree = page.find("nav[aria-label='Folders'] > ul#media-picker-folder-tree.admin-tree", visible: :all)
+    assert_equal "admin--tree--disclosure", tree["data-controller"]
+    %w[data-tree-open-cookie data-tree-open-path data-media-drag-tree data-media-drag-max-depth].each do |name|
+      assert_nil tree[name], "the picker's tree carries #{name}"
+    end
+    assert_no_selector "#media-folder-tree, #media-folder-tree-part", visible: :all
+    assert_no_selector ".admin-tree-row__add, .admin-tree-node__handle, [data-media-drag-handle]", visible: :all
+    assert_no_selector "[data-admin--media--folders-target]", visible: :all
+
+    links = page.all("#media-picker-folder-tree a[data-tree-focus][data-turbo-frame='media-picker-grid']", visible: :all).to_h { |link| [ link.text, link[:href] ] }
+    assert_equal "/cs-studio/media?filter=unused&picker=1&q=logo", links.fetch("All media")
+    assert_equal "/cs-studio/media?filter=unused&folder=none&picker=1&q=logo", links.fetch("Not in a folder")
+    assert_equal "/cs-studio/media?filter=unused&folder=#{client_a.id}&picker=1&q=logo", links.fetch("Client A")
+    assert_no_selector "#media-picker-folder-tree a[data-turbo-action]", visible: :all
+
+    selected = page.find("#media-picker-folder-tree .admin-tree-row--selected", visible: :all)
+    assert_equal "media-picker-place-row-#{client_a.id}", selected[:id]
+    assert_equal "4", selected.find(".admin-tree-row__count", visible: :all).text
+    assert_nil node(clients)["data-folded"]
+    assert node(client_a)["data-folded"], "Client A, the place, keeps its own branch folded"
+    assert node(team)["data-folded"], "a fold in cs_media_open reached the picker"
+    assert_selector "#media-picker-folder-children-#{team.id}[hidden]", visible: :all
+  end
+
+  test "the picker's places are also a select named Folder" do
+    clients = folder("Clients")
+    client_a = folder("Client A", clients)
+    folder("Events")
+
+    render_tree(place: place(client_a), query: { q: "logo" }, mode: :picker)
+
+    select = page.find_field("Folder", type: "select", visible: :all)
+    assert_equal "change->admin--media--picker#place", select["data-action"]
+    assert_nil select[:name], "the select is no form's field"
+    assert_includes select[:class], "cs-select"
+    assert_selector "div.sm\\:hidden select##{select[:id]}", visible: :all
+    assert_selector "nav.hidden.sm\\:block", visible: :all
+
+    options = select.all("option", visible: :all)
+    assert_equal [ "All media", "Not in a folder", "Clients", "\u00A0\u00A0\u00A0\u00A0Client A", "Events" ], options.map { |option| option.native.text }
+    assert_equal [ "all", "none", clients.id.to_s, client_a.id.to_s, folder_id("Events") ], options.map(&:value)
+    assert_equal "/cs-studio/media?folder=#{client_a.id}&picker=1&q=logo", options[3]["data-href"]
+    assert_equal "/cs-studio/media?picker=1&q=logo", options[0]["data-href"]
+    assert_equal [ client_a.id.to_s ], options.select(&:selected?).map(&:value)
+  end
+
+  def folder_id(name) = Media::Folder.find_by!(name: name).id.to_s
 end

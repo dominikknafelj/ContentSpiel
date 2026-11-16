@@ -52,10 +52,29 @@ module Admin
     # `data-media-folder-*` and the tree's `data-media-drag-max-depth`
     # (`Media::Folder::MAX_DEPTH`), so a refusal is said before anything is
     # sent; the server judges again.
+    #
+    # `mode: :picker` is the same places in `Admin::Ui::MediaPickerComponent`
+    # (the card's D12), drawn by `admin/media/picker` inside the picker's
+    # frame and answered again with every navigation of it. Its rows are
+    # read-only (no "+", no handle, no drag, whatever `manage:` says) and
+    # their links load the picker's frame (`picker=1`, no history entry: the
+    # page under the dialog keeps its address). Its folds are a view state:
+    # the path to the place is open and every other folder folded, and none
+    # is kept (no `data-tree-open-cookie`, so `tree/open_set.js` reads and
+    # writes no cookie for it; `open_set:` is not read). Its ids are its own
+    # (`media-picker-…`), so it never meets the Media screen's column on a
+    # page. Below 640px the same places are a select, "Folder", which
+    # `admin--media--picker#place` follows; the picker's view lays the two
+    # out (the list beside the grid, the select above the toolbar).
     class FolderTreeComponent < AdminComponent
       ID = "media-folder-tree"
+      PICKER_ID = "media-picker-folder-tree"
       PART_ID = "media-folder-tree-part"
-      MODES = %i[screen].freeze
+      MODES = %i[screen picker].freeze
+
+      # The select's indent per level below the first, in no-break spaces: an
+      # `<option>` draws no padding and collapses ordinary spaces.
+      INDENT = "\u00A0" * 4
 
       ROW = Admin::Ui::TreeItemComponent::CLASSES
 
@@ -66,9 +85,9 @@ module Admin
         @counts = counts
         @place = place
         @query = query
-        @open_set = open_set
-        @manage = manage
         @mode = mode
+        @open_set = picker? ? TreeOpenSet::EMPTY : open_set
+        @manage = manage && !picker?
         @go_to = go_to
         @path_ids = place.folder ? tree.path(place.folder).map(&:id).excluding(place.folder).to_set : Set.new
       end
@@ -92,6 +111,24 @@ module Admin
 
       attr_reader :tree, :counts, :place, :query, :open_set, :manage, :mode, :go_to, :path_ids
 
+      def picker? = mode == :picker
+
+      def tree_id = picker? ? PICKER_ID : ID
+
+      def row_id(each) = picker? ? "media-picker-place-row-#{each.to_param}" : self.class.row_id(each)
+
+      def tree_data
+        words = messages_data("components.ui.tree_item.fold", "components.ui.tree_item.unfold")
+        return { controller: "admin--tree--disclosure", tree_locale: tree_locale, messages: words } if picker?
+
+        { controller: "admin--tree--disclosure admin--media--folders",
+          tree_open_path: "/#{ContentSpiel::ADMIN_PATH}", tree_open_cookie: TreeOpenSet::MEDIA_COOKIE, tree_locale: tree_locale,
+          media_drag_tree: true, media_drag_max_depth: Media::Folder::MAX_DEPTH,
+          messages: words,
+          "admin--media--folders-selected-class": ROW[:row_selected],
+          action: "turbo:frame-load@document->admin--media--folders#follow" }
+      end
+
       def folders? = tree.size.positive?
 
       def selected?(each) = each == place
@@ -101,19 +138,34 @@ module Admin
       def place_href(each)
         kept = query.to_h.slice(:q, :filter).select { |_, value| value.is_a?(String) && value.present? }
         kept[:folder] = each.to_param unless each.all?
+        kept[:picker] = 1 if picker?
         helpers.admin_media_path(**kept, **url_options.slice(:locale))
+      end
+
+      # The select's choices below 640px: every place in the list's order,
+      # a folder indented by its level, each with the address its row links to.
+      def select_options
+        places = [ [ t(".all"), Media::Place::ALL ], [ t(".none"), Media::Place::NONE ] ]
+        places += folder_options(tree.roots, 1)
+        safe_join(places.map { |text, each| tag.option(text, value: each.to_param, selected: selected?(each), data: { href: place_href(each) }) })
+      end
+
+      def folder_options(nodes, depth)
+        nodes.flat_map do |node|
+          [ [ "#{INDENT * (depth - 1)}#{node.name}", Media::Place.new(:folder, node.id) ], *folder_options(tree.children(node.id), depth + 1) ]
+        end
       end
 
       def url_options = helpers.respond_to?(:admin_url_options) ? helpers.admin_url_options : {}
 
       def tree_locale = helpers.respond_to?(:admin_locale) ? helpers.admin_locale : Locales.default
 
-      def link_data = { turbo_frame: "content", turbo_action: "advance", tree_focus: true }
+      def link_data = picker? ? { turbo_frame: "media-picker-grid", tree_focus: true, action: "admin--media--picker#placePressed" } : { turbo_frame: "content", turbo_action: "advance", tree_focus: true }
 
-      def row_data(each) = { media_place: each.to_param, "admin--media--folders-target": "row" }
+      def row_data(each) = picker? ? { media_place: each.to_param } : { media_place: each.to_param, "admin--media--folders-target": "row" }
 
       def link(text, each)
-        link_to text, place_href(each), id: "#{self.class.row_id(each)}-link", data: link_data, aria: (selected?(each) ? { current: "page" } : {})
+        link_to text, place_href(each), id: "#{row_id(each)}-link", data: link_data, aria: (selected?(each) ? { current: "page" } : {})
       end
 
       # A count, shown at rest; nothing at 0.
@@ -131,7 +183,7 @@ module Admin
       # stylesheet, `.admin-tree[data-media-drag-tree]`).
       def handle = tag.span("⠿", class: ROW[:handle], aria: { hidden: true }, data: { media_drag_handle: true })
 
-      def children_list_id(node) = "media-folder-children-#{node.id}"
+      def children_list_id(node) = "#{picker? ? 'media-picker' : 'media'}-folder-children-#{node.id}"
 
       def folded?(node) = tree.children(node.id).any? && !open_set.open?(node.id, root: false, on_path: path_ids.include?(node.id))
 
@@ -143,7 +195,7 @@ module Admin
         children = tree.children(node.id)
         folded = folded?(node)
         item = Admin::Ui::TreeItemComponent.new(
-          id: self.class.row_id(folder_place), title: node.name, parent: children.any?, folded: folded,
+          id: row_id(folder_place), title: node.name, parent: children.any?, folded: folded,
           controls: children_list_id(node), selected: selected?(folder_place), node_id: node.id,
           data: row_data(folder_place).merge(media_folder_depth: depth, media_folder_height: tree.height(node.id),
                                              media_folder_parent: node.parent_id.to_s, media_folder_name: node.name.downcase)

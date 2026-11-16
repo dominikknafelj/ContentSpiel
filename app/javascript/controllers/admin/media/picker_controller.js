@@ -1,5 +1,30 @@
 import { Controller } from "@hotwired/stimulus"
 import { UploadTiles, updateCounts, uploadWords } from "media/upload_tiles"
+import { messages } from "i18n/messages"
+
+// The place the picker showed last, per browser (media-folders spec §8, the
+// owner's ruling): `all`, `none` or a folder's id. Storage may be refused
+// (a private window, blocked site data) or hold anything, so every read and
+// write is guarded and anything else is All media.
+const PLACE_KEY = "cs.media.picker.place"
+const PLACE = /^(all|none|[1-9]\d{0,18})$/
+
+function rememberedPlace() {
+  try {
+    const place = window.localStorage.getItem(PLACE_KEY)
+    return PLACE.test(place ?? "") ? place : "all"
+  } catch {
+    return "all"
+  }
+}
+
+function remember(place) {
+  try { window.localStorage.setItem(PLACE_KEY, place) } catch { /* storage refused: the next open is All media */ }
+}
+
+function forget() {
+  try { window.localStorage.removeItem(PLACE_KEY) } catch { /* storage refused: nothing was kept */ }
+}
 
 // The one media picker, on `Admin::Ui::MediaPickerComponent`'s `<dialog>` -- rendered
 // once per CS Studio page by
@@ -33,8 +58,17 @@ import { UploadTiles, updateCounts, uploadWords } from "media/upload_tiles"
 // the start of the grid (`media/upload_tiles.js`, one at a time); the first to
 // finish is selected, so Use image is one click away. A refused file keeps its
 // tile with the server's reason. No browser dialogs anywhere.
+//
+// PLACES (the card's D12): the frame opens at the place it showed last
+// (`PLACE_KEY`), and after each load of it the place it now shows is read from
+// `#media-picker-place` inside it (never the frame's own attributes, which
+// Turbo does not copy): stored, or forgotten when the server answered All
+// media for a folder that is gone (`data-media-place-gone`); said before
+// Upload ("Uploads go into …"); and its row, which the server draws
+// selected, scrolled into view in the list. Uploads go to that place. Below
+// 640px the places are a select, whose change loads the frame (`place`).
 export default class extends Controller {
-  static targets = [ "frame", "file", "status" ]
+  static targets = [ "frame", "file", "status", "uploadInto" ]
   static values = { gridUrl: String, uploadUrl: String, tileClass: String, buttonClass: String }
 
   connect() {
@@ -42,10 +76,11 @@ export default class extends Controller {
     this.pending = null
     this.escapeCleared = false
     this.gridPending = false
+    this.shownPlace = "all"
     this.uploads = new UploadTiles({
       url: this.uploadUrlValue,
       grid: () => this.frameTarget.querySelector("ul.admin-media-grid"),
-      fields: () => this.searchValue ? { q: this.searchValue } : {},
+      fields: () => this.uploadFields(),
       onUploaded: (done) => this.uploaded(done),
       announce: (text) => { this.statusTarget.textContent = text },
       tileClass: this.tileClassValue,
@@ -91,7 +126,10 @@ export default class extends Controller {
 
     this.gridPending = true
     this.frameTarget.replaceChildren()
-    const url = new URL(this.gridUrlValue, window.location.href).toString()
+    const address = new URL(this.gridUrlValue, window.location.href)
+    const place = rememberedPlace()
+    if (place !== "all") address.searchParams.set("folder", place)
+    const url = address.toString()
     if (this.frameTarget.src === url) {
       this.frameTarget.reload()
     } else {
@@ -107,6 +145,7 @@ export default class extends Controller {
 
     this.gridPending = false
     this.uploads.reattach()
+    this.showPlace()
     if (!this.focusSearchOnLoad) return
 
     this.focusSearchOnLoad = false
@@ -114,6 +153,71 @@ export default class extends Controller {
     if (active === this.element || active === document.body || active?.dataset?.action?.includes("admin--media--picker#browse")) {
       this.search?.focus()
     }
+  }
+
+  // The place the frame now shows: kept for the next open (or forgotten, a
+  // folder gone), said before Upload, and its row scrolled into the list's
+  // view. A press on a place (a row, the select) lost its control with the
+  // frame's old body: the new body's control for the place takes the focus.
+  showPlace() {
+    const marker = this.frameTarget.querySelector("#media-picker-place")
+    if (!marker) return
+
+    const place = marker.dataset.mediaPlace
+    if (marker.hasAttribute("data-media-place-gone")) forget()
+    else remember(place)
+    this.shownPlace = place
+
+    const words = messages(this.element)
+    this.uploadIntoTarget.textContent = /^\d+$/.test(place)
+      ? words.t("components.ui.media_picker.upload_into", { name: marker.dataset.mediaPlaceName })
+      : words.t("components.ui.media_picker.upload_nowhere")
+
+    const row = this.frameTarget.querySelector(`[id="media-picker-place-row-${place}"]`)
+    if (row) this.scrollIntoList(row)
+
+    if (!this.refocusPlace) return
+    this.refocusPlace = false
+    const active = document.activeElement
+    if (active !== document.body && active !== this.element) return
+    const select = this.frameTarget.querySelector("#media-picker-place-select")
+    const control = select?.checkVisibility() ? select : row?.querySelector("a")
+    control?.focus({ preventScroll: true })
+  }
+
+  // Only the list scrolls: the dialog and the page behind it stay put
+  // (`scrollIntoView` would move every scrolling box above the row).
+  scrollIntoList(row) {
+    const list = row.closest("nav")
+    if (!list || !list.checkVisibility()) return
+
+    const box = list.getBoundingClientRect()
+    const edge = row.getBoundingClientRect()
+    if (edge.top < box.top) list.scrollTop -= box.top - edge.top
+    else if (edge.bottom > box.bottom) list.scrollTop += edge.bottom - box.bottom
+  }
+
+  // A row of the list was pressed (its link loads the frame by itself).
+  placePressed() {
+    this.refocusPlace = true
+  }
+
+  // The select below 640px: its option names the address its row links to.
+  place(event) {
+    const href = event.target.selectedOptions[0]?.dataset.href
+    if (!href) return
+
+    this.refocusPlace = true
+    this.frameTarget.src = new URL(href, window.location.href).toString()
+  }
+
+  // What an upload sends beside its file: the search shown (the counts it
+  // answers are of it) and the place, whose folder the file goes into.
+  uploadFields() {
+    const fields = {}
+    if (this.searchValue) fields.q = this.searchValue
+    if (this.shownPlace !== "all") fields.folder = this.shownPlace
+    return fields
   }
 
   // The load ended with no grid (the network failed, or the answer held no

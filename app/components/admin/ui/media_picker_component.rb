@@ -34,7 +34,11 @@ module Admin
     # on this same element). Uploads (`Admin::MediaAssetsController#create`,
     # `Media::Upload`) show as progress tiles at the start of the grid; the first
     # one to finish is selected, and a refused one keeps its tile with the
-    # server's reason and Dismiss (`media/upload_tiles.js`). No browser dialogs
+    # server's reason and Dismiss (`media/upload_tiles.js`). Beside the grid
+    # stand the library's places, read-only (the card StudioMediaFolders, D12;
+    # `Admin::MediaLibrary::FolderTreeComponent`, `mode: :picker`): the frame
+    # opens at the place it showed last in this browser, an upload goes into
+    # the place shown, and "Uploads go into …" before Upload says where. No browser dialogs
     # anywhere; Escape clears a typed search first and a second one closes the
     # dialog, the ×, Cancel and a press that both begins and ends on the backdrop
     # close it too, and focus goes back to the opener.
@@ -57,11 +61,12 @@ module Admin
         limits: [
           "It is drawn once, by the admin layout, and only for someone with media.upload; a field opens it with media-picker:open and never draws a picker of its own.",
           "It hands back one image: several cannot be chosen.",
-          "What it lists is the Media screen's own listing (picker=1), loaded into its frame each time it opens; the toolbar and the tiles are Admin::MediaLibrary's."
+          "What it lists is the Media screen's own listing (picker=1), loaded into its frame each time it opens; the toolbar and the tiles are Admin::MediaLibrary's.",
+          "It browses the library's places and opens at the last one shown, per browser."
         ],
         states: %i[rest],
         script_states: { open: [ "test/system/admin/media_picker_test.rb", "choosing: a click only selects, Use image fills the field, a double click picks at once" ] },
-        keys: %w[title upload close file none selected cancel use],
+        keys: %w[title upload upload_into upload_nowhere close file none selected cancel use],
         slots: [],
         controller: "admin--media--picker",
         keyboard: [ "test/system/admin/media_picker_test.rb", "the keyboard reaches a tile by Tab from the search field, Space selects it and a second Enter on it confirms" ]
@@ -72,6 +77,10 @@ module Admin
       # The footer's words `admin--media--select` says, served on the dialog
       # beside the upload tiles'.
       FOOTER_MESSAGES = %w[components.ui.media_picker.none components.ui.media_picker.selected].freeze
+
+      # The words before Upload, which `admin--media--picker` writes for each
+      # place the frame shows.
+      PLACE_MESSAGES = %w[components.ui.media_picker.upload_into components.ui.media_picker.upload_nowhere].freeze
 
       # The picker's wiring, one place (all on the dialog element):
       # - `media-picker:open@window` / `close`: the opener contract above;

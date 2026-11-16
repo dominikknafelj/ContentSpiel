@@ -25,6 +25,7 @@
 - Move to…: images move from the image panel's new Folder fact (its path a link to that place) and a folder from its "Folder actions" menu, through a dialog that lists "Not in a folder" (or "Top of the library") and every folder, marks the current place, and, for a folder, refuses its own branch and places too deep, saying why. `GET /media/move/new` draws its list; a refusal stands in the dialog. A folder move's toast says where it went.
 - Selecting several images on the Media screen: "Select" in the place heading enters selection mode (`select=1`; the panel closes), where a press, Space or Shift+click (a range) ticks tiles, and a bar sticky over the grid says how many are selected and offers "Select all" (what the page draws), "Clear", "Move to…" (the Move to… dialog for the selection) and "Done". Escape, Done or any visit leaves it.
 - Dragging onto the Folders column, with a fine pointer: an image tile (or, in selection mode, the whole selection from a ticked tile) dropped on a folder row or "Not in a folder", and a folder by its row's handle (`media.manage`) dropped on a folder row or "All media"; a folded row opens after a 600 ms rest, a row that cannot take the folder says why ("too deep", "this folder", "name taken"), and the move is said in the screen's polite status.
+- The image picker browses folders and opens where you last were.
 
 ### Changed
 

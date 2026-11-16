@@ -18,6 +18,8 @@ require "application_system_test_case"
 class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   include ActiveJob::TestHelper
 
+  PLACE_KEY = "cs.media.picker.place"
+
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(users(:one))
@@ -31,6 +33,12 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     @landing = create_page(title: "Landing")
     assert Pages::Save.call(@landing, attributes: { template: "landing" }).ok?
+  end
+
+  # The place the picker remembers is per browser, and the browser is shared
+  # with the tests that follow.
+  teardown do
+    page.execute_script("try { localStorage.removeItem(arguments[0]) } catch {}", PLACE_KEY)
   end
 
   test "picking an image sets the field's width, height and blur, and the next pick replaces them" do
@@ -261,8 +269,11 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     JS
     assert_equal [ "solid", "2px", "2px", accent, "0px" ], look
 
+    # Beside the places (the card's D12): four columns from 1024px, three
+    # from 768px, two below.
     columns = -> { page.evaluate_script(%(getComputedStyle(document.querySelector("dialog[open] ul.admin-media-grid")).gridTemplateColumns.split(" ").length)) }
-    assert_equal 6, columns.call
+    assert_equal 4, columns.call
+    at_window(800) { assert_eventually(message: -> { "the picker shows #{columns.call} columns at 800px" }) { columns.call == 3 } }
     at_window(600) { assert_eventually(message: -> { "the picker shows #{columns.call} columns at 600px" }) { columns.call == 2 } }
   end
 
@@ -548,6 +559,174 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(1400, 1400)
   end
 
+  # The picker's places (the card StudioMediaFolders, D12): the library's
+  # places beside the grid, read-only, and the frame opens at the place it
+  # showed last in this browser (`cs.media.picker.place`).
+  test "the picker browses into a folder, and opens there the next time" do
+    client_a = client_folders.last
+    logo = in_folder(create_media_asset(filename: "tiny.png"), client_a)
+    block = image_block
+    visit_editor(@landing)
+    editor_path = current_path
+
+    choose_image(block)
+    within("dialog[open]") do
+      assert_button @asset.title
+      assert_button logo.title
+      assert_text "Uploads go into no folder"
+      # Client A is folded under Clients, as on the Media screen.
+      assert_no_link "Client A"
+      find("button[aria-label='Unfold Clients']").click
+      click_on "Client A"
+      assert_place client_a.id
+      assert_no_button @asset.title
+      assert_button logo.title
+      assert_text "Uploads go into Client A"
+      assert_selector "a[aria-current=page]", text: "Client A"
+      # The rows are read-only.
+      assert_no_selector ".admin-tree-row__add, .admin-tree-node__handle", visible: :all
+    end
+    assert_equal client_a.id.to_s, stored_place
+    # The page under the dialog kept its address.
+    assert_equal editor_path, current_path
+    within("dialog[open]") { click_on "Cancel" }
+    refute_selector "dialog[open]"
+
+    choose_image(block)
+    within("dialog[open]") do
+      assert_place client_a.id
+      assert_selector "a[aria-current=page]", text: "Client A"
+      assert_text "Uploads go into Client A"
+      assert_no_button @asset.title
+    end
+    pick_from_library(logo)
+    assert_eventually { block.reload.media_asset_id == logo.id }
+  end
+
+  # Review Focus 5: the folder was deleted in between.
+  test "a remembered folder that is gone opens All media and is forgotten" do
+    gone = Media::Folder.create!(name: "Old shoot")
+    block = image_block
+    visit_editor(@landing)
+    remember_place(gone.id)
+    gone.destroy!
+
+    choose_image(block)
+    within("dialog[open]") do
+      assert_selector "#media-picker-place[data-media-place='all'][data-media-place-gone]", visible: :all
+      assert_selector "a[aria-current=page]", text: "All media"
+      assert_button @asset.title
+      assert_text "Uploads go into no folder"
+      assert_no_link "Old shoot"
+    end
+    assert_eventually(message: -> { "the gone folder is still remembered: #{stored_place.inspect}" }) { stored_place.nil? }
+    pick_from_library(@asset)
+    assert_eventually { block.reload.media_asset_id == @asset.id }
+  end
+
+  test "storage that throws opens All media and the picker still works" do
+    client_a = client_folders.last
+    logo = in_folder(create_media_asset(filename: "tiny.png"), client_a)
+    block = image_block
+    visit_editor(@landing)
+    remember_place(client_a.id)
+    # Storage refused for the picker's key (a private window, blocked site
+    # data): every read and write of it throws.
+    page.execute_script(<<~JS, PLACE_KEY)
+      const key = arguments[0]
+      for (const name of [ "getItem", "setItem", "removeItem" ]) {
+        const own = Storage.prototype[name]
+        Storage.prototype[name] = function (each, ...rest) {
+          if (each === key) throw new DOMException("refused", "SecurityError")
+          return own.call(this, each, ...rest)
+        }
+      }
+    JS
+
+    choose_image(block)
+    within("dialog[open]") do
+      assert_place "all"
+      assert_button @asset.title
+      find("button[aria-label='Unfold Clients']").click
+      click_on "Client A"
+      assert_place client_a.id
+      assert_no_button @asset.title
+    end
+    pick_from_library(logo)
+    assert_eventually { block.reload.media_asset_id == logo.id }
+  end
+
+  test "an upload in the picker lands in the folder shown" do
+    client_a = client_folders.last
+    block = image_block
+    visit_editor(@landing)
+
+    choose_image(block)
+    within("dialog[open]") do
+      find("button[aria-label='Unfold Clients']").click
+      click_on "Client A"
+      assert_place client_a.id
+      upload = find_button("Upload")
+      assert_equal "Uploads go into Client A", find("##{upload['aria-describedby']}").text
+      attach_file "Image file", file_fixture("tiny.png").to_s
+      assert_text "1 selected", wait: 10
+    end
+    uploaded = Media::Asset.where.not(id: @asset.id).sole
+    assert_equal client_a.id, uploaded.folder_id
+    assert_nil @asset.reload.folder_id
+  end
+
+  test "the remembered place is the selected row, scrolled into view" do
+    folders = (1..40).map { |n| Media::Folder.create!(name: format("Shoot %02d", n)) }
+    block = image_block
+    at_window(1400, height: 700) do
+      visit_editor(@landing)
+      remember_place(folders.last.id)
+
+      choose_image(block)
+      within("dialog[open]") do
+        assert_place folders.last.id
+        assert_selector ".admin-tree-row--selected a[aria-current=page]", text: "Shoot 40"
+      end
+      await_js(<<~JS, message: "the selected row is not in the list's view")
+        (() => {
+          const row = document.querySelector("dialog[open] nav .admin-tree-row--selected")
+          const list = row?.closest("nav")
+          if (!row || list.scrollHeight <= list.clientHeight) return false
+          const edge = row.getBoundingClientRect(), box = list.getBoundingClientRect()
+          return list.scrollTop > 0 && edge.top >= box.top && edge.bottom <= box.bottom
+        })()
+      JS
+      # Only the list scrolled: the grid's column did not.
+      assert_equal 0, page.evaluate_script(%(document.querySelector("dialog[open] ul.admin-media-grid").closest(".overflow-y-auto").scrollTop))
+    end
+  end
+
+  test "below 640px the places are the select" do
+    clients, client_a = client_folders
+    logo = in_folder(create_media_asset(filename: "tiny.png"), client_a)
+    block = image_block
+    visit_editor(@landing)
+
+    choose_image(block)
+    at_window(600) do
+      within("dialog[open]") do
+        assert_no_selector "nav[aria-label=Folders]"
+        folder = find_field("Folder", type: "select")
+        assert_equal "all", folder.value
+        assert_equal [ "all", "none", clients.id.to_s, client_a.id.to_s ], folder.all("option").map(&:value)
+        folder.find("option[value='#{client_a.id}']").select_option
+        assert_place client_a.id
+        assert_no_button @asset.title
+        assert_button logo.title
+        assert_equal client_a.id.to_s, find_field("Folder", type: "select").value
+      end
+      # The new select took the focus the old one lost with the frame's body.
+      await_js(%(document.activeElement?.id === "media-picker-place-select"), message: "the select lost the focus")
+    end
+    assert_equal client_a.id.to_s, stored_place
+  end
+
   # Select-then-use (D14): a click selects the tile, Use image confirms.
   def pick_from_library(asset)
     within("dialog[open]") do
@@ -556,4 +735,32 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     end
     refute_selector "dialog[open]"
   end
+
+  # Clients, and Client A inside it.
+  def client_folders
+    clients = Media::Folder.create!(name: "Clients")
+    [ clients, Media::Folder.create!(name: "Client A", parent: clients) ]
+  end
+
+  def in_folder(asset, folder)
+    asset.update_columns(folder_id: folder.id) # version: none (a test's own rows)
+    asset
+  end
+
+  def image_block = @landing.content_blocks.create!(block_type: "image", position: 0)
+
+  # Opens the picker from the Image block's field and waits for its frame.
+  def choose_image(block)
+    within("##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section") { click_on "Choose image" }
+    assert_selector "dialog[open] #media-picker-place", visible: :all
+  end
+
+  # The place the frame shows (`#media-picker-place`, inside it).
+  def assert_place(place)
+    assert_selector "#media-picker-place[data-media-place='#{place}']", visible: :all
+  end
+
+  def remember_place(place) = page.execute_script("localStorage.setItem(arguments[0], arguments[1])", PLACE_KEY, place.to_s)
+
+  def stored_place = page.evaluate_script("localStorage.getItem('#{PLACE_KEY}')")
 end

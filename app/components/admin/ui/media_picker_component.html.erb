@@ -9,7 +9,7 @@
         "admin--media--picker-upload-url-value": upload_url,
         "admin--media--picker-tile-class-value": Admin::MediaLibrary::TileComponent::CARD,
         "admin--media--picker-button-class-value": Admin::Ui::ButtonComponent.classes(:secondary, size: :small),
-        messages: messages_data(*Admin::MediaLibrary::TileComponent::UPLOAD_MESSAGES, *Admin::Ui::MediaPickerComponent::FOOTER_MESSAGES)
+        messages: messages_data(*Admin::MediaLibrary::TileComponent::UPLOAD_MESSAGES, *Admin::Ui::MediaPickerComponent::FOOTER_MESSAGES, *Admin::Ui::MediaPickerComponent::PLACE_MESSAGES)
       } do %>
   <%# Padding lives on the sections below, not the <dialog>: a click on the
       dialog's own padding is a click on the <dialog> element, which the
@@ -17,8 +17,11 @@
   <div class="flex min-h-0 flex-1 flex-col">
     <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-4">
       <h2 id="<%= part_id("title") %>" class="text-h2 text-ink"><%= t(".title") %></h2>
-      <div class="flex items-center gap-3">
-        <%= render Admin::Ui::ButtonComponent.new(label: t(".upload"), variant: :secondary, type: "button", data: { action: "admin--media--picker#browse" }) %>
+      <div class="flex min-w-0 items-center gap-3">
+        <%# Where Upload's files go: the place the frame shows, rewritten by
+            `admin--media--picker` after each load of it. %>
+        <p id="<%= part_id("upload-into") %>" class="min-w-0 truncate text-small text-meta" data-admin--media--picker-target="uploadInto"><%= t(".upload_nowhere") %></p>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".upload"), variant: :secondary, type: "button", "aria-describedby": part_id("upload-into"), data: { action: "admin--media--picker#browse" }) %>
         <%= tag.button "×", type: "button", "aria-label": t(".close"), class: "rounded-cs px-2 text-2xl leading-none text-meta hover:text-ink focus:outline-2 focus:outline-accent",
               data: { action: "admin--media--picker#dismiss" } %>
       </div>
@@ -32,13 +35,17 @@
           data: { "admin--media--picker-target": "file", action: "change->admin--media--picker#upload" } %>
     <p class="sr-only" role="status" aria-live="polite" data-admin--media--picker-target="status"></p>
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-      <%# Loaded by `admin--media--picker#open` every time the picker opens (so a
-          library changed meanwhile -- an upload in another tab, a delete -- is
-          never stale), then navigated in place by its own search form, segments
-          and pagination links. %>
-      <turbo-frame id="media-picker-grid" data-admin--media--picker-target="frame"></turbo-frame>
-    </div>
+    <%# Loaded by `admin--media--picker#open` every time the picker opens (so a
+        library changed meanwhile -- an upload in another tab, a delete -- is
+        never stale), at the place it showed last, then navigated in place by
+        its places, its own search form, segments and pagination links. The
+        frame is the body's grid (`admin/media/picker` draws its parts): from
+        640px the 200px list of places beside the grid's column, each
+        scrolling on its own; below, the select, then the grid's column. The
+        frame's own classes stay on this tag: Turbo copies a response frame's
+        children, never its attributes. %>
+    <turbo-frame id="media-picker-grid" data-admin--media--picker-target="frame"
+                 class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] sm:grid-cols-[200px_minmax(0,1fr)] sm:grid-rows-[minmax(0,1fr)]"></turbo-frame>
 
     <div class="flex items-center justify-between gap-4 border-t border-line px-6 py-3">
       <%# What is chosen, said in words and announced as it changes. %>

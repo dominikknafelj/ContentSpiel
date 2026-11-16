@@ -69,7 +69,7 @@ class Admin::MediaLibrary::GridComponentTest < ViewComponent::TestCase
     assert_selector "#media-picker-asset-#{asset.id} button[type=button][aria-pressed=false]"
     assert_no_selector "#media-asset-#{asset.id}"
     assert_no_selector "ul.admin-media-grid a"
-    assert_selector "ul.admin-media-grid.lg\\:grid-cols-6"
+    assert_selector "ul.admin-media-grid.grid-cols-2.md\\:grid-cols-3.lg\\:grid-cols-4"
   end
 
   test "an empty library: the list is still drawn for an upload to land in, and the empty state follows it" do

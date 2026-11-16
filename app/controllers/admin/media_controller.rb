@@ -62,8 +62,9 @@ module Admin
     # toolbar, the grid and the pagination, rendered on their own
     # inside the picker's `<turbo-frame id="media-picker-grid">`
     # (`admin/media/picker`, no layout) with select buttons instead of panel
-    # links. Deliberately this endpoint rather than a second one: one search,
-    # one set of segments and counts, one constant-query load (`Media::Search`,
+    # links, beside the library's places (read-only). Deliberately this
+    # endpoint rather than a second one: one search, one set of segments and
+    # counts, one constant-query load (`Media::Search`,
     # kept images only), and the same `media.upload` gate -- the picker's only
     # permission is "may browse and choose". It has no panel.
     #
@@ -94,7 +95,7 @@ module Admin
       @assets = scope.order(id: :desc).limit(PER_PAGE).offset(@pagination.offset).to_a
 
       @counts = @search.counts
-      return render :picker, layout: false if params[:picker].present?
+      return picker if params[:picker].present?
 
       @library_has_images = @search.any_images?(counts: @counts)
 
@@ -224,6 +225,15 @@ module Admin
       raise ActiveRecord::RecordNotFound, "Couldn't find Media::Asset" unless raw.is_a?(String)
 
       Media::Asset.kept.with_file.find(raw)
+    end
+
+    # The picker's frame: the grid and, beside it, the places
+    # (`FolderTreeComponent`, `mode: :picker`), whose links keep the search
+    # shown.
+    def picker
+      @folder_counts = Media::FolderCounts.call
+      @place_query = shown_query
+      render :picker, layout: false
     end
 
     # What the Folders column draws, for a full answer only: a frame answer
