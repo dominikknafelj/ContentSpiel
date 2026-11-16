@@ -12,6 +12,7 @@
 - System status's notes on the limited languages and on a backend without title suggestions.
 - The span `search.suggest` and the attributes `search.close` and `search.correction`; a refused or limited suggestion request writes `search.outcome` on the request's span.
 - `docs/reference/hosting.md`, "Database requirements": the Postgres version, the extensions (`plpgsql`, `pg_trgm`) and the encoding and character type.
+- The image viewer (`Admin::Ui::ImageViewerComponent`): a note's picture opens over CS Studio, fitted to the window, with its name and facts in the head, arrows to step through the message's pictures, the position, Open original and Download. Escape, Close or the backdrop close it. The Dialog has a `viewer` width, a `title_aside` slot and a `data:` option, and a GIF is one shared part, `Admin::Ui::GifComponent` (`docs/reference/design-system.md`, "Shared components"; `docs/reference/notes.md`, "Files").
 
 ### Changed
 
@@ -19,6 +20,7 @@
 - A page's meta title and the slugs are searched (B).
 - The index rebuilds itself once after the upgrade (`Documents::REVISION` 2), with System status showing the progress. Title suggestions start when it is done.
 - The Search block's `limits:` sentence reads "No filter, and no sort; suggestions as one types with a script, none without; ten results to a page."
+- A plain click on a note's picture opens it in the image viewer; a click with ⌘, Ctrl or Shift, a middle click and the viewer's Open original open it in a tab.
 
 ### Fixed
 

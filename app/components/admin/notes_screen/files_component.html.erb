@@ -1,28 +1,13 @@
-<div class="flex flex-col gap-2" data-note-files>
+<%= tag.div class: "flex flex-col gap-2", data: { note_files: true, image_viewer_group: message.id } do %>
   <% attachments.each do |attachment| %>
     <% name = attachment.blob.filename.to_s %>
     <% if gif?(attachment) %>
-      <%= tag.div class: PICTURE_BOX_CLASS, data: { note_gif: true, controller: "admin--notes--gif" } do %>
-        <%# The link is the picture's own size, and the still lies over
-            exactly that: on a tile larger than a small GIF (decision 37) a
-            canvas over the whole tile would stretch the frame. %>
-        <%= link_to path(attachment), target: "_blank", rel: "noopener", class: "relative block min-w-0 max-w-full focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
-              title: t(".open", name: name), data: { turbo: false } do %>
-          <%= image_tag path(attachment), alt: name, loading: "lazy", class: "#{PICTURE_CLASS} motion-reduce:opacity-0",
-                data: { "admin--notes--gif-target": "moving", action: "load->admin--notes--gif#paint" } %>
-          <canvas class="pointer-events-none absolute inset-0 hidden size-full motion-reduce:block" aria-hidden="true" data-admin--notes--gif-target="still"></canvas>
-        <% end %>
-        <%# Drawn only when motion is reduced (`motion-safe:hidden`). Centred over the still; in the corner while the picture plays, so it does not lie over it. %>
-        <%= tag.button type: "button", data: { playing: "false", action: "admin--notes--gif#toggle", "admin--notes--gif-target": "button", play: t(".play"), pause: t(".pause") },
-              class: "admin-note-gif-button absolute #{Admin::Ui::ButtonComponent.classes(:secondary, size: :small)} motion-safe:hidden" do %>
-          <span data-admin--notes--gif-target="icon" class="flex"><%= helpers.render "admin/shared/icon", name: :play, size: "size-3" %></span>
-          <span data-admin--notes--gif-target="label"><%= t(".play") %></span>
-        <% end %>
-        <span class="pointer-events-none absolute bottom-1.5 left-1.5 max-w-[calc(100%-12px)] truncate text-label text-dim"><%= t(".gif", name: name) %></span>
-      <% end %>
+      <%= render Admin::Ui::GifComponent.new(src: path(attachment), name: name, placement: :tile,
+            link: { title: t(".view", name: name), data: viewer_item(attachment, name).merge(image_viewer_gif: true) },
+            class: PICTURE_BOX_CLASS, data: { note_gif: true }) %>
     <% elsif image?(attachment) %>
       <%= link_to path(attachment), target: "_blank", rel: "noopener", class: "#{PICTURE_BOX_CLASS} focus-visible:outline-2 focus-visible:outline-accent",
-            title: t(".open", name: name), data: { note_image: true, turbo: false } do %>
+            title: t(".view", name: name), data: { note_image: true, turbo: false, **viewer_item(attachment, name) } do %>
         <%= image_tag path(attachment), alt: name, loading: "lazy", class: PICTURE_CLASS %>
       <% end %>
     <% else %>
@@ -37,4 +22,4 @@
       <% end %>
     <% end %>
   <% end %>
-</div>
+<% end %>

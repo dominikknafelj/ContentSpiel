@@ -340,7 +340,7 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     post admin_restore_trash_item_path("page", @child), params: { parent_id: @section.id }
     assert_redirected_to admin_trash_path
     follow_redirect!
-    assert_select "[role=alert]"
+    assert_select "[role=alert]", text: Trash::Restore::UNKNOWN_PARENT
   end
 
   # A forged `parent_id` that names the page itself or one of its own

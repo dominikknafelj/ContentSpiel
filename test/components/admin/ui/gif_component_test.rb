@@ -1,0 +1,85 @@
+require "test_helper"
+
+# A GIF wherever CS Studio shows one: a note's tile and the image viewer's
+# stage. The picture, the still it is painted on under reduced motion and the
+# Play control are one part on `admin--ui--gif`; what a click on the picture
+# does is the caller's.
+class Admin::Ui::GifComponentTest < ViewComponent::TestCase
+  test "it draws the picture, a hidden canvas and Play under the gif controller" do
+    render_inline(Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif"))
+
+    root = page.find("[data-controller='admin--ui--gif']")
+    assert_equal "/files/1", root["data-admin--ui--gif-src-value"]
+    assert_equal "true", root["data-admin--ui--gif-gif-value"]
+    assert_equal %w[components.ui.gif.pause components.ui.gif.play], (JSON.parse(root["data-messages"]).keys - [ "@locale" ]).sort
+    assert_selector "[data-controller='admin--ui--gif'] img[alt='loop.gif'][src='/files/1'][data-admin--ui--gif-target='moving'][data-action='load->admin--ui--gif#paint']"
+    assert_selector "[data-controller='admin--ui--gif'] canvas[aria-hidden=true][data-admin--ui--gif-target='still']", visible: :all
+    button = page.find("[data-controller='admin--ui--gif'] button[type=button][data-admin--ui--gif-target='button'][data-action='admin--ui--gif#toggle']", text: "Play")
+    assert_includes button[:class].split, "admin-gif-button"
+    assert_includes button[:class].split, "motion-safe:hidden"
+    assert_selector "button [data-admin--ui--gif-target='label']", exact_text: "Play"
+    assert_selector "button [data-admin--ui--gif-target='icon'] [data-gif-icon='play']:not([hidden]) svg"
+    assert_selector "button [data-admin--ui--gif-target='icon'] [data-gif-icon='pause'][hidden] svg", visible: :all
+  end
+
+  test "on a tile the picture is a link to it in a new tab carrying the caller's link attributes, on the stage a span" do
+    render_inline(Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", link: { title: "Open loop.gif in a new tab", data: { viewer_item: true } },
+      class: "my-tile", data: { note_gif: true }))
+
+    root = page.find("div[data-controller='admin--ui--gif'][data-note-gif]")
+    assert_includes root[:class].split, "my-tile"
+    assert_selector "a[href='/files/1'][target=_blank][rel=noopener][data-turbo=false][data-viewer-item][title='Open loop.gif in a new tab'] img[alt='loop.gif']"
+    assert_selector "a canvas", visible: :all
+
+    render_inline(Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", placement: :stage))
+    assert_no_selector "a"
+    assert_selector "[data-controller='admin--ui--gif'] > span img[alt='loop.gif']"
+    assert_selector "[data-controller='admin--ui--gif'] > span canvas", visible: :all
+
+    render_inline(Admin::Ui::GifComponent.new(src: nil, name: "", placement: :stage))
+    assert_selector "img:not([src])", visible: :all
+  end
+
+  test "a tile draws the label GIF · name after the button, the stage none" do
+    render_inline(Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif"))
+    label = page.find("[data-controller='admin--ui--gif'] > button + span", exact_text: "GIF · loop.gif")
+    # The Gif card's ground: the surface at 85%, 1px 6px, a small radius.
+    assert_empty %w[bg-surface/85 px-1.5 py-px rounded-cs text-label text-dim bottom-1.5 left-1.5] - label[:class].split
+
+    render_inline(Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", placement: :stage))
+    assert_no_text "GIF · loop.gif"
+    assert_no_selector "[data-controller='admin--ui--gif'] > button + span"
+  end
+
+  test "a caller's data under String keys merges with the frame's, and its class adds no second relative" do
+    render_inline(Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", class: "relative flex", data: { "controller" => "other", "action" => "click->other#go", "note_gif" => true }))
+
+    root = page.find("[data-note-gif]")
+    assert_equal "admin--ui--gif other", root["data-controller"]
+    assert_equal "turbo:before-cache@document->admin--ui--gif#cache click->other#go", root["data-action"]
+    assert_equal %w[relative flex], root[:class].split
+  end
+
+  test "an unknown placement, or link: on the stage, raises" do
+    assert_raises(ArgumentError) { Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", placement: :wall) }
+    assert_raises(ArgumentError) { Admin::Ui::GifComponent.new(src: "/files/1", name: "loop.gif", placement: :stage, link: { title: "x" }) }
+  end
+
+  test "image: puts the caller's attributes on the picture, its class added and its action after the GIF's own" do
+    render_inline(Admin::Ui::GifComponent.new(src: nil, name: "", placement: :stage,
+      image: { class: "object-contain", data: { "viewer-target" => "picture", action: "error->viewer#failed" } }))
+
+    picture = page.find("img[data-admin--ui--gif-target='moving']", visible: :all)
+    assert_equal "picture", picture["data-viewer-target"]
+    assert_equal "load->admin--ui--gif#paint error->viewer#failed", picture["data-action"]
+    assert_includes picture[:class].split, "object-contain"
+    assert_includes picture[:class].split, "block"
+  end
+
+  test "gif: false is a picture that is no GIF: the value says so and the picture is not drawn invisible under reduced motion" do
+    render_inline(Admin::Ui::GifComponent.new(src: nil, name: "", placement: :stage, gif: false))
+
+    assert_equal "false", page.find("[data-controller='admin--ui--gif']", visible: :all)["data-admin--ui--gif-gif-value"]
+    assert_not_includes page.find("img", visible: :all)[:class].split, "motion-reduce:opacity-0"
+  end
+end

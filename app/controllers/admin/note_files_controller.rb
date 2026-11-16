@@ -21,7 +21,7 @@ module Admin
   # disposition -- and a stored type that is not on the allowed list (a row
   # written around `Notes::Files`) is `application/octet-stream`. Only the
   # four image types are answered inline (the thread shows them in an
-  # `<img>`, and a click opens the same address in a new tab); anything else
+  # `<img>`, and a click shows the same address in the image viewer); anything else
   # is a download. No variant is made. Every answer carries three guards
   # (`GUARDS`): `nosniff`, so the type sent is the type used; a `sandbox`
   # content security policy, so a file that a browser did open as a document
