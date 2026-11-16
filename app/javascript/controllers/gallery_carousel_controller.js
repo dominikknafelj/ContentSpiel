@@ -111,20 +111,23 @@ export default class extends Controller {
     this.track.addEventListener("wheel", this.taken, { passive: true })
   }
 
+  // Every field is asked for before it is used: a `connect` that threw
+  // half-way (a theme's template without a required target) has kept only
+  // some of them, and the take-back must not throw over that error.
   disconnect() {
-    this.observer.disconnect()
-    this.track.removeEventListener("scrollend", this.ended)
-    this.track.removeEventListener("pointerdown", this.taken)
-    this.track.removeEventListener("wheel", this.taken)
+    this.observer?.disconnect()
+    this.track?.removeEventListener("scrollend", this.ended)
+    this.track?.removeEventListener("pointerdown", this.taken)
+    this.track?.removeEventListener("wheel", this.taken)
 
-    this.shown.forEach((element) => { element.hidden = true })
+    this.shown?.forEach((element) => { element.hidden = true })
     if (this.status) this.status.textContent = ""
-    if (this.position) this.position.textContent = this.fill(this.positionValue, 0)
-    this.picks.forEach((pick, index) => {
+    if (this.position && this.slides) this.position.textContent = this.fill(this.positionValue, 0)
+    this.picks?.forEach((pick, index) => {
       if (index === 0) pick.setAttribute("aria-current", "true")
       else pick.removeAttribute("aria-current")
     })
-    this.buttons.forEach((button) => { button.disabled = false })
+    this.buttons?.forEach((button) => { button.disabled = false })
     this.element.removeAttribute("data-gallery-carousel-state")
   }
 

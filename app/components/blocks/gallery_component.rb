@@ -41,7 +41,8 @@ module Blocks
       limits: [
         "It holds at most 60 images, and the carousel draws a picker of dots for twelve or fewer; above that the position and the buttons alone.",
         "It has no enlarged view, never moves by itself and never wraps from the last image to the first.",
-        "An id that names no image, an image in the trash or an image whose file is gone is skipped; a gallery with no image that can be drawn renders nothing."
+        "An id that names no image, an image in the trash or an image whose file is gone is skipped; " \
+        "a gallery with no image that can be drawn renders nothing."
       ]
     )
 

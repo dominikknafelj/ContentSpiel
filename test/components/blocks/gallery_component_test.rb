@@ -143,6 +143,8 @@ class Blocks::GalleryComponentTest < ActiveSupport::TestCase
   test "the images are looked up at the same cost for one image and for many" do
     one = gallery(images(1))
     many = gallery(images(6))
+    # A first lookup warms what a first query loads (the columns, Active
+    # Storage's reflections), which neither count below may carry.
     component(gallery(images(1))).send(:items)
     assert_equal count_statements { component(one).send(:items) }, count_statements { component(many).send(:items) }
   end

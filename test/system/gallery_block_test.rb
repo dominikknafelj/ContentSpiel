@@ -22,7 +22,7 @@ class GalleryBlockSystemTest < ApplicationSystemTestCase
   # The emulated media and a direction set by a test are the shared
   # browser's: both are taken back.
   teardown do
-    reduce_motion(false)
+    page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [])
     page.execute_script("document.documentElement.removeAttribute('dir')")
   end
 
@@ -152,6 +152,27 @@ class GalleryBlockSystemTest < ApplicationSystemTestCase
     track.send_keys(:left)
     assert_at 3, of: 4, status: "Image 3 of 4"
     await_shown 3
+    track.send_keys(:home)
+    assert_at 1, of: 4, status: "Image 1 of 4"
+    await_shown 1
+
+    # Nothing wraps: at the first image Left and Home, at the last Right and
+    # End, change nothing and say nothing new.
+    [ :left, :home ].each do |key|
+      track.send_keys(key)
+      await_frames
+      assert_at 1, of: 4, status: "Image 1 of 4"
+      assert_equal 1, shown
+    end
+    track.send_keys(:end)
+    assert_at 4, of: 4, status: "Image 4 of 4"
+    await_shown 4
+    [ :right, :end ].each do |key|
+      track.send_keys(key)
+      await_frames
+      assert_at 4, of: 4, status: "Image 4 of 4"
+      assert_equal 4, shown
+    end
     track.send_keys(:home)
     assert_at 1, of: 4, status: "Image 1 of 4"
     await_shown 1
