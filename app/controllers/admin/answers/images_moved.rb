@@ -10,14 +10,14 @@ module Admin
 
       PLACE_COUNT_ID = "media-place-count"
 
-      # `column` draws the Folders column with its counts after the move
-      # (`Admin::MediaPlaces#folder_column_for`); a refusal draws none.
-      def initialize(view:, column: nil)
-        @column = column
+      def initialize(view:)
         @turbo_stream = Answers.stream_builder(view)
       end
 
-      def answer(assets:, folder:, place:, counts:)
+      # `column` draws the Folders column with its counts after the move
+      # (`Admin::MediaPlaces#folder_column_for`); a refusal draws none.
+      def answer(assets:, folder:, place:, counts:, column:)
+        @column = column
         streams = []
         streams.concat(assets.map { |asset| @turbo_stream.remove(Admin::MediaLibrary::TileComponent.dom_id(asset)) }) unless place.all?
         streams.concat(counts.map { |key, count| @turbo_stream.update(Admin::MediaLibrary::ToolbarComponent.count_id(key), count.to_s) })

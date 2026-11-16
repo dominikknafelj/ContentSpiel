@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { Turbo } from "@hotwired/turbo-rails"
 import { openPathIn } from "tree/open_set"
 
 // The Folders column's tree (`Admin::MediaLibrary::FolderTreeComponent`, on
@@ -10,7 +11,7 @@ import { openPathIn } from "tree/open_set"
 // holds only for the place it was drawn with. The place shown is the one
 // `#content` names (`[data-media-place]`, drawn by the Media screen), and
 // this marks exactly that row, whoever drew it: as each row connects (a full
-// visit, a restored snapshot, an answer's redrawn column) and after every
+// visit, an answer's redrawn column) and after every
 // load of the content frame (`follow`), as `admin--pages--tree#follow` does
 // for the open page. The marks are the shared row's own (the selected class,
 // `TreeItemComponent::CLASSES[:row_selected]`, handed over as a Stimulus
@@ -27,13 +28,14 @@ import { openPathIn } from "tree/open_set"
 //
 // AN ANSWER NAMES WHERE TO GO. A folder write's answer replaces the column's
 // part, which carries the place the screen goes to next (`data-media-go`): a
-// stream cannot navigate, so this sends the content frame there (its `src`;
-// `#content` advances the address) and takes the attribute away, so a
-// snapshot restored later does not go again.
+// stream cannot navigate, so this visits it in the content frame with the
+// action `advance` (`Turbo.visit`: setting the frame's `src` would load it
+// without moving the address or the history) and takes the attribute away,
+// so the part never sends the screen there twice.
 //
-// What this writes into the page (the selection, the path, the links) is
-// right for the address Turbo's snapshot keeps it under, and a restored
-// snapshot is marked again as its rows connect.
+// The Media screen is `turbo-cache-control: no-cache`, so no snapshot of it
+// is restored: a Back is a fresh answer, whose column the server draws for
+// its own place, and the rows are marked again as they connect.
 export default class extends Controller {
   static targets = ["row"]
   static classes = ["selected"]
@@ -67,8 +69,7 @@ export default class extends Controller {
     if (!url) return
 
     part.removeAttribute("data-media-go")
-    const frame = document.getElementById("content")
-    if (frame) frame.src = url
+    if (document.getElementById("content")) Turbo.visit(url, { frame: "content", action: "advance" })
   }
 
   // The place `#content` lists: "all", "none" or a folder's id; null on a

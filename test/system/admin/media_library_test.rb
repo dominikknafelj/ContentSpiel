@@ -590,9 +590,10 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     at_library(1199, "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}") do
       assert_rail_docked(false)
-      # The notes' frame is lazy, and where the rail does not dock their
-      # section stands under the image's panel, below the window's fold: it
-      # loads as a person scrolls to it.
+      # A gap this test does not close: a thread's link to an image whose
+      # rail does not dock lands with the Notes section under the image's
+      # panel, below the window's fold, and its lazy frame loads only when
+      # scrolled to, so the thread the link names is out of sight on arrival.
       scroll_to find("#media-rail-panel-notes")
       assert_selector "#media-rail-panel-notes #note-thread-#{thread.id}", visible: :visible, text: "Too dark here"
       assert_selector "#media-rail-panel-image #media-panel", visible: :visible

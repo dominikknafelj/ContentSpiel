@@ -27,7 +27,7 @@ module Admin
 
       place = shown_place(tree)
       counts = Media::Search.new(q: params[:q], place: place, actor: Current.actor).counts
-      render_answer(Admin::Answers::ImagesMoved.new(view: view_context, column: method(:folder_column_for)).answer(assets: result.moved, folder: folder, place: place, counts: counts))
+      render_answer(Admin::Answers::ImagesMoved.new(view: view_context).answer(assets: result.moved, folder: folder, place: place, counts: counts, column: method(:folder_column_for)))
     end
 
     private

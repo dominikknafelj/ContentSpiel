@@ -125,4 +125,33 @@ class Admin::MediaFoldersSystemTest < ApplicationSystemTestCase
     assert_current_path "/cs-studio/media?folder=none&q=logo"
     assert_no_selector "#media-asset-#{@portrait.id}"
   end
+
+  # A create's answer replaces the column's part, which names the new folder
+  # as the place to go to (`data-media-go`): the content frame goes there and
+  # the address advances with it, so Back returns to the place before.
+  test "a create's answer opens the new folder and advances the address" do
+    visit_screen "/cs-studio/media?folder=none"
+
+    watch_frame_load
+    page.execute_script(<<~JS)
+      (async () => {
+        const answer = await fetch("/cs-studio/media_folders", {
+          method: "POST",
+          headers: { "Accept": "text/vnd.turbo-stream.html", "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? "" },
+          body: new URLSearchParams({ "media_folder[name]": "Trips", "place": "none" })
+        })
+        window.Turbo.renderStreamMessage(await answer.text())
+      })()
+    JS
+    await_frame_load
+    trips = Media::Folder.find_by!(name: "Trips")
+
+    assert_current_path "/cs-studio/media?folder=#{trips.id}"
+    assert_selector "#content #media-library[data-media-place='#{trips.id}']"
+    assert_equal [ trips.id.to_s ], selected_places
+    assert_no_selector "#media-folder-tree-part[data-media-go]", visible: :all
+
+    page.go_back
+    assert_current_path "/cs-studio/media?folder=none"
+  end
 end
