@@ -31,7 +31,7 @@ class Publishing::TextDiffTest < ActiveSupport::TestCase
     overview = changes
     entry = Publishing::TextDiff.block(overview, overview.blocks.first, locale: :en)
     assert_equal "again", words(entry.result.segments, :insert)
-    assert_equal "Plain words here again", entry.after
+    assert_equal [ "Plain words here again" ], entry.after.map(&:shown)
   end
 
   test "a body that only became bold is formatting only" do
@@ -58,6 +58,66 @@ class Publishing::TextDiffTest < ActiveSupport::TestCase
     assert_equal :added, change.kind
     assert_nil entry.before
     assert_nil entry.result
-    assert_equal "New", entry.after
+    assert_equal [ :body ], entry.after.map(&:label)
+    assert_equal "New", entry.after.first.shown
+  end
+
+  test "settings are named by their schema label and diffed as values, never with the label in the words" do
+    note = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "note", settings: { "title" => "Heads up" } },
+      translations: { "en" => { body: rich_doc("Careful") } }).record
+    assert Pages::Save.call(@page, attributes: { published: true }).ok?
+    publish_changes(@page)
+    @version = Publishing.baseline(@page.reload)
+    result = ContentBlocks::Save.call(note, attributes: { settings: { "title" => "Heads down" } })
+    assert result.ok?, result.errors.to_sentence
+
+    overview = changes
+    entry = Publishing::TextDiff.block(overview, overview.blocks.first, locale: :en)
+
+    assert_includes entry.after.map(&:label), "Title"
+    assert_equal "Heads down", entry.after.find { |part| part.label == "Title" }.shown
+    assert_equal "down", words(entry.result.segments, :insert)
+    assert_equal "up", words(entry.result.segments, :delete)
+    assert entry.result.segments.none? { |_kind, text| text.include?("Title") }
+  end
+
+  test "caption and alt are parts named by key and diffed by their values" do
+    image = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "image" },
+      translations: { "en" => { caption: "A cap", alt: "An alt" } }).record
+    publish_changes(@page)
+    @version = Publishing.baseline(@page.reload)
+    assert ContentBlocks::Save.call(image, translations: { "en" => { caption: "A new cap" } }).ok?
+
+    overview = changes
+    entry = Publishing::TextDiff.block(overview, overview.blocks.first, locale: :en)
+
+    assert_equal [ :caption, :alt ], entry.after.map(&:label)
+    assert_equal [ "A new cap", "An alt" ], entry.after.map(&:shown)
+    assert_equal "new", words(entry.result.segments, :insert)
+    assert_empty words(entry.result.segments, :delete)
+  end
+
+  test "a structured value is named as changed and has no words" do
+    parts = Publishing::TextDiff.block_parts({ "block_type" => "rich_text", "settings" => {}, "body" => nil }, :en)
+    assert_empty parts
+    was = [ Publishing::TextDiff::Part.new(label: "Rows", shown: nil, compared: [ { "a" => 1 } ]) ]
+    now = [ Publishing::TextDiff::Part.new(label: "Rows", shown: nil, compared: [ { "a" => 2 } ]) ]
+
+    assert_equal [ "Rows" ], Publishing::TextDiff.opaque_changes(was, now)
+    assert_empty Publishing::TextDiff.opaque_changes(was, was)
+    assert Publishing::TextDiff.text_part("Tags", [ "a", "b" ]).then { |part| part.shown == "a, b" }
+    assert Publishing::TextDiff.text_part("Rows", { "a" => 1 }).opaque?
+  end
+
+  test "a removed block has no after" do
+    assert ContentBlocks::Destroy.call(@block).ok?
+    overview = changes
+    change = overview.blocks.first
+    entry = Publishing::TextDiff.block(overview, change, locale: :en)
+
+    assert_equal :removed, change.kind
+    assert_nil entry.after
+    assert_nil entry.result
+    assert_equal "Plain words here", entry.before.first.shown
   end
 end

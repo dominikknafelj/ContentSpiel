@@ -13,71 +13,92 @@ module Publishing
   # would report the asterisks as words.
   #
   # `result` is nil when a side is absent (an added or removed block): there is
-  # nothing to diff, and the caller shows the other side whole.
+  # nothing to diff, and the caller shows the other side whole. `before` and
+  # `after` are lists of `Part`s (nil for an absent side); a field is one part
+  # with no label.
   module TextDiff
-    Entry = Data.define(:label, :before, :after, :result)
+    Entry = Data.define(:label, :before, :after, :result, :opaque)
 
-    # What a text is, per side: the lines shown, and the paragraphs compared.
-    Text = Data.define(:shown, :compared)
+    # `label`: a Symbol, a String (a schema field's label) or nil; `shown`: the
+    # text as drawn (Markdown for a document), nil for a structured value;
+    # `compared`: what the diff reads, a String or paragraphs.
+    Part = Data.define(:label, :shown, :compared) do
+      def opaque? = shown.nil?
+    end
 
-    FIELD_NAMES = "admin.components.editor_screen.changes_overview.field_names".freeze
+    FIELD_NAMES = "admin.publishing.text_diff.field_names".freeze
 
     module_function
 
     def field(changes, name, locale:)
       translated = Changes::TRANSLATED.fetch(changes.record.class.polymorphic_name).include?(name)
-      was, now = changes.sides.map { |side| field_text(side["fields"][name], locale, translated) }
-      Entry.new(label: I18n.t(name, scope: FIELD_NAMES, default: name.humanize), before: was.shown, after: now.shown, result: diff(was, now))
+      was, now = changes.sides.map { |side| [ field_part(side["fields"][name], locale, translated) ] }
+      Entry.new(label: I18n.t(name, scope: FIELD_NAMES, default: name.humanize), before: was, after: now, result: diff(was, now), opaque: [])
     end
 
     def block(changes, change, locale:)
-      was, now = changes.sides_of(change).map { |stored| stored && block_text(stored, locale) }
-      Entry.new(label: block_label(change.block), before: was&.shown, after: now&.shown, result: was && now ? diff(was, now) : nil)
+      was, now = changes.sides_of(change).map { |stored| stored && block_parts(stored, locale) }
+      both = was && now
+      Entry.new(label: block_label(change.block), before: was, after: now, result: both ? diff(was, now) : nil, opaque: both ? opaque_changes(was, now) : [])
     end
 
-    def diff(was, now) = Translations::SourceDiff.call(from: was.compared, to: now.compared)
+    def diff(was, now) = Translations::SourceDiff.call(from: compared(was), to: compared(now))
 
-    def field_text(value, locale, translated)
+    # The values of the parts that have words, as paragraphs.
+    def compared(parts) = parts.reject(&:opaque?).flat_map { |part| Array(part.compared) }
+
+    # The labels whose structured value differs between the sides.
+    def opaque_changes(was, now)
+      by_label = ->(parts) { parts.select(&:opaque?).to_h { |part| [ part.label, part.compared ] } }
+      before, after = by_label.(was), by_label.(now)
+      (before.keys | after.keys).select { |label| before[label] != after[label] }
+    end
+
+    def field_part(value, locale, translated)
       value = value[locale.to_s] if translated && value.is_a?(Hash)
-      text_of(value)
+      text_part(nil, value)
     end
 
     # A block's words in `locale`: its body, caption and alt, then each field
-    # of its schema that holds text, named by the schema's label.
-    def block_text(stored, locale)
-      parts = [ text_of(language(stored["body"], locale)) ]
-      %w[caption alt].each do |column|
-        value = language(stored[column], locale).to_s
-        parts << Text.new(shown: "#{column.humanize}: #{value}", compared: [ "#{column.humanize}: #{value}" ]) if value.present?
-      end
-      settings_lines(stored, locale).each { |line| parts << Text.new(shown: line, compared: [ line ]) }
-      parts = parts.reject { |part| part.shown.blank? }
-      Text.new(shown: parts.map(&:shown).join("\n\n"), compared: parts.flat_map(&:compared))
+    # of its schema that holds a value, named by the schema's label.
+    def block_parts(stored, locale)
+      parts = [ text_part(:body, language(stored["body"], locale)) ]
+      %w[caption alt].each { |column| parts << text_part(column.to_sym, language(stored[column], locale)) }
+      parts.concat(settings_parts(stored, locale))
+      parts.reject { |part| !part.opaque? && part.shown.blank? }
     end
 
-    def settings_lines(stored, locale)
+    def settings_parts(stored, locale)
       definition = BlockTypes.find(stored["block_type"])
       return [] unless definition
 
-      translated = language(stored["translated_settings"], locale) || {}
+      translated = language(stored["translated_settings"], locale)
       values = (stored["settings"] || {}).merge(translated.is_a?(Hash) ? translated : {})
       definition.fields.filter_map do |field|
         value = values[field.name]
-        "#{field.label}: #{value.is_a?(String) ? value : value.to_json}" unless value.blank?
+        next if value.blank?
+
+        text_part(field.label, value)
       end
     end
 
     def language(value, locale) = value.is_a?(Hash) ? value[locale.to_s] : nil
 
-    def text_of(value)
-      if value.is_a?(Hash) && value["type"] == "doc"
+    def text_part(label, value)
+      case value
+      when Hash
+        return opaque(label, value) unless value["type"] == "doc"
+
         document = RichText::Document.new(value)
-        Text.new(shown: document.to_markdown.strip, compared: document.plain_paragraphs)
-      else
-        string = value.is_a?(String) ? value : (value.nil? ? "" : value.to_json)
-        Text.new(shown: string, compared: string)
+        Part.new(label:, shown: document.to_markdown.strip, compared: document.plain_paragraphs)
+      when Array
+        value.any? { |item| item.is_a?(Hash) || item.is_a?(Array) } ? opaque(label, value) : text_part(label, value.join(", "))
+      when nil then Part.new(label:, shown: "", compared: "")
+      else Part.new(label:, shown: value.to_s, compared: value.to_s)
       end
     end
+
+    def opaque(label, value) = Part.new(label:, shown: nil, compared: value)
 
     # A block's name as the editor says it: its type's name, or the stored
     # type's when that type is no longer registered.
