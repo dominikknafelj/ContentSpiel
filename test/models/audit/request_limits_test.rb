@@ -55,4 +55,10 @@ class Audit::RequestLimitsTest < ActiveSupport::TestCase
     assert_equal 1, lines.size
     assert_no_match(/hunter2/, lines.first)
   end
+
+  test "a payload with no controller records nothing and does not raise" do
+    assert_no_difference -> { limited.count } do
+      Audit::RequestLimits.heard(payload(nil))
+    end
+  end
 end

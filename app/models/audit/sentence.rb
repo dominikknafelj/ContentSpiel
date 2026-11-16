@@ -517,15 +517,15 @@ module Audit
         [ text("regenerated #{count} #{count == 1 ? "image" : "images"}") ]
       end
 
-      # A lock-out of the account's bucket, of one known device's or of the
-      # address's (`bucket` in the metadata).
       # The door and the limit's name, from the metadata: no address, no
       # typed value ever reaches the event.
       def limited_sentence
         metadata = self.class.metadata_of(event)
-        "Requests were limited at #{metadata["door"]} (#{metadata["limit"]})"
+        "hit the request limit at #{metadata["door"]} (#{metadata["limit"]})"
       end
 
+      # A lock-out of the account's bucket, of one known device's or of the
+      # address's (`bucket` in the metadata).
       def locked_sentence
         case event.metadata.is_a?(Hash) ? event.metadata["bucket"] : nil
         when "address_wide" then "Sign-in from one address paused after repeated failures"
