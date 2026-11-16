@@ -1,7 +1,7 @@
 # WHICH BRANCHES OF A TREE A PERSON HAS OPENED OR FOLDED, read from the
 # cookie its tree names: `cs_tree_open` (`COOKIE`, the pages of both page
-# trees) or `cs_media_open` (`MEDIA_COOKIE`, the library's folders). The Pages tree draws its folds from it on the
-# server from the first paint (`Admin::PagesScreen::TreeComponent`,
+# trees) or `cs_media_open` (`MEDIA_COOKIE`, the library's folders). The
+# Pages tree draws its folds from it on the server from the first paint (`Admin::PagesScreen::TreeComponent`,
 # `TreeRowComponent.for_page`), and the mind graph's list draws its first
 # folds from `to_s`, handed over as `data-tree-open`. The browser writes it,
 # through `tree/open_set.js` alone; no Ruby
