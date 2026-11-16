@@ -17,9 +17,10 @@ module Admin
     # `turbo:before-cache` and `disconnect`.
     #
     # THE FRAME is `DialogComponent` at the `viewer` step: the title is the
-    # file name (truncated on one line, and whole as the dialog's accessible
-    # name), the facts its title aside, Close the dialog's own. Its body is
-    # a padding-less flex column the stage fills.
+    # file name (the `title` target, a span in the h2, truncated on one line
+    # and whole as the dialog's accessible name), the facts its title aside,
+    # Close the dialog's own. Its body is a padding-less flex column the
+    # stage fills.
     #
     # THE STAGE is `cs-sunken`, the picture centred on it at its own size and
     # never enlarged. The picture is `Admin::Ui::GifComponent` on the stage
@@ -58,11 +59,15 @@ module Admin
           "It steps within the opener's [data-image-viewer-group] only, read once at opening."
         ],
         states: %i[rest],
-        script_states: {},
+        script_states: {
+          open: [ "test/system/admin/image_viewer_test.rb", "a plain click on a note's picture opens the viewer with its name, facts and position" ],
+          stepped: [ "test/system/admin/image_viewer_test.rb", "the arrows step through one message's pictures only, disabled at the ends, and say the name and position" ],
+          failed: [ "test/system/admin/image_viewer_test.rb", "a picture that can't be loaded says so and keeps Open original and Download" ]
+        },
         keys: %w[previous next position open_original download failed loading stepped],
         slots: [],
         controller: "admin--ui--image-viewer",
-        keyboard: nil
+        keyboard: [ "test/system/admin/image_viewer_test.rb", "the keyboard reaches a note's picture with Tab, Enter opens the viewer on Next, the arrows step, and Escape gives the focus back to the picture" ]
       )
 
       DIALOG_ID = "image-viewer".freeze
@@ -72,6 +77,11 @@ module Admin
       MESSAGES = %w[components.ui.image_viewer.position components.ui.image_viewer.stepped].freeze
 
       TARGET = "admin--ui--image-viewer-target".freeze
+
+      # ← and → step from anything in the dialog (the script leaves a key
+      # with a modifier to the browser: Alt+← is Back), and the dialog's
+      # `close` (Escape, Close, the backdrop) gives the focus back.
+      ACTIONS = "keydown.left->admin--ui--image-viewer#previous keydown.right->admin--ui--image-viewer#next close->admin--ui--image-viewer#closed".freeze
 
       # A stage arrow: 40px on the popover with a 1px edge and shadow 2;
       # disabled, the sunken ground, the arrow in meta and no shadow, in the
@@ -83,6 +93,8 @@ module Admin
       private
 
       def target(name) = { TARGET => name }
+
+      def script_messages = messages_data(*MESSAGES)
 
       # The `<img>` of the GIF part, which is also the viewer's picture:
       # fitted to the stage and never enlarged (`w-auto h-auto` and the

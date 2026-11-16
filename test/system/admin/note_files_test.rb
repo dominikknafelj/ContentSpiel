@@ -51,7 +51,7 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
 
   def reduce_motion(on) = page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: on ? "reduce" : "" } ])
 
-  test "an image and a PDF are attached to a reply: both are shown, the composer is empty again, and the picture opens in a new tab through the notes action" do
+  test "an image and a PDF are attached to a reply: both are shown, the composer is empty again, and the picture opens in the viewer through the notes action" do
     open_thread
     assert_selector "#{reply} button[data-note-attach][title='Attach up to 5 files, 10 MB each']"
     choose(file_fixture("tiny.png"), pdf_path)
@@ -75,7 +75,10 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
     assert_match %r{\A.*/cs-studio/notes/page/#{@page.id}/threads/#{@thread.id}/messages/#{message.id}/files/\d+\z}, image[:href]
     assert_eventually(message: "the picture never loaded") { page.evaluate_script("document.querySelector(#{"#{note} a[data-note-image] img".to_json}).naturalWidth") > 0 }
     assert_no_selector "#notes-drawer [src*='active_storage'], #notes-drawer [href*='active_storage']", visible: :all
-    tab = window_opened_by { image.click }
+    image.click
+    assert_selector "dialog#image-viewer[open] h2", text: "tiny.png"
+    assert_equal 1, windows.size, "the click opened a window as well"
+    tab = window_opened_by { find("dialog#image-viewer a[data-admin--ui--image-viewer-target=original]").click }
     within_window(tab) { assert_match %r{/files/\d+\z}, current_url }
     tab.close
   end

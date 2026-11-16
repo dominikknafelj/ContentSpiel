@@ -1,12 +1,13 @@
-<div class="flex flex-col gap-2" data-note-files>
+<%= tag.div class: "flex flex-col gap-2", data: { note_files: true, image_viewer_group: message.id } do %>
   <% attachments.each do |attachment| %>
     <% name = attachment.blob.filename.to_s %>
     <% if gif?(attachment) %>
-      <%= render Admin::Ui::GifComponent.new(src: path(attachment), name: name, placement: :tile, link: { title: t(".open", name: name) },
+      <%= render Admin::Ui::GifComponent.new(src: path(attachment), name: name, placement: :tile,
+            link: { title: t(".view", name: name), data: viewer_item(attachment, name).merge(image_viewer_gif: true) },
             class: PICTURE_BOX_CLASS, data: { note_gif: true }) %>
     <% elsif image?(attachment) %>
       <%= link_to path(attachment), target: "_blank", rel: "noopener", class: "#{PICTURE_BOX_CLASS} focus-visible:outline-2 focus-visible:outline-accent",
-            title: t(".open", name: name), data: { note_image: true, turbo: false } do %>
+            title: t(".view", name: name), data: { note_image: true, turbo: false, **viewer_item(attachment, name) } do %>
         <%= image_tag path(attachment), alt: name, loading: "lazy", class: PICTURE_CLASS %>
       <% end %>
     <% else %>
@@ -21,4 +22,4 @@
       <% end %>
     <% end %>
   <% end %>
-</div>
+<% end %>

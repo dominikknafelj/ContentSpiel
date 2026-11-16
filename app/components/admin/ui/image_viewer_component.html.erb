@@ -1,5 +1,5 @@
-<%= render Admin::Ui::DialogComponent.new(id: DIALOG_ID, title: "", width: :viewer,
-      data: { controller: "admin--ui--image-viewer", messages: messages_data(*MESSAGES) }) do |dialog| %>
+<%= render Admin::Ui::DialogComponent.new(id: DIALOG_ID, title: tag.span(data: target("title")), width: :viewer,
+      data: { controller: "admin--ui--image-viewer", messages: script_messages, action: ACTIONS }) do |dialog| %>
   <% dialog.with_title_aside do %><%= tag.span(data: target("facts")) %><% end %>
 
   <%= tag.div class: "admin-image-viewer__stage relative isolate grid min-h-0 flex-1 place-items-center bg-sunken", data: target("stage") do %>
