@@ -1,9 +1,9 @@
 <ul class="admin-media-grid <%= grid_class %>">
   <% assets.each do |asset| %>
-    <%= render Admin::MediaLibrary::TileComponent.new(asset: asset, url: (show_path(asset) unless pick?), unused: !used_ids.include?(asset.id),
+    <%= render Admin::MediaLibrary::TileComponent.new(asset: asset, url: tile_url(asset), unused: !used_ids.include?(asset.id),
           selected: selected?(asset), pick: pick?, locale: locale,
           open_notes: note_counts.fetch(asset.id, 0), notes_unread: note_unread.include?(asset.id),
-          folder_path: folder_path(asset)) %>
+          folder_path: folder_path(asset), select: select?) %>
   <% end %>
 </ul>
 <% if assets.empty? %>

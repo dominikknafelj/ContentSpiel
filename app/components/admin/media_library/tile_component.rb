@@ -40,6 +40,16 @@ module Admin
     # would (`Media::Asset#alt_text` with no override), so a blank per-use
     # override field can show what will actually be used.
     #
+    # `select: true` is the tile in the Media screen's selection mode
+    # (`select=1`, the card StudioMediaFolders, D6): a button with
+    # `aria-pressed`, as the picker's is, which `admin--media--selection`
+    # toggles (a press, Space, Shift+click for a range), with the 24px chip
+    # at its top left holding a tick. The tick is a picture of the state, not
+    # a control: the button is the one control and the one name, so the
+    # checkbox is out of the tab order and hidden from a screen reader, and
+    # takes no pointer (a press on it is the button's). The tile carries its
+    # id and its title for the bar's Move to… (`selection_data`).
+    #
     # `open_notes:` and `notes_unread:` are the caller's to say for the same
     # reason (`GridComponent#note_counts`, `#note_unread`): the image's open
     # notes as the notes pill on the image's top right corner, accent while
@@ -70,7 +80,11 @@ module Admin
 
       PICK_ACTIONS = "click->admin--media--select#select dblclick->admin--media--select#choose keydown->admin--media--select#key".freeze
 
-      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false, folder_path: nil)
+      SELECT_ACTIONS = "admin--media--selection#toggle".freeze
+
+      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false, folder_path: nil,
+                     select: false)
+        @select = select
         @folder_path = folder_path
         @asset = asset
         @url = url
@@ -83,6 +97,10 @@ module Admin
       end
 
       def pick? = @pick
+
+      def select? = @select
+
+      def selection_data = { action: SELECT_ACTIONS, "admin--media--selection-target": "tile", "asset-id": asset.id, "asset-title": asset.title }
 
       attr_reader :folder_path
 

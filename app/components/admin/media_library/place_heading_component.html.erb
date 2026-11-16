@@ -25,7 +25,9 @@
     </div>
   </div>
   <div class="flex items-center gap-2">
-    <%# SLOT: Select stands here, before Upload images. %>
+    <% if select? %>
+      <%= link_to t(".select"), select_url, class: Admin::Ui::ButtonComponent.classes(:secondary, size: :small), data: link_data %>
+    <% end %>
     <% if upload? %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".upload"), variant: :primary, type: "button", data: { action: "admin--media--upload#browse" }) %>
     <% end %>

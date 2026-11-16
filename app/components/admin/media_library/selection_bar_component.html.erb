@@ -1,0 +1,14 @@
+<p role="status" aria-live="polite" aria-atomic="true" class="sr-only" data-admin--media--selection-target="status"></p>
+<%= tag.div class: "admin-media-selection-bar flex flex-wrap items-center gap-2.5 rounded-card bg-popover px-3 py-2 text-sm text-ink shadow-3",
+      data: { media_selection_bar: "", messages: bar_messages } do %>
+  <strong class="font-semibold" data-admin--media--selection-target="count"><%= words(:count, count: 0) %></strong>
+  <%= render Admin::Ui::ButtonComponent.new(label: words(:select_all, count: count_on_page), variant: :tertiary, size: :small,
+        data: { action: "admin--media--selection#selectAll" }.merge(target("selectAll"))) %>
+  <%= render Admin::Ui::ButtonComponent.new(label: words(:clear), variant: :tertiary, size: :small, data: { action: "admin--media--selection#clear" }) %>
+  <%# The room kept for "Move to trash…" and "Download" (spec §5.3). %>
+  <span class="flex-1" aria-hidden="true"></span>
+  <%= tag.button type: "button", class: move_classes, disabled: true, data: move_data do %>
+    <%= render "admin/shared/icon", name: :folder_input, size: "size-4" %><%= words(:move) %>
+  <% end %>
+  <%= link_to words(:done), done_url, class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small), data: done_data %>
+<% end %>

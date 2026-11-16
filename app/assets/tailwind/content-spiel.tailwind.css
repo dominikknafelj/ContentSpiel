@@ -1459,6 +1459,11 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    canvas: nothing in the rail drops onto the grid, and a raised panel
    would stand over Close. */
 .admin-media-library { container: admin-media / inline-size; }
+/* Selection mode's bar (`Admin::MediaLibrary::SelectionBarComponent`), a
+   child of the library and not of the head, so it stays stuck under the top
+   offset over the whole grid; over the tiles (`sticky`), centred with them
+   past 1200px. */
+.admin-media-selection-bar { position: sticky; top: var(--admin-top-offset); z-index: var(--cs-z-sticky); margin-bottom: var(--cs-sp-4); }
 .admin-media-library__grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--cs-sp-6); }
 .admin-media-library__main { min-width: 0; }
 .admin-media-library__main:only-child { grid-column: 1 / -1; }
@@ -1472,7 +1477,8 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
     overflow-y: auto; overscroll-behavior: contain; }
 }
 @container admin-media (min-width: 1200px) {
-  .admin-media-library__head { max-width: var(--cs-content-max); margin-inline: auto; }
+  .admin-media-library__head,
+  .admin-media-selection-bar { max-width: var(--cs-content-max); margin-inline: auto; }
   .admin-media-library__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; }
   .admin-media-rail { --admin-rail-docked: 1; gap: 0; padding: 0; overflow: hidden; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
   .admin-media-rail .admin-rail__tabs { display: flex; flex: none; align-items: flex-end; gap: var(--cs-sp-4); height: 3rem; box-sizing: border-box; padding: 0 3.5rem 0 var(--cs-sp-4); }

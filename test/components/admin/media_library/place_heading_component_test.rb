@@ -87,4 +87,19 @@ class Admin::MediaLibrary::PlaceHeadingComponentTest < ViewComponent::TestCase
     heading(Media::Place::NONE)
     assert_no_selector "[data-controller='admin--ui--menu']", visible: :all
   end
+
+  test "Select is a frame link into selection mode before Upload, and selection mode draws neither" do
+    heading(Media::Place::ALL, select_url: "/cs-studio/media?select=1")
+    select = page.find("a", text: "Select")
+    assert_equal "/cs-studio/media?select=1", select[:href]
+    assert_equal "content", select["data-turbo-frame"]
+    assert_equal [ "Select", "Upload images" ], page.all("header > div:last-child > *").map { |node| node.text.strip }
+
+    heading(Media::Place::ALL, count: 0, select_url: "/cs-studio/media?select=1")
+    assert_no_link "Select"
+
+    heading(Media::Place::ALL, select_url: "/cs-studio/media?select=1", selecting: true)
+    assert_no_link "Select"
+    assert_no_button "Upload images"
+  end
 end

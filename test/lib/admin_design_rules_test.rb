@@ -1364,7 +1364,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       "admin-dashboard" => [ ".admin-dashboard__grid", ".admin-dashboard__head,\n  .admin-dashboard__notice" ],
       "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ],
       "admin-settings" => [ ".admin-settings-layout__grid" ],
-      "admin-media" => [ ".admin-media-library__head", ".admin-media-library__grid" ] }.each do |container, selectors|
+      "admin-media" => [ ".admin-media-library__head,\n  .admin-media-selection-bar", ".admin-media-library__grid" ] }.each do |container, selectors|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).first
       selectors.each do |selector|
         rule = docked[/(?:\A|[};])\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/, 1]

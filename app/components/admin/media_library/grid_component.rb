@@ -27,6 +27,10 @@ module Admin
     # tile is then a button that selects it for the picker
     # (`TileComponent`'s own comment) instead of a link to the panel -- one
     # grid, one search/pagination endpoint, two ways of acting on a tile.
+    # `select: true` is the Media screen's selection mode (`select=1`): each
+    # tile a button that `admin--media--selection` ticks (`TileComponent`'s
+    # own comment), and no link to the panel, which is closed.
+    #
     # `locale` is the editing language the picked asset's default alt/caption
     # are read in, which the fields the picker fills show as placeholders.
     #
@@ -37,7 +41,8 @@ module Admin
     # `admin.components.media_library.grid.empty.*`.
     class GridComponent < Admin::AdminComponent
       def initialize(assets:, url_options: {}, pick: false, locale: ::Locales.default, selected_id: nil, link_params: {},
-                     place: ::Media::Place::ALL, tree: nil, subfolders: [])
+                     place: ::Media::Place::ALL, tree: nil, subfolders: [], select: false)
+        @select = select
         @place = place
         @tree = tree
         @subfolders = subfolders
@@ -50,6 +55,11 @@ module Admin
       end
 
       def pick? = @pick
+
+      def select? = @select
+
+      # A tile's link to its panel; none for a button (the picker's, a selection's).
+      def tile_url(asset) = (show_path(asset) unless pick? || select?)
 
       # An empty place that is no search's empty answer: a folder (it takes
       # the upload into it and names the folders it holds) or Not in a folder.

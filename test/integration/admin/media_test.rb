@@ -1275,4 +1275,44 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { folder: "none" }
     assert_select "h1", text: "Not in a folder"
   end
+
+  test "select drops the panel and is dropped by a link to another place" do
+    sign_in_as(users(:one))
+    clients = Media::Folder.create!(name: "Clients")
+    client_a = Media::Folder.create!(name: "Client A", parent: clients)
+    assets = Array.new(49) { create_media_asset }
+    put_in(client_a, *assets)
+
+    # Select is a link to the place as listed, with select=1 and without the
+    # panel's image.
+    get "/cs-studio/media", params: { folder: client_a.id, q: "tiny", page: "2", selected: assets.first.id }
+    select = css_select("[data-media-place-heading] a").find { |link| link.text.strip == "Select" }
+    query = Rack::Utils.parse_query(URI(select["href"]).query)
+    assert_equal({ "folder" => client_a.id.to_s, "q" => "tiny", "page" => "2", "select" => "1" }, query)
+
+    get "/cs-studio/media", params: { folder: client_a.id, select: "1", selected: assets.last.id }
+    assert_response :success
+    assert_select "#media-rail", count: 0
+    assert_select "#media-library[data-controller='admin--media--selection']"
+    assert_select "#media-library > [data-media-selection-bar]"
+    assert_select "[data-media-selection-bar] button", text: "Select all 48"
+    assert_select "#media-library ul.admin-media-grid > li > button[aria-pressed=false][data-asset-id]", count: 48
+    assert_select "#media-library ul.admin-media-grid a", count: 0
+    assert_select "[data-media-place-heading] a", text: "Select", count: 0
+    assert_select "[data-media-place-heading] button", text: "Upload images", count: 0
+    done = css_select("[data-media-selection-bar] a").find { |link| link.text.strip == "Done" }
+    assert_equal({ "folder" => client_a.id.to_s }, Rack::Utils.parse_query(URI(done["href"]).query))
+
+    # Every way to another place, page or search leaves selection mode.
+    column = css_select("##{Admin::MediaLibrary::FolderTreeComponent::ID} a")
+    assert_operator column.size, :>=, 4, "All media, Not in a folder and the two folders"
+    links = css_select("#media-library nav a, a[href*='page=']") + column
+    links.each { |link| assert_not_includes link["href"], "select=", link.to_html }
+    assert_not_includes controller.send(:place_query, place_in(clients)).keys, :select
+    assert_select "#media-library form[action$='/cs-studio/media'] input[name=select]", count: 0
+
+    get "/cs-studio/media", params: { folder: clients.id }
+    assert_select "#media-library[data-controller]", count: 0
+    assert_select "#media-library ul.admin-media-grid button[aria-pressed]", count: 0
+  end
 end

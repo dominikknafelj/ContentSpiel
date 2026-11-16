@@ -12,7 +12,8 @@ import { messages } from "i18n/messages"
 // (written by `MoveDialogComponent.images_trigger` and `.folder_trigger`):
 // `asset-ids` (comma-joined) or `folder-id`, and `title` (the one image's
 // title, or the folder's name). From them the title is worded ("Move 3
-// images", "Move “beach.jpg”", "Move “Client A”", the server's words in
+// images", "Move “beach.jpg”" (one image with no title: "Move 1 image"),
+// "Move “Client A”", the server's words in
 // `data-messages`, a name reaching the page only through `textContent`) and
 // the frame is pointed at the list for that subject (`GET /media/move/new`),
 // with the place and the search the content frame shows (`#content`'s
@@ -26,7 +27,8 @@ import { messages } from "i18n/messages"
 // carries a refusal, on the refusal's notice.
 //
 // FIND A FOLDER hides the rows whose name does not hold what is typed (case
-// ignored). It stands outside the form, so Enter in it sends nothing.
+// ignored), and a chosen row it hides is chosen no more (Move here is
+// disabled again). It stands outside the form, so Enter in it sends nothing.
 //
 // SENT THROUGH THE WRITE QUEUE. The list's form is a Turbo form; its request
 // is held until the screen's other writes have answered (`holdTurboRequest`),
@@ -56,9 +58,13 @@ export default class extends Controller {
     const title = param("title")
     const words = messages(this.element)
 
-    document.getElementById(`${this.element.id}-title`).textContent = folderId
-      ? words.t("components.media_library.move_dialog.title.folder", { name: title })
-      : words.t("components.media_library.move_dialog.title.images", { count: ids.length, title })
+    // One image is named by its title; with none (a blank title) it is
+    // counted, as several are, never "Move “”".
+    let heading
+    if (folderId) heading = words.t("components.media_library.move_dialog.title.folder", { name: title })
+    else if (ids.length === 1 && title.trim() !== "") heading = words.t("components.media_library.move_dialog.title.image", { title })
+    else heading = words.t("components.media_library.move_dialog.title.images", { count: ids.length })
+    document.getElementById(`${this.element.id}-title`).textContent = heading
     this.submitTarget.disabled = true
     this.load(folderId, ids)
   }
@@ -106,7 +112,12 @@ export default class extends Controller {
     const typed = field.value.trim().toLowerCase()
     this.choicesTarget.querySelectorAll("[data-move-choice]").forEach((row) => {
       row.hidden = typed !== "" && !row.dataset.moveName.includes(typed)
+      // A choice the find hides is no choice: Move here would send a place
+      // the person can no longer see.
+      const radio = row.querySelector("input[type=radio]")
+      if (row.hidden && radio?.checked) radio.checked = false
     })
+    this.submitTarget.disabled = !this.choicesTarget.querySelector("input[type=radio]:checked")
   }
 
   send(event) {

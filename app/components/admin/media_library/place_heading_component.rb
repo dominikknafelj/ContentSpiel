@@ -22,8 +22,13 @@ module Admin
     #
     # Upload images opens the file input of the `admin--media--upload`
     # controller this heading is drawn inside (`admin/media/index`); `upload:
-    # false` leaves it out. Select (before Upload) stands at the SLOT comment
-    # of the template.
+    # false` leaves it out. Select, before it, enters selection mode: a
+    # content-frame link to `select_url` (the place as listed, with
+    # `select=1`, which the screen builds), drawn while the place lists an
+    # image. In selection mode (`selecting: true`) the right end holds neither:
+    # the selection's bar (`SelectionBarComponent`) stands over the grid
+    # instead, sticky over what it acts on, which a bar inside this heading
+    # could not be (a sticky box sticks only inside its parent).
     #
     # THE FOLDER'S MENU (D10), after the count: in a folder, for `manage:`
     # (the viewer holds `media.manage`), the ⋯ "Folder actions" with "New
@@ -40,7 +45,9 @@ module Admin
 
       def self.count_text(count) = I18n.t("admin.components.media_library.place_heading.count", count: count)
 
-      def initialize(place:, tree:, count:, query:, manage:, upload: true)
+      def initialize(place:, tree:, count:, query:, manage:, upload: true, select_url: nil, selecting: false)
+        @select_url = select_url
+        @selecting = selecting
         @place = place
         @tree = tree
         @count = count
@@ -51,7 +58,13 @@ module Admin
 
       def folder? = place.folder.present?
 
-      def upload? = @upload
+      def upload? = @upload && !selecting?
+
+      def selecting? = @selecting
+
+      def select? = @select_url.present? && !selecting? && count.positive?
+
+      attr_reader :select_url
 
       def manage? = @manage
 

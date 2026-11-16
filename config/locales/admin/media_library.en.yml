@@ -55,9 +55,12 @@ en:
         # title for each opening. "this folder" and "too deep" say why a place
         # cannot take a folder.
         move_dialog:
+          # `image` names the one image moved; `images` counts them, and is
+          # also one image's title when it has none to name.
           title:
+            image: "Move “%{title}”"
             images:
-              one: "Move “%{title}”"
+              one: "Move %{count} image"
               other: "Move %{count} images"
             folder: "Move “%{name}”"
           find: "Find a folder"
@@ -107,12 +110,24 @@ en:
             other: "%{count} images"
           breadcrumb_label: "Where you are"
           upload: "Upload images"
+          # Selection mode's way in (`select=1`), before Upload images.
+          select: "Select"
           # The folder's ⋯ menu (a folder, for `media.manage`).
           menu: "Folder actions"
           new_inside: "New folder inside…"
           rename: "Rename…"
           move: "Move to…"
           delete: "Delete folder…"
+        # Selection mode's bar (`Admin::MediaLibrary::SelectionBarComponent`):
+        # `count` is also what its status says; `select_all` counts the tiles
+        # the page draws, and reads `all_selected` once all of them are.
+        selection:
+          count: "%{count} selected"
+          select_all: "Select all %{count}"
+          all_selected: "All %{count} selected"
+          clear: "Clear"
+          move: "Move to…"
+          done: "Done"
         toolbar:
           searching_in: "Searching in %{name}."
           search_all: "Search all media for “%{q}” →"

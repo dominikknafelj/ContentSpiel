@@ -5,6 +5,11 @@
       <img src="<%= loading_preview_url %>" alt="" aria-hidden="true" class="absolute inset-0 size-full scale-110 object-cover blur-md">
     <% end %>
     <%= render Admin::Ui::LibraryImageComponent.new(asset: asset, min_width: 480, css_class: "relative h-full w-full object-cover") %>
+    <% if select? %>
+      <span class="pointer-events-none absolute top-2 left-2 flex size-6 items-center justify-center rounded-button-sm bg-surface shadow-1" aria-hidden="true" data-media-tick>
+        <%= render Admin::Ui::CheckboxComponent.new(name: nil, tabindex: "-1") %>
+      </span>
+    <% end %>
     <%# Open notes: on the image, where the title's chips below never push it.
         Words for a screen reader, like the chips: the number alone says
         nothing. %>
@@ -26,6 +31,8 @@
 <li id="<%= dom_id %>">
   <% if pick? %>
     <%= tag.button face, type: "button", class: PICK_CARD, aria: { pressed: "false" }, data: pick_data %>
+  <% elsif select? %>
+    <%= tag.button face, type: "button", class: CARD, aria: { pressed: "false" }, data: selection_data %>
   <% else %>
     <%= link_to face, url, class: CARD, aria: { current: (selected? ? "true" : nil) }, data: { turbo_frame: "content", turbo_action: "advance", action: "click->admin--media--panel#choose" } %>
   <% end %>

@@ -26,10 +26,13 @@ module Admin
 
       FRAME_ID = "media-move-choices"
 
-      MESSAGES = %w[title.images title.folder].map { |key| "components.media_library.move_dialog.#{key}" }.freeze
+      MESSAGES = %w[title.image title.images title.folder].map { |key| "components.media_library.move_dialog.#{key}" }.freeze
 
       # What opens the dialog for the images `ids`; `title` is the image's
-      # title when there is one image (the dialog says "Move “beach.jpg”").
+      # title when there is one image (the dialog says "Move “beach.jpg”"; with
+      # no title to name, "Move 1 image"). The selection's bar draws it with
+      # no ids and `admin--media--selection` rewrites the two values as the
+      # selection changes: the attributes are this method's.
       def self.images_trigger(ids, title: nil)
         { "admin--ui--dialog-id-param": ID, action: "admin--ui--dialog#open",
           "admin--media--move-asset-ids-param": Array(ids).join(","),

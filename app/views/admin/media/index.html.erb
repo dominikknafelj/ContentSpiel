@@ -48,8 +48,14 @@
     the room the library has, never the window's
     (content-spiel.tailwind.css, "THE MEDIA RAIL"). It names the place and the
     search it lists (`data-media-place`, `data-media-query`: a JSON object of
-    `q` and `filter`) for the Folders column's script. %>
-<div id="media-library" class="admin-media-library" data-media-place="<%= @place.to_param %>" data-media-query="<%= @place_query.to_json %>">
+    `q` and `filter`) for the Folders column's script.
+
+    In selection mode (`select=1`) it carries `admin--media--selection`,
+    which holds the selection of this page's tiles and the bar's state: the
+    bar stands between the head and the grid, a child of the library so it
+    stays stuck over the whole grid. %>
+<% selection = (@selecting ? { controller: "admin--media--selection", action: "keydown.esc@document->admin--media--selection#escape" } : {}) %>
+<%= tag.div id: "media-library", class: "admin-media-library", data: { media_place: @place.to_param, media_query: @place_query.to_json, **selection } do %>
 <div class="admin-media-library__head">
 <%# Uploading: the wrapper carries `admin--media--drop` (a file drag
     anywhere on the screen shows the overlay below and a drop hands its files to
@@ -70,7 +76,8 @@
   <%# The place heading: the breadcrumb, the place's name as the `h1`, its count
       and Upload images (`Admin::MediaLibrary::PlaceHeadingComponent`), inside
       the upload wrapper because its button is the upload controller's. %>
-  <%= render Admin::MediaLibrary::PlaceHeadingComponent.new(place: @place, tree: @folder_tree, count: @counts.fetch(:all), query: @place_query, manage: can?("media.manage")) %>
+  <%= render Admin::MediaLibrary::PlaceHeadingComponent.new(place: @place, tree: @folder_tree, count: @counts.fetch(:all), query: @place_query, manage: can?("media.manage"),
+        select_url: admin_media_path(**@link_params, select: "1", **admin_url_options), selecting: @selecting) %>
   <%# The zone is the empty library's invitation: once the library holds a kept
       image (whatever the search shows) the wrapper is hidden. The file input
       stays in the document, the header button's and the full-window drop's
@@ -95,6 +102,10 @@
 <%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], selected_id: @selected&.id, url_options: admin_url_options, place: (@place.to_param unless @place.all?), place_name: (@folder_tree.find(@place.folder).name if @place.folder)) %>
 </div>
 
+<% if @selecting %>
+  <%= render Admin::MediaLibrary::SelectionBarComponent.new(count_on_page: @assets.size, done_url: admin_media_path(**@link_params.except(:select), **admin_url_options)) %>
+<% end %>
+
 <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :selected, :folder).merge("page" => page)) } %>
 <%# DOM order is visual order at every width (grid, then rail; the rail stacks
     under the grid in a narrow library): no `order-*` swap, so tab order never
@@ -106,7 +117,7 @@
       <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
     <% else %>
       <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options, selected_id: @selected&.id, link_params: @link_params,
-            place: @place, tree: @folder_tree, subfolders: (@place.folder ? @folder_tree.children(@place.folder) : [])) %>
+            place: @place, tree: @folder_tree, subfolders: (@place.folder ? @folder_tree.children(@place.folder) : []), select: @selecting) %>
       <% if @pagination.total_pages > 1 %>
         <div class="mt-4 rounded-card bg-surface shadow-1">
           <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) %>
@@ -156,7 +167,7 @@
     <% end %>
   <% end %>
 </div>
-</div>
+<% end %>
 
 <%# THE FOLDER DIALOGS, for `media.manage`: once each, after the library and
     outside every form, but inside the content frame (this view is the

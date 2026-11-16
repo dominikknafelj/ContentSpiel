@@ -67,6 +67,12 @@ module Admin
     # kept images only), and the same `media.upload` gate -- the picker's only
     # permission is "may browse and choose". It has no panel.
     #
+    # `select=1` is selection mode (the card StudioMediaFolders, D6): the
+    # tiles are buttons that tick, the selection's bar stands over the grid,
+    # and no panel opens (a `selected` beside it is not read). Every link of
+    # the grid keeps it (`list_query`); a link to a place, a page or a search
+    # leaves it, and so does Done.
+    #
     # `folder` chooses the place the listing is of (`Media::Place`: All media,
     # Not in a folder, or one folder's own images). A folder that names nothing
     # is the 404 with "Back to Media" on the screen, like a stale `selected`;
@@ -92,7 +98,8 @@ module Admin
 
       @library_has_images = @search.any_images?(counts: @counts)
 
-      @selected = selected_asset
+      @selecting = selecting?
+      @selected = selected_asset unless @selecting
       @link_params = list_query
       @place_query = shown_query
       delete_folder_preview
@@ -245,11 +252,13 @@ module Admin
 
     # The grid's own state, kept by every link out of the panel and by the
     # panel form's own URL (symbol keys, strings only, never `locale`, which
-    # `admin_url_options` carries): the search, the segment, the place and the
-    # page.
+    # `admin_url_options` carries): the search, the segment, the place, the
+    # page and selection mode.
     def list_query
-      request.query_parameters.slice("q", "filter", "folder", "page").select { |_, value| value.is_a?(String) }.symbolize_keys
+      request.query_parameters.slice("q", "filter", "folder", "page", "select").select { |_, value| value.is_a?(String) }.symbolize_keys
     end
+
+    def selecting? = params[:select] == "1"
 
     # What an autosave in the panel changes on the screen behind it, answered
     # with the save itself so nothing reloads under the typing editor: the

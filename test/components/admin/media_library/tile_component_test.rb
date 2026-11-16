@@ -161,4 +161,26 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_no_selector "[title]"
     assert_no_selector "svg"
   end
+  test "in selection mode a tile is a pressed button with its tick" do
+    asset = create_media_asset
+    asset.update!(title: "launch-stage.jpg")
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, unused: false, select: true)
+
+    assert_no_selector "a"
+    tile = page.find("li#media-asset-#{asset.id} > button.admin-tile[type=button][aria-pressed=false]")
+    assert_equal "admin--media--selection#toggle", tile["data-action"]
+    assert_equal "tile", tile["data-admin--media--selection-target"]
+    assert_equal asset.id.to_s, tile["data-asset-id"]
+    assert_equal "launch-stage.jpg", tile["data-asset-title"]
+
+    # The tick is the state drawn, not a second control: out of the tab
+    # order, hidden from a screen reader and taking no pointer, in the 24px
+    # chip at the top left.
+    chip = tile.find("[data-media-tick][aria-hidden=true]")
+    %w[pointer-events-none absolute top-2 left-2 size-6 bg-surface shadow-1].each { |name| assert_includes chip[:class].split, name }
+    tick = chip.find("input[type=checkbox].cs-checkbox[tabindex='-1']")
+    assert_not tick.checked?
+    assert_nil tick[:name]
+  end
 end

@@ -23,6 +23,7 @@
 - The media library's folders, in the tree column of the Media screen.
 - A folder is created ("+ New folder" in the Folders column, a row's "+", or "New folder inside…"), renamed and deleted from the Media screen: a small dialog with its Name field and the refusal under it, and a confirm that says what moves where before a delete. The place heading of a folder has a "Folder actions" menu for `media.manage`.
 - Move to…: images move from the image panel's new Folder fact (its path a link to that place) and a folder from its "Folder actions" menu, through a dialog that lists "Not in a folder" (or "Top of the library") and every folder, marks the current place, and, for a folder, refuses its own branch and places too deep, saying why. `GET /media/move/new` draws its list; a refusal stands in the dialog. A folder move's toast says where it went.
+- Selecting several images on the Media screen: "Select" in the place heading enters selection mode (`select=1`; the panel closes), where a press, Space or Shift+click (a range) ticks tiles, and a bar sticky over the grid says how many are selected and offers "Select all" (what the page draws), "Clear", "Move to…" (the Move to… dialog for the selection) and "Done". Escape, Done or any visit leaves it.
 
 ### Changed
 
