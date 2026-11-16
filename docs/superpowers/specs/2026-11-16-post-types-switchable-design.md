@@ -336,10 +336,18 @@ due copy it marks (a refresh of nothing only when one is due); and
 row `FOR UPDATE` first, so a publish in flight finishes before a switch-off's
 refresh reads its post, and a publish that arrives during a switch-off waits for
 its commit and is refused. The order is the settings row, then the record's row,
-the addresses and the entries; a switch writes no page or post row, so a writer
-that holds its record's row first waits with no cycle.
+the block rows, the addresses and the entries, for every writer of a page, a
+post or a block: `Locales::Enable` takes the settings row `FOR UPDATE` and then
+writes every page and post row, so a writer that held its record's row before
+the settings row would deadlock with it. So each holds the settings row as its
+transaction's first lock (the services at the top, `ContentBlocks::Structure
+#lock_owner` before the page's row, and `Page`, `Post` and `ContentBlock` in a
+`before_save` and `before_destroy`), and `ContentSpiel::LockOrder` checks the
+order on every statement in development and test.
 (`test/services/posts/switch_hold_test.rb`, statement order;
-`test/services/settings/switch_race_test.rb`, both orders on two connections.)
+`test/services/settings/switch_race_test.rb`, both orders on two connections;
+`test/services/locales/enable_race_test.rb`, a language switched on beside a
+page's writer.)
 
 ### 7.3 The audit
 

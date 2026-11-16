@@ -32,16 +32,35 @@ module ContentTypes
   # switch as it stands at the write's commit, and a switch-off's refresh
   # never runs beside a write that still sees the type on.
   #
-  # THE ORDER: the settings row before any `public_paths` row or search entry.
-  # A switch writes those after its own lock and writes no page or post row,
-  # so a writer that already holds its record's row (`take!`, a save's
-  # UPDATE) waits here without a cycle.
+  # THE ORDER: the settings row, then the page's or post's row, then block
+  # rows, then what is derived from them (`public_paths`, copies,
+  # `translation_states`, search entries). Every writer of a page or a post
+  # holds the switches as its transaction's first lock: the services at the
+  # top of their transactions, `ContentBlocks::Structure#lock_owner` before
+  # the page's row, and `Page`, `Post` and `ContentBlock` in a `before_save`
+  # and `before_destroy` for a write around them. The settings row's own
+  # writers take it `FOR UPDATE` first, and `Locales::Enable` then writes
+  # every page and post row, so a writer that held its record's row and only
+  # then waited here would wait for Enable while Enable waits for it: a
+  # deadlock (`test/services/locales/enable_race_test.rb`). A call deeper
+  # down (`PublicSite::Paths.refresh`, `SiteSearch::Indexing`, `take!`) is
+  # then a lock already held, which costs one short query, or the first lock
+  # of a transaction that writes nothing before it. Development and test
+  # check the order on every statement (`ContentSpiel::LockOrder`).
+  #
+  # A switch waits for a gap between writes: Postgres grants a new
+  # `FOR SHARE` while a `FOR UPDATE` waits, so a settings save in a busy
+  # minute waits until no write transaction holds the row. Each hold lasts
+  # one write's transaction, and the waiting save holds nothing a write
+  # needs.
   #
   # `Current.site` becomes the row read when it was written since the memo
   # was loaded (a switch committed since the request began); a memo with
   # changes not yet saved is this transaction's own write of the row and is
-  # kept as it is. Outside a transaction the lock ends with its statement.
-  # Answers nil.
+  # kept as it is, with no lock taken (a `Settings::Save` that was refused
+  # leaves the request's memo so: a write later in that request would hold
+  # nothing, and none does). Outside a transaction the lock ends with its
+  # statement. Answers nil.
   def self.hold!
     site = Current.site
     return nil if site.new_record? || site.has_changes_to_save?

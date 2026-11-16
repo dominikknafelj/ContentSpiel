@@ -33,6 +33,8 @@ module Translations
       return failure(@record, [ "Nothing to confirm" ]) unless confirmable?
 
       @record.class.transaction(requires_new: true) do
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
+        ContentTypes.hold!
         # A BLOCK'S CONFIRM TAKES ITS PAGE'S ROW FIRST, as every writer of a
         # page's blocks does (`ContentBlocks::Structure#lock_owner`,
         # `ContentBlocks::Save#call` has the rule and its history). Below,

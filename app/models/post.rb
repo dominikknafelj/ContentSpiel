@@ -117,6 +117,9 @@ class Post < ApplicationRecord
   # when the post's changes are published (the copy's own refresh).
   url_inputs_are :slug, :content_type, :published_at, :trashed_at
   after_save :sync_public_paths
+  # The settings row before the post's own, as `Page`'s callbacks say.
+  before_save(prepend: true) { ContentTypes.hold! }
+  before_destroy(prepend: true) { ContentTypes.hold! }
 
   # The columns, and the ids of the tags the post carries (a query unless
   # the association is loaded; nothing on a save path reads this).

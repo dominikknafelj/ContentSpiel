@@ -29,6 +29,8 @@ module Tags
       pages = pages_listing(names: [ @tag.name ], ids: [ @tag.id ])
       carriers = @tag.post_tags.pluck(:post_id)
       destroyed = Tag.transaction do
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
+        ContentTypes.hold!
         touch_carrying_posts(@tag)
         note_pages_changed(pages)
         record_event("tag.deleted", subject: @tag)

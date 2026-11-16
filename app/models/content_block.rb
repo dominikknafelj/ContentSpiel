@@ -116,6 +116,11 @@ class ContentBlock < ApplicationRecord
   # are what is listed.
   after_save :sync_listed_post_paths
   after_destroy :sync_listed_post_paths
+  # The settings row before the block's own, as `Page`'s callbacks say: the
+  # sync above asks for it. A service takes it earlier still, before the
+  # page's row (`ContentBlocks::Structure#lock_owner`).
+  before_save(prepend: true) { ContentTypes.hold! }
+  before_destroy(prepend: true) { ContentTypes.hold! }
 
   # A block of a live page is published output, so every committed change to
   # one moves the public content version (`PublicSite`, technical cleanup

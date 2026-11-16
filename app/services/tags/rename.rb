@@ -22,6 +22,8 @@ module Tags
 
       old_name = @tag.name
       saved = Tag.transaction do
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
+        ContentTypes.hold!
         @tag.name = @name
         @tag.save || raise(ActiveRecord::Rollback)
         # An open post form resends the tag's *old* name on its next autosave,

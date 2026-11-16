@@ -375,6 +375,8 @@ module PublicSite
     # too.
     def rebuild!
       PublicPath.transaction do
+        # The settings row before the rows it deletes (`ContentTypes.hold!`).
+        ContentTypes.hold!
         PublicPath.delete_all
         PublicSite.bump_version!
         refresh(everything: true)

@@ -59,14 +59,16 @@ class LocalizedSlugTest < ActiveSupport::TestCase
   # `SiteSetting.instance`, a database row -- not worth fetching on every save
   # of a page that has no blank slug to fill in the first place. Counting
   # queries, rather than stubbing (no mocking library, per project
-  # constraints), so this exercises the real callback.
+  # constraints), so this exercises the real callback. The save's hold of the
+  # settings row (`ContentTypes.hold!`, `FOR SHARE`) is a lock, not that
+  # lookup, and is not counted.
   test "saving a page with every locale already slugged does not query SiteSetting" do
     page = Page.create!(parent: @root, title_en: "About", slug_en: "about",
       title_de: "Über uns", slug_de: "uber-uns", title_es: "Sobre Nosotros", slug_es: "sobre-nosotros")
 
     site_setting_queries = 0
     ActiveSupport::Notifications.subscribed(lambda { |_name, _started, _finished, _unique_id, payload|
-      site_setting_queries += 1 if payload[:sql]&.include?("site_settings")
+      site_setting_queries += 1 if payload[:sql]&.include?("site_settings") && !payload[:sql].include?("FOR SHARE")
     }, "sql.active_record") do
       page.update!(title_en: "About the team")
     end
@@ -81,7 +83,7 @@ class LocalizedSlugTest < ActiveSupport::TestCase
 
     site_setting_queries = 0
     ActiveSupport::Notifications.subscribed(lambda { |_name, _started, _finished, _unique_id, payload|
-      site_setting_queries += 1 if payload[:sql]&.include?("site_settings")
+      site_setting_queries += 1 if payload[:sql]&.include?("site_settings") && !payload[:sql].include?("FOR SHARE")
     }, "sql.active_record") do
       post.update!(title_en: "Hello There")
     end

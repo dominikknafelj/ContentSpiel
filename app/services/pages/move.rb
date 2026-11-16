@@ -27,6 +27,8 @@ module Pages
       return failure(@page, [ "A page can't be moved under itself or one of its own subpages" ]) if @parent.self_and_ancestors.include?(@page)
 
       moved = Page.transaction do
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
+        ContentTypes.hold!
         @page.parent = @parent
         @page.position = @position
         # Before saving: closure_tree's `after_save` reloads the page,

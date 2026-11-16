@@ -51,6 +51,8 @@ module Trash
       # sees it -- leaving the descendants' `update_all` in place under a
       # kept root.
       @record.class.transaction(requires_new: true) do
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
+        ContentTypes.hold!
         descendant_ids = page? ? trash_descendants : []
         @record.assign_attributes(trashed_at: now, trashed_by: actor_user, **(page? ? { trash_root_id: @record.id } : {}))
         # Without validations: setting the trash flags can't make a valid

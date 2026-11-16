@@ -398,7 +398,7 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert_equal [ "This block no longer exists" ], result.errors
   end
 
-  test "a save that creates a block locks the page's row before it writes, in a section or at the top level" do
+  test "a save that creates a block locks the settings row, then the page's row, before it writes, in a section or at the top level" do
     page = create_page(title: "Lock")
     section = section_on(page)
     locks = ->(statements) { statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) } }
@@ -411,7 +411,9 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
 
     [ into_column, layout, new_section, outside ].each do |statements|
       assert_operator locks.call(statements), :<, first_write.call(statements)
-      assert_equal 0, statements.index { |sql| !sql.match?(/SAVEPOINT|BEGIN/) }.then { |first| locks.call(statements) - first }, "the lock is the transaction's first statement"
+      first = statements.index { |sql| !sql.match?(/SAVEPOINT|BEGIN/) }
+      assert_match(/FROM "site_settings".*FOR SHARE/m, statements[first], "the settings row is the transaction's first lock")
+      assert_equal first + 1, locks.call(statements), "the page's row is the next statement"
     end
   end
 

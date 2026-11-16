@@ -14,6 +14,11 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
   # call that sends its documents raise, as an engine that stops answering
   # half way. By the record and not by the count, since the fixtures' pages
   # are sent too, in an order of their own.
+  #
+  # `on_index` stands for another process's write while the build runs: it
+  # runs on this connection, inside the build's transaction for a record,
+  # and is followed as a transaction of its own (`ContentSpiel::LockOrder
+  # .aside`), as it would be on its own connection.
   class Wrapped
     attr_reader :indexed
 
@@ -26,7 +31,7 @@ class SiteSearch::ReindexJobTest < ActiveSupport::TestCase
 
     def index(documents)
       @indexed += 1
-      @on_index&.call(@indexed)
+      ContentSpiel::LockOrder.aside(ActiveRecord::Base.connection) { @on_index.call(@indexed) } if @on_index
       raise IOError, "http://engine/update?secret" if @raise_on && documents.any? { |document| document.record_id == @raise_on.id }
 
       @backend.index(documents)

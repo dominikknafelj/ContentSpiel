@@ -76,6 +76,8 @@ module Trash
       # go (the FK case below, rescued outside the block) must roll back
       # alone without poisoning the rest of the run.
       purged = @record.class.transaction(requires_new: true) do
+        # The settings row first (`ContentTypes.hold!`, "THE ORDER").
+        ContentTypes.hold!
         branch = branch_deepest_first if @record.is_a?(Page)
         descendant_ids = branch.to_a.map(&:id) - [ @record.id ]
         record_event("#{event_prefix}.purged", subject: @record, metadata: descendant_ids.any? ? { descendant_ids: } : {})

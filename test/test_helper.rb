@@ -197,6 +197,11 @@ module ActiveSupport
     # test's buckets.
     setup { SignIn.store.clear }
 
+    # The lock order's check (`ContentSpiel::LockOrder`) forgets the test's
+    # own transaction, so a row the test's setup wrote is not the code's: the
+    # first savepoint the code opens stands where its real transaction would.
+    setup { ContentSpiel::LockOrder.forget(ActiveRecord::Base.connection) }
+
     # Runs the block as `actor` (a User or ApiToken) on `channel`, the way a
     # CS Studio request would -- so a service called inside it is authorized
     # and audited for that actor.
