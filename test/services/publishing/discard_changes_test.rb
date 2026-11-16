@@ -475,6 +475,77 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal @published, shape
   end
 
+  # An image a copy in force shows cannot be trashed through the services
+  # (`Media::UsageIndex`, role `published`), but one can go behind them, and
+  # an older version's image may be gone (version history, R7): the copy's
+  # id is never written, the image is left empty, and the difference stays
+  # marked.
+  test "a discard of a copy whose image is in the trash leaves the image empty and succeeds" do
+    asset = create_media_asset
+    image = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "image", media_asset_id: asset.id },
+      translations: { "en" => { caption: "Shown" } }).record
+    publish_changes(@page)
+    assert ContentBlocks::Save.call(image.reload, translations: { "en" => { caption: "Typed" } }).ok?
+    asset.update_columns(trashed_at: Time.current) # version: none (a test trashes an image the copy shows)
+
+    result = Publishing::DiscardChanges.call(@page.reload)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_nil image.reload.media_asset_id
+    assert_equal "Shown", Mobility.with_locale(:en) { image.caption }, "the text is the copy's"
+    assert_includes result.notice, Publishing::DiscardChanges::IMAGES_GONE
+    assert_not_includes result.notice, Publishing::DiscardChanges::REMAINS, "no tag stayed behind"
+    assert @page.reload.unpublished_changes?, "the empty image is a difference from the copy"
+  end
+
+  # The shared reconciliation on its own, as a restore drives it: inside the
+  # caller's transaction and lock, returning what it could not bring back.
+  class ReturnToCopy < ApplicationService
+    include ContentBlocks::Structure
+    include Publishing::ReturnTo
+
+    def initialize(record) = (@record = record)
+
+    def call
+      @record.class.transaction do
+        lock_owner(@record)
+        @record.reload
+        return_to!(Publishing.current(@record))
+      end
+    end
+  end
+
+  test "a hero and a deleted block's image that are gone come back empty, a block made again included, and each is counted" do
+    hero = create_media_asset
+    shown = create_media_asset
+    assert Pages::Save.call(@page, attributes: { hero_media_asset_id: hero.id }).ok?
+    image = add(nil, block_type: "image", media_asset_id: shown.id)
+    publish_changes(@page)
+    assert ContentBlocks::Destroy.call(image).ok?
+    assert Pages::Save.call(@page.reload, attributes: { hero_media_asset_id: nil }).ok?
+    Media::Asset.where(id: [ hero.id, shown.id ]).update_all(trashed_at: Time.current) # version: none (a test trashes images the copy shows)
+
+    outcome = ReturnToCopy.call(@page.reload)
+
+    assert_equal Publishing::ReturnTo::Outcome.new(images_missing: 2, tags_missing: 0), outcome
+    assert_nil @page.reload.hero_media_asset_id
+    made = @page.content_blocks.find_by!(block_type: "image")
+    assert_not_equal image.id, made.id
+    assert_nil made.media_asset_id
+    assert @page.unpublished_changes?, "the reconciliation leaves the mark as the save services leave it"
+  end
+
+  test "a tag deleted since is counted: a post's, and a list block's filter" do
+    list = add(nil, block_type: "post_list", settings: { "content_type" => "blog", "tag" => "alpha" })
+    post = live_post(%w[alpha gamma])
+    publish_changes(@page)
+    assert Tags::Destroy.call(Tag.find_by!(name: "alpha")).ok?
+
+    assert_equal Publishing::ReturnTo::Outcome.new(images_missing: 0, tags_missing: 1), ReturnToCopy.call(post.reload)
+    assert_equal Publishing::ReturnTo::Outcome.new(images_missing: 0, tags_missing: 1), ReturnToCopy.call(@page.reload)
+    assert_equal "alpha", list.reload.settings["tag"]
+  end
+
   test "a discard that fails half way leaves the rows as they were" do
     add("Added")
     assert ContentBlocks::Destroy.call(@first).ok?
