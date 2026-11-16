@@ -3,8 +3,10 @@ module Admin
     # One alert on System status, on `Admin::Ui::SystemCheckRowComponent`'s
     # grid: the kind as a state chip (an error is danger, a security finding
     # warn), the sentence, then the facts joined by " · ": how often, when it
-    # was last seen and its mail state. A security row ends with the link to
-    # the audit log, where the finding came from.
+    # was last seen and its mail state (why it was not mailed when no digest
+    # can go, `Alerts::Mailing.blocked_by`). A security row ends with the
+    # link to the audit log, where the finding came from, when it is handed
+    # one (the viewer holds `audit.view`).
     #
     # The sentence is `Alerts::Alert#sentence`, the data the model hands up,
     # worded here with this card's keys (the digest mail words the same data
@@ -15,9 +17,9 @@ module Admin
     class AlertRowComponent < Admin::AdminComponent
       LINK_CLASS = Admin::Ui::SystemCheckRowComponent::LINK_CLASS
 
-      def initialize(alert:, mail_ready:, audit_href:)
+      def initialize(alert:, mail_blocked_by:, audit_href:)
         @alert = alert
-        @mail_ready = mail_ready
+        @mail_blocked_by = mail_blocked_by
         @audit_href = audit_href
       end
 
@@ -43,16 +45,8 @@ module Admin
       def error_place = values[:place]
 
       def sentence
-        values = self.values
-        key = case alert.kind
-        when "owner_changed" then "owner_#{values[:now_owner] ? "made" : "removed"}#{"_by" if values[:actor_name]}"
-        when "token_issued" then values[:actor_name] ? "token_issued_by" : "token_issued"
-        else alert.kind
-        end
-        options = values.merge(minutes: Alerts::Alert::WINDOW.in_minutes.to_i)
-        count = { "request_limited" => values[:limited], "access_denied_burst" => values[:actors] }[alert.kind]
-        options[:count] = count if count
-        t(".sentences.#{key}", **options)
+        sentence = alert.sentence
+        t(".sentences.#{sentence.key}", **sentence.values)
       end
 
       def how_often = t(".occurrences", count: alert.occurrences)
@@ -69,10 +63,14 @@ module Admin
       def mail_state
         return t(".mailed", time: mailed_time) if alert.mailed_at
 
-        @mail_ready ? t(".not_mailed_yet") : t(".not_mailed_no_mail")
+        case @mail_blocked_by
+        when :mail_not_ready then t(".not_mailed_no_mail")
+        when :no_address then t(".no_address")
+        else t(".not_mailed_yet")
+        end
       end
 
-      def mail_unavailable? = alert.mailed_at.nil? && !@mail_ready
+      def mail_unavailable? = alert.mailed_at.nil? && !@mail_blocked_by.nil?
 
       def mailed_time
         time = alert.mailed_at.in_time_zone

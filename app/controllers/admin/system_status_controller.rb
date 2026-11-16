@@ -15,7 +15,7 @@ module Admin
         forms_link: holds_any?(%w[forms.manage form_submissions.view]))
       @content_results = content_results
       @alerts = ::Alerts::Alert.recent
-      @mail_ready = MailSettings.current.ready?
+      @mail_blocked_by = ::Alerts::Mailing.blocked_by
     end
 
     private

@@ -31,8 +31,20 @@ module Alerts
   class Mailing
     NOT_READY = "[ContentSpiel] An alert digest was not sent: mail is not ready.".freeze
     NO_ADDRESS = "[ContentSpiel] An alert digest was not sent: no site address is known. Set PUBLIC_HOST.".freeze
+    SKIPPED_LINES = { mail_not_ready: NOT_READY, no_address: NO_ADDRESS }.freeze
     # How often a skipped digest's line is logged.
     SKIPPED_LOGGED_EVERY = 1.hour
+
+    # Why no digest can go now: nil when one can, `:mail_not_ready` while
+    # outgoing mail is not ready, `:no_address` while no origin is known for
+    # the mail's link (asked as a job asks, with no request). Mail not ready
+    # wins when both are missing: it is the first thing to fix. `deliver`
+    # and System status both ask it, so the card says what the digest does.
+    def self.blocked_by
+      return :mail_not_ready unless MailSettings.current.ready?
+
+      :no_address if DigestMailer.link_url_options.empty?
+    end
 
     # `now` to the microsecond, the column's precision, so the claim reads
     # back exactly the rows it wrote.
@@ -46,8 +58,8 @@ module Alerts
 
       ids = pending_ids
       return 0 if ids.empty?
-      return skipped(:not_ready, NOT_READY) unless MailSettings.current.ready?
-      return skipped(:no_address, NO_ADDRESS) if DigestMailer.link_url_options.empty?
+      blocked_by = self.class.blocked_by
+      return skipped(blocked_by) if blocked_by
 
       owners = User.owners.to_a
       return 0 if owners.empty?
@@ -80,8 +92,8 @@ module Alerts
       !last.nil? && last > @now - Alert::DIGEST_EVERY
     end
 
-    def skipped(reason, line)
-      Rails.logger.warn(line) if skipped_line_due?(reason)
+    def skipped(reason)
+      Rails.logger.warn(SKIPPED_LINES.fetch(reason)) if skipped_line_due?(reason)
       0
     end
 

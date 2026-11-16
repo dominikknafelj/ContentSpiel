@@ -5,7 +5,7 @@
     <% if alerts.empty? %>
       <p class="px-4 py-4 text-sm text-dim"><%= t(".none") %></p>
     <% else %>
-      <% unless mail_ready? %>
+      <% if mail_blocked_by == :mail_not_ready %>
         <div class="px-4 pt-4">
           <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil) do %>
             <%= t(".mail_not_ready") %>
@@ -14,10 +14,16 @@
             <% end %>
           <% end %>
         </div>
+      <% elsif mail_blocked_by == :no_address %>
+        <div class="px-4 pt-4">
+          <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact) do %>
+            <%= t(".address_off") %>
+          <% end %>
+        </div>
       <% end %>
       <ul class="divide-y divide-line px-4">
         <% alerts.each do |alert| %>
-          <%= render Admin::SystemStatusScreen::AlertRowComponent.new(alert: alert, mail_ready: mail_ready?, audit_href: audit_href) %>
+          <%= render Admin::SystemStatusScreen::AlertRowComponent.new(alert: alert, mail_blocked_by: mail_blocked_by, audit_href: audit_href) %>
         <% end %>
       </ul>
     <% end %>

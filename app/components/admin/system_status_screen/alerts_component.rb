@@ -5,31 +5,33 @@ module Admin
     # They are not checks: the card is no part of "n of m checks passed" and
     # the setup wizard does not draw it. Read only.
     #
-    # While outgoing mail is not ready and an alert exists, a warn notice at
-    # the card's top says the owners cannot be mailed; its link to Settings'
-    # Mail section is drawn only when the screen hands `settings_href` (a
-    # holder of `settings.manage`). The notice has no role of its own to
-    # repeat: it stands where the page arrives and is read there.
+    # While an alert exists and no digest can go (`mail_blocked_by`, the
+    # reason `Alerts::Mailing.blocked_by` answers), one warn notice at the
+    # card's top says why the owners cannot be mailed, and each row's mail
+    # state says the same. Mail not ready: the notice links to Settings'
+    # Mail section only when the screen hands `settings_href` (a holder of
+    # `settings.manage`), and it has no role of its own to repeat: it stands
+    # where the page arrives and is read there. No site address: the notice
+    # is an alert, as the design's card has it, and has no link, since the
+    # fix is the host's and the sentence names the variable. Mail not ready
+    # wins when both are missing, so the card shows one notice at most.
+    #
+    # A security row links to the audit log only when the screen hands
+    # `audit_href` (a holder of `audit.view`).
     #
     # One screen draws this card, so it lives in the screen's folder and
     # takes no shared-component contract.
     class AlertsComponent < Admin::AdminComponent
-      def initialize(alerts:, mail_ready:, settings_href: nil)
+      def initialize(alerts:, mail_blocked_by:, settings_href: nil, audit_href: nil)
         @alerts = alerts.to_a
-        @mail_ready = mail_ready
+        @mail_blocked_by = mail_blocked_by
         @settings_href = settings_href
+        @audit_href = audit_href
       end
 
       private
 
-      attr_reader :alerts, :settings_href
-
-      def mail_ready? = @mail_ready
-
-      def audit_href
-        url_options = helpers.respond_to?(:admin_url_options) ? helpers.admin_url_options : {}
-        helpers.admin_audit_events_path(**url_options)
-      end
+      attr_reader :alerts, :mail_blocked_by, :settings_href, :audit_href
     end
   end
 end

@@ -48,7 +48,9 @@
 
   <%# The Alerts card: recent errors and security findings, after Content and
       like it no part of the checks' count. The Mail settings link only for a
-      holder of `settings.manage`, as in the check rows above. %>
-  <%= render Admin::SystemStatusScreen::AlertsComponent.new(alerts: @alerts, mail_ready: @mail_ready,
-        settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage"))) %>
+      holder of `settings.manage`, as in the check rows above, and the audit
+      log's only for a holder of `audit.view`, who alone may open it. %>
+  <%= render Admin::SystemStatusScreen::AlertsComponent.new(alerts: @alerts, mail_blocked_by: @mail_blocked_by,
+        settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage")),
+        audit_href: (admin_audit_events_path(**admin_url_options) if can?("audit.view"))) %>
 </div>

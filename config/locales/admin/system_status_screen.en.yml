@@ -13,6 +13,7 @@ en:
           none: "No alerts in the last 7 days."
           mail_not_ready: "Owners can't be mailed about these: outgoing mail is not set up."
           open_mail_settings: "Open Mail settings →"
+          address_off: "Owners can't be mailed about these: the site has no address for the mail to link to. Set PUBLIC_HOST to the site's address."
         # `Admin::SystemStatusScreen::AlertRowComponent`, one alert.
         alert_row:
           error: "Error"
@@ -28,6 +29,7 @@ en:
           mailed: "Mailed %{time}"
           not_mailed_yet: "Not mailed yet"
           not_mailed_no_mail: "Not mailed: outgoing mail is not set up"
+          no_address: "Not mailed: the site has no address"
           open_audit_log: "Open audit log →"
           sentences:
             sign_in_failures: "%{failed} failed sign-ins in %{minutes} minutes"

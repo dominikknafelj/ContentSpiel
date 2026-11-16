@@ -115,6 +115,17 @@ class Alerts::MailingTest < ActiveSupport::TestCase
     end
   end
 
+  test "blocked_by: nothing while mail is ready and an address is known, else why, mail not ready first" do
+    with_mail_state(:working) do
+      with_site_address(SITE) { assert_nil Alerts::Mailing.blocked_by }
+      with_site_address(nil) { assert_equal :no_address, Alerts::Mailing.blocked_by }
+    end
+    with_mail_state(:not_set_up) do
+      with_site_address(SITE) { assert_equal :mail_not_ready, Alerts::Mailing.blocked_by }
+      with_site_address(nil) { assert_equal :mail_not_ready, Alerts::Mailing.blocked_by }
+    end
+  end
+
   test "with nothing due nothing is logged, even with mail not ready" do
     with_mail_state(:not_set_up) do
       assert_empty capture_log { assert_equal 0, deliver }.lines.grep(/ContentSpiel/)
