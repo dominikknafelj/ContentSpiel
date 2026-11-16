@@ -203,6 +203,48 @@ class Admin::ImageViewerSystemTest < ApplicationSystemTestCase
     reduce_motion(false)
   end
 
+  # A colleague's replies arrive live under an open viewer (`notes/merge.js`
+  # redraws the thread's `messages` part, keeping each message's files as the
+  # elements they were). Two replies on a thread of four messages fold the
+  # message the viewer was opened from into "Show N more", so the thumbnail
+  # to go back to is then in a closed <details>.
+  test "a live refresh of the thread under an open viewer leaves the viewer as it was, and Close still gives the focus back to the thumbnail" do
+    as(users(:two)) { assert Notes::Reply.call(@thread, body: "A loop", files: [ fixture_upload("tiny.png", name: "first.png"), fixture_upload("small.gif", name: "loop.gif") ]).ok? }
+    reduce_motion(true)
+    open_thread
+    stage_button = "#{part('frame')} button"
+
+    open_viewer("first.png")
+    find(part("next")).click
+    assert_equal "loop.gif", title
+    find(stage_button).click
+    assert_selector stage_button, text: "Pause"
+    assert focused?(stage_button), "Play did not keep the focus"
+    page.execute_script("window.__stage = document.querySelector(#{part('picture').to_json})")
+    src = find(part("picture"))[:src]
+
+    as(users(:two)) do
+      assert Notes::Reply.call(@thread, body: "Looks good").ok?
+      assert Notes::Reply.call(@thread, body: "Ship it").ok?
+    end
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Ship it", wait: 8
+    assert_selector "#note-thread-#{@thread.id}-messages details[data-note-fold]:not([open]) a[data-image-viewer-item][data-name='first.png']", visible: :all
+
+    assert_selector "#{VIEWER}[open]"
+    assert_equal "loop.gif", title
+    assert_equal "2 of 2", position
+    assert_selector stage_button, text: "Pause"
+    assert focused?(stage_button), "the refresh took the focus out of the viewer"
+    assert page.evaluate_script("window.__stage === document.querySelector(#{part('picture').to_json})"), "the stage's picture was drawn again"
+    assert_equal src, find(part("picture"))[:src]
+
+    page.send_keys(:escape)
+    assert_no_selector "#{VIEWER}[open]"
+    assert_eventually(message: "the focus did not go back to the thumbnail") { focused?(thumbnail("first.png")) }
+  ensure
+    reduce_motion(false)
+  end
+
   test "a slow picture shows Loading after 400 ms, a cached one never does" do
     open_thread
     unseen("wide.png")

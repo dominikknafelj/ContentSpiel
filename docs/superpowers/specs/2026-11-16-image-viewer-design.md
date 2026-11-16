@@ -95,8 +95,11 @@ with one picture.
   elements they were"). If that element is gone, the focus goes to the first
   `[data-image-viewer-item]` with the same `href`, else to the thread
   (`#note-thread-<id>`) when it is still drawn, else where the browser puts it
-  **(call)**. The viewer gives it explicitly, because Safari does not focus a
-  clicked link.
+  **(call)**. A closed `<details>` around it (a live refresh can fold the
+  message into "Show N more") is opened first, or the focus would fall to
+  `<body>` (`image_viewer_test.rb`, "a live refresh of the thread under an
+  open viewer…"). The viewer gives it explicitly, because Safari does not
+  focus a clicked link.
 - A step is announced politely: "hero-phone-3.png, 3 of 3", from a visually
   hidden live region the viewer writes on a step only (the opening is the
   dialog's own name). The visible "3 of 3" is not a live region, so nothing is

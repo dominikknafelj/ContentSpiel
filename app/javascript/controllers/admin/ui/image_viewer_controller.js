@@ -41,8 +41,10 @@ import { messages } from "i18n/messages"
 // a message's pictures as the elements they were), else the first viewer
 // item with its address, else the nearest element around it that takes the
 // focus by script (a note's thread, `tabindex="-1"` with an id), looked up
-// again by id. Given explicitly, because Safari does not focus a clicked
-// link, so the browser's own return would land nowhere.
+// again by id, with any closed <details> around it opened first (a live
+// refresh can fold the message into "Show N more"). Given explicitly,
+// because Safari does not focus a clicked link, so the browser's own return
+// would land nowhere.
 //
 // THE TAKE-BACK (`takeBack`, at `turbo:before-cache` and `disconnect`):
 // the dialog closed, the picture's address removed (through the GIF part,
@@ -169,6 +171,11 @@ export default class extends Controller {
 
     const twin = openerHref && document.querySelector(`a[data-image-viewer-item][href="${CSS.escape(openerHref)}"]`)
     const back = opener.isConnected ? opener : twin ?? (returnId && document.getElementById(returnId))
+    // The picture to go back to is shown first: a live refresh while the
+    // viewer was open can fold its message into a thread's closed "Show N
+    // more" (`ThreadComponent`), and an element in a closed <details> takes
+    // no focus, which would then fall to <body>.
+    for (let fold = back?.closest("details:not([open])"); fold; fold = fold.parentElement?.closest("details:not([open])")) fold.open = true
     back?.focus()
   }
 
