@@ -78,8 +78,11 @@ module Admin
       # A summary part's kind => the class it is drawn in (nil: plain). The
       # set is closed; a type's summary answers nothing else (block types
       # spec, decision 8; `:hint` is the meta colour the Code block's "Empty"
-      # was drawn in before the line moved into the type).
-      LOOKS = { text: nil, word: nil, mono: "font-cs-mono", hint: "text-meta" }.freeze
+      # was drawn in before the line moved into the type). `:warn` is no
+      # class but a badge of its own after the line, `Admin::Ui::BadgeComponent`
+      # `tone: :warn` (the media grid's "No alt" look: the Gallery's "3
+      # without alt"), each part one badge.
+      LOOKS = { text: nil, word: nil, mono: "font-cs-mono", hint: "text-meta", warn: :badge }.freeze
 
       def self.dom_id(block) = "#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-tile-summary"
 
@@ -105,11 +108,15 @@ module Admin
       # that names nothing, which a name or a description skips.
       def self.part_ids(block) = %w[attention name status].map { |part| "#{dom_id(block)}-#{part}" }
       def self.text_id(block) = "#{dom_id(block)}-text"
+      # The badges after the line (`:warn` parts), which describe the face
+      # after its text.
+      def self.badges_id(block) = "#{dom_id(block)}-badges"
 
       def attention_id = self.class.part_ids(block)[0]
       def name_id = self.class.part_ids(block)[1]
       def status_id = self.class.part_ids(block)[2]
       def text_id = self.class.text_id(block)
+      def badges_id = self.class.badges_id(block)
 
       # The line as text, whatever its parts look like.
       def line = parts.map(&:first).join
@@ -125,10 +132,10 @@ module Admin
       # The line's own parts, without "Needs fixing": what a preview that
       # asks for the line (`Preview#line`) draws under its heading, where
       # "Needs fixing" stands on a line of its own.
-      def line_parts
-        found = content
-        (found.is_a?(Array) ? found : [ [ found, nil ] ]).reject { |text, _| text.blank? }
-      end
+      def line_parts = content_parts.reject { |_, look| look == :badge }
+
+      # The `:warn` parts' words, each drawn as a warn badge after the line.
+      def badges = content_parts.select { |_, look| look == :badge }.map(&:first)
 
       # The preview's heading: bold in the ink, or, quiet (`Preview
       # #quiet_heading`, a word the CMS supplies), the meta colour at 500.
@@ -175,9 +182,34 @@ module Admin
       def needs_fixing = t(".needs_fixing")
 
       # The image drawn small (`Admin::Ui::LibraryImageComponent`: a width, the
-      # preview or a box, as the Media grid draws it), for a type that uses one
-      # and has it.
-      def thumbnail_asset = (asset if uses?("image"))
+      # preview or a box, as the Media grid draws it): the image column's, for
+      # a type that uses one, else the first image of the definition's media
+      # fields (`ContentModel::Definition#media_ids_in`, the Gallery's list)
+      # that the library still keeps, read in one query. An id that names no
+      # image is passed over, as the site passes it over.
+      def thumbnail_asset
+        return @thumbnail_asset if defined?(@thumbnail_asset)
+
+        @thumbnail_asset =
+          if uses?("image") then asset
+          elsif media_fields? then first_listed_asset
+          end
+      end
+
+      # Whether the tile draws its thumbnail box (72px at 4:3, StudioGallery
+      # D5): with an image to show, or, for a type whose definition has a
+      # media field, plain and sunken with none, so a gallery's tile keeps
+      # its shape while it is empty. A type that only uses the image column
+      # draws no box without an image: its line says what it lacks.
+      def thumbnail_box? = thumbnail_asset.present? || media_fields?
+
+      # The box, its image cropped to fill it; nothing of it is read out
+      # (the image's alt is empty, and the line names the block).
+      def thumbnail_box
+        tag.span(class: "admin-block-tile__thumbnail block aspect-[4/3] w-18 shrink-0 overflow-hidden rounded-cs bg-sunken", aria: { hidden: true }) do
+          render Admin::Ui::LibraryImageComponent.new(asset: thumbnail_asset, min_width: 480, css_class: "size-full object-cover") if thumbnail_asset
+        end
+      end
 
       private
 
@@ -188,6 +220,21 @@ module Admin
       def asset = block.media_asset
 
       def uses?(column) = definition&.uses_columns&.include?(column) || false
+
+      def media_fields? = definition&.media_fields&.any? || false
+
+      def first_listed_asset
+        ids = definition.media_ids_in(block.settings)
+        Media::Asset.kept.with_file.where(id: ids).in_order_of(:id, ids).first if ids.any?
+      end
+
+      # The line's parts and its badges, as the type answers them.
+      def content_parts
+        @content_parts ||= begin
+          found = content
+          (found.is_a?(Array) ? found : [ [ found, nil ] ]).reject { |text, _| text.blank? }
+        end
+      end
 
       # The mark is for a block that is nothing without its image. A type with
       # a `summary` of its own has more than an image to say (a Card's image is
@@ -268,8 +315,8 @@ module Admin
           raise ArgumentError, "#{block.block_type}'s summary answered a part of kind #{kind.inspect}: a part is one of #{LOOKS.keys.join(", ")}" unless LOOKS.key?(kind)
 
           look = LOOKS.fetch(kind)
-          [ %i[word hint].include?(kind) ? word(value, **values) : value.to_s, look ]
-        end.slice_when { |a, b| a.last != b.last }.map { |run| [ run.map(&:first).join, run.first.last ] }
+          [ %i[word hint warn].include?(kind) ? word(value, **values) : value.to_s, look ]
+        end.slice_when { |a, b| a.last != b.last || a.last == :badge }.map { |run| [ run.map(&:first).join, run.first.last ] }
       end
 
       def word(key, **values)

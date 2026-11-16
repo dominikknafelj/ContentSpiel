@@ -107,4 +107,25 @@ class SiteSearch::BlockTextTest < ActiveSupport::TestCase
 
     assert_equal "Card heading Card words Card picture", field(document, "body").text
   end
+
+  # Spec §9: what the gallery draws in that language, from the copy; an id
+  # that names no image (written around the services) gives nothing, and
+  # the library image's own words and the label are not in it.
+  test "a gallery gives its captions and alt overrides of images that are there, in the language asked" do
+    first = create_media_asset.tap { |asset| asset.update!(alt: "Library alt words", caption: "Library caption words") }
+    second = create_media_asset
+    block = add_block("gallery", settings: { "images" => [ first.id, second.id ], "label" => "Gallery label words",
+                                             "texts" => { first.id.to_s => { "caption" => "First caption", "alt" => "First alt" },
+                                                          second.id.to_s => { "caption" => "Second caption" } } },
+                                 translations: { "de" => { settings: { "texts" => { second.id.to_s => { "caption" => "Zweite Unterschrift" } } } } })
+    gone = Media::Asset.maximum(:id) + 1
+    block.update_columns(settings: block.settings.merge("images" => [ gone, first.id, second.id ]),
+                         translated_settings: block.translated_settings.deep_merge("en" => { "texts" => { gone.to_s => { "caption" => "Gone caption" } } })) # version: none (a console write names an image that is not there)
+
+    assert_equal [ "First caption", "First alt", "Second caption" ], BlockTypes::Gallery.search_text(block.reload, locale: "en")
+    assert_equal [ "Zweite Unterschrift" ], BlockTypes::Gallery.search_text(block, locale: "de"), "German's own texts, not English's"
+    body = field(document, "body").text
+    assert_equal "First caption First alt Second caption", body
+    assert_equal "Zweite Unterschrift", field(document("de"), "body").text
+  end
 end

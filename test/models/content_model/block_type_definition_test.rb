@@ -319,7 +319,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
   end
 
   test "every built-in block type declares the family the design gives it" do
-    families = { "rich_text" => :text, "note" => :text, "image" => :media, "card" => :media, "code" => :code, "diagram" => :code, "table" => :code,
+    families = { "rich_text" => :text, "note" => :text, "image" => :media, "gallery" => :media, "card" => :media, "code" => :code, "diagram" => :code, "table" => :code,
                  "form" => :form, "search" => :form, "post_list" => :lists, "section" => :structure }
     assert_equal families, BlockTypes.all.to_h { |type| [ type.name, type.family ] }.slice(*BuiltInBlockTypes.names)
   end
@@ -331,7 +331,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     definition.icon :pilcrow
     assert_equal "pilcrow", definition.icon
     error = assert_raises(ArgumentError) { ContentModel::BlockTypeDefinition.new("x").icon "rocket" }
-    assert_match(/\Ax: icon is one of pilcrow, image, code_xml, diagram, posts, columns_2, info, lightbulb, circle_alert, triangle_alert/, error.message)
+    assert_match(/\Ax: icon is one of pilcrow, image, images, code_xml, diagram, posts, columns_2, info, lightbulb, circle_alert, triangle_alert/, error.message)
   end
 
   # Note block plan, ruling 12: the Note's icon in the picker is its type's

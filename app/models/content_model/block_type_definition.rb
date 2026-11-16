@@ -47,8 +47,8 @@ module ContentModel
     # `triangle_alert` are the Note block's kinds (note block plan, rulings
     # 11 and 12), which its blocks' cards and tiles draw through
     # `for_block:`; `table` is the Table block's, `diagram` the Diagram
-    # block's and `search` the Search block's.
-    ICONS = %w[pilcrow image code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list search].freeze
+    # block's, `search` the Search block's and `images` the Gallery block's.
+    ICONS = %w[pilcrow image images code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list search].freeze
 
     # The hue families an icon may be drawn in: the chip behind a
     # type's icon takes the family's colour pair

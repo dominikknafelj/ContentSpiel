@@ -31,12 +31,21 @@ module ContentModel
   #   (a Mermaid source's `drawing:`). Most types have none.
   # - `media_ids`: `->(value) { [Integer] }`, the library images a stored
   #   value refers to (`Definition#media_ids_in`, which the usage rows are
-  #   written from). Every type but `:media_list` answers none.
+  #   written from). Every type but `:media_list` answers none; a type
+  #   that declares its own is a media type (`#media?`), which a reader asks
+  #   instead of the type's name.
   #
   # It names no component: a type's input and its read-only display are its
   # `Admin::Fields::<Type>Field`, found by name, because the content model
   # sits below CS Studio (CLAUDE.md, Dependency order).
   FieldType = Data.define(:name, :cast, :options, :validate, :translatable, :audit, :tracked, :finish, :media_ids) do
-    def initialize(tracked: true, finish: ->(_field, _fields) { }, media_ids: ->(_value) { [] }, **attributes) = super(tracked:, finish:, media_ids:, **attributes)
+    def initialize(tracked: true, finish: ->(_field, _fields) { }, media_ids: FieldType::NO_MEDIA, **attributes) = super(tracked:, finish:, media_ids:, **attributes)
+
+    # Whether a value of the type can refer to library images: a type that
+    # answers `media_ids` of its own.
+    def media? = !media_ids.equal?(FieldType::NO_MEDIA)
   end
+  # The answer of every type that refers to no library image, one object,
+  # so `FieldType#media?` can tell a type's own answer from it.
+  FieldType::NO_MEDIA = ->(_value) { [] }
 end

@@ -87,6 +87,11 @@ en:
           default: Default
           no_icon: No icon
           not_in_theme: "%{name} (not in this theme)"
+        # The Gallery block's card (StudioGallery): the Label field's help,
+        # `%{placeholder}` the visitor's word ("Image gallery") in the
+        # language being edited (`Admin::Ui::FieldComponent#help_text`).
+        gallery:
+          label_help: "What a screen reader calls the gallery. Leave it blank for “%{placeholder}” in each visitor's language."
         # The Search block's card (EditorSearchBlock): the Label field's help,
         # `%{placeholder}` the visitor's word in the language being edited
         # (`Admin::Ui::FieldComponent#help_text`), and the card's note

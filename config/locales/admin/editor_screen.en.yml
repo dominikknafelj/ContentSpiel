@@ -49,6 +49,18 @@ en:
           # answers.
           types:
             # bin/rails generate block_type adds a type's scope below this line.
+            # A Gallery block's tile (`BlockTypes::Gallery.summary`): the
+            # layout with the number of images, none, and the warn badge of
+            # the images with no alt in the language.
+            gallery:
+              grid:
+                one: "Grid · 1 image"
+                other: "Grid · %{count} images"
+              carousel:
+                one: "Carousel · 1 image"
+                other: "Carousel · %{count} images"
+              empty: "Empty"
+              without_alt: "%{count} without alt"
             # A Diagram block's tile (`BlockTypes::Diagram.summary`): no
             # source in the language or its fallback; no description; a
             # drawing kept from an earlier source; a source with no drawing

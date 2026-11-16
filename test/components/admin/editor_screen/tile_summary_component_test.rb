@@ -32,8 +32,8 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     Rails.application.reloader.prepare!
   end
 
-  # The line itself, without the mark and the thumbnail beside it.
-  def line = ".admin-block-tile__summary > span:last-child"
+  # The line itself, without the mark, the badges and the thumbnail beside it.
+  def line = ".admin-block-tile__summary [id$='-tile-summary-name']"
 
   # Block types spec, decision 8: a type's tile line is data its definition
   # answers, drawn here; its words are CS Studio's, under the type's own
@@ -272,15 +272,18 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_selector attention
   end
 
+  # The thumbnail is the tile's box at the end, beside the heading and the
+  # text it stands for (StudioGallery D5), never inside the heading's row.
   test "a card with a title and an image shows the thumbnail beside its heading" do
     pictured = block("card", media_asset_id: create_media_asset(filename: "tiny.png").id)
     pictured.assign_settings({ "title" => "Our services", "text" => "What we do" }, locale: "en")
     pictured.save!
     render_summary pictured
 
-    assert_selector "#{heading_row} img", count: 1
-    assert_selector "#{heading_row} > :last-child#{heading.delete_prefix(heading_row + " > ")}", exact_text: "Our services"
-    assert_selector text, exact_text: "What we do"
+    assert_selector ".admin-block-tile__summary > .admin-block-tile__thumbnail:last-child img", count: 1
+    assert_no_selector ".admin-block-tile__heading img"
+    assert_selector ".admin-block-tile__summary .admin-block-tile__heading > .admin-block-tile__title:last-child", exact_text: "Our services"
+    assert_selector ".admin-block-tile__summary .admin-block-tile__text", exact_text: "What we do"
   end
 
   # Review focus 3: an outside type's `preview` is a gem's code. One that
@@ -812,5 +815,59 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     render_summary drawn, invalid: true
     assert_selector diagram_line(drawn), exact_text: "Flowchart · A --> B · Needs fixing"
     assert_selector attention
+  end
+
+  # Spec §10.5 (StudioGallery D5): one thumbnail, the first image of the
+  # list the library still holds, in the tile's 72px box at 4:3, at the end;
+  # with none the box stays, plain and sunken, so an empty gallery keeps its
+  # shape. The line counts the list.
+  test "a gallery's tile shows its first image as the thumbnail, and a plain box with none" do
+    first = create_media_asset(filename: "wide.png")
+    second = create_media_asset(filename: "tiny.png")
+    gone = Media::Asset.maximum(:id) + 1
+    render_summary block("gallery", settings: { "layout" => "carousel", "images" => [ gone, first.id, second.id ] })
+
+    box = ".admin-block-tile__summary > .admin-block-tile__thumbnail[aria-hidden='true']"
+    assert_selector "#{box}:last-child[class~='w-18'][class~='aspect-[4/3]']"
+    assert_selector "#{box} img", count: 1
+    assert_selector "#{box} img[width='#{first.width}'][height='#{first.height}']", count: 1
+    assert_selector ".admin-block-tile__summary [id$='-name']", exact_text: "Carousel · 3 images"
+
+    render_summary block("gallery", settings: { "images" => [ gone ] })
+    assert_selector "#{box}[class~='bg-sunken']"
+    assert_no_selector "#{box} *"
+
+    render_summary block("gallery")
+    assert_selector "#{box}[class~='bg-sunken']"
+    assert_no_selector "#{box} *"
+    assert_selector ".admin-block-tile__summary [id$='-name']", exact_text: "Empty"
+
+    labelled = block("gallery", settings: { "images" => [ first.id ] })
+    labelled.assign_settings({ "label" => "Harbour walk" }, locale: "en")
+    labelled.save!
+    render_summary labelled
+    assert_selector heading_row.sub(" > ", " ") + " > .admin-block-tile__title", exact_text: "Harbour walk"
+    assert_selector ".admin-block-tile__line", exact_text: "Grid · 1 image"
+    assert_selector "#{box} img", count: 1
+  end
+
+  test "a warn part is drawn as the warn badge after the line" do
+    bare = create_media_asset
+    render_summary block("gallery", settings: { "images" => [ bare.id ] })
+
+    assert_selector ".admin-block-tile__summary [id$='-name']", exact_text: "Grid · 1 image"
+    badges = ".admin-block-tile__summary [id$='-tile-summary-badges']"
+    assert_selector "#{badges} > span.bg-warn-tint.text-warn-ink", exact_text: "1 without alt", count: 1
+    assert_no_selector "[id$='-name'] .bg-warn-tint", visible: :all
+
+    with_test_types do
+      I18n.backend.store_translations(:en, admin: { components: { editor_screen: { tile_summary: { types: { test: { quote: { odd: "Odd", off: "Off" } } } } } } })
+      BlockTypes.fetch("test/quote").summary(->(block, locale:) { [ [ :text, "Q" ], [ :warn, :odd ], [ :warn, :off ] ] })
+      render_summary block("test/quote", settings: { "text" => "Q" })
+      assert_equal "Q", page.find(".admin-block-tile__summary [id$='-name']").text
+      assert_equal %w[Odd Off], page.all("#{badges} > span").map(&:text), "each warn part is a badge of its own, in order"
+    end
+  ensure
+    I18n.reload!
   end
 end
