@@ -16,7 +16,7 @@
        [ t(".default_language"), language_name(@site_setting.default_locale), "languages" ],
        [ t(".home_page"), t(".home_page_always"), nil ],
        [ t(".mcp_token"), @mcp_token_name.present? ? t(".mcp_token_created", name: @mcp_token_name) : t(".skipped"), "mcp_token" ],
-       [ t(".starter_content"), @starter_added ? t(".starter_added") : t(".starter_skipped"), "starter_content" ]
+       [ t(".starter_content"), @starter_added ? t(".starter_added", pages: starter_page_titles.join(t("setup.list_separator"))) : t(".starter_skipped"), "starter_content" ]
      ] %>
   <% rows.each do |label, value, step| %>
     <div class="flex items-baseline gap-4 py-3">

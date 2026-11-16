@@ -68,7 +68,7 @@ class SetupController < ApplicationController
     render :mail, status: :too_many_requests
   }
 
-  helper_method :step_label, :optional_step?, :next_step, :previous_step
+  helper_method :step_label, :optional_step?, :next_step, :previous_step, :starter_page_titles
 
   def index
     redirect_to setup_step_path(first_step)
@@ -131,6 +131,10 @@ class SetupController < ApplicationController
   end
 
   private
+
+  # The titles of the pages the starter content adds: one per post type that
+  # is switched on, so the step and its review row name what is made.
+  def starter_page_titles = StarterContent.sections.map { |section| section[:section][:title] }
     def require_setup_pending
       head :not_found unless Setup.required?
     end

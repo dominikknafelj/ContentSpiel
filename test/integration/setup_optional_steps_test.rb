@@ -74,6 +74,18 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
     assert_equal [ "Re-run checks", "Back", "Continue" ], row, "the step's own secondary first, then Back, the primary last"
   end
 
+  test "the starter step names a page for each switched-on post type, and only those" do
+    site_settings(:default).update!(content_types: %w[blog])
+    get setup_step_path("starter_content")
+    assert_select "li strong", text: "Blog"
+    assert_select "li strong", text: "Resume", count: 0
+    assert_select "li strong", text: "Now", count: 0
+
+    site_settings(:default).update!(content_types: %w[blog resume_entry now_update])
+    get setup_step_path("starter_content")
+    assert_equal %w[Blog Resume Now], css_select("li strong").map(&:text)
+  end
+
   test "the MCP token step can be skipped" do
     get setup_step_path("mcp_token")
 

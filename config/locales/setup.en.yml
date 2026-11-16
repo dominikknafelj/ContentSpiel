@@ -8,6 +8,8 @@
 # (docs/reference/i18n.md).
 en:
   setup:
+    # Between the titles of a list the wizard writes out (the starter pages).
+    list_separator: ", "
     layout:
       title: "Set up Content·Spiel"
       first_run: "First-run setup"
@@ -123,10 +125,7 @@ en:
     starter_content:
       heading: "Starter content"
       intro_html: "Finishing setup always creates your Home page at %{path}. You can also add:"
-      pages_html: "%{blog}, %{resume} and %{now} pages, each listing posts of that type"
-      blog: "Blog"
-      resume: "Resume"
-      now: "Now"
+      pages_html: "a page for each post type that is switched on, listing its posts: %{pages}"
       posts: "one sample post for each, in your default language"
       add: "Add starter content"
       skip: "Skip for now"
@@ -144,7 +143,7 @@ en:
       mcp_token: "MCP token"
       mcp_token_created: "%{name} (created)"
       starter_content: "Starter content"
-      starter_added: "Blog, Resume and Now pages, one sample post each"
+      starter_added: "%{pages}, with one sample post each"
       starter_skipped: "Skipped — Home page only"
       skipped: "Skipped"
       none: "None"
