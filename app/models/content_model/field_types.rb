@@ -29,10 +29,15 @@ module ContentModel
     # the Diagram block's, whose card makes the drawing (the renderer frame)
     # and whose component prints it, and no other record has either.
     DIAGRAM_ONLY = "a drawing is made by the Diagram block's card and printed by its component, and nothing else draws or shows one".freeze
+    # The Gallery block's images and their texts: the usage rows that protect
+    # an image in use are written for a block's fields only.
+    MEDIA_ONLY = "a list of library images is the Gallery block's, and only a block's fields are written into the image usage rows".freeze
     BLOCK_ONLY = {
       THEME_CHOICE => { posts: "choices for posts are not built", outside: "its list would need a key of theme.yml, which the CMS owns" },
       mermaid: { posts: DIAGRAM_ONLY, outside: DIAGRAM_ONLY },
-      diagram_drawing: { posts: DIAGRAM_ONLY, outside: DIAGRAM_ONLY }
+      diagram_drawing: { posts: DIAGRAM_ONLY, outside: DIAGRAM_ONLY },
+      media_list: { posts: MEDIA_ONLY, outside: MEDIA_ONLY },
+      media_texts: { posts: MEDIA_ONLY, outside: MEDIA_ONLY }
     }.freeze
 
     # A link longer than this is refused, never cut.
@@ -103,9 +108,9 @@ module ContentModel
 
       def reset! = types.clear
 
-      # The sixteen built-ins, in this order (it is `names`' order).
+      # The eighteen built-ins, in this order (it is `names`' order).
       def register_built_ins
-        [ string, text, code, mermaid, diagram_drawing, integer, boolean, date, url, select, content_type, tag, link, theme_choice, email, form ].each { |type| register(type) }
+        [ string, text, code, mermaid, diagram_drawing, integer, boolean, date, url, select, content_type, tag, link, theme_choice, email, form, media_list, media_texts ].each { |type| register(type) }
       end
 
       # The one rule for a link a visitor follows (the Card's address): an
@@ -392,6 +397,66 @@ module ContentModel
         )
       end
 
+      # The images of a Gallery block, in their order: library image ids, as
+      # an Array (or the JSON of one, which the editor's script sends) cast to
+      # the unique positive Integers in it, nil when none is left. It holds
+      # ids only: that an image exists and may be used is decided where a
+      # block is saved, and an image is protected by the usage rows, never a
+      # key into this jsonb. `max:` is refused, never cut (`:too_many_images`).
+      # The same in every language, so never translated.
+      def media_list
+        FieldType.new(
+          name: :media_list, translatable: false, audit: :value, tracked: false,
+          cast: ->(value) { cast_media_ids(value) },
+          media_ids: ->(value) { cast_media_ids(value) || [] },
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "media_list fields can't be translated (the images are the same in every language; their texts are a media_texts field's)" if options[:translated]
+            raise ArgumentError, "`max:` on a media_list field is a number of images, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
+            refuse_choice_and_string_options(options)
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            max = field.options[:max]
+            errors.add(field.name, :too_many_images, count: max) if value && max && value.size > max
+          }
+        )
+      end
+
+      # The captions and alt texts of a `:media_list` field's images
+      # (`of:`), by image id, one pair per language: `{ "<id>" => { "caption",
+      # "alt" } }`, each text stripped, a blank one and an image with none
+      # dropped, nil when nothing is left. Keyed by id, so a text stays with
+      # its image when the list is reordered, and an id the list no longer
+      # holds is the block's to drop, not this type's (it cannot see the
+      # list). Translated, since a text is prose, and tracked for translation
+      # state. `max:` counts characters of each text, refused as `:too_long`.
+      def media_texts
+        FieldType.new(
+          name: :media_texts, translatable: false, audit: :value,
+          cast: ->(value) { cast_media_texts(value) },
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "media_texts fields are translated: a caption is said in each language, `translated: true`" unless options[:translated]
+            raise ArgumentError, "a media_texts field names its media_list field, `of:`" unless options[:of].is_a?(Symbol) || options[:of].is_a?(String)
+            raise ArgumentError, "`max:` on a media_texts field is a number of characters, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
+            refuse_choice_and_string_options(options.except(:of))
+          },
+          finish: lambda { |field, fields|
+            list = fields.find { |candidate| candidate.name == field.options[:of].to_s }
+            unless list&.type == :media_list
+              raise ArgumentError, "the media_texts field #{field.name} names `of: #{field.options[:of].inspect}`, which is to be a media_list field of this definition"
+            end
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            max = field.options[:max]
+            next unless max
+
+            sent = [ value ]
+            sent += translations.values.map { |values| cast_media_texts(values.to_h[field.name]) } if field.translated?
+            too_long = sent.compact.any? { |texts| texts.each_value.any? { |pair| pair.each_value.any? { |text| text.length > max } } }
+            errors.add(field.name, :too_long, count: max) if too_long
+          }
+        )
+      end
+
       # `min:` and `max:` are a number's bounds. A non-blank input that is no
       # number casts to nil and is `:not_a_number`.
       def integer
@@ -556,6 +621,40 @@ module ContentModel
 
       def add_once(errors, name, type, **options)
         errors.add(name, type, **options) unless errors.added?(name, type, **options)
+      end
+
+      # The unique positive ids of an Array or of the JSON text of one, in
+      # order; nil for anything else and for no id.
+      def cast_media_ids(value)
+        list = value.is_a?(String) ? parse_json(value) : value
+        return nil unless list.is_a?(Array)
+
+        ids = list.filter_map do |entry|
+          case entry
+          when Integer then entry if entry.positive?
+          when String then entry.to_i if entry.match?(/\A[1-9]\d*\z/)
+          end
+        end.uniq
+        ids.presence
+      end
+
+      MEDIA_TEXT_KEYS = %w[caption alt].freeze
+
+      # `{ "<digits>" => { "caption" => ..., "alt" => ... } }`, as a Hash or
+      # as the parameters of a form; each text stripped, blanks dropped.
+      def cast_media_texts(value)
+        value = value.to_unsafe_h if value.respond_to?(:to_unsafe_h)
+        value = parse_json(value) if value.is_a?(String)
+        return nil unless value.is_a?(Hash)
+
+        texts = value.each_with_object({}) do |(id, pair), kept|
+          next unless id.to_s.match?(/\A\d+\z/) && pair.respond_to?(:to_h) && !pair.is_a?(String)
+
+          pair = pair.to_h.stringify_keys
+          cleaned = MEDIA_TEXT_KEYS.each_with_object({}) { |key, hash| (text = STRIPPED.call(pair[key])) && hash[key] = text }
+          kept[id.to_s] = cleaned if cleaned.any?
+        end
+        texts.presence
       end
 
       def cast_drawing(value)

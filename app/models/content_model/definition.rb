@@ -149,6 +149,15 @@ module ContentModel
       fields.each { |field| field.field_type&.finish&.call(field, fields) }
     end
 
+    # The library images a block's values refer to, over the untranslated
+    # values ({ field name => value }): every field's answer
+    # (`FieldType#media_ids`), in field order, each once. The usage rows are
+    # written from it.
+    def media_ids_in(values)
+      values = values.to_h.stringify_keys
+      fields.flat_map { |field| field.field_type&.media_ids&.call(values[field.name]).to_a }.uniq
+    end
+
     def uses(*columns) = @uses_columns.concat(columns.map(&:to_s))
     def capability(*names) = @capabilities.concat(names)
     def capability?(name) = @capabilities.include?(name)

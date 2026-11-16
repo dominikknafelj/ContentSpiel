@@ -32,6 +32,14 @@ class ContentModel::FieldTypesTest < ActiveSupport::TestCase
     assert_equal %i[code mermaid diagram_drawing], digests.intersection(BUILT_INS)
   end
 
+  test "the media list and the media texts follow the form field, and neither is translatable by AI" do
+    names = ContentModel::FieldTypes.names
+
+    assert_equal %i[media_list media_texts], names.last(2)
+    assert_equal :form, names[-3]
+    assert_empty ContentModel::FieldTypes.all.select(&:translatable).map(&:name).intersection(%i[media_list media_texts])
+  end
+
   test "a type is registered once" do
     error = assert_raises(ArgumentError) { ContentModel::FieldTypes.register(ContentModel::FieldTypes.fetch(:string)) }
     assert_includes error.message, "string"

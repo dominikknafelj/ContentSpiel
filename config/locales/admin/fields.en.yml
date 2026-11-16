@@ -75,6 +75,12 @@ en:
         form_field:
           choose: Choose a form
           gone: A form that's gone
+        # A Gallery block's images (`Admin::Fields::MediaListField`), as a
+        # read-only count.
+        media_list:
+          display:
+            one: 1 image
+            other: "%{count} images"
         # A theme's choices (`theme.yml`): the empty choice of a style list
         # and of an icon list, and a stored name the theme does not declare.
         theme_choice_field:
