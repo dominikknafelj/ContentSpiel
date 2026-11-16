@@ -55,6 +55,7 @@ require_relative "support/component_test_helper"
 require_relative "support/test_types"
 require_relative "support/gallery_album"
 require_relative "support/block_samples"
+require_relative "support/post_samples"
 require_relative "support/ui_contract"
 require_relative "support/design_system_entries"
 require_relative "support/built_in_block_types"
@@ -135,6 +136,10 @@ module ActiveSupport
     # block of a type from its declared sample -- see
     # test/support/block_samples.rb.
     include BlockSamples
+
+    # `sample_post`, `sample_every_post_type`: one post of a content type
+    # from its declared sample -- see test/support/post_samples.rb.
+    include PostSamples
 
     # `with_site_address(value) { ... }`: PUBLIC_HOST for a block, with
     # `SiteAddress`'s memo dropped on both sides -- see

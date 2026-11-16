@@ -18,6 +18,7 @@ class ContentTypeSetsTest < ActiveSupport::TestCase
     "app/controllers/admin/posts_controller.rb" => "the posts list's type filter reads the declared set until it takes the types present from `Posts::List#types_present`",
     "app/services/settings/save.rb" => "the switch is normalised against the declared names",
     "db/seeds.rb" => "development switches every declared type on",
+    "app/values/theme/contract.rb" => "a theme's contract is the code's, whatever a site switches on",
     "app/models/site_setting.rb" => "the at-least-one rule counts declared names"
   }.freeze
 

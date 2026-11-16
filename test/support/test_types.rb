@@ -86,10 +86,11 @@ module TestTypes
 
     ContentTypes.register "test/event" do |t|
       t.label "Event"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :venue, :string
       t.field :speakers, :groups, of: "test/speaker"
+      t.sample title: "A test event", fields: { venue: "Town hall" }, shows: [ "A test event" ]
     end
 
     switch_on_registered_types

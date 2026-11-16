@@ -65,19 +65,35 @@ class Theme::ContractTest < ActiveSupport::TestCase
     Rails.application.reloader.prepare!
   end
 
-  test "a content type registered with a list component the list does not hold fails the same way" do
-    component = unlisted_component("Posts::GalleryListComponent")
+  test "the post lines are each declared type's components" do
+    expected = ContentTypes.all.flat_map { |type| [ [ type.list_component, type.list_theme_methods ], [ type.detail_component, type.detail_theme_methods ] ] }
+      .to_h { |component, methods| [ component.name.underscore, methods ] }
+
+    assert_equal expected, Theme::Contract.post_components
+    assert_equal expected, Theme::Contract.components.slice(*expected.keys)
+  end
+
+  test "a content type's component is a line of the contract the day it is declared" do
     ContentTypes.register("gallery") do |t|
       t.label "Gallery"
-      t.list_component component
-      t.detail_component Posts::DetailComponent
+      t.list_component unlisted_component("Posts::GalleryListComponent"), theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
     end
 
-    error = assert_raises(Minitest::Assertion) { assert_every_registered_component_is_listed }
-
-    assert_includes error.message, %(Theme::Contract.components has no entry for "posts/gallery_list_component")
+    assert_equal %w[posts page], Theme::Contract.components.fetch("posts/gallery_list_component")
+    assert_every_registered_component_is_listed
   ensure
     Rails.application.reloader.prepare!
+  end
+
+  test "the theme contract is the same with every post type switched off" do
+    before = Theme::Contract.components
+
+    SiteSetting.instance.update_columns(content_types: [ "gallery/x" ]) # version: none (a test puts the switch where no declared type is on)
+    Current.site = nil
+
+    assert_equal before, Theme::Contract.components
+    assert_empty ContentTypes.switched_on
   end
 
   test "every listed component has its default template and every method its template may call" do

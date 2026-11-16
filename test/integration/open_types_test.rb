@@ -60,8 +60,8 @@ class OpenTypesTest < ActionDispatch::IntegrationTest
     FieldGroups.register("test/host") { |c| c.field :name, :string, required: true, label: "Full name" }
     ContentTypes.register "test/talk" do |t|
       t.label "Talk"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :room, :string, required: true, label: "Meeting room"
       t.field :hosts, :groups, of: "test/host", label: "Speakers"
       t.field :chair, :group, of: "test/host"

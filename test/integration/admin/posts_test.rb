@@ -195,8 +195,8 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     with_test_types do
       ContentTypes.register "test/required_company" do |t|
         t.label "Required company"
-        t.list_component Posts::BlogListComponent
-        t.detail_component Posts::DetailComponent
+        t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+        t.detail_component Posts::DetailComponent, theme_methods: %w[post]
         t.field :company, :string, required: true
       end
       switch_on_registered_types
@@ -681,8 +681,8 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     with_test_types do
       ContentTypes.register "test/mixed" do |t|
         t.label "Mixed"
-        t.list_component Posts::BlogListComponent
-        t.detail_component Posts::DetailComponent
+        t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+        t.detail_component Posts::DetailComponent, theme_methods: %w[post]
         t.field :blurb, :string, translated: true
         t.field :venue, :string
         t.field :capacity, :integer

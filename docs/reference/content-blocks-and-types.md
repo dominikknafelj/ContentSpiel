@@ -334,6 +334,15 @@ A field type is two places, and nothing else asks which type a field is by its n
 
 Tests by file: `test/lib/field_type_branches_test.rb`, `test/models/content_model/field_types_test.rb`, `test/components/admin/fields/field_types_studio_test.rb`, and the type's own (for `:mermaid` and `:diagram_drawing`, `test/models/content_model/mermaid_field_test.rb`, `diagram_drawing_field_test.rb`, `test/components/admin/fields/mermaid_field_test.rb` and `diagram_drawing_field_test.rb`; for `:link`, `test/models/content_model/link_field_test.rb` and `test/components/admin/fields/link_field_test.rb`; for `:theme_choice`, `test/models/content_model/theme_choice_field_test.rb` and `test/components/admin/fields/theme_choice_field_test.rb`).
 
+## What a content type declares
+
+A content type (`ContentTypes.register`, `app/models/content_types/`) declares, beside `t.label`, `t.field` and `colour_index`:
+
+- `t.list_component(Component, theme_methods: %w[posts page])` and `t.detail_component(Component, theme_methods: %w[post])`: the component and the methods its template may call, its line of the theme contract (`Theme::Contract.post_components`). `theme_methods:` is required, and a type that declares a component another type declares already, with other methods, is refused at registration (`ContentTypes.admit!`), naming both: the three built-ins share `Posts::DetailComponent`.
+- `t.sample(title:, excerpt: nil, body: nil, fields: {}, shows:)`: one post as `Posts::Save` takes it (`body` Markdown), and `shows:`, texts its public page holds, each the title, the excerpt or a String field value. Refused at registration, starting with the type's name. `PostSamples` (`test/support/post_samples.rb`) builds and publishes a post from it, and `test/integration/post_samples_test.rb` and the canary run every declared type's.
+- `t.starter(section: { title:, slug: })`: the section page the starter content makes; its post is the sample (`starter_data[:sample]`, the sample without `shows`).
+- `t.description :key` and `t.group :key`: Symbols naming keys under `admin.content_types.descriptions` and `.groups` (`config/locales/admin/content_types.en.yml`), read when the Settings card is drawn, never at registration.
+
 ## Block types from outside
 
 A gem (a Rails engine) registers its block types through one hook, `ContentSpiel::Plugins.block_types` (`lib/content_spiel/plugins.rb`), called from an `initializer` of its own:

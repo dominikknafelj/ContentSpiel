@@ -18,8 +18,10 @@ class Theme
   # call. A derived list makes removing a name as easy as adding one, so the
   # built-in types' part is held by the ledger
   # (`test/values/theme/contract_ledger_test.rb`), the one hand list kept on
-  # purpose. Content types are not part of this: their three components stay
-  # written in POST_COMPONENTS. `test/values/theme/contract_test.rb` fails for
+  # purpose. A content type joins the same way: its
+  # `list_component` and `detail_component` declare `theme_methods:`, which
+  # `post_components` reads from `ContentTypes.all`, the declared set, so the
+  # contract is the code's whatever a site switches on. `test/values/theme/contract_test.rb` fails for
   # a component a type registry hands out that `components` does not hold,
   # and for a `--th-` token that tokens.css defines and no list names, each
   # with the missing entry in its message.
@@ -114,15 +116,6 @@ class Theme
     # rendered as `render "theme/anything"`.
     OWN_PARTIALS = "theme/".freeze
 
-    # The content types' components, written here: a content type declares
-    # no line of its own (block types spec, "not part of this").
-    POST_COMPONENTS = {
-      "posts/blog_list_component" => %w[posts page],
-      "posts/resume_list_component" => %w[posts page],
-      "posts/now_list_component" => %w[posts page],
-      "posts/detail_component" => %w[post]
-    }.freeze
-
     # What the template of a visitor's form input may call: the three keywords every input is drawn with
     # (`Blocks::FormFields::Base`). The same for every form field type, a
     # gem's included, so a type declares no line of its own.
@@ -145,7 +138,18 @@ class Theme
         [ path, definition.theme_methods ]
       end
       inputs = ::Forms::FieldTypes.all.map { |type| [ path_of(type.input), FORM_INPUT_METHODS ] }
-      blocks.to_h.merge(inputs.to_h).merge(POST_COMPONENTS).freeze
+      blocks.to_h.merge(inputs.to_h).merge(post_components).freeze
+    end
+
+    # Every declared content type's components with their methods: the lists
+    # in registration order, then the detail pages (the order the ledger
+    # keeps). The declared set, never the site's switch: a theme's contract
+    # does not change with what a site shows.
+    def self.post_components
+      types = ::ContentTypes.all
+      lines = types.map { |type| [ type.list_component, type.list_theme_methods ] } +
+              types.map { |type| [ type.detail_component, type.detail_theme_methods ] }
+      lines.select(&:first).to_h { |component, methods| [ path_of(component), methods ] }.freeze
     end
 
     def self.themed_tokens = SHARED_THEMED_TOKENS + ::BlockTypes.all.flat_map(&:themed_tokens)

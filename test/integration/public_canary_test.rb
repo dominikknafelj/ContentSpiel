@@ -94,11 +94,13 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     # is in the canary the day it is registered. `overwrite_rows!` overwrites
     # every live block's rows, so nothing more is written for it.
     @samples = live_page("Samples") { |page| sample_every_type(page) }
+    # A post of every declared type from its sample (test/support/post_samples.rb):
+    # a type is in the canary the day it is declared. The two blog posts beside
+    # them carry what a sample does not: tags, and an image in the body.
     @posts = [
       live_post("Ruby post", "blog", tags: %w[ruby rails], body: rich_doc(%(::image{asset="#{@picture.id}"}\n\nRuby words))),
       live_post("Plain post", "blog", tags: %w[misc]),
-      live_post("Now post", "now_update"),
-      live_post("Resume post", "resume_entry", fields: { company: "Example Co", role: "Engineer", role_type: "ic", start_date: "2024-01-01", end_date: "" })
+      *sample_every_post_type
     ]
   end
 

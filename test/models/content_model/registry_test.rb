@@ -90,4 +90,18 @@ class ContentModel::RegistryTest < ActiveSupport::TestCase
     BlockTypes.register(:x) { |t| TestTypes.declare(t); t.capability :lists_posts; t.field :content_type, :content_type; t.field :tag, :string }
     assert_equal %w[x], BlockTypes.names
   end
+
+  test "two types that declare one component with different methods are refused, naming both" do
+    error = assert_raises(ArgumentError) do
+      ContentTypes.register("acme/second") { |t| t.detail_component Posts::DetailComponent, theme_methods: %w[post page] }
+    end
+
+    assert_includes error.message, "acme/second"
+    assert_includes error.message, %("blog")
+    assert_includes error.message, "Posts::DetailComponent"
+    assert_nil ContentTypes.find("acme/second")
+    ContentTypes.register("acme/third") { |t| t.detail_component Posts::DetailComponent, theme_methods: %w[post] }
+  ensure
+    Rails.application.reloader.prepare!
+  end
 end

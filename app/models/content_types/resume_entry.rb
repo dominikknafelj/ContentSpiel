@@ -15,21 +15,22 @@ module ContentTypes
     def self.register
       ContentTypes.register :resume_entry do |t|
         t.label "Resume entry"
-        t.list_component Posts::ResumeListComponent
-        t.detail_component Posts::DetailComponent
+        t.description :resume_entry
+        t.group :personal_site
+        t.list_component Posts::ResumeListComponent, theme_methods: %w[posts page]
+        t.detail_component Posts::DetailComponent, theme_methods: %w[post]
         t.field :company, :string
         t.field :role, :string
         t.field :role_type, :select, options: ROLE_TYPES
         t.field :start_date, :date
         t.field :end_date, :date
 
-        # Moved from the old `StarterContent::SECTIONS` entry: the sample
-        # post's structured values are now `fields:` (typed, going through
-        # `Posts::Save`'s `attributes: { fields: ... }`) rather than a raw
-        # `metadata:` hash.
-        t.starter section: { title: "Resume", slug: "resume" },
-          sample: { title: "Your first role", body: "Describe what you did in this role.",
-                     fields: { company: "Example Co", role_type: "ic", start_date: "2024-01-01", end_date: "" } }
+        # The sample's structured values are typed `fields:`, going through
+        # `Posts::Save`'s `attributes: { fields: ... }`.
+        t.sample title: "Your first role", body: "Describe what you did in this role.",
+                 fields: { company: "Example Co", role_type: "ic", start_date: "2024-01-01", end_date: "" },
+                 shows: [ "Your first role", "Example Co" ]
+        t.starter section: { title: "Resume", slug: "resume" }
       end
     end
   end

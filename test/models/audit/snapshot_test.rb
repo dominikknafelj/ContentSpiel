@@ -258,8 +258,8 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     end
     ContentTypes.register "test/snippet" do |t|
       t.label "Snippet"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :source, :code, max: 100
       t.field :note, :string
       t.field :samples, :groups, of: "test/sample"

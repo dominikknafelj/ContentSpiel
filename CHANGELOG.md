@@ -8,11 +8,17 @@
 
 ### Changed
 
+- The theme contract's post lines are derived from each content type's declarations (`Theme::Contract.post_components`), in the order they were (the three lists, then the detail page); the built-in types' names are unchanged.
 - A new site starts with Blog alone; Resume entry and Now update are switched on in Settings. The public site reads the post types a site has switched on (`ContentTypes.switched_on`): a post of a switched-off type is kept, with no address, in no list, search or sitemap, offered no starter section, and opens view only. The search index is built once more after the upgrade, in the background, as a switch of post types asks for it.
 - A post of a switched-off type is left out of the dashboard's lists (Your drafts, Going live next, Waiting for you, Languages behind) and the Translations matrix; the New post dialog and a Post list block's type select offer the switched-on types, and the select keeps a stored switched-off choice, marked "(switched off)".
 
+### Removed
+
+- `Theme::Contract::POST_COMPONENTS`, now `Theme::Contract.post_components`, derived from each content type's declarations; `ContentTypeDefinition#starter`'s `sample:` keyword, now `t.sample`.
+
 ### For a gem or an outside caller
 
+- `t.list_component` and `t.detail_component` take `theme_methods:`; `t.sample`, `t.description` and `t.group` on a content type; `ContentTypes.switched_on`, `.switched_on_names` and `.switched_on?`.
 - MCP: `create_post` and `list_posts` offer the switched-on post types, and `get_post`'s answer says `type_switched_on`.
 
 ## 0.7.0 (2026-11-15)

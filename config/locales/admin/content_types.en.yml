@@ -1,0 +1,12 @@
+# What a content type says about itself in CS Studio: `t.description` and
+# `t.group` name a key here, read when the Settings card is drawn, never when
+# the type registers.
+en:
+  admin:
+    content_types:
+      descriptions:
+        blog: "Articles and news, newest first."
+        resume_entry: "One role on a résumé: company, role and dates."
+        now_update: "A short note on what you are doing now; the site shows the latest."
+      groups:
+        personal_site: "For a personal site"

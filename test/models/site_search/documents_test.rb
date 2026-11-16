@@ -61,8 +61,8 @@ class SiteSearch::DocumentsTest < ActiveSupport::TestCase
     saved = ContentTypes.all.dup
     ContentTypes.register("test/report") do |t|
       t.label "Report"
-      t.list_component Posts::BlogListComponent
-      t.detail_component Posts::DetailComponent
+      t.list_component Posts::BlogListComponent, theme_methods: %w[posts page]
+      t.detail_component Posts::DetailComponent, theme_methods: %w[post]
       t.field :standfirst, :text, translated: true
       t.field :venue, :string
     end
