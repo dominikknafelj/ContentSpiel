@@ -91,8 +91,17 @@ class HostSettingsStackTest < ActiveSupport::TestCase
     end
   end
 
-  test "only /up is the health check: beside it and under it nothing is answered by IP" do
-    [ "/up/x", "/up/", "/UP", "/up.json" ].each do |path|
+  test "the readiness check is answered over plain HTTP by IP, as the health check is" do
+    response = get("https://docs.example.org", "http://10.0.0.5/ready")
+
+    assert_equal 200, response.status
+    assert_equal "ok", response.body
+    assert_no_match(/; secure/i, cookie(response))
+    assert_equal 403, get("https://docs.example.org", "https://10.0.0.5/ready/x").status
+  end
+
+  test "beside and under the health paths nothing is answered by IP" do
+    [ "/up/x", "/up/", "/UP", "/up.json", "/ready/", "/READY", "/ready.json" ].each do |path|
       assert_equal 403, get("https://docs.example.org", "https://10.0.0.5#{path}").status, path
     end
   end

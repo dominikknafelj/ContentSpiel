@@ -84,6 +84,17 @@ class AdminHostTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "/ready answers on both hosts" do
+    both_hosts do
+      %w[docs.example.org studio.example.internal].each do |host|
+        host! host
+        get "/ready"
+        assert_response :success, host
+        assert_equal "ok", response.body, host
+      end
+    end
+  end
+
   test "a made width of a library image answers on both hosts" do
     asset = make_renditions!(create_media_asset)
     both_hosts do

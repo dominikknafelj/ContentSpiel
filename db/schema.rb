@@ -72,6 +72,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_130000) do
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
+  create_table "alerts", force: :cascade do |t|
+    t.string "kind", null: false
+    t.string "fingerprint", null: false
+    t.jsonb "details", default: {}, null: false
+    t.integer "occurrences", default: 1, null: false
+    t.datetime "first_seen_at", null: false
+    t.datetime "last_seen_at", null: false
+    t.datetime "mailed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["fingerprint"], name: "index_alerts_on_fingerprint", unique: true
+    t.index ["last_seen_at"], name: "index_alerts_on_last_seen_at"
+  end
+
   create_table "api_tokens", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "last_used_at"

@@ -347,6 +347,13 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You were refused access", read(sentence_for(event("access.denied", metadata: {})))
   end
 
+  test "a request limit reads actor-led, with its door and limit" do
+    limited = event("request.limited", metadata: { "limit" => "default", "door" => "admin/invites#create" })
+    assert_equal "You hit the request limit at admin/invites#create (default)", read(sentence_for(limited))
+    assert_equal "System hit the request limit at admin/sessions#create (default)",
+      read(sentence_for(event("request.limited", user_id: nil, metadata: { "limit" => "default", "door" => "admin/sessions#create" })))
+  end
+
   test "owner changes read from the new value" do
     on = event("user.owner_changed", subject_type: "User", subject_id: users(:two).id, subject_label: "two", field_changes: { "owner" => [ false, true ] })
     off = event("user.owner_changed", subject_type: "User", subject_id: users(:two).id, subject_label: "two", field_changes: { "owner" => [ true, false ] })
@@ -357,7 +364,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   end
 
   test "the security keys" do
-    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted] +
+    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted request.limited] +
       PASSKEY_EVENTS - %w[passkey.renamed] + SSO_EVENTS
     assert_equal secure.sort, Audit::Sentence::ACTIONS.select { |action| sentence_for(Audit::Event.new(action:, occurred_at: Time.current, last_occurred_at: Time.current)).security }.sort
   end

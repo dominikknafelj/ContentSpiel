@@ -137,7 +137,7 @@ module Audit
       session.created session.destroyed session.ended session.failed session.locked access.denied
       passkey.added passkey.renamed passkey.removed recovery_codes.generated recovery_code.used
       session.second_factor_failed session.confirmation_failed
-      sso.linked sso.refused sso.unlinked
+      sso.linked sso.refused sso.unlinked request.limited
     ].freeze
 
     ACTIONS = (
@@ -165,7 +165,7 @@ module Audit
     SECURITY_ACTIONS = %w[
       session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted
       passkey.added passkey.removed recovery_codes.generated recovery_code.used session.second_factor_failed session.confirmation_failed
-      sso.linked sso.refused sso.unlinked
+      sso.linked sso.refused sso.unlinked request.limited
     ].freeze
 
     # `sso.refused`'s reasons (`SignIn::Sso::ACCOUNT_REASONS`) in words. A
@@ -499,6 +499,7 @@ module Audit
         # Nor the address of a lock-out, which is the event's own `ip`.
         when "session.locked" then [ text(locked_sentence) ]
         when "access.denied" then denied_parts
+        when "request.limited" then [ text(limited_sentence) ]
         when "user.owner_changed" then owner_parts
         # The actor IS the subject: the account the invitation's token made.
         when "invitation.accepted" then [ text("accepted the invite") ]
@@ -550,6 +551,13 @@ module Audit
       def regenerated_parts
         count = event.metadata.is_a?(Hash) ? event.metadata["count"].to_i : 0
         [ text("regenerated #{count} #{count == 1 ? "image" : "images"}") ]
+      end
+
+      # The door and the limit's name, from the metadata: no address, no
+      # typed value ever reaches the event.
+      def limited_sentence
+        metadata = self.class.metadata_of(event)
+        "hit the request limit at #{metadata["door"]} (#{metadata["limit"]})"
       end
 
       # A lock-out of the account's bucket, of one known device's or of the

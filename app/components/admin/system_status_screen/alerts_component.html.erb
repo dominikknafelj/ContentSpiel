@@ -1,0 +1,31 @@
+<section class="mt-6" aria-labelledby="alerts-heading">
+  <h2 id="alerts-heading" class="text-h2 text-ink"><%= t(".title") %></h2>
+  <p class="mb-2 text-small text-meta"><%= t(".line") %></p>
+  <div id="system-alerts" class="rounded-card bg-surface shadow-1">
+    <% if alerts.empty? %>
+      <p class="px-4 py-4 text-sm text-dim"><%= t(".none") %></p>
+    <% else %>
+      <% if mail_blocked_by == :mail_not_ready %>
+        <div class="px-4 pt-4">
+          <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil) do %>
+            <%= t(".mail_not_ready") %>
+            <% if settings_href.present? %>
+              <%= link_to t(".open_mail_settings"), settings_href, class: "font-medium text-warn-ink underline hover:no-underline" %>
+            <% end %>
+          <% end %>
+        </div>
+      <% elsif mail_blocked_by == :no_address %>
+        <div class="px-4 pt-4">
+          <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact) do %>
+            <%= t(".address_off") %>
+          <% end %>
+        </div>
+      <% end %>
+      <ul class="divide-y divide-line px-4">
+        <% alerts.each do |alert| %>
+          <%= render Admin::SystemStatusScreen::AlertRowComponent.new(alert: alert, mail_blocked_by: mail_blocked_by, audit_href: audit_href) %>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
+</section>

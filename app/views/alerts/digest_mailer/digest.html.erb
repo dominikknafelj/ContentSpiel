@@ -1,0 +1,18 @@
+<%# A row per alert, divided by a 1px gainsboro line: a named colour, as
+    every colour of a mail but the button's (layouts/mailer). %>
+<p style="margin:0;"><%= t("mail.alerts_mailer.digest.intro", count: @count, site: site_name) %></p>
+<table role="presentation" style="width:100%;border-collapse:collapse;margin-top:12px;">
+  <% @alerts.each_with_index do |alert, index| %>
+    <tr>
+      <td style="padding:10px 0;border-top:1px solid gainsboro;<%= "border-bottom:1px solid gainsboro;" if index == @alerts.size - 1 %>">
+        <b><%= alert_kind(alert) %>:</b> <%= alert_sentence(alert) %><br>
+        <span style="font-size:13px;color:dimgray;"><%= alert_facts(alert) %></span>
+      </td>
+    </tr>
+  <% end %>
+</table>
+<% if @more.positive? %>
+  <p style="margin:12px 0 0;font-size:13px;color:dimgray;"><%= t("mail.alerts_mailer.digest.more", count: @more) %></p>
+<% end %>
+<%= render "mails/button", url: system_status_url, label: t("mail.alerts_mailer.digest.button") %>
+<p style="margin:0;font-size:13px;color:dimgray;"><%= t("mail.alerts_mailer.digest.outro", site: site_name, minutes: digest_every) %></p>

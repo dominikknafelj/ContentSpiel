@@ -69,10 +69,15 @@ class TelemetrySpansTest < ActiveSupport::TestCase
     assert_empty offenders
   end
 
-  test "both lists are frozen and name each entry once" do
-    assert Telemetry::SPANS.frozen? && Telemetry::ATTRIBUTES.frozen?
+  test "every span event name is auth., search., server., http. or error." do
+    assert_empty Telemetry::EVENTS.reject { |name| name.start_with?(*PREFIXES) }
+  end
+
+  test "the lists are frozen and name each entry once" do
+    assert Telemetry::SPANS.frozen? && Telemetry::ATTRIBUTES.frozen? && Telemetry::EVENTS.frozen?
     assert_equal Telemetry::SPANS.uniq, Telemetry::SPANS
     assert_equal Telemetry::ATTRIBUTES.uniq, Telemetry::ATTRIBUTES
+    assert_equal Telemetry::EVENTS.uniq, Telemetry::EVENTS
   end
 
   private

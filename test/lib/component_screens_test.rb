@@ -187,6 +187,10 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/translations
       app/controllers/admin/translations_controller.rb
     ],
+    "system_status_screen" => %w[
+      app/views/admin/system_status
+      app/controllers/admin/system_status_controller.rb
+    ],
     "trash_screen" => %w[
       app/views/admin/trash
       app/controllers/admin/trash_controller.rb
@@ -206,7 +210,6 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/passwords
       app/views/admin/second_factors
       app/views/admin/sessions
-      app/views/admin/system_status
       app/controllers/admin/confirmations_controller.rb
       app/controllers/admin/diagram_renderers_controller.rb
       app/controllers/admin/enrolments_controller.rb
@@ -215,7 +218,6 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/admin/second_factors_controller.rb
       app/controllers/admin/sessions_controller.rb
       app/controllers/admin/sso_sessions_controller.rb
-      app/controllers/admin/system_status_controller.rb
       app/controllers/admin/media_assets_controller.rb
       app/controllers/admin/tag_suggestions_controller.rb
       app/controllers/admin/user_suggestions_controller.rb

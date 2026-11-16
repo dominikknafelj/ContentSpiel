@@ -4,6 +4,13 @@
 
 ### Added
 
+- Error alerts: every error report (`Rails.error`, handled or not, but not an error Rails answers with a 4xx, and not a failure of the alert jobs themselves) becomes a log line, an `error.reported` span event and an alert, folded by the error's class and its place in the code and counted; never its message. Owners get them by mail.
+- Security alerts, found by a job that runs every minute and reads the audit log: 20 failed sign-ins, 20 denied requests, or any request over a limit in 15 minutes; every owner change and every API token made.
+- The alert digest mail to every owner: at most one every 10 minutes, up to 20 alerts, an alert seen again mailed again after an hour. While mail is not set up the alerts wait, unmarked.
+- `request.limited`, an audit event for the first refusal of a rate limit's window on a CS Studio door (not on the public site's forms, search and suggestions).
+- `GET /ready`: 200 when the databases answer, 503 when one does not, for an uptime monitor; `/up` stays the proxy's boot check. Both are outside host authorization, the HTTPS redirect and the setup redirect, and answer on both hosts.
+- System status's Alerts card: the newest ten alerts of the last seven days, so a site without mail still sees them.
+- `docs/reference/alerting.md`.
 - `Media::MoveImages.call(asset_ids:, folder:)` moves library images into a folder or out of every folder, and is the one writer of an image's folder after an upload. Each image needs its own edit right and one image refused refuses the move ("2 of these images are not yours to move. Nothing was moved."); at most 200 images a move; a move touches neither `updated_at` nor the site's content version. Each image that moved is recorded as `media.moved` (counted on the dashboard: "moved 12 images to “Client A”").
 - The Media screen and the picker list a place: `folder` is `all` (or absent), `none` (images in no folder) or a folder's id, and a folder lists its own images, not its subfolders'; an unknown folder is the 404 on the screen and All media in the picker. The segment counts are the place's. An upload takes `folder` (`POST /media` and `POST /media_assets`) and lands in it, `media.uploaded` records its `folder_id`, and the answer carries `folder_counts` beside `counts`; an upload to a folder deleted meanwhile is refused ("That folder is gone.") and stores nothing. `Media::Upload.call(file:, folder: nil)` and `Media::Search.new(place:)` take the place.
 - MCP: `list_media_tool` takes `folder` (a folder's id, or `none`) and lists the images directly in it, and it and `get_media_tool` name each image's `folder` (`{id, name, path}`, or null); the new `list_media_folders_tool` lists the folders in tree order with `parent_id`, `path` and `image_count`. All need `media.upload`.
@@ -17,8 +24,18 @@
 - The image picker browses folders and opens where you last were.
 - The Media screen and the open picker follow changes made in another tab: the Folders column and its counts are redrawn in place, folds and focus kept, and when the images of the place shown changed a notice above the grid offers "Show changes" (`GET /media/folders`, the column's part with the place's digest, `Media::Place#digest`).
 
+### Changed
+
+- Production's databases connect with `connect_timeout: 5`: an unreachable database fails in five seconds.
+
+### Breaking
+
+- A new top-level name, `Alerts` (`app/models/alerts.rb`): a gem whose hook owner is `alerts` is refused at boot. A gem with such an owner renames it.
+- A new top-level name, `ReadinessController` (`app/controllers/readiness_controller.rb`): a gem whose hook owner is `readiness_controller` is refused at boot. A gem with such an owner renames it.
+
 ### Migrations
 
+- `20261116120000_create_alerts`: the table `alerts` (one row per error or security alert: its kind, a unique fingerprint, the fixed details of its kind, how often it was seen, when first and last, and when it was last mailed). It writes no row.
 - `20261116130000_create_media_folders`: the table `media_folders` and `media_assets.folder_id`; every existing image starts in no folder.
 
 ## 0.8.0 (2026-11-16)

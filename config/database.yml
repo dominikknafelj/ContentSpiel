@@ -90,6 +90,9 @@ production:
     database: content_spiel_production
     username: content_spiel
     password: <%= ENV["CONTENT_SPIEL_DATABASE_PASSWORD"] %>
+    # `/ready` asks each database: an unreachable one must answer 503 in
+    # seconds, not hang until the monitor gives up.
+    connect_timeout: 5
   cache:
     <<: *primary_production
     database: content_spiel_production_cache

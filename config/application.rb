@@ -119,6 +119,11 @@ module ContentSpiel
     config.i18n.available_locales = SUPPORTED_LOCALES.keys.map(&:to_sym)
     config.i18n.default_locale = :en
 
+    # Error reports become alerts (`config/initializers/alerts.rb`); the test
+    # environment turns this off, and a test turns it on with
+    # `with_error_alerts`.
+    config.x.alerts.errors = true
+
     # Two job queues (`config/queue.yml`): the jobs that decode and encode
     # pictures are on `images`, served by one thread, and everything else is
     # on `default`. Active Storage's analysis and transform jobs are image
