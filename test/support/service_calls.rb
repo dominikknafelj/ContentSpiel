@@ -326,6 +326,12 @@ module ServiceCalls
       { call: -> { Locales::MakeDefault.call("de") }, permission: "languages.manage", on: Current.site.reload }
     },
 
+    # Deletes a folder: its images move up, the row goes, one audit event.
+    "Media::DeleteFolder" => lambda {
+      folder = Media::Folder.create!(name: "Trips")
+      { call: -> { Media::DeleteFolder.call(folder) }, permission: "media.manage", on: folder }
+    },
+
     "Media::Regenerate" => lambda {
       create_media_asset
       { call: -> { Media::Regenerate.call }, permission: "settings.manage", on: Current.site.reload,
