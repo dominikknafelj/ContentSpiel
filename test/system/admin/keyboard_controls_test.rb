@@ -93,17 +93,19 @@ class Admin::KeyboardControlsSystemTest < ApplicationSystemTestCase
     assert_selector "dialog#new-page-dialog[open]"
   end
 
-  # No screen draws a choice tile yet that this test could visit, so it draws a
-  # group on a page of its own: the arrow keys are the browser's for radios of
-  # one name, and what is held here is that the tile's markup keeps them so.
+  # The arrow keys are native to radios of one name; what is held here is that
+  # the tile's markup keeps them (one Tab stop for the group, the choice moving
+  # with the arrows). The group is drawn into a real screen, as the screen's
+  # own CSS draws it.
   test "a choice tile is one Tab stop for its group, and the arrow keys move the choice between its tiles" do
+    visit_screen admin_pages_path
     tiles = %w[scheduled later].map.with_index do |value, index|
       Admin::Ui::ChoiceTileComponent.new(name: "choice", value: value, title: "Title #{value}", line: "Line #{value}", checked: index.zero?)
     end
-    html = ApplicationController.render(inline: <<~ERB, locals: { tiles: tiles })
-      <p>Before</p><div role="radiogroup" aria-label="What goes live"><% tiles.each do |tile| %><%= render tile %><% end %></div><button>After</button>
+    html = ApplicationController.render(inline: <<~ERB, locals: { tiles: tiles }, layout: false)
+      <div><p>Before</p><div role="radiogroup" aria-label="What goes live"><% tiles.each do |tile| %><%= render tile %><% end %></div><button>After</button></div>
     ERB
-    page.driver.browser.goto("data:text/html;charset=utf-8,#{ERB::Util.url_encode(html)}")
+    page.execute_script("document.body.insertAdjacentHTML('beforeend', arguments[0])", html)
 
     page.find("p", text: "Before").click
     stop_on("input[value=scheduled]")

@@ -24,12 +24,12 @@ class Admin::Ui::ChoiceTileComponentTest < ViewComponent::TestCase
     assert_selector "label[data-role=tile] input[form=publish-form]"
   end
 
-  test "tiles of one name are native radios of one group, so the arrow keys move the choice" do
-    render_inline(tile(checked: true))
-    first = page.find("input")
-    render_inline(Admin::Ui::ChoiceTileComponent.new(name: "publish[choice]", value: "later", title: "Later", line: "x"))
-    assert_equal "publish[choice]", first[:name]
-    assert_selector "input[type=radio][name='publish[choice]'][value=later]"
-    assert_no_selector "input[tabindex]"
+  test "tiles drawn together are one native group: one name, one checked, no tabindex" do
+    html = [ tile(checked: true), Admin::Ui::ChoiceTileComponent.new(name: "publish[choice]", value: "later", title: "Later", line: "x") ]
+      .map { |component| render_inline(component).to_html }.join
+    fragment = Capybara.string(html)
+    assert_equal 2, fragment.all("input[type=radio][name='publish[choice]']").size
+    assert_equal 1, fragment.all("input[checked]").size
+    assert_equal 0, fragment.all("input[tabindex]").size
   end
 end
