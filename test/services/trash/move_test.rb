@@ -1,6 +1,7 @@
 require "test_helper"
 
 class Trash::MoveTest < ActiveSupport::TestCase
+  include TestTypes
   setup { Current.actor = users(:one) }
 
   test "a page moves with its whole branch, which frees every URL" do
@@ -69,6 +70,22 @@ class Trash::MoveTest < ActiveSupport::TestCase
     assert Trash::Move.call(asset.reload).ok?
     assert asset.reload.trashed?
     assert_equal users(:one), asset.trashed_by
+  end
+
+  test "an image a kept block's media list uses cannot be moved to the trash" do
+    with_media_list_type do
+      asset = create_media_asset
+      page = create_page(title: "Gallery page")
+      media_list_block(page, [ asset.id ])
+
+      refused = Trash::Move.call(asset)
+      assert_not refused.ok?
+      assert_equal [ "This image is used on the page “Gallery page”" ], refused.errors
+      assert_not asset.reload.trashed?
+
+      assert Trash::Move.call(page).ok?
+      assert Trash::Move.call(asset.reload).ok?
+    end
   end
 
   # The refusal names places for the service's own actor ("not found, not

@@ -114,13 +114,26 @@ class Media::UsageIndex
 
     private
 
-    # Every library image a copy refers to: the hero, the blocks' images and
-    # the images inside the bodies (the record's and the blocks'), as ids.
+    # Every library image a copy refers to: the hero, the blocks' images, the
+    # images the blocks' fields name and the images inside the bodies (the
+    # record's and the blocks'), as ids. A copied block's fields are read
+    # with its type as registered now: a type no longer registered names
+    # none, as its block draws nothing.
     def asset_ids_in(version)
       fields = version.snapshot.fetch("fields", {})
       bodies = [ fields["body"], *version.blocks.map { |block| block["body"] } ].flat_map { |by_locale| by_locale.is_a?(Hash) ? by_locale.values : [] }
       direct = [ fields["hero_media_asset_id"], *version.blocks.map { |block| block["media_asset_id"] } ]
-      (direct + bodies.select { |doc| doc.is_a?(Hash) }.flat_map { |doc| image_asset_ids(doc) }).filter_map { |value| normalize_asset_id(value) }
+      named = version.blocks.flat_map { |block| field_asset_ids(BlockTypes.find(block["block_type"]), block["settings"]) }
+      (direct + named + bodies.select { |doc| doc.is_a?(Hash) }.flat_map { |doc| image_asset_ids(doc) }).filter_map { |value| normalize_asset_id(value) }
+    end
+
+    # The images a block's untranslated settings name through its type's
+    # fields (`ContentModel::Definition#media_ids_in`); none without a type
+    # or for settings that are not a Hash.
+    def field_asset_ids(definition, settings)
+      return [] unless definition && settings.is_a?(Hash)
+
+      definition.media_ids_in(settings)
     end
 
     def media_managed?(owner) = OWNER_CLASSES.any? { |klass| owner.is_a?(klass) }
@@ -162,6 +175,7 @@ class Media::UsageIndex
       rows = []
       rows.concat(hero_rows(owner, now)) if owner.is_a?(Page)
       rows.concat(block_image_rows(owner, now)) if owner.is_a?(ContentBlock)
+      rows.concat(block_field_rows(owner, now)) if owner.is_a?(ContentBlock)
       rows.concat(rich_text_rows(owner, now)) if owner.is_a?(ContentBlock) || owner.is_a?(Post)
       rows
     end
@@ -192,6 +206,20 @@ class Media::UsageIndex
       return [] unless asset_id
 
       [ row(asset_id: asset_id, owner: block, role: "block_image", locale: nil, now: now) ]
+    end
+
+    # The images a block's fields name (`ContentModel::Definition
+    # #media_ids_in` over its untranslated settings: the Gallery's
+    # `:media_list`), one row each, `locale` nil since such a field is never
+    # translated. Like a rich-text `asset_id` these ids sit in jsonb with no
+    # foreign key, so only the ones `media_assets` still holds become rows
+    # (one query), and an id deleted around the services fails nothing. A
+    # block of a type no longer registered names none.
+    def block_field_rows(block, now)
+      ids = field_asset_ids(block.definition, block.settings)
+      return [] if ids.empty?
+
+      Media::Asset.where(id: ids).pluck(:id).map { |id| row(asset_id: id, owner: block, role: "block_field", locale: nil, now: now) }
     end
 
     # Every `image` node's `asset_id` in every locale of `owner`'s rich-text

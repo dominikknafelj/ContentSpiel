@@ -1,6 +1,7 @@
 require "test_helper"
 
 class Trash::RestoreTest < ActiveSupport::TestCase
+  include TestTypes
   setup { Current.actor = users(:one) }
 
   test "a branch comes back together with its URLs" do
@@ -237,6 +238,24 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     assert_equal "Media::Asset", asset_event.subject_type
     assert_equal "Page##{page.id}", asset_event.metadata["restored_with"]
     assert_not Audit::Event.where(action: "media.restored", subject_id: unrelated.id).exists?
+  end
+
+  test "restoring a page restores the trashed images its blocks' media lists name" do
+    with_media_list_type do
+      asset = create_media_asset
+      unrelated = create_media_asset
+      page = create_page(title: "Gallery page")
+      media_list_block(page, [ asset.id ])
+      assert Trash::Move.call(page).ok?
+      assert Trash::Move.call(asset.reload).ok?
+      assert Trash::Move.call(unrelated).ok?
+
+      service = Trash::Restore.new(page.reload)
+      assert service.call.ok?
+      assert_equal [ asset ], service.restored_assets
+      assert_not asset.reload.trashed?
+      assert unrelated.reload.trashed?
+    end
   end
 
   test "an image restores on its own" do
