@@ -30,7 +30,7 @@ module Admin
 
     def destroy
       result = Media::DeleteFolder.call(@folder)
-      return refused(result) unless result.ok?
+      return refused_without_form(result) unless result.ok?
 
       parent = result.record.parent_id && Media::Folder.find_by(id: result.record.parent_id)
       answer(Admin::Answers::FolderDeleted.new(view: view_context, url: place_url, column: method(:folder_column_for)).answer(parent: parent))
@@ -56,10 +56,25 @@ module Admin
       answer(Admin::Answers::FolderSaved.new(view: view_context, url: place_url, column: method(:folder_column_for)).answer(folder: result.record, place: place, created: created))
     end
 
+    # A create or a rename (a name was sent) draws the dialog's form again,
+    # as it was sent; a move answers with its sentences alone.
     def refused(result)
+      return refused_without_form(result) unless sent_name?
+
       errors = result.record.respond_to?(:errors) && result.record.errors.any? ? result.record.errors.messages : { base: result.errors }
-      answer(Admin::Answers::FolderRefused.new(view: view_context).answer(errors: errors, status: Admin::RefusalStatus.for(result)))
+      form = Admin::MediaLibrary::FolderFormComponent.new(
+        tree: Media::FolderTree.load, folder: @folder, parent_id: (folder_attributes[:parent_id] unless @folder),
+        name: params.dig(:media_folder, :name).to_s, errors: errors, place: params[:place].to_s, query: shown_query
+      )
+      answer(Admin::Answers::FolderRefused.new(view: view_context).answer(form: form, status: Admin::RefusalStatus.for(result)))
     end
+
+    def refused_without_form(result)
+      sentences = result.record.respond_to?(:errors) && result.record.errors.any? ? result.record.errors.map(&:message) : result.errors
+      answer(Admin::Answers::FolderRefused.new(view: view_context).toast(sentences: sentences, status: Admin::RefusalStatus.for(result)))
+    end
+
+    def sent_name? = params[:media_folder].respond_to?(:key?) && params[:media_folder].key?(:name)
 
     def place_url = ->(place) { admin_media_path(**place_query(place)) }
 

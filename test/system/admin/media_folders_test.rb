@@ -154,4 +154,150 @@ class Admin::MediaFoldersSystemTest < ApplicationSystemTestCase
     page.go_back
     assert_current_path "/cs-studio/media?folder=none"
   end
+
+  # The folder dialogs (D2, D3, D4 and D10's menu): every write is sent
+  # through the write queue, and the answer's column sends the screen to the
+  # place it names.
+
+  def dialog = "dialog#media-folder-dialog[open]"
+
+  def focused_id = page.evaluate_script("document.activeElement?.id")
+
+  def toasts_text = find("#toasts", visible: :all).text(:all).squish
+
+  def open_folder_menu(item)
+    find("[data-media-place-heading] button[aria-label='Folder actions']").click
+    find("[data-media-place-heading] [role=menu] button", text: item).click
+  end
+
+  test "a folder is created from a row's +, becomes the place, and gets no toast" do
+    visit_screen "/cs-studio/media"
+
+    find("#{row(@clients.id)} button[aria-label='New folder in Clients']", visible: :all).click
+    within(dialog) do
+      assert_selector "h2", text: "New folder"
+      assert_selector "#media-folder-where", text: "Inside Clients"
+      assert_button "Create folder"
+    end
+    assert_equal "media-folder-name", focused_id
+
+    fill_in "Name", with: "Trips"
+    watch_frame_load
+    press "Create folder"
+    await_frame_load
+
+    trips = Media::Folder.find_by!(name: "Trips")
+    assert_equal @clients.id, trips.parent_id
+    assert_current_path "/cs-studio/media?folder=#{trips.id}"
+    assert_selector "#content h1", text: "Trips"
+    assert_no_selector dialog
+    assert_equal [ trips.id.to_s ], selected_places
+    assert_equal "", toasts_text
+  end
+
+  test "a taken name keeps the dialog open with the error under the field and the focus in it" do
+    visit_screen "/cs-studio/media"
+
+    find("#tree-column button", text: "+ New folder").click
+    within(dialog) { assert_selector "#media-folder-where", text: "At the top of the library" }
+    fill_in "Name", with: "events"
+    press "Create folder"
+
+    within(dialog) do
+      assert_selector "#media-folder-name + #media-folder-name-errors", text: "A folder named “events” is already here."
+      assert_field "Name", with: "events"
+      assert_selector "#media-folder-where", text: "At the top of the library"
+    end
+    assert_eventually(message: "the focus is back in the field") { focused_id == "media-folder-name" }
+    assert_equal 1, Media::Folder.where(parent_id: nil).pluck(:name).count { |name| name.casecmp?("events") }
+
+    fill_in "Name", with: "Events 2"
+    watch_frame_load
+    press "Create folder"
+    await_frame_load
+    assert_selector "#content h1", text: "Events 2"
+    assert_nil Media::Folder.find_by!(name: "Events 2").parent_id
+  end
+
+  test "a folder is renamed from the place menu" do
+    visit_screen "/cs-studio/media?folder=#{@client_a.id}"
+
+    open_folder_menu "Rename…"
+    within(dialog) do
+      assert_selector "h2", text: "Rename folder"
+      assert_field "Name", with: "Client A"
+      assert_selector "#media-folder-where", text: "Inside Clients"
+    end
+    assert_eventually(message: "the name is selected, to be typed over") do
+      page.evaluate_script("(f => document.activeElement === f && f.selectionStart === 0 && f.selectionEnd === f.value.length)(document.getElementById('media-folder-name'))")
+    end
+
+    fill_in "Name", with: "Client B"
+    watch_frame_load
+    press "Rename"
+    await_frame_load
+
+    assert_equal "Client B", @client_a.reload.name
+    assert_equal @clients.id, @client_a.parent_id
+    assert_current_path "/cs-studio/media?folder=#{@client_a.id}"
+    assert_selector "#content h1", text: "Client B"
+    assert_selector "#{row(@client_a.id)} a", text: "Client B"
+    assert_equal "", toasts_text
+  end
+
+  test "deleting a folder says what moves where, then opens the parent with Folder deleted" do
+    visit_screen "/cs-studio/media?folder=#{@client_a.id}"
+
+    open_folder_menu "Delete folder…"
+    within("dialog#media-folder-delete-dialog[open]") do
+      assert_selector "h2", text: "Delete “Client A”?"
+      assert_text "Its 1 image move to “Clients”. Nothing else is deleted."
+      assert_text "This can't be undone."
+    end
+
+    watch_frame_load
+    press "Delete folder"
+    await_frame_load
+
+    assert_nil Media::Folder.find_by(id: @client_a.id)
+    assert_equal @clients.id, @logo.reload.folder_id
+    assert_current_path "/cs-studio/media?folder=#{@clients.id}"
+    assert_selector "#content h1", text: "Clients"
+    assert_selector "#toasts", text: "Folder deleted"
+    assert_no_selector row(@client_a.id), visible: :all
+    assert_equal [ @clients.id.to_s ], selected_places
+  end
+
+  test "a folder is created and deleted from the keyboard alone" do
+    visit_screen "/cs-studio/media"
+
+    # The keyboard starts on the column's button; from there no pointer.
+    page.execute_script("Array.from(document.querySelectorAll('#tree-column button')).find((b) => b.textContent.includes('New folder')).focus()")
+    page.send_keys(:enter)
+    assert_selector dialog
+    assert_eventually(message: "the dialog starts on its field") { focused_id == "media-folder-name" }
+    watch_frame_load
+    page.send_keys("Trips", :enter)
+    await_frame_load
+    trips = Media::Folder.find_by!(name: "Trips")
+    assert_current_path "/cs-studio/media?folder=#{trips.id}"
+
+    page.execute_script("document.querySelector(\"[data-media-place-heading] button[aria-label='Folder actions']\").focus()")
+    page.send_keys(:enter)
+    assert_eventually(message: "the menu opens on its first item") { page.evaluate_script("document.activeElement?.textContent") == "New folder inside…" }
+    page.send_keys(:up)
+    assert_equal "Delete folder…", page.evaluate_script("document.activeElement?.textContent")
+    page.send_keys(:enter)
+    assert_selector "dialog#media-folder-delete-dialog[open]", text: "It is empty."
+    assert_equal "Cancel", page.evaluate_script("document.activeElement?.textContent")
+    page.send_keys(:tab)
+    assert_equal "Delete folder", page.evaluate_script("document.activeElement?.textContent")
+    watch_frame_load
+    page.send_keys(:enter)
+    await_frame_load
+
+    assert_nil Media::Folder.find_by(id: trips.id)
+    assert_current_path "/cs-studio/media"
+    assert_selector "#toasts", text: "Folder deleted"
+  end
 end

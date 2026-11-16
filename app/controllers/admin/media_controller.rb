@@ -95,6 +95,7 @@ module Admin
       @selected = selected_asset
       @link_params = list_query
       @place_query = shown_query
+      delete_folder_preview
       folder_column unless turbo_frame_request?
     end
 
@@ -223,6 +224,16 @@ module Admin
     def folder_column
       @folder_counts = Media::FolderCounts.call
       @media_open = TreeOpenSet.parse(cookies[TreeOpenSet::MEDIA_COOKIE], readable_ids: @folder_tree.ids)
+    end
+
+    # The folder shown and what deleting it would move where, for the delete
+    # confirm the screen draws in a folder for `media.manage`
+    # (`Admin::MediaLibrary::DeleteFolderDialogComponent`).
+    def delete_folder_preview
+      return unless @place.folder && can?("media.manage")
+
+      @shown_folder = Media::Folder.find(@place.folder)
+      @delete_preview = Media::DeleteFolder.preview(@shown_folder, tree: @folder_tree)
     end
 
     # A `folder` that names no folder of the screen: the library as it was

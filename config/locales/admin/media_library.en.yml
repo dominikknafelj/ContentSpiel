@@ -33,6 +33,45 @@ en:
           all: "All media"
           none: "Not in a folder"
           empty: "No folders yet."
+          # The column head's button, which creates at the top level, and a
+          # row's "+", which creates inside that folder.
+          new_folder: "+ New folder"
+          add: "New folder in %{name}"
+        # The New folder and Rename folder dialog
+        # (`Admin::MediaLibrary::FolderDialogComponent`, its form
+        # `FolderFormComponent`); `admin--media--folder-dialog` words it for
+        # each opening.
+        folder_dialog:
+          new_title: "New folder"
+          rename_title: "Rename folder"
+          name: "Name"
+          top: "At the top of the library"
+          inside: "Inside %{path}"
+          cancel: "Cancel"
+          create: "Create folder"
+          rename: "Rename"
+        # The confirm before a folder is deleted
+        # (`Admin::MediaLibrary::DeleteFolderDialogComponent`): what moves
+        # where (`Media::DeleteFolder.preview`). A part with nothing to move is
+        # left out of the sentence.
+        delete_folder_dialog:
+          title: "Delete “%{name}”?"
+          confirm: "Delete folder"
+          images:
+            one: "%{count} image"
+            other: "%{count} images"
+          folders:
+            one: "%{count} folder"
+            other: "%{count} folders"
+          into_parent_both: "Its %{images} and %{folders} move to “%{parent}”. Nothing else is deleted."
+          into_parent: "Its %{things} move to “%{parent}”. Nothing else is deleted."
+          to_top_both: "Its %{folders} move to the top of the library, and its %{images} to Not in a folder. Nothing else is deleted."
+          to_top_folders: "Its %{folders} move to the top of the library. Nothing else is deleted."
+          to_top_images: "Its %{images} move to Not in a folder. Nothing else is deleted."
+          empty: "It is empty."
+          renamed: "“%{from}” becomes “%{to}”, because “%{parent}” already has a folder of that name."
+          renamed_at_top: "“%{from}” becomes “%{to}”, because the top of the library already has a folder of that name."
+          undone: "This can't be undone."
         # The heading over the grid: the place's name, its count and Upload.
         place_heading:
           count:
@@ -40,6 +79,11 @@ en:
             other: "%{count} images"
           breadcrumb_label: "Where you are"
           upload: "Upload images"
+          # The folder's ⋯ menu (a folder, for `media.manage`).
+          menu: "Folder actions"
+          new_inside: "New folder inside…"
+          rename: "Rename…"
+          delete: "Delete folder…"
         toolbar:
           searching_in: "Searching in %{name}."
           search_all: "Search all media for “%{q}” →"

@@ -24,9 +24,11 @@ module Admin
     end
 
     # The search and the segment the screen shows (`q`, `filter`, Strings
-    # only), which every link to a place keeps: the Folders column's `query:`.
+    # only, an empty one left out: a folder dialog sends both, empty when no
+    # search is typed), which every link to a place keeps: the Folders
+    # column's `query:`.
     def shown_query
-      request.parameters.slice("q", "filter").select { |_, value| value.is_a?(String) }.symbolize_keys
+      request.parameters.slice("q", "filter").select { |_, value| value.is_a?(String) && value.present? }.symbolize_keys
     end
 
     # The Folders column as it stands after a write, `place` selected and

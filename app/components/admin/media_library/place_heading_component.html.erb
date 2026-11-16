@@ -11,7 +11,17 @@
     <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <h1 class="text-h1 text-ink"><%= name %></h1>
       <span id="<%= COUNT_ID %>" class="text-small text-meta"><%= count_text %></span>
-      <%# SLOT: the folder actions' menu (a folder, for `media.manage`) follows the count. %>
+      <% if menu? %>
+        <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".menu"), align: :left, close_on_select: true) do |menu| %>
+          <% if new_inside? %>
+            <% menu.with_item { tag.button(t(".new_inside"), type: "button", data: new_inside_data) } %>
+          <% end %>
+          <% menu.with_item { tag.button(t(".rename"), type: "button", data: rename_data) } %>
+          <%# SLOT: "Move to…" (the folder moved) stands here, before the separator. %>
+          <% menu.with_item { tag.div(role: "separator", class: "my-1 border-t border-line") } %>
+          <% menu.with_item { tag.button(t(".delete"), type: "button", class: "text-danger-ink", data: delete_data) } %>
+        <% end %>
+      <% end %>
     </div>
   </div>
   <div class="flex items-center gap-2">

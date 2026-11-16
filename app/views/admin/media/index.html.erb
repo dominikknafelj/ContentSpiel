@@ -25,6 +25,12 @@
   <% content_for :tree do %>
     <div class="mb-2 flex items-center gap-2 px-1">
       <h2 class="flex-1 text-sm font-semibold text-ink"><%= t("admin.components.media_library.folder_tree.heading") %></h2>
+      <%# "+ New folder" creates at the top (the folder dialog drawn below);
+          before the hide button, so it is the drawer's first stop. %>
+      <% if can?("media.manage") %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t("admin.components.media_library.folder_tree.new_folder"), variant: :secondary, size: :small,
+              data: Admin::MediaLibrary::FolderTreeComponent.add_params(nil, nil)) %>
+      <% end %>
       <%= render Admin::Ui::TreeHideComponent.new(subject: "media") %>
     </div>
     <%= render Admin::Ui::TreeFindComponent.new(controls: Admin::MediaLibrary::FolderTreeComponent::ID, noun: :folders) %>
@@ -151,3 +157,17 @@
   <% end %>
 </div>
 </div>
+
+<%# THE FOLDER DIALOGS, for `media.manage`: once each, after the library and
+    outside every form, but inside the content frame (this view is the
+    frame's answer), so a frame navigation draws them again with the place
+    it opens. The folder dialog is opened by every create and rename trigger
+    (the Folders column's, outside the frame, find it by its id, as every
+    dialog is found); the delete confirm exists only in a folder, worded for
+    that folder (`Media::DeleteFolder.preview`). %>
+<% if can?("media.manage") %>
+  <%= render Admin::MediaLibrary::FolderDialogComponent.new(tree: @folder_tree, place: @place.to_param, query: @place_query) %>
+  <% if @delete_preview %>
+    <%= render Admin::MediaLibrary::DeleteFolderDialogComponent.new(folder: @shown_folder, preview: @delete_preview, tree: @folder_tree, query: @place_query) %>
+  <% end %>
+<% end %>

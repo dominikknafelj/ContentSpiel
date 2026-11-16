@@ -21,6 +21,7 @@
 - Library folders: `Media::SaveFolder` creates, renames and moves a folder (four levels deep at most, a thousand at most, one name per parent in any case, under the tree's table lock); each is recorded as `media_folder.created`, `media_folder.renamed` or `media_folder.moved`, and the audit log's Type filter offers "Media folder".
 - `Media::DeleteFolder` deletes a folder: its images (trashed ones too) and subfolders move one level up, a subfolder whose name the parent holds takes the next free " 2", " 3" and is recorded as `media_folder.renamed`, and one `media_folder.deleted` is recorded; `Media::DeleteFolder.preview` says what will move.
 - The media library's folders, in the tree column of the Media screen.
+- A folder is created ("+ New folder" in the Folders column, a row's "+", or "New folder inside…"), renamed and deleted from the Media screen: a small dialog with its Name field and the refusal under it, and a confirm that says what moves where before a delete. The place heading of a folder has a "Folder actions" menu for `media.manage`.
 
 ### Changed
 

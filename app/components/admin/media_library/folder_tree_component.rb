@@ -36,7 +36,13 @@ module Admin
     # `data-tree-node`): a find over folders neither counts nor hides them.
     #
     # `manage:` is whether the viewer holds `media.manage` (the folder
-    # writes). `mode:` is `:screen`, the Media screen's own column.
+    # writes): each folder row above the deepest level then carries its "+"
+    # ("New folder in %{name}", levels 1 to 3; a folder at level 4 can hold
+    # none), a button that opens the folder dialog
+    # (`Admin::MediaLibrary::FolderDialogComponent`) to create inside it, with
+    # the folder and its path as the trigger's params (`.add_params`). The
+    # column head's "+ New folder" (the Media screen's view) is the same
+    # trigger for the top. `mode:` is `:screen`, the Media screen's own column.
     class FolderTreeComponent < AdminComponent
       ID = "media-folder-tree"
       PART_ID = "media-folder-tree-part"
@@ -61,6 +67,17 @@ module Admin
       # The id of the row of `place` (a `Media::Place`), which the script
       # scrolls to.
       def self.row_id(place) = "media-place-row-#{place.to_param}"
+
+      # What opens the folder dialog to create inside the folder `id` (nil:
+      # at the top), whose path `path` the dialog says ("Inside Clients /
+      # Client A"): `admin--media--folder-dialog` reads the two params as it
+      # opens.
+      def self.add_params(id, path)
+        { "admin--ui--dialog-id-param": FolderDialogComponent::ID,
+          action: "admin--ui--dialog#open",
+          "admin--media--folder-dialog-parent-id-param": id.to_s,
+          "admin--media--folder-dialog-parent-path-param": path.to_s }
+      end
 
       private
 
@@ -122,6 +139,9 @@ module Admin
           row_item.with_title { link(node.name, folder_place) }
           count = count_part(counts.fetch(:folders, {})[node.id])
           row_item.with_trailing { count } if count
+          if manage && depth < Media::Folder::MAX_DEPTH
+            row_item.with_add(label: t("admin.components.media_library.folder_tree.add", name: node.name), data: self.class.add_params(node.id, tree.path_name(node.id)))
+          end
         end
         list = tag.ul(id: children_list_id(node), class: ROW[:children], hidden: folded, data: { tree_children: true }) do
           safe_join(children.map { |child| folder_node(child, depth + 1) })

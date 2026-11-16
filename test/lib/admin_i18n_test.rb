@@ -562,6 +562,15 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/media_library/toolbar_component.html.erb
     app/components/admin/media_library/folder_tree_component.rb
     app/components/admin/media_library/folder_tree_component.html.erb
+    app/components/admin/media_library/place_heading_component.rb
+    app/components/admin/media_library/place_heading_component.html.erb
+    app/components/admin/media_library/folder_dialog_component.rb
+    app/components/admin/media_library/folder_dialog_component.html.erb
+    app/components/admin/media_library/folder_form_component.rb
+    app/components/admin/media_library/folder_form_component.html.erb
+    app/components/admin/media_library/delete_folder_dialog_component.rb
+    app/components/admin/media_library/delete_folder_dialog_component.html.erb
+    app/javascript/controllers/admin/media/folder_dialog_controller.js
     app/javascript/controllers/admin/media/folders_controller.js
     app/views/admin/media/index.html.erb
     app/views/admin/media/picker.html.erb

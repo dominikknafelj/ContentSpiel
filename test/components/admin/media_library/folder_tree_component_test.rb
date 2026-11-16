@@ -7,11 +7,11 @@ require "test_helper"
 class Admin::MediaLibrary::FolderTreeComponentTest < ViewComponent::TestCase
   def folder(name, parent = nil) = Media::Folder.create!(name: name, parent: parent)
 
-  def render_tree(place: Media::Place::ALL, counts: { all: 0, none: 0, folders: {} }, query: {}, cookie: nil, go_to: nil)
+  def render_tree(place: Media::Place::ALL, counts: { all: 0, none: 0, folders: {} }, query: {}, cookie: nil, go_to: nil, manage: true)
     tree = Media::FolderTree.load
     render_inline Admin::MediaLibrary::FolderTreeComponent.new(
       tree: tree, counts: counts, place: place, query: query,
-      open_set: TreeOpenSet.parse(cookie, readable_ids: tree.ids), manage: true, go_to: go_to
+      open_set: TreeOpenSet.parse(cookie, readable_ids: tree.ids), manage: manage, go_to: go_to
     )
   end
 
@@ -137,5 +137,35 @@ class Admin::MediaLibrary::FolderTreeComponentTest < ViewComponent::TestCase
     render_tree(go_to: "/cs-studio/media?folder=none")
 
     assert_selector "div#media-folder-tree-part[data-media-go='/cs-studio/media?folder=none']"
+  end
+
+  test "New folder and the rows' + are for media.manage, on levels 1 to 3" do
+    clients = folder("Clients")
+    client_a = folder("Client A", clients)
+    year = folder("2026", client_a)
+    deepest = folder("Spring", year)
+
+    render_tree(place: place(deepest))
+
+    [ clients, client_a, year ].each do |each|
+      add = row(each.id).find("button.admin-tree-row__add", visible: :all)
+      assert_equal "New folder in #{each.name}", add["aria-label"]
+      assert_equal "admin--ui--dialog#open", add["data-action"]
+      assert_equal "media-folder-dialog", add["data-admin--ui--dialog-id-param"]
+      assert_equal each.id.to_s, add["data-admin--media--folder-dialog-parent-id-param"]
+    end
+    assert_equal "Clients / Client A", row(client_a.id).find("button.admin-tree-row__add", visible: :all)["data-admin--media--folder-dialog-parent-path-param"]
+    row(deepest.id).assert_no_selector ".admin-tree-row__add", visible: :all
+    row("all").assert_no_selector ".admin-tree-row__add", visible: :all
+    row("none").assert_no_selector ".admin-tree-row__add", visible: :all
+
+    # The column head's "+ New folder" (the Media screen's view) is the same
+    # trigger, for the top.
+    assert_equal({ "admin--ui--dialog-id-param": "media-folder-dialog", action: "admin--ui--dialog#open",
+                   "admin--media--folder-dialog-parent-id-param": "", "admin--media--folder-dialog-parent-path-param": "" },
+                 Admin::MediaLibrary::FolderTreeComponent.add_params(nil, nil))
+
+    render_tree(place: place(deepest), manage: false)
+    assert_no_selector ".admin-tree-row__add", visible: :all
   end
 end

@@ -22,9 +22,17 @@ module Admin
     #
     # Upload images opens the file input of the `admin--media--upload`
     # controller this heading is drawn inside (`admin/media/index`); `upload:
-    # false` leaves it out. The folder actions' menu (after the count) and
-    # Select (before Upload) stand at the two SLOT comments of the template;
-    # `manage:` is whether the viewer holds `media.manage`, which the menu asks.
+    # false` leaves it out. Select (before Upload) stands at the SLOT comment
+    # of the template.
+    #
+    # THE FOLDER'S MENU (D10), after the count: in a folder, for `manage:`
+    # (the viewer holds `media.manage`), the ⋯ "Folder actions" with "New
+    # folder inside…" (levels 1 to 3: a folder at level 4 can hold none),
+    # "Rename…", and after a separator "Delete folder…". The first two open
+    # the one folder dialog (`FolderDialogComponent`), told by their params
+    # what for (`admin--media--folder-dialog`); the last opens the delete
+    # confirm the Media screen draws for this folder
+    # (`DeleteFolderDialogComponent`).
     class PlaceHeadingComponent < AdminComponent
       COUNT_ID = Admin::Answers::ImagesMoved::PLACE_COUNT_ID
 
@@ -70,6 +78,23 @@ module Admin
       end
 
       def link_data = { turbo_frame: "content", turbo_action: "advance" }
+
+      def menu? = manage? && folder?
+
+      def new_inside? = tree.depth(place.folder) < Media::Folder::MAX_DEPTH
+
+      def new_inside_data = FolderTreeComponent.add_params(place.folder, tree.path_name(place.folder))
+
+      def rename_data
+        node = tree.find(place.folder)
+        { "admin--ui--dialog-id-param": FolderDialogComponent::ID,
+          action: "admin--ui--dialog#open",
+          "admin--media--folder-dialog-folder-id-param": node.id.to_s,
+          "admin--media--folder-dialog-folder-name-param": node.name,
+          "admin--media--folder-dialog-parent-path-param": (node.parent_id ? tree.path_name(node.parent_id) : "") }
+      end
+
+      def delete_data = dialog_trigger(DeleteFolderDialogComponent::ID)
 
       private
 

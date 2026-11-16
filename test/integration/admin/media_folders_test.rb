@@ -36,6 +36,24 @@ class Admin::MediaFoldersTest < ActionDispatch::IntegrationTest
     assert_equal [ "Client A" ], Media::Folder.pluck(:name)
   end
 
+  # `folder` is deleted just before this request's service takes the tree's
+  # lock, inside its transaction: the controller found the folder, the
+  # service finds it gone (a refused save rolls the deletion back with it).
+  # (The suite has no minitest/mock: the model's own method is put back.)
+  def deleted_meanwhile(folder)
+    lock_tree = Media::Folder.method(:lock_tree!)
+    Media::Folder.define_singleton_method(:lock_tree!) do
+      Media::Asset.where(folder_id: folder.id).update_all(folder_id: nil) # version: none (a test's own rows)
+      Media::Folder.where(id: folder.id).delete_all
+      lock_tree.call
+    end
+    yield
+  ensure
+    Media::Folder.define_singleton_method(:lock_tree!, lock_tree)
+  end
+
+  def form_stream = streams.find { |stream| stream["target"] == "media-folder-form" }
+
   test "a refused name answers 422 with the field's sentence and writes nothing" do
     sign_in_as(users(:one))
 
@@ -44,9 +62,101 @@ class Admin::MediaFoldersTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    form = streams.find { |stream| stream["target"] == "media-folder-form" }
-    assert_equal "replace", form["action"]
+    assert_equal "replace", form_stream["action"]
+    assert_equal "Give the folder a name.", form_stream.at_css("[data-media-folder-error='name']").text
+  end
+
+  test "a refused create draws the whole form again: the name as typed, the parent and the search, the sentence under the field" do
+    sign_in_as(users(:one))
+    clients = Media::Folder.create!(name: "Clients")
+    Media::Folder.create!(name: "Press", parent: clients)
+
+    post "/cs-studio/media_folders", params: { media_folder: { name: " press ", parent_id: clients.id.to_s }, place: clients.id.to_s, q: "logo", filter: "unused" }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    form = form_stream.at_css("template form#media-folder-form")
+    assert_equal "/cs-studio/media_folders", form["action"]
+    assert_equal "post", form.at_css("input[name=_method]")["value"]
+    name = form.at_css("input#media-folder-name")
+    assert_equal " press ", name["value"]
+    assert_equal "true", name["aria-invalid"]
+    assert_equal clients.id.to_s, form.at_css("input[name='media_folder[parent_id]']")["value"]
+    assert_equal [ clients.id.to_s, "logo", "unused" ], %w[place q filter].map { |field| form.at_css("input[name=#{field}]")["value"] }
+    assert_equal "A folder named “press” is already here.", form.at_css("#media-folder-name-errors [data-media-folder-error='name']").text
+    assert_equal "Inside Clients", form.at_css("#media-folder-where").text.squish
+  end
+
+  test "a refused rename draws the rename form again and a parent deleted meanwhile is said under the field" do
+    sign_in_as(users(:one))
+    clients = Media::Folder.create!(name: "Clients")
+    client_a = Media::Folder.create!(name: "Client A", parent: clients)
+
+    patch "/cs-studio/media_folders/#{client_a.id}", params: { media_folder: { name: "" }, place: client_a.id.to_s }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    form = form_stream.at_css("template form#media-folder-form")
+    assert_equal "/cs-studio/media_folders/#{client_a.id}", form["action"]
+    assert_equal "patch", form.at_css("input[name=_method]")["value"]
+    assert form.at_css("input[name='media_folder[parent_id]']")["disabled"], "a rename sends no parent"
     assert_equal "Give the folder a name.", form.at_css("[data-media-folder-error='name']").text
+    assert_equal "Client A", client_a.reload.name
+
+    events = Media::Folder.create!(name: "Events")
+    deleted_meanwhile(events) do
+      post "/cs-studio/media_folders", params: { media_folder: { name: "Trips", parent_id: events.id.to_s } }, as: :turbo_stream
+    end
+    assert_response :unprocessable_entity
+    form = form_stream.at_css("template form#media-folder-form")
+    assert_equal "That folder is gone.", form.at_css("[data-media-folder-error]").text
+    assert_equal events.id.to_s, form.at_css("input[name='media_folder[parent_id]']")["value"], "the parent asked for is sent again as it was"
+  end
+
+  test "a refused delete answers with an error toast and no form" do
+    sign_in_as(users(:one))
+    clients = Media::Folder.create!(name: "Clients")
+
+    deleted_meanwhile(clients) do
+      delete "/cs-studio/media_folders/#{clients.id}", params: { place: clients.id.to_s }, as: :turbo_stream
+    end
+
+    assert_response :unprocessable_entity
+    assert_nil form_stream
+    assert_nil part
+    assert_equal "That folder is gone.", toast_text
+    assert streams.find { |stream| stream["target"] == "toasts" }.at_css("template [role=alert]"), "an error toast"
+  end
+
+  test "the Media screen draws New folder, the folder dialog and, in a folder, the delete confirm for media.manage only" do
+    clients = Media::Folder.create!(name: "Clients")
+    client_a = Media::Folder.create!(name: "Client A", parent: clients)
+    asset = create_media_asset
+    asset.update_columns(folder_id: client_a.id) # version: none (a test's own rows)
+
+    sign_in_as(users(:one))
+    get "/cs-studio/media?folder=#{client_a.id}"
+    html = Nokogiri::HTML(response.body)
+    head_button = html.at_css("#tree-column button[data-admin--ui--dialog-id-param='media-folder-dialog']")
+    assert_equal "+ New folder", head_button.text.strip
+    assert_equal "", head_button["data-admin--media--folder-dialog-parent-id-param"]
+    assert html.at_css("#content dialog#media-folder-dialog form#media-folder-form")
+    delete_dialog = html.at_css("#content dialog#media-folder-delete-dialog")
+    assert_equal "Delete “Client A”?", delete_dialog.at_css("h2").text
+    assert_equal "Its 1 image move to “Clients”. Nothing else is deleted.", delete_dialog.at_css("[data-media-folder-delete-body]").text
+    assert_equal "/cs-studio/media_folders/#{client_a.id}", delete_dialog.at_css("form#media-folder-delete-form")["action"]
+
+    get "/cs-studio/media"
+    html = Nokogiri::HTML(response.body)
+    assert html.at_css("dialog#media-folder-dialog")
+    assert_nil html.at_css("dialog#media-folder-delete-dialog"), "no folder to delete in All media"
+
+    sign_in_as(uploader_without_manage)
+    get "/cs-studio/media?folder=#{client_a.id}"
+    assert_response :success
+    html = Nokogiri::HTML(response.body)
+    assert_nil html.at_css("[data-admin--ui--dialog-id-param='media-folder-dialog']")
+    assert_nil html.at_css("dialog#media-folder-dialog")
+    assert_nil html.at_css("dialog#media-folder-delete-dialog")
+    assert_nil html.at_css(".admin-tree-row__add")
   end
 
   test "a create answers the column's part with the new folder as the place to go to and no toast" do

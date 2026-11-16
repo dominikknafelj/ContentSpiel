@@ -661,7 +661,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-count-missing_alt", text: "3"
     assert_select "#media-count-mine", text: "1"
     assert_select "input#media-filter-unused[checked]"
-    assert_select "input[name=filter]", count: 5
+    assert_select "input[name=filter]:not([type=hidden])", count: 5
 
     get "/cs-studio/media", params: { q: "mine" }
     assert_select "#media-count-all", text: "1"
@@ -695,7 +695,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { filter: "untranslated" }
 
     assert_response :success
-    assert_select "input[name=filter]", count: 4
+    assert_select "input[name=filter]:not([type=hidden])", count: 4
     assert_select "input#media-filter-all[checked]"
   end
 
