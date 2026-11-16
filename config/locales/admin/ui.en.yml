@@ -260,18 +260,20 @@ en:
           upload_into: "Uploads go into %{name}"
           upload_nowhere: "Uploads go into no folder"
           # A multiple opening (the Gallery card's Add images): the title, the
-          # footer's primary and status, a tile already in the gallery, and a
-          # chosen tile's name, its place in the order picked by the script
-          # with `Intl.PluralRules`' ordinal type (`ordinal: true`).
+          # footer's primary and status, a tile already in the gallery, and
+          # what a chosen tile's whole name ends with, its place in the order
+          # picked by the script with `Intl.PluralRules`' ordinal type
+          # (`ordinal: true`).
           title_multiple: "Add images"
           add_count:
             zero: "Add images"
             one: "Add 1 image"
             other: "Add %{count} images"
+          takes_none: "No images selected · the gallery takes %{left} more"
           takes: "%{count} selected · the gallery takes %{left} more"
           full: "The gallery takes no more: %{max} images."
           in_gallery: "In the gallery"
-          chosen_order: "%{name}, chosen %{ordinal}"
+          chosen: ", chosen %{ordinal}"
           ordinal:
             one: "%{count}st"
             two: "%{count}nd"

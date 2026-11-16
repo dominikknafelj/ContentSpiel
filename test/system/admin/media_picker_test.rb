@@ -518,6 +518,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
       assert_selector "h2", exact_text: "Add images"
       assert_button "Add images", disabled: true
       assert_no_button "Use image"
+      assert_selector "[role=status]", exact_text: "No images selected · the gallery takes 10 more"
 
       click_on "Harbour"
       assert_order harbour => 1
@@ -552,6 +553,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     end
     refute_selector "dialog[open]"
 
+    await_js("window.__picked !== null", message: "the opener was never answered")
     picked = page.evaluate_script("window.__picked")
     assert_equal [ crowd.id, harbour.id, stage.id ], picked.fetch("items").map { |item| item["id"] }
     assert_equal %w[alt caption id title url], picked["items"].first.keys.intersection(%w[id url title alt caption]).sort
@@ -598,6 +600,23 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
       assert_selector "[role=status]", exact_text: "The gallery takes no more: 60 images."
       assert_selector "#{tile(stage)}[aria-disabled=true]"
       assert_no_selector "#{tile(harbour)}[aria-disabled], #{tile(crowd)}[aria-disabled]"
+      # It looks disabled, with no pill, and the status line says why.
+      limited = find("#{tile(stage)}[data-media-pick-limit]")
+      assert_equal "The gallery takes no more: 60 images.", find_by_id(limited["aria-describedby"]).text
+      assert_no_selector "#{tile(stage)} [data-media-pick-in-gallery], #{tile(stage)} [data-media-pick-order]"
+      look = page.evaluate_script(<<~JS)
+        (() => {
+          const tile = document.querySelector("#{tile(stage)}")
+          const meta = getComputedStyle(document.querySelector("dialog[open] [role=status].text-meta")).color
+          return { filter: getComputedStyle(tile.querySelector("img:not([aria-hidden])")).filter, cursor: getComputedStyle(tile).cursor,
+                   title: getComputedStyle(tile.querySelector(".text-ink, .font-medium")).color === meta }
+        })()
+      JS
+      assert_equal({ "filter" => "saturate(0.35)", "cursor" => "not-allowed", "title" => true }, look)
+      # No lift under the pointer: elevation 1, a chosen tile's.
+      find(tile(stage)).hover
+      shadow = ->(asset) { page.evaluate_script(%(getComputedStyle(document.querySelector("#{tile(asset)}")).boxShadow)) }
+      assert_equal shadow.(harbour), shadow.(stage)
 
       find(tile(stage)).click
       assert_selector "#{tile(stage)}[aria-pressed=false]"
@@ -605,6 +624,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
       click_on "Harbour"
       assert_no_selector "#{tile(stage)}[aria-disabled]"
+      assert_no_selector "#{tile(stage)}[data-media-pick-limit], #{tile(stage)}[aria-describedby]"
       assert_selector "[role=status]", exact_text: "1 selected · the gallery takes 1 more"
       click_on "Stage"
       assert_order crowd => 1, stage => 2
@@ -617,18 +637,112 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     open_multiple(max: 10)
     within("dialog[open]") do
+      unchosen = accessible_name(tile(crowd))
+      assert_match(/\ACrowd\b.*No alt.*Unused\z/, unchosen)
       click_on "Harbour"
       click_on "Crowd"
       click_on "Stage"
-      assert_selector "#{tile(harbour)}[aria-label='Harbour, chosen 1st']"
-      assert_selector "#{tile(crowd)}[aria-label='Crowd, chosen 2nd']"
-      assert_selector "#{tile(stage)}[aria-label='Stage, chosen 3rd']"
+      assert_order harbour => 1, crowd => 2, stage => 3
+      # The whole name stays, the order after it; the badges stay drawn.
+      assert_equal "#{unchosen}, chosen 2nd", accessible_name(tile(crowd))
+      assert_match(/, chosen 1st\z/, accessible_name(tile(harbour)))
+      assert_match(/, chosen 3rd\z/, accessible_name(tile(stage)))
+      assert_selector tile(crowd), text: "No alt"
+      assert_no_selector "#{tile(crowd)}[aria-label]"
 
       click_on "Harbour"
-      assert_selector "#{tile(harbour)}:not([aria-label])"
-      assert_selector "#{tile(stage)}[aria-label='Stage, chosen 2nd']"
+      assert_no_match(/chosen/, accessible_name(tile(harbour)))
+      assert_match(/, chosen 2nd\z/, accessible_name(tile(stage)))
       # The number is a picture of the name, never read beside it.
       assert_selector "#{tile(stage)} [data-media-pick-order][aria-hidden=true]", text: "2"
+    end
+  end
+
+  # Important 1: the keyboard in a multiple opening. A press is a toggle, a
+  # tile that cannot be chosen takes no press, and a held Enter (the key's
+  # repeats) toggles once, not on and off with every repeat.
+  test "in a multiple opening Tab reaches a tile, Space chooses it, Enter unchooses it, a disabled tile takes no key and a held Enter toggles once" do
+    harbour, crowd = titled("Harbour"), titled("Crowd")
+    visit_screen(admin_root_path)
+
+    # 59 images in the gallery: it takes one more of its 60.
+    open_multiple(max: 1, chosen: (1..59).map { |n| 1_000_000 + n })
+    await_js(%(document.activeElement?.matches("dialog[open] input[type=search]")), message: "the search field did not take the focus")
+    stop_on("dialog[open] button[aria-pressed]")
+    first = page.evaluate_script("document.activeElement.closest('li').id")
+    other = ([ harbour, crowd ].map { |asset| "media-picker-asset-#{asset.id}" } - [ first ]).sole
+
+    page.send_keys(:space)
+    assert_selector "##{first} button[aria-pressed=true] [data-media-pick-order]", text: "1"
+    assert_selector "##{other} button[aria-disabled=true]"
+    assert_selector "dialog[open]"
+
+    # The other tile is at the limit: Space and Enter on it change nothing.
+    stop_on("##{other} button")
+    page.send_keys(:space)
+    page.send_keys(:enter)
+    assert_selector "##{other} button[aria-pressed=false][aria-disabled=true]"
+    assert_selector "##{first} button[aria-pressed=true]"
+
+    stop_on("##{first} button", keys: [ :shift, :tab ])
+    page.send_keys(:enter)
+    assert_selector "##{first} button[aria-pressed=false]"
+    assert_no_selector "dialog[open] [data-media-pick-order]"
+
+    hold_enter(repeats: 3)
+    assert_selector "##{first} button[aria-pressed=true] [data-media-pick-order]", text: "1"
+    assert_selector "dialog[open] [role=status]", exact_text: "The gallery takes no more: 60 images."
+  end
+
+  # A gallery adds what was just uploaded: every finished upload of a batch
+  # joins the choice in the order it finished, until the gallery is full,
+  # and a tile that arrives after that is drawn at the limit at once.
+  test "in a multiple opening every finished upload joins the choice, up to the limit" do
+    harbour = titled("Harbour")
+    visit_screen(admin_root_path)
+
+    open_multiple(max: 3, chosen: (1..57).map { |n| 1_000_000 + n })
+    within("dialog[open]") do
+      click_on "Harbour"
+      attach_file "Image file", [ file_fixture("tiny.png").to_s, file_fixture("small.gif").to_s, file_fixture("medium.png").to_s ]
+      assert_selector "[role=status]", exact_text: "The gallery takes no more: 60 images.", wait: 15
+      # The setup's image, Harbour and the three uploads.
+      assert_selector "ul.admin-media-grid > li[id^=media-picker-asset-]", count: 5, wait: 15
+    end
+    uploads = Media::Asset.where.not(id: [ harbour.id, @asset.id ]).order(:id).to_a
+    assert_equal 3, uploads.size
+    within("dialog[open]") do
+      assert_order harbour => 1, uploads[0] => 2, uploads[1] => 3
+      assert_selector "#{tile(uploads[2])}[aria-disabled=true][data-media-pick-limit]"
+    end
+  end
+
+  # Minor 2: the choice and the scripts' marks go with the close, and the
+  # single opening's title and primary come back, so neither the next
+  # opening nor Turbo's snapshot keeps them.
+  test "a closed multiple opening leaves nothing chosen for the next" do
+    titled("Harbour")
+    visit_screen(admin_root_path)
+
+    open_multiple(max: 10)
+    within("dialog[open]") do
+      click_on "Harbour"
+      assert_selector "[data-media-pick-order]"
+      click_on "Cancel"
+    end
+    refute_selector "dialog[open]"
+    within("dialog#media-picker", visible: :all) do
+      assert_selector "h2", exact_text: "Choose an image", visible: :all
+      assert_selector "button[data-admin--media--select-target=use]", exact_text: "Use image", visible: :all
+      assert_no_selector "[data-media-pick-order], [aria-pressed=true]", visible: :all
+    end
+
+    open_multiple(max: 10)
+    within("dialog[open]") do
+      assert_selector "h2", exact_text: "Add images"
+      assert_selector "[role=status]", exact_text: "No images selected · the gallery takes 10 more"
+      assert_no_selector "[data-media-pick-order], [aria-pressed=true]"
+      assert_button "Add images", disabled: true
     end
   end
 
@@ -664,6 +778,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     end
     refute_selector "dialog[open]"
 
+    await_js("window.__picked !== null", message: "the opener was never answered")
     picked = page.evaluate_script("window.__picked")
     assert_equal "Harbour", picked["title"]
     assert_equal %w[alt caption id title url], picked.keys.intersection(%w[id url title alt caption]).sort
@@ -677,6 +792,26 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     asset = create_media_asset(filename: "tiny.png")
     asset.update_columns(title: title) # version: none (a test's own rows)
     asset
+  end
+
+  # What a screen reader names an element, from Chrome's accessibility tree.
+  def accessible_name(selector)
+    cdp = page.driver.browser.page
+    root = cdp.command("DOM.getDocument", depth: 0).dig("root", "nodeId")
+    node = cdp.command("DOM.querySelector", nodeId: root, selector: selector).fetch("nodeId")
+    # The words appended to a chosen tile stand in a box of their own, so
+    # Chrome puts a space before their comma: no screen reader says it.
+    cdp.command("Accessibility.getPartialAXTree", nodeId: node, fetchRelatives: false).fetch("nodes").first.dig("name", "value").to_s.squish.gsub(" ,", ",")
+  end
+
+  # Enter held down: one press, then the key's repeats, then its release
+  # (CDP key events, which `send_keys` cannot repeat).
+  def hold_enter(repeats:)
+    cdp = page.driver.browser.page
+    key = { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 }
+    cdp.command("Input.dispatchKeyEvent", type: "keyDown", text: "\r", **key)
+    repeats.times { cdp.command("Input.dispatchKeyEvent", type: "keyDown", text: "\r", autoRepeat: true, **key) }
+    cdp.command("Input.dispatchKeyEvent", type: "keyUp", **key)
   end
 
   # The picker's tile of an image.

@@ -60,7 +60,8 @@ module Admin
       include Admin::Ui::Contract
 
       contract(
-        accessibility: "A native modal dialog named by its title, with Upload, Close, a polite status saying what is chosen, Cancel and Use image; its tiles are buttons with aria-pressed, Escape clears a typed search and then closes it, and the focus goes back to the control that opened it.",
+        accessibility: "A native modal dialog named by its title, with Upload, Close, a polite status saying what is chosen, Cancel and Use image; its tiles are buttons with aria-pressed, Escape clears a typed search and then closes it, and the focus goes back to the control that opened it; " \
+                       "opened for several, a chosen tile's name ends with its place in the order (\", chosen 2nd\"), a tile already in the gallery is aria-disabled and described as \"In the gallery\", and at the limit every other tile is aria-disabled and described by the status line.",
         motion: :reduced,
         content_edges: %i[none many long],
         widths: :fixed_width,
@@ -77,10 +78,11 @@ module Admin
           multiple: [ "test/system/admin/media_picker_test.rb",
                       "a multiple opening reads Add images, toggles tiles numbered in the order chosen, keeps the order across searches and places, and hands back items" ]
         },
-        keys: %w[title upload upload_into upload_nowhere close file none selected cancel use title_multiple add_count takes full in_gallery chosen_order ordinal],
+        keys: %w[title upload upload_into upload_nowhere close file none selected cancel use title_multiple add_count takes_none takes full in_gallery chosen ordinal],
         slots: [],
         controller: "admin--media--picker",
-        keyboard: [ "test/system/admin/media_picker_test.rb", "the keyboard reaches a tile by Tab from the search field, Space selects it and a second Enter on it confirms" ]
+        keyboard: [ "test/system/admin/media_picker_test.rb",
+                    "in a multiple opening Tab reaches a tile, Space chooses it, Enter unchooses it, a disabled tile takes no key and a held Enter toggles once" ]
       )
 
       DIALOG_ID = "media-picker".freeze
@@ -91,7 +93,7 @@ module Admin
 
       # What a multiple opening says instead (the title and the primary,
       # which a single opening then puts back), and a chosen tile's name.
-      MULTIPLE_MESSAGES = %w[title title_multiple use add_count takes full chosen_order ordinal]
+      MULTIPLE_MESSAGES = %w[title title_multiple use add_count takes_none takes full chosen ordinal]
                           .map { |key| "components.ui.media_picker.#{key}" }.freeze
 
       # The words before Upload, which `admin--media--picker` writes for each
@@ -99,7 +101,9 @@ module Admin
       PLACE_MESSAGES = %w[components.ui.media_picker.upload_into components.ui.media_picker.upload_nowhere].freeze
 
       # The picker's wiring, one place (all on the dialog element):
-      # - `media-picker:open@window` / `close`: the opener contract above;
+      # - `media-picker:open@window` / `close`: the opener contract above, and
+      #   on `close` the choice forgotten with the marks a multiple opening
+      #   drew (Turbo's snapshot keeps the dialog);
       # - `cancel`: native Escape, which a typed search turns into "clear it";
       # - `keydown`: the same Escape, caught earlier where the browser lets us;
       # - `turbo:frame-load`: after the grid arrives or navigates, live upload tiles
@@ -115,6 +119,7 @@ module Admin
       ACTIONS = [
         "media-picker:open@window->admin--media--picker#open",
         "close->admin--media--picker#closed",
+        "close->admin--media--select#reset",
         "cancel->admin--media--picker#cancel",
         "keydown->admin--media--picker#keydown",
         "turbo:frame-load->admin--media--picker#gridLoaded",

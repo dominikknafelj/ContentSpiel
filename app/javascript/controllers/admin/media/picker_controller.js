@@ -82,6 +82,7 @@ export default class extends Controller {
 
   connect() {
     this.opener = null
+    this.multiple = false
     this.pending = null
     this.escapeCleared = false
     this.gridPending = false
@@ -107,6 +108,7 @@ export default class extends Controller {
     if (!opener) return
 
     const multiple = event.detail.multiple === true
+    this.multiple = multiple
     this.opener = opener
     this.pending = null
     this.selectNextUpload = false
@@ -315,6 +317,11 @@ export default class extends Controller {
     const detail = this.pending
     this.opener = null
     this.pending = null
+    // The single opening's title is put back with the choice
+    // (`admin--media--select#reset`, on the same close): Turbo's snapshot
+    // keeps the dialog as it is left.
+    this.multiple = false
+    this.titleTarget.textContent = messages(this.element).t("components.ui.media_picker.title")
     if (!opener || !opener.isConnected) return
 
     opener.focus()
@@ -366,11 +373,13 @@ export default class extends Controller {
 
   // A finished upload: the counts follow it, the place it went to is said
   // with its digest now (`admin--media--live#uploaded`), and the first of the
-  // batch is the selection -- selected, not chosen: the editor confirms.
+  // batch is the selection -- selected, not chosen: the editor confirms. A
+  // multiple opening is handed every one, in the order they finish (a
+  // gallery adds what was just uploaded, up to what it takes).
   uploaded({ json, tile }) {
     updateCounts(json.counts, { picker: true, folders: json.folder_counts, tree: this.frameTarget.querySelector("#media-picker-folder-tree") })
     this.dispatch("digest", { detail: { place: json.place, digest: json.place_digest } })
-    if (!this.selectNextUpload || !tile) return
+    if (!(this.selectNextUpload || this.multiple) || !tile) return
 
     const raw = tile.querySelector("[data-admin--media--select-asset-param]")?.getAttribute("data-admin--media--select-asset-param")
     if (!raw) return

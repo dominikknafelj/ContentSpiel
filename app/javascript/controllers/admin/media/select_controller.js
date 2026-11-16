@@ -18,15 +18,21 @@ import { messages } from "i18n/messages"
 // picker hands `multiple`, `max` and the ids already in the gallery in its
 // `reset`): a press, Enter or Space TOGGLES a tile, and the choice is a list in
 // the order chosen. Each chosen tile wears its place as the accent pill (the
-// `orderMark` template, a picture: the tile's name ends ", chosen 2nd"), and
-// unchoosing renumbers the rest. A tile already in the gallery wears "In the
-// gallery" (`inGalleryMark`, its description), its thumbnail desaturated
-// (`data-media-pick-present`), and is `aria-disabled`; when the list reaches
-// `max` every other tile is `aria-disabled` too. A press on an
-// `aria-disabled` tile does nothing. A double click is no confirm there, and
-// its second click is not a second toggle (a click's `detail` counts it), so
-// a quick double press chooses once. The primary reads "Add 3 images" and
-// confirms the list: `chosen` carries `{ items: [payload, ...] }`.
+// `orderMark` template, a picture), and its whole name, size and badges
+// kept, ends ", chosen 2nd" (words of the script's, visually hidden, last in
+// the tile); unchoosing renumbers the rest. A tile already in the gallery
+// wears "In the gallery" (`inGalleryMark`, its description), its thumbnail
+// desaturated (`data-media-pick-present`), and is `aria-disabled`; when the
+// list reaches `max` every other tile is `aria-disabled` too, drawn disabled
+// (`data-media-pick-limit`) and described by the status line, which says
+// why. A press on an `aria-disabled` tile does nothing. A double click is no
+// confirm there, and its second click is not a second toggle (a click's
+// `detail` counts it), so a quick double press chooses once; a held Enter's
+// repeats are refused, since each would be a click, so it toggles once. Every
+// finished upload joins the list, in the order it finished, while the gallery
+// takes more. The primary reads "Add 3 images" and confirms the list:
+// `chosen` carries `{ items: [payload, ...] }`. The dialog's `close` resets
+// it all, so neither the next opening nor Turbo's snapshot keeps a mark.
 //
 // The selection is the payload held HERE, not a mark in the DOM: searching or
 // choosing a segment replaces the grid inside its frame, and the choice has to
@@ -70,8 +76,14 @@ export default class extends Controller {
   // Enter on a tile that is already selected confirms. The first Enter falls
   // through to the button's own click, which selects.
   key(event) {
+    if (this.multiple) {
+      // A repeated Enter is a click of its own: held, it would choose and
+      // unchoose with every repeat.
+      if (event.key === "Enter" && event.repeat) event.preventDefault()
+      return
+    }
     // Holding the key repeats keydown: one Enter confirms, not a stream of them.
-    if (this.multiple || event.key !== "Enter" || event.repeat || event.currentTarget.getAttribute("aria-pressed") !== "true") return
+    if (event.key !== "Enter" || event.repeat || event.currentTarget.getAttribute("aria-pressed") !== "true") return
 
     event.preventDefault()
     this.confirm()
@@ -85,22 +97,27 @@ export default class extends Controller {
     }
   }
 
-  // The picker opened afresh: nothing is chosen yet, and its opening says
-  // whether several are (`multiple`, `max`, the ids `present` in the gallery).
-  // `total`, what the gallery holds at most, is what it holds and what it
-  // still takes.
+  // The picker opened afresh (or closed): nothing is chosen, and an opening
+  // says whether several are (`multiple`, `max`, the ids `present` in the
+  // gallery). `total`, what the gallery holds at most, is what it holds and
+  // what it still takes. A close whose event arrives after the next open
+  // (`admin--media--picker#closed`) is not this open's to reset.
   reset(event) {
-    const opening = event?.detail || {}
+    if (event?.type === "close" && this.element.open) return
+
+    const opening = event?.type === "close" ? {} : event?.detail || {}
     this.multiple = opening.multiple === true
     this.present = new Set((opening.present || []).map(String))
     this.max = this.multiple ? opening.max : 0
-    this.total = this.multiple ? (opening.present || []).length + opening.max : 0
+    this.total = this.multiple ? this.present.size + opening.max : 0
     this.order = []
     this.setSelected(null)
   }
 
-  // A finished upload: the picker selects the first one of a batch (in a
-  // multiple opening, adds it to the list while the gallery takes more).
+  // A finished upload: the picker selects the first one of a batch. In a
+  // multiple opening it hands every one, which joins the list while the
+  // gallery takes more; its new tile is marked either way (at the limit,
+  // disabled).
   selectUploaded(event) {
     const payload = event.detail?.payload
     if (!this.multiple) {
@@ -108,6 +125,7 @@ export default class extends Controller {
       return
     }
     if (payload && Number.isInteger(payload.id) && !this.chosenAt(payload.id) && !this.present.has(String(payload.id)) && !this.full) this.toggle(payload)
+    else this.mark()
   }
 
   // The grid frame (not an upload tile's own events) was rendered or navigated.
@@ -162,7 +180,10 @@ export default class extends Controller {
     tile.setAttribute("aria-pressed", place > 0 ? "true" : "false")
     if (present || (place === 0 && this.full)) tile.setAttribute("aria-disabled", "true")
 
-    if (present) {
+    if (!present && place === 0 && this.full) {
+      tile.dataset.mediaPickLimit = ""
+      if (this.hasStatusTarget) tile.setAttribute("aria-describedby", this.statusTarget.id)
+    } else if (present) {
       const mark = this.addMark(tile, this.inGalleryMarkTarget)
       mark.id = `media-picker-in-gallery-${tile.dataset.assetId}`
       tile.setAttribute("aria-describedby", mark.id)
@@ -171,14 +192,18 @@ export default class extends Controller {
       this.addMark(tile, this.orderMarkTarget).textContent = String(place)
       const words = messages(this.element)
       const ordinal = words.t("components.ui.media_picker.ordinal", { count: place, ordinal: true })
-      tile.setAttribute("aria-label", words.t("components.ui.media_picker.chosen_order", { name: this.order[place - 1].title, ordinal }))
+      const said = document.createElement("span")
+      said.className = "sr-only"
+      said.dataset.mediaPickChosen = ""
+      said.textContent = words.t("components.ui.media_picker.chosen", { ordinal })
+      tile.append(said)
     }
   }
 
   // A tile as a single opening draws it: nothing of a multiple opening's.
   unmark(tile) {
-    tile.querySelectorAll("[data-media-pick-order], [data-media-pick-in-gallery]").forEach((mark) => mark.remove())
-    for (const name of [ "aria-disabled", "aria-describedby", "aria-label", "data-media-pick-present" ]) tile.removeAttribute(name)
+    tile.querySelectorAll("[data-media-pick-order], [data-media-pick-in-gallery], [data-media-pick-chosen]").forEach((mark) => mark.remove())
+    for (const name of [ "aria-disabled", "aria-describedby", "data-media-pick-present", "data-media-pick-limit" ]) tile.removeAttribute(name)
   }
 
   // A mark cloned onto the tile's thumbnail (its first child, the
@@ -198,9 +223,9 @@ export default class extends Controller {
         this.useTarget.textContent = words.t("components.ui.media_picker.add_count", { count })
       }
       if (this.hasStatusTarget) {
-        this.statusTarget.textContent = this.full
-          ? words.t("components.ui.media_picker.full", { max: this.total })
-          : words.t("components.ui.media_picker.takes", { count, left: this.max - count })
+        if (this.full) this.statusTarget.textContent = words.t("components.ui.media_picker.full", { max: this.total })
+        else if (count === 0) this.statusTarget.textContent = words.t("components.ui.media_picker.takes_none", { left: this.max })
+        else this.statusTarget.textContent = words.t("components.ui.media_picker.takes", { count, left: this.max - count })
       }
       return
     }
