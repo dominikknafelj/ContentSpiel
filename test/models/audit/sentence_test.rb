@@ -688,7 +688,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     # A gem's type whose label nothing here knows is spelled by the same rule,
     # and an event that recorded no type is "a block".
     assert_equal "You added an Accordion block to “Pricing”", sentence.("block.created", "accordion")
-    assert_equal "You added a Gallery block to “Pricing”", sentence.("block.created", "gallery")
+    assert_equal "You added a Retired widget block to “Pricing”", sentence.("block.created", "retired_widget")
     assert_equal "You added a block to “Pricing”", sentence.("block.created", nil)
     assert_equal "You edited a block on “Pricing”", sentence.("block.updated", nil)
 

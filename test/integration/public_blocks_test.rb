@@ -167,8 +167,8 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
 
   test "an unregistered stored block type is skipped on render" do
     @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Hello there"))
-    gallery = @root.content_blocks.create!(block_type: :rich_text, position: 1, body: rich_doc("Gone"))
-    gallery.update_column(:block_type, "gallery")
+    retired = @root.content_blocks.create!(block_type: :rich_text, position: 1, body: rich_doc("Gone"))
+    retired.update_column(:block_type, "retired_widget")
 
     get "/"
 
@@ -437,7 +437,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   # can be drawn is an empty one.
   test "a block of an unregistered type in a column is skipped, and a section of nothing else renders nothing" do
     section = section_with_texts([ 1, "Still here" ], [ 2, "Gone" ])
-    @root.content_blocks.find_by!(section: section, section_column: 2).update_column(:block_type, "gallery")
+    @root.content_blocks.find_by!(section: section, section_column: 2).update_column(:block_type, "retired_widget")
     get "/"
 
     assert_response :success
@@ -445,7 +445,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "section.content-section .cs-prose", text: /Still here/
     assert_not_includes response.body, "Gone"
 
-    @root.content_blocks.find_by!(section: section, section_column: 1).update_column(:block_type, "gallery")
+    @root.content_blocks.find_by!(section: section, section_column: 1).update_column(:block_type, "retired_widget")
     get "/"
 
     assert_response :success
