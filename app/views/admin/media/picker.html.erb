@@ -8,10 +8,14 @@
     names it among the keys to keep), so every later request comes back here, not to
     the full Media module page. The toolbar is the Media screen's own
     (`Admin::MediaLibrary::ToolbarComponent`, `picker: true`), the tiles the grid's
-    (`pick: true`). A `folder` that named nothing was answered as All media; the
-    frame says so (`data-media-place-gone`) and the picker's script forgets the
-    place it remembered. %>
-<%= tag.turbo_frame id: "media-picker-grid", data: { media_place_gone: @place_gone ? "" : nil } do %>
+    (`pick: true`). The place this answer is of, and whether a `folder` that named
+    nothing was answered as All media, is one hidden element INSIDE the frame
+    (`#media-picker-place`): Turbo moves only a response frame's children into the
+    live frame, never its attributes, so the picker's script reads the place, its
+    name and `data-media-place-gone` (to forget a remembered place) from there. %>
+<turbo-frame id="media-picker-grid">
+  <% place_name = @place.all? ? t(".place_all") : @place.none? ? t(".place_none") : @folder_tree.find(@place.folder).name %>
+  <%= tag.div id: "media-picker-place", hidden: true, data: { media_place: @place.to_param, media_place_name: place_name, media_place_gone: @place_gone ? "" : nil } %>
   <%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], url_options: admin_url_options, picker: true, place: (@place.to_param unless @place.all?)) %>
 
   <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :picker, :folder).merge("page" => page)) } %>
@@ -25,4 +29,4 @@
       </div>
     <% end %>
   <% end %>
-<% end %>
+</turbo-frame>

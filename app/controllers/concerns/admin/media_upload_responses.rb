@@ -11,6 +11,8 @@ module Admin
   # - `tile`: the finished tile's HTML, drawn by `Admin::MediaLibrary::TileComponent`
   #   itself (a link into the panel on the Media screen, a pick button in the
   #   picker) so the markup has one author; and
+  # - `folder_counts`: `Media::FolderCounts.call`, the Folders column's numbers
+  #   (every folder's direct images, those outside any folder, all); and
   # - `counts`: `Media::Search#counts` for the search the grid was showing
   #   (`q` rides along with the file; it respects the search, never the
   #   segment) -- the same numbers the panel's autosave answer rewrites.
@@ -47,7 +49,9 @@ module Admin
 
     # The place `folder` names, nil when it names no folder.
     def requested_place
-      Media::Place.parse(params[:folder], tree: Media::FolderTree.load)
+      return @requested_place if defined?(@requested_place)
+
+      @requested_place = Media::Place.parse(params[:folder], tree: Media::FolderTree.load)
     end
 
     # The folder an upload lands in: the place's, or none. A `folder` that names

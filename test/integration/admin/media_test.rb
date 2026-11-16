@@ -1098,13 +1098,14 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { picker: 1, folder: "999999999" }
     assert_response :success
-    assert_select "turbo-frame#media-picker-grid[data-media-place-gone]"
+    assert_select "turbo-frame#media-picker-grid > #media-picker-place[hidden][data-media-place=all][data-media-place-name='All media'][data-media-place-gone]"
+    assert_select "turbo-frame#media-picker-grid[data-media-place-gone]", count: 0
     assert_select PICK, count: 2
     assert_select "input[name=folder]", count: 0
 
     folder = Media::Folder.create!(name: "Client A")
     get "/cs-studio/media", params: { picker: 1, folder: folder.id }
-    assert_select "turbo-frame#media-picker-grid[data-media-place-gone]", count: 0
+    assert_select "#media-picker-place[data-media-place=?][data-media-place-name=?]:not([data-media-place-gone])", folder.id.to_s, "Client A"
     assert_select "input[name=folder][value=?]", folder.id.to_s
   end
 
