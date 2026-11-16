@@ -1,0 +1,37 @@
+<%= tag.div class: "admin-gallery mt-1 border-t border-line pt-3", role: "group", aria: { labelledby: heading_id }, data: controller_data do %>
+  <div class="mb-2 flex items-baseline gap-2">
+    <h3 id="<%= heading_id %>" class="text-sm font-semibold text-ink"><%= t("#{WORDS}.images") %></h3>
+    <% if heading_count %>
+      <%= tag.span heading_count, class: "ml-auto text-small text-meta", hidden: empty? && !translation_tab?, data: { "admin--editor--gallery-target": "count" } %>
+    <% end %>
+  </div>
+
+  <%= tag.ul class: "flex flex-col gap-2", hidden: empty?, aria: { labelledby: heading_id }, data: { "admin--editor--gallery-target": "list" } do %>
+    <% ids.each do |id| %>
+      <%= render row(id) %>
+    <% end %>
+  <% end %>
+
+  <% if list_editable? %>
+    <%# The row the script copies for an image the picker hands it (`MediaTextRowComponent`, `template: true`). %>
+    <template data-admin--editor--gallery-target="template"><%= render template_row %></template>
+    <%# The keyboard moves' sentences, said politely and shown under the rows. Empty as the server draws it. %>
+    <p class="mt-2 text-small text-meta empty:hidden" role="status" data-admin--editor--gallery-target="status"></p>
+
+    <%# Under the rows: the add buttons and the count. Empty, the same part is the dashed box with the empty words (`data-empty`, which the script keeps). %>
+    <%= tag.div class: "mt-2 flex flex-wrap items-center gap-2 data-empty:flex-col data-empty:rounded-tile data-empty:border data-empty:border-dashed data-empty:border-line-strong data-empty:p-5 data-empty:text-center",
+          data: { "admin--editor--gallery-target": "foot", empty: ("" if empty?) } do %>
+      <%= tag.p t("#{WORDS}.empty"), class: "text-sm text-dim", hidden: !empty?, data: { "admin--editor--gallery-target": "empty" } %>
+      <% if can_add? %>
+        <div class="flex flex-wrap items-center gap-2">
+          <%= add_button("add", "add") %>
+          <%= add_button("addFolder", "add_folder", icon: :folder) if folders? %>
+        </div>
+      <% end %>
+      <% if count_line %>
+        <%= tag.span count_line, class: "ml-auto text-small text-meta", hidden: empty?, data: { "admin--editor--gallery-target": "countLine" } %>
+      <% end %>
+    <% end %>
+    <%= tag.p t("#{WORDS}.limit", max: max), id: limit_id, class: "mt-1 text-small text-meta", hidden: !full?, data: { "admin--editor--gallery-target": "limit" } if max %>
+  <% end %>
+<% end %>

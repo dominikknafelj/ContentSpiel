@@ -1921,4 +1921,125 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   def media_list_block_as_owner
     as_owner { media_list_block(@page, []) }
   end
+
+  # The Gallery block's card (StudioGallery D2 and D3): the card's autosave
+  # sends the list (the hidden input's JSON, written by `admin--editor--gallery`)
+  # and the texts together, through the same path as every block.
+  def gallery_block
+    post blocks_path, params: { block: { block_type: "gallery" } }, as: :turbo_stream
+    assert_response :success
+    @page.content_blocks.where(block_type: "gallery").order(:id).last
+  end
+
+  def save_gallery(block, settings, base: block.reload.updated_at.iso8601(6), tab: nil)
+    patch "#{blocks_path}/#{block.id}", params: { block: { settings: settings }, base_updated_at: base }, as: :turbo_stream,
+      headers: { "X-Notes-Tab" => tab }.compact
+  end
+
+  def images_json(*assets) = JSON.generate(assets.map(&:id))
+
+  def usage_ids(block) = Media::Usage.where(owner: block, role: "block_field").pluck(:media_asset_id).sort
+
+  test "a Gallery added from the picker saves its list and its texts together" do
+    block = gallery_block
+    assert_select "turbo-stream template input[type=hidden][name='block[settings][images]']"
+    assert_select "turbo-stream template [data-controller='admin--editor--gallery']" do
+      assert_select "*", text: /No images yet\. Add them from the library, in the order the site shows them\./
+    end
+    first, second = create_media_asset, create_media_asset
+
+    save_gallery(block, { layout: "carousel", ratio: "4:3", images: images_json(second, first),
+                          texts: { second.id.to_s => { caption: " The pier ", alt: "" }, first.id.to_s => { caption: "", alt: "Boats" } } })
+
+    assert_response :success
+    block.reload
+    assert_equal [ second.id, first.id ], block.settings["images"]
+    assert_equal({ second.id.to_s => { "caption" => "The pier" }, first.id.to_s => { "alt" => "Boats" } }, block.translated_settings.dig("en", "texts"))
+    assert_equal [ first.id, second.id ].sort, usage_ids(block)
+
+    save_gallery(block, { images: images_json(first, second) })
+    assert_response :success
+    assert_equal [ first.id, second.id ], block.reload.settings["images"], "a reorder is a change of the field"
+  end
+
+  test "a Gallery save over the limit is refused with its message, and nothing is written" do
+    block = gallery_block
+    images = Array.new(61) { create_media_asset }
+    stamp = block.reload.updated_at
+
+    assert_no_difference -> { Audit::Event.count } do
+      save_gallery(block, { images: images_json(*images) })
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='block-#{block.id}-images-errors'] template", text: /holds more than 60 images/
+    assert_nil block.reload.settings["images"]
+    assert_equal stamp, block.updated_at
+    assert_empty usage_ids(block)
+  end
+
+  test "a Gallery in a column says its line on its tile, is duplicated with its list and usages, and is deleted with them" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "gallery", section: section, section_column: 1, position: 0)
+    first, second = create_media_asset, create_media_asset
+
+    save_gallery(inside, { images: images_json(first, second) })
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='block-#{inside.id}-tile-summary'] template", text: /Grid · 2 images/
+
+    post "#{blocks_path}/#{inside.id}/duplicate", as: :turbo_stream
+    assert_response :success
+    copy = @page.content_blocks.where(block_type: "gallery").where.not(id: inside.id).sole
+    assert_equal [ first.id, second.id ], copy.settings["images"]
+    assert_equal [ first.id, second.id ].sort, usage_ids(copy)
+
+    delete "#{blocks_path}/#{copy.id}", as: :turbo_stream
+    assert_response :success
+    assert_not ContentBlock.exists?(copy.id)
+    assert_empty Media::Usage.where(owner_type: "ContentBlock", owner_id: copy.id)
+    assert_equal [ first.id, second.id ].sort, usage_ids(inside), "the original keeps its usages"
+  end
+
+  test "duplicating a Gallery needs media.upload, and a reorder or a removal does not" do
+    block = gallery_block
+    first, second = create_media_asset, create_media_asset
+    save_gallery(block, { images: images_json(first, second) })
+    assert_response :success
+    group = access_control_groups(:branch_editors)
+    %w[pages.read pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    sign_in_as(users(:editor_branch))
+
+    assert_no_difference -> { @page.content_blocks.count } do
+      post "#{blocks_path}/#{block.id}/duplicate", as: :turbo_stream
+    end
+    assert_response :forbidden
+    assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
+
+    save_gallery(block, { images: images_json(second, first) })
+    assert_response :success
+    save_gallery(block, { images: images_json(second) })
+    assert_response :success
+    assert_equal [ second.id ], block.reload.settings["images"]
+    assert_equal [ second.id ], usage_ids(block)
+  end
+
+  test "a Gallery's save is refused when it is stale and when another tab holds it, like any block's" do
+    block = gallery_block
+    first, second = create_media_asset, create_media_asset
+    base = block.reload.updated_at.iso8601(6)
+
+    save_gallery(block, { images: images_json(first) }, base: base, tab: "tab-aaaaaaaa")
+    assert_response :success
+    travel 1.minute do
+      save_gallery(block, { images: images_json(second) }, base: base, tab: "tab-aaaaaaaa")
+    end
+    assert_response :conflict
+    assert_equal [ first.id ], block.reload.settings["images"]
+
+    sign_in_as users(:two)
+    save_gallery(block, { images: images_json(first, second) }, tab: "tab-bbbbbbbb")
+    assert_response :conflict
+    assert_select "turbo-stream[action=update][target='block-#{block.id}-hold'] template [role=alert]", text: /is editing this block\. Your changes weren't saved\./
+    assert_equal [ first.id ], block.reload.settings["images"]
+  end
 end

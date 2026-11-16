@@ -1930,6 +1930,18 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    drag: it stays the dashed, empty slot, and the clone is what looks lifted. */
 .admin-drag-ghost.admin-drag-chosen { background: transparent; box-shadow: none; }
 
+/* A Gallery block's image row picked up by the keyboard
+   (`admin--editor--gallery`, StudioGallery D3): elevation 4 on the raised
+   tile's ground, with a 2px accent outline inside its edge, so nothing moves
+   or changes size. A row dragged by the pointer takes the drag's own looks
+   above (the dashed slot, the lifted clone). */
+.admin-gallery-row[data-picked] { background: var(--cs-tile-raised); box-shadow: var(--cs-shadow-4); outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-gallery-row[data-picked] .admin-gallery-row__handle { color: var(--cs-accent); }
+/* A row's Alt text whose library image has no alt either: the well's bottom
+   edge is the warn colour while the placeholder says so (the media panel's
+   `.admin-media-alt-warn`). */
+.admin-gallery-row__alt--warn:placeholder-shown { border-bottom-color: var(--cs-warn); }
+
 /* A view-only editor: the fieldset that disables a
    record's fields also marks them as plainly read-only -- sunken and dim,
    the same look a disabled field already has, but on the rich-text editor

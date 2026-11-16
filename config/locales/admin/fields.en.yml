@@ -81,6 +81,36 @@ en:
           display:
             one: 1 image
             other: "%{count} images"
+        # A Gallery block's Images section and its rows
+        # (`Admin::Fields::MediaTextsField`, `MediaTextRowComponent`;
+        # StudioGallery D2 and D3). `picked_up`, `moved`, `dropped` and
+        # `cancelled` are the keyboard moves' sentences, said by
+        # `admin--editor--gallery`, which also writes `move`, `remove`, the
+        # counts and `no_library_alt` into a row it adds.
+        media_texts:
+          images: Images
+          count: "%{count} of %{max}"
+          count_line: "%{count} of %{max} images"
+          add: Add images
+          add_folder: Add a folder
+          limit: "A gallery holds at most %{max} images. Remove one to add another."
+          empty: No images yet. Add them from the library, in the order the site shows them.
+          caption: Caption
+          alt: Alt text
+          use_library_caption: Use library caption
+          no_library_alt: No alt text in the library
+          remove: "Remove %{title}"
+          move: "Move %{title}"
+          picked_up: "Picked up %{title}, image %{position} of %{count}. Up and Down Arrow move it, Space drops it, Escape puts it back."
+          moved: "Moved to %{position} of %{count}."
+          dropped: "Dropped at %{position} of %{count}."
+          cancelled: "Cancelled. %{title} is back where it was."
+          missing: This image is no longer in the library
+          missing_hint: It isn't shown on the site. Remove it, or leave it until someone restores the image.
+          translation_list:
+            one: "1 image · the list is changed in %{language}"
+            other: "%{count} images · the list is changed in %{language}"
+          reference: "%{language}: %{text}"
         # A theme's choices (`theme.yml`): the empty choice of a style list
         # and of an icon list, and a stored name the theme does not declare.
         theme_choice_field:

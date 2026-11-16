@@ -65,8 +65,12 @@ module ContentBlocks
       # `lock_owner`. An image trashed between this check and the write is
       # stored and skipped when drawn, as a hero's is; no lock is added.
       # The type is the one about to be assigned: a new block has none yet.
-      if @attributes.key?(:settings)
-        list_refusal = media_fields_choice_result(@block, BlockTypes.find(@attributes[:block_type] || @block.block_type), @attributes[:settings])
+      # A new block that arrives with its settings already on the record (a
+      # copy, `ContentBlocks::Duplicate`) is checked on those: every id of
+      # it is a choice, as a copied Image block's image is.
+      chosen_settings = @attributes.key?(:settings) ? @attributes[:settings] : (@block.settings if @block.new_record?)
+      if chosen_settings
+        list_refusal = media_fields_choice_result(@block, BlockTypes.find(@attributes[:block_type] || @block.block_type), chosen_settings)
         return list_refusal if list_refusal
       end
 

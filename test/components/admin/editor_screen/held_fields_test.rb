@@ -318,4 +318,31 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     assert_empty held.css("fieldset.admin-held [data-action]").flat_map { |node| node["data-action"].split }.grep(/placeholder-from/),
       "the placeholder script listens without an action, so there is nothing of it to keep"
   end
+
+  # The Gallery's rows (StudioGallery D3): held by someone else, the caption
+  # and alt are read-only with their texts, the handle, Remove, "Use library
+  # caption" and the add buttons are disabled, and not one of
+  # `admin--editor--gallery`'s actions is left, since each of them writes
+  # the list or a text (none is on the allow-list).
+  test "a gallery held by someone else keeps its rows read-only and no list action survives" do
+    page = create_page(title: "Held gallery")
+    image = create_media_asset.tap { |asset| asset.update!(title: "pier.jpg", caption: "The pier") }
+    block = page.content_blocks.create!(block_type: "gallery", position: 0, settings: { "images" => [ image.id ] },
+      translated_settings: { "en" => { "texts" => { image.id.to_s => { "alt" => "Boats" } } } })
+    as_owner { render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true) }
+    assert_survives(rendered_content)
+    assert_selector "[data-action*='admin--editor--gallery']", visible: :all
+
+    reserve(block, page, users(:two), "tab-bbbbbbbb")
+    as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en") }
+    held = Nokogiri::HTML5.fragment(rendered_content)
+
+    assert_selector "fieldset.admin-held textarea[name='block[settings][texts][#{image.id}][caption]'][readonly]"
+    assert_selector "fieldset.admin-held input[name='block[settings][texts][#{image.id}][alt]'][readonly][value='Boats']"
+    assert_selector "fieldset.admin-held input[type=hidden][name='block[settings][images]']:not([disabled])", visible: :all
+    assert held.css("fieldset.admin-held [data-admin--editor--gallery-target=row] button").all? { |button| button["disabled"] }, "the handle, Remove and Use library caption are disabled"
+    assert_no_selector "[data-controller~='admin--saving--autosave']"
+    assert_empty held.css("[data-action]").flat_map { |node| node["data-action"].split }.grep(/admin--editor--gallery/), "no action of the rows' script is left"
+    assert_empty ::BlockTypes.find("gallery").read_only_actions, "the Gallery declares no read-only action: its script only writes"
+  end
 end

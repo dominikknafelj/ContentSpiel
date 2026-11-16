@@ -39,6 +39,11 @@ module Admin
     # alone. Only then does an input draw its import control (`label_end`);
     # it is false unless asked for.
     #
+    # `values:` is the `ContentModel::FieldSet` the field is drawn among,
+    # handed to the input unread (`Fields::Base`), for an input that reads a
+    # sibling (the Gallery's rows read the list they describe). The block
+    # card hands it; nil elsewhere.
+    #
     # The original is a code frame (`ReferenceCardComponent`'s `:code`) where
     # the input is the Code field or one built on it (`kind_for`).
     class FieldComponent < AdminComponent
@@ -49,13 +54,14 @@ module Admin
         motion: :reduced,
         content_edges: %i[none short long],
         widths: :from_container,
-        interface: %i[field form_name value original locale errors id_prefix translation_state translation_confirm translation_record placeholder importable],
+        interface: %i[field form_name value original locale errors id_prefix translation_state translation_confirm translation_record placeholder importable values],
         limits: [
           "It draws the chrome around a field; the input is the Admin::Fields class of the field's type.",
           "Whether the original is shown is the caller's and the input's: it is shown only when an original is handed over and the input answers reference? (a drawing nobody types in does not).",
           "A hidden input (hidden?) is drawn with its error slot alone: no label, help, original or Translate button, and no room in the form until the slot holds an error.",
           "An input may put data on the field's wrapper (field_data) and draw under the translation pair (below_pair), the Mermaid source's preview.",
-          "An input may draw a control at the end of its label's row (label_end), the Mermaid source's Import file…; it is drawn only with importable: true, which only a caller that may change the field now and draws outside_form passes."
+          "An input may draw a control at the end of its label's row (label_end), the Mermaid source's Import file…; it is drawn only with importable: true, which only a caller that may change the field now and draws outside_form passes.",
+          "An input reads its sibling fields only through values:, the FieldSet a caller hands over (the block card alone); with none it reads nothing beside its own value."
         ],
         states: %i[rest invalid translated outdated hover focus],
         keys: [],
@@ -95,7 +101,7 @@ module Admin
       # changed" note beside the original -- the same contract
       # `Admin::Columns::Base` gives every column field.
       def initialize(field:, form_name:, value:, original: nil, locale:, errors: [], id_prefix: nil,
-        translation_state: nil, translation_confirm: nil, translation_record: nil, placeholder: nil, importable: false)
+        translation_state: nil, translation_confirm: nil, translation_record: nil, placeholder: nil, importable: false, values: nil)
         @field = field
         @form_name = form_name
         @value = value
@@ -108,6 +114,7 @@ module Admin
         @translation_record = translation_record
         @placeholder = placeholder
         @importable = importable
+        @values = values
       end
 
       # The field's own label where its type gives one (`label: "File name"`),
@@ -130,7 +137,7 @@ module Admin
       def input_component
         @input_component ||= input_class.new(
           field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix, placeholder: placeholder,
-          importable: importable
+          importable: importable, values: values
         )
       end
 
@@ -213,7 +220,7 @@ module Admin
 
       def translatable? = field.field_type&.translatable == true
 
-      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record, :placeholder, :importable
+      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record, :placeholder, :importable, :values
     end
   end
 end

@@ -1,0 +1,53 @@
+<%= tag.li class: row_class, data: row_data do %>
+  <% if list? %>
+    <%# A real button for the keyboard moves (`admin--editor--gallery#key`); the drag starts from it too. %>
+    <%= tag.button type: "button", class: "admin-gallery-row__handle flex h-[72px] w-5 cursor-grab select-none items-center justify-center rounded-cs text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent",
+          aria: { label: (words(:move, title: title) unless template?) }, data: handle_data do %>
+      <span aria-hidden="true">⠿</span>
+    <% end %>
+  <% end %>
+
+  <% if missing? %>
+    <span class="flex aspect-[4/3] w-24 items-center justify-center rounded-button bg-sunken text-meta" aria-hidden="true">
+      <%= helpers.render "admin/shared/icon", name: :image_off, size: "size-5" %>
+    </span>
+    <div class="flex min-w-0 flex-col gap-1">
+      <p class="text-sm font-medium text-ink"><%= words(:missing) %></p>
+      <p class="text-small text-warn-ink"><%= words(:missing_hint) %></p>
+      <% texts.slice("caption", "alt").each do |part, text| %>
+        <%= tag.input type: "hidden", name: name_for(part), value: text %>
+      <% end %>
+    </div>
+  <% else %>
+    <%= tag.img src: thumbnail_url, alt: "", class: class_names("aspect-[4/3] w-24 rounded-button bg-sunken object-cover", "blur-sm": blurred?),
+          data: { "admin--editor--gallery-target": "thumbnail" } %>
+    <div class="flex min-w-0 flex-col gap-2">
+      <div>
+        <div class="flex items-center gap-2">
+          <label class="<%= helpers.setup_label_class %>" for="<%= id_for(:caption) %>"><%= words(:caption) %></label>
+          <% if offer_caption? %>
+            <%= tag.button words(:use_library_caption), type: "button", hidden: offer_hidden?, class: "ml-auto #{Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)}", data: offer_data %>
+          <% end %>
+        </div>
+        <% if (text = reference_text("caption")) %>
+          <p class="truncate text-label text-meta"><%= text %></p>
+        <% end %>
+        <%= tag.textarea caption, name: name_for(:caption), id: id_for(:caption), rows: 1, class: caption_class, data: caption_data %>
+      </div>
+      <div>
+        <label class="<%= helpers.setup_label_class %>" for="<%= id_for(:alt) %>"><%= words(:alt) %></label>
+        <% if (text = reference_text("alt")) %>
+          <p class="truncate text-label text-meta"><%= text %></p>
+        <% end %>
+        <%= tag.input type: "text", name: name_for(:alt), id: id_for(:alt), value: alt, placeholder: (alt_placeholder unless template?), class: alt_class %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if list? %>
+    <%= tag.button type: "button", class: "admin-gallery-row__remove inline-flex size-7 items-center justify-center rounded-button-sm text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent",
+          aria: { label: (words(:remove, title: title) unless template?) }, data: remove_data do %>
+      <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
+    <% end %>
+  <% end %>
+<% end %>
