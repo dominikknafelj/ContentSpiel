@@ -22,10 +22,10 @@ module Media
   # index's rule) takes the first free " 2", " 3", ..., recorded as its own
   # `media_folder.renamed`. One `media_folder.deleted` is recorded on the
   # folder before the row goes, its metadata the parent, the count of moved
-  # images (their ids only for IDS_IN_EVENT or fewer) and the moved folders'
+  # images (their ids only for IDS_KEPT or fewer) and the moved folders'
   # ids; no event per image.
   class DeleteFolder < ApplicationService
-    IDS_IN_EVENT = 200
+    IDS_KEPT = 200
 
     # What the confirm dialog says before the press: `renames` maps a
     # subfolder's id to the name it will take, `target` is the folder
@@ -34,7 +34,7 @@ module Media
 
     def self.preview(folder, tree: Media::FolderTree.load)
       Preview.new(
-        image_count: Media::Asset.where(folder_id: folder.id).count,
+        image_count: Media::Asset.kept.where(folder_id: folder.id).count,
         folder_count: tree.children(folder.id).size,
         renames: renames(folder, tree),
         target: folder.parent_id && Media::Folder.find_by(id: folder.parent_id)
@@ -99,7 +99,7 @@ module Media
       Media::Folder.where(parent_id: @folder.id).update_all(parent_id: parent_id) # version: none (a folder is never drawn on the site)
 
       metadata = { "parent_id" => parent_id, "moved_image_count" => image_ids.size, "moved_folder_ids" => folder_ids }
-      metadata["moved_image_ids"] = image_ids if image_ids.size <= IDS_IN_EVENT
+      metadata["moved_image_ids"] = image_ids if image_ids.size <= IDS_KEPT
       record_event("media_folder.deleted", subject: @folder, metadata: metadata, coalesce: false)
       @folder.destroy!
     end

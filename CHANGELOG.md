@@ -16,6 +16,7 @@
 - `docs/reference/hosting.md`, "Database requirements": the Postgres version, the extensions (`plpgsql`, `pg_trgm`) and the encoding and character type.
 - The image viewer (`Admin::Ui::ImageViewerComponent`): a note's picture opens over CS Studio, fitted to the window, with its name and facts in the head, arrows to step through the message's pictures, the position, Open original and Download. Escape, Close or the backdrop close it. The Dialog has a `viewer` width, a `title_aside` slot and a `data:` option, and a GIF is one shared part, `Admin::Ui::GifComponent` (`docs/reference/design-system.md`, "Shared components"; `docs/reference/notes.md`, "Files").
 - Library folders: `Media::SaveFolder` creates, renames and moves a folder (four levels deep at most, a thousand at most, one name per parent in any case, under the tree's table lock); each is recorded as `media_folder.created`, `media_folder.renamed` or `media_folder.moved`, and the audit log's Type filter offers "Media folder".
+- `Media::DeleteFolder` deletes a folder: its images (trashed ones too) and subfolders move one level up, a subfolder whose name the parent holds takes the next free " 2", " 3" and is recorded as `media_folder.renamed`, and one `media_folder.deleted` is recorded; `Media::DeleteFolder.preview` says what will move.
 
 ### Changed
 

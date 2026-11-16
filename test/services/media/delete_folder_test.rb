@@ -159,6 +159,7 @@ class Media::DeleteFolderTest < ActiveSupport::TestCase
     folder!("Photos", parent: doomed)
     image_in(doomed)
     image_in(doomed)
+    as_owner { assert Trash::Move.call(image_in(doomed)).ok? }
 
     preview = Media::DeleteFolder.preview(doomed)
 
