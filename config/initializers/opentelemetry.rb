@@ -85,7 +85,15 @@ unless kind == :none
       # instrumentation (still on) already covers every query made through
       # ActiveRecord, which is the entire app; this only adds coverage for a
       # raw PG::Connection used outside ActiveRecord, which nothing here does.
-      "OpenTelemetry::Instrumentation::PG" => { enabled: false }
+      "OpenTelemetry::Instrumentation::PG" => { enabled: false },
+
+      # The Anthropic client's own instrumentation stays off: its gen_ai spans
+      # can carry the messages sent, which for AI translation are a site's
+      # unpublished text, and no span holds content. The call is still traced
+      # as an outgoing HTTP request (Net::HTTP). When on, it also refuses the
+      # client versions it does not know with a warning on every boot, which
+      # the site commands print as part of their own output.
+      "OpenTelemetry::Instrumentation::Anthropic" => { enabled: false }
     )
   end
 
