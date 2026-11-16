@@ -25,20 +25,40 @@ module Publishing
     BLOCK_TRANSLATED = %w[translated_settings body caption alt].freeze
     TRANSLATED = { "Page" => %w[title subtitle meta_title meta_description hero_alt], "Post" => %w[title excerpt body translated_metadata] }.freeze
 
-    attr_reader :record, :version, :fields, :blocks, :locales
+    # `version` is the was side of an overview (`of`, `new`); `between` names
+    # both. Each side is a `Publishing::Version` or `:working`, the rows as
+    # `Snapshot.of` reads them. No version at all compares the rows with
+    # themselves.
+    attr_reader :record, :version, :fields, :blocks, :locales, :sides
 
     def self.of(record) = new(record, Publishing.baseline(record))
 
-    def initialize(record, version)
+    # What `to` changed from `from`, whichever is the later: the names are the
+    # same either way round, and a block only one side has is added or removed
+    # as the direction says. Stand-ins (`stand_ins`) pair a block that came
+    # back under a new id, so two old copies compare as a copy and the rows do.
+    def self.between(record, from:, to:) = new(record, from, to: to)
+
+    def initialize(record, version, to: :working)
       @record = record
       @version = version
       @changed_locales = Set.new
-      now = Snapshot.of(record) # reads the rows fresh and takes no lock: the overview must not hold a row
-      was = version ? { "fields" => version.snapshot.fetch("fields", {}), "tags" => version.snapshot.fetch("tags", []), "blocks" => version.blocks } : now
+      @was_source = version || :working
+      @now_source = to
+      now = side(to)
+      was = version ? side(version) : now
+      @sides = [ was, now ]
+      @block_sides = {}.compare_by_identity
       @fields = changed_fields(was, now)
       @blocks = changed_blocks(was.fetch("blocks", []), now.fetch("blocks", []))
       @locales = @changed_locales.to_a.sort
     end
+
+    # The stored form of one block of this comparison on each side, `[was,
+    # now]`, a side nil where the block is not on it: the text of a changed
+    # block is read from these (`Publishing::TextDiff`), never from the row,
+    # which is the working version's whatever the sides are.
+    def sides_of(change) = @block_sides.fetch(change.block)
 
     def none? = fields.empty? && blocks.empty?
 
@@ -121,6 +141,20 @@ module Publishing
 
     private
 
+    # reads the rows fresh and takes no lock: the overview must not hold a row
+    def side(source)
+      return Snapshot.of(record) if source == :working
+
+      { "fields" => source.snapshot.fetch("fields", {}), "tags" => source.snapshot.fetch("tags", []), "blocks" => source.blocks }
+    end
+
+    # The blocks of one side as `ContentBlock`s, by id.
+    def block_rows(source, ids)
+      return ContentBlock.where(id: ids).index_by(&:id) if source == :working
+
+      Snapshot.blocks_from(source, record).index_by(&:id)
+    end
+
     def changed_fields(was, now)
       translated = TRANSLATED.fetch(record.class.polymorphic_name)
       names = (Publishing.content_columns(record) - Publishable::BOOKKEEPING).select do |name|
@@ -142,7 +176,7 @@ module Publishing
     end
 
     def changed_blocks(was, now)
-      rows = ContentBlock.where(id: now.map { |block| block["id"] }).index_by(&:id)
+      rows = block_rows(@now_source, now.map { |block| block["id"] })
       stands_for = self.class.stand_ins(was, now)
       rows = rows.transform_keys { |id| stands_for.fetch(id, id) }
       now = now.map { |block| block.merge("id" => stands_for.fetch(block["id"], block["id"]), "section_id" => stands_for.fetch(block["section_id"], block["section_id"])) }
@@ -161,11 +195,11 @@ module Publishing
           elsif content_differs?(old, block) then :changed
           elsif old.values_at("section_id", "section_column") != block.values_at("section_id", "section_column") || !settled.include?(id) then :moved
           end
-        Block.new(kind:, block: rows.fetch(id)) if kind
+        Block.new(kind:, block: rows.fetch(id)).tap { |entry| @block_sides[entry.block] = [ old, block ] } if kind
       end
       gone = was.reject { |block| after.key?(block["id"]) }
-      removed = gone.any? ? Snapshot.blocks_from(version, record).index_by(&:id) : {}
-      entries + gone.map { |block| note_languages(block) && Block.new(kind: :removed, block: removed.fetch(block["id"])) }
+      removed = gone.any? ? block_rows(@was_source, gone.map { |block| block["id"] }) : {}
+      entries + gone.map { |block| note_languages(block) && Block.new(kind: :removed, block: removed.fetch(block["id"])).tap { |entry| @block_sides[entry.block] = [ block, nil ] } }
     end
 
     def content_differs?(old, block)

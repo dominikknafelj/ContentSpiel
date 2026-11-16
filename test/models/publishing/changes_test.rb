@@ -177,4 +177,47 @@ class Publishing::ChangesTest < ActiveSupport::TestCase
     assert_equal "/blog/hello", PublicSite::Urls.new.path_for(post, "en"), "asking moved nothing"
     assert_equal 1, Publishing::Version.of(blog).count, "and kept no copy"
   end
+
+  test "between two copies names what the later one changed, in either order" do
+    first = Publishing.baseline(@page.reload)
+    assert Pages::Save.call(@page, translations: { "en" => { title: "Costs" } }).ok?
+    assert ContentBlocks::Save.call(@first, translations: { "en" => { body: rich_doc("First again") } }).ok?
+    publish_changes(@page)
+    second = Publishing.baseline(@page.reload)
+
+    forward = Publishing::Changes.between(@page, from: first, to: second)
+    assert_includes forward.fields, "title"
+    assert_equal [ :changed ], forward.blocks.map(&:kind)
+
+    backward = Publishing::Changes.between(@page, from: second, to: first)
+    assert_equal forward.fields.sort, backward.fields.sort
+    assert_equal [ :changed ], backward.blocks.map(&:kind)
+    assert_equal [ first.snapshot["fields"]["title"], second.snapshot["fields"]["title"] ], [ backward.sides.last["fields"]["title"], backward.sides.first["fields"]["title"] ]
+  end
+
+  test "a version compared with the working version is the overview of the rows" do
+    version = Publishing.baseline(@page.reload)
+    assert Pages::Save.call(@page, translations: { "de" => { title: "Preise" } }).ok?
+    assert ContentBlocks::Destroy.call(@second).ok?
+
+    between = Publishing::Changes.between(@page.reload, from: version, to: :working)
+    overview = Publishing::Changes.new(@page, version)
+    assert_equal overview.fields, between.fields
+    assert_equal overview.blocks.map { |entry| [ entry.kind, entry.block.id ] }, between.blocks.map { |entry| [ entry.kind, entry.block.id ] }
+    assert_equal overview.locales, between.locales
+  end
+
+  test "a block back under a new id between two copies is the block it was" do
+    first = Publishing.baseline(@page.reload)
+    assert ContentBlocks::Destroy.call(@second).ok?
+    publish_changes(@page)
+    assert_equal [ :removed ], Publishing::Changes.between(@page.reload, from: first, to: Publishing.baseline(@page)).blocks.map(&:kind)
+    again = add("Second")
+    assert ContentBlocks::Reorder.call(@page, [ @first.id, again.id, @third.id ]).ok?
+    publish_changes(@page)
+    third = Publishing.baseline(@page.reload)
+
+    assert_not_equal first.id, third.id
+    assert Publishing::Changes.between(@page, from: first, to: third).none?
+  end
 end
