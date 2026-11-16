@@ -671,7 +671,9 @@ type on at upgrade, even with no posts of a type.
   row carries `data-stored="on|off"`, and the rules are
   `[data-stored="on"]:has(.cs-toggle:not(:checked)) .…__leaving` and
   `[data-stored="off"]:has(.cs-toggle:checked) .…__returning`. A type with 0
-  posts draws neither. Each line is in the switch's `aria-describedby`.
+  posts draws neither. The lines are NOT in the switch's `aria-describedby`: an
+  element named there is announced even while it is hidden. A line that is
+  announced only while it shows needs a script (an open design question).
 
 ### 16.4 D3, the posts list
 

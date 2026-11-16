@@ -518,7 +518,8 @@ class Settings::SaveTest < ActiveSupport::TestCase
 
   # --- post types (#114) ---
 
-  setup do
+  # A published page with a Post list block, so a post has an address to take or give back.
+  def list_page
     root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
     everything = Page.create!(parent: root, title: "Everything", published_at: 1.day.ago)
     everything.content_blocks.create!(block_type: :post_list, position: 0, settings: {})
@@ -527,6 +528,7 @@ class Settings::SaveTest < ActiveSupport::TestCase
   def stored_types = SiteSetting.find(Current.site.id).content_types
 
   def publish_resume_post(title: "Lighthouse keeper")
+    list_page
     post = create_post(title: title, content_type: "resume_entry")
     assert PublicPath.current.where(record: post).exists?, "the premise: a switched-on post has an address"
     post
@@ -592,6 +594,7 @@ class Settings::SaveTest < ActiveSupport::TestCase
   end
 
   test "switching on a type whose post's address is taken saves and reports the clash" do
+    list_page
     update = create_post(title: "Team", content_type: "now_update")
     switch_on_content_types("blog")
     assert_not PublicPath.current.exists?(record: update)
@@ -633,11 +636,15 @@ class Settings::SaveTest < ActiveSupport::TestCase
   end
 
   test "a save that changes no type refreshes no address and queues no rebuild" do
+    post = publish_resume_post
     clear_enqueued_jobs
+    paths = PublicPath.current.order(:id).map(&:attributes)
 
     result = as_owner { Settings::Save.call(Current.site, attributes: { content_types: %w[now_update blog resume_entry], time_zone: "Europe/Berlin" }) }
 
     assert result.ok?, result.errors.inspect
+    assert PublicPath.current.exists?(record: post)
+    assert_equal paths, PublicPath.current.order(:id).map(&:attributes)
     assert_no_enqueued_jobs only: SiteSearch::ReindexJob
     assert_not Audit::Event.exists?(action: "content_type.switched_on")
     assert_not Audit::Event.exists?(action: "content_type.switched_off")
@@ -649,5 +656,23 @@ class Settings::SaveTest < ActiveSupport::TestCase
     as_owner { Settings::Save.call(Current.site, attributes: { content_types: %w[blog] }) }
 
     assert_enqueued_jobs 1, only: SiteSearch::ReindexJob
+  end
+
+  test "a refused save leaves Current.site as it was" do
+    publish_resume_post
+    other = SiteSetting.find(Current.site.id)
+    before = Current.site
+    original = Audit.method(:record)
+    Audit.define_singleton_method(:record) { |*, **| raise ActiveRecord::Rollback }
+    begin
+      result = as_owner { Settings::Save.call(other, attributes: { content_types: %w[blog now_update] }) }
+    ensure
+      Audit.define_singleton_method(:record, original)
+    end
+
+    assert_not result.ok?
+    assert_equal %w[blog resume_entry now_update], stored_types
+
+    assert_same before, Current.site
   end
 end

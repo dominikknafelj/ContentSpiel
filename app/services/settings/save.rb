@@ -154,6 +154,18 @@ module Settings
     end
 
     def call
+      result = nil
+      result = save
+    ensure
+      # `switch_content_types` points `Current.site` at the saved row for the
+      # address refresh; a save that rolled back (or raised) must not leave it
+      # on a row that was never stored.
+      Current.site = @site_before if @site_before && !result&.ok?
+    end
+
+    private
+
+    def save
       # Every right is checked BEFORE anything is assigned or written, so a
       # refusal leaves nothing behind and records the single `access.denied`.
       if site_part? && !authorize!("settings.manage", @site)
@@ -278,8 +290,6 @@ module Settings
       failure(@site, [ self.class.no_encryption_keys ])
     end
 
-    private
-
     # The AI API key (translation helpers spec §6.2), written straight to
     # its column after the main save (inside the same transaction, so a
     # refused save writes no key either) rather than through
@@ -402,6 +412,7 @@ module Settings
       moved = declared.select { |name| @types_before.include?(name) != after.include?(name) }
       return if moved.empty?
 
+      @site_before = Current.site
       Current.site = @site
       PublicSite::Paths.refresh(posts: Post.where(content_type: moved), report_taken: true)
       SiteSearch::Indexing.content_types_changed

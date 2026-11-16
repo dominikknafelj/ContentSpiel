@@ -549,4 +549,15 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-type-state]"
     assert_no_selector "[data-switched-off-notice]"
   end
+
+  test "a live dormant post that an unfiltered list would list draws no No address chip" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    Page.create!(parent: root, title: "Everything", published_at: 1.day.ago).content_blocks.create!(block_type: :post_list, position: 0, settings: {})
+    switch_on_content_types("blog", "resume_entry")
+    post = create_post(title: "Role", content_type: "resume_entry")
+    switch_on_content_types("blog")
+
+    render_header(post.reload)
+    assert_no_selector "[data-no-address]"
+  end
 end

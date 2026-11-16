@@ -5,12 +5,14 @@
 ### Added
 
 - Each post type is switched on or off in Settings (Settings › Post types: a switch per declared type, Resume entry and Now update together under "For a personal site", each with its post count, saved with the save bar and found in ⌘K); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`.
+- MCP: `get_post`'s answer says `type_switched_on`.
 
 ### Changed
 
 - A new site starts with Blog alone; an existing site keeps all three post types on at the upgrade. The search index is built once more after the upgrade, in the background, as a switch of post types asks for it.
 - A post of a switched-off post type is kept, with no address, in no list, search or sitemap, and offered no starter section; it opens view only, and its writes are refused with "<Type> is switched off. Switch it on in Settings to change this post." It is left out of the dashboard's lists (Your drafts, Going live next, Waiting for you, Languages behind) and the Translations matrix, and the New post dialog and a Post list block's type select offer the switched-on types (the select keeps a stored switched-off choice, marked "(switched off)"). The posts list, the Trash, ⌘K and the Mind graph still find it.
 - A switched-off post type is marked "Switched off" in the posts list (its Status cell, with "Not on the site" for its path, and the Type filter's "(switched off)" entries), in the editor (the header's chip and a note above the form that, for a holder of `settings.manage`, links to Settings › Post types), on a Post list block filtered to it (the card says the list shows nothing on the site), in the Mind graph (the hub's card and list row; no lists line to it) and in the Groups screen (neutral: a grant scoped to it is live, and the warn "no longer exists" wording stays for an undeclared type). CS Studio says "post type" where it said "content type".
+- MCP: `create_post` and `list_posts` offer only the switched-on post types, and `list_posts` no longer lists a switched-off type's posts.
 - The theme contract's post lines are derived from each content type's declarations (`Theme::Contract.post_components`), in the order they were (the three lists, then the detail page); the built-in types' names are unchanged.
 
 ### Removed
@@ -25,7 +27,6 @@
 
 - `Admin::Ui::TypeStateComponent(content_type:)` is the one "Switched off" chip.
 - `t.list_component` and `t.detail_component` take `theme_methods:`; `t.sample`, `t.description` and `t.group` on a content type; `ContentTypes.switched_on`, `.switched_on_names` and `.switched_on?`.
-- MCP: `create_post` and `list_posts` offer the switched-on post types, and `get_post`'s answer says `type_switched_on`.
 
 ## 0.7.0 (2026-11-15)
 

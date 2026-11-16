@@ -11,7 +11,8 @@ class Posts::SwitchedOffRefusalTest < ActiveSupport::TestCase
     "Posts::Save" => ->(post) { Posts::Save.call(post, attributes: {}, translations: { "en" => { title: "Changed" } }) },
     "Publishing::PublishChanges" => ->(post) { Publishing::PublishChanges.call(post) },
     "Publishing::DiscardChanges" => ->(post) { Publishing::DiscardChanges.call(post) },
-    "Publishing::CancelScheduledChange" => ->(post) { Publishing::CancelScheduledChange.call(post) }
+    "Publishing::CancelScheduledChange" => ->(post) { Publishing::CancelScheduledChange.call(post) },
+    "Translations::Confirm" => ->(post) { Translations::Confirm.call(post, field: "title", locale: "de") }
   }.freeze
 
   SENTENCE = "Resume entry is switched off. Switch it on in Settings to change this post."

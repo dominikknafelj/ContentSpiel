@@ -17,9 +17,6 @@ module Admin
 
       def self.own_label?(_field) = false
 
-      # The switched-on types, then the stored value when it is not one (a
-      # switched-off type or a retired name), marked, so a save of the form
-      # keeps what it holds instead of silently choosing another type.
       # The stored value names a type the site has not switched on (switched
       # off, or no longer declared): the list this filter makes shows nothing.
       def switched_off?
@@ -37,6 +34,9 @@ module Admin
       # Navigation only: the link is offered to a holder of `settings.manage`.
       def settings? = can?("settings.manage")
 
+      # The switched-on types, then the stored value when it is not one (a
+      # switched-off type or a retired name), marked, so a save of the form
+      # keeps what it holds instead of silently choosing another type.
       def option_pairs
         pairs = ::ContentTypes.switched_on.map { |definition| [ definition.label, definition.name ] }
         stored = value.to_s

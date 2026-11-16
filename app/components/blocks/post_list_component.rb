@@ -36,7 +36,7 @@ module Blocks
     # permalinks for exactly the same posts.
     #
     # A blank/unknown `content_type` renders through `ContentTypes.default`
-    # (blog) -- the same reading `listed_posts` already gives a blank
+    # (the first switched-on type) -- the same reading `listed_posts` already gives a blank
     # `content_type` (every type), so an unfiltered listing needs *some*
     # component to render its rows through, and the default type's is as
     # good a choice as any single one.

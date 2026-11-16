@@ -24,6 +24,10 @@ module Translations
     end
 
     def call
+      # A state, not a right: no `access.denied` (`ApplicationService#switched_off_refusal`).
+      dormant = switched_off_refusal(@record)
+      return dormant if dormant
+
       refused = edit_refusal(@record) { |key| authorize!(key, @record) }
       return denied(refused, @record) if refused
       return failure(@record, [ "Nothing to confirm" ]) unless confirmable?

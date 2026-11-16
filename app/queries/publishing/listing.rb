@@ -54,7 +54,7 @@ module Publishing
       # those blocks, so that no row block's tag is looked up once per post.
       # Without it the block answers itself (`ContentBlock#listed_tag_id`).
       def lists?(block, post, tags: nil)
-        return false unless block.definition&.capability?(:lists_posts) && post.definition
+        return false unless block.definition&.capability?(:lists_posts) && post.definition && post.type_switched_on?
 
         settings = block.settings_object
         return false if settings.content_type.present? && settings.content_type != post.content_type

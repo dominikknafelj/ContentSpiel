@@ -154,4 +154,17 @@ class Posts::BulkTest < ActiveSupport::TestCase
     result = as(users(:one), channel: :admin) { Posts::Bulk.call(action: "publish", ids: [ "abc", "", nil, "99999999999999999999" ]) }
     assert_equal 3, result.not_found
   end
+
+  test "a dormant post in a publish comes back failed with the switched-off sentence" do
+    switch_on_content_types("blog", "resume_entry")
+    dormant = create_post(title: "Role", content_type: "resume_entry", published: false)
+    switch_on_content_types("blog")
+
+    result = as(users(:one), channel: :admin) { Posts::Bulk.call(action: "publish", ids: [ dormant.id ]) }
+
+    assert_equal [ dormant ], result.failed
+    assert_empty result.done
+    assert_equal "Resume entry is switched off. Switch it on in Settings to change this post.", result.reasons.fetch(dormant.id)
+    assert_not dormant.reload.live?
+  end
 end
