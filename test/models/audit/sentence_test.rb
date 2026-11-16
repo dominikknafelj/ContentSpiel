@@ -89,7 +89,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   # The sign-in steps that record these are not built yet: their sentences
   # stand ahead of them. An entry fails once something records it, so the
   # list empties as they arrive.
-  RECORDED_LATER = %w[].freeze
+  RECORDED_LATER = %w[media_folder.deleted].freeze
 
   test "the sentence table lists no action nothing records" do
     literals, = scan_recorded_actions
@@ -141,6 +141,20 @@ class Audit::SentenceTest < ActiveSupport::TestCase
         user_id: @me.id, occurred_at: Time.current, last_occurred_at: Time.current)))
       assert_equal "You #{expected}", read, action
     end
+  end
+
+  test "the folder actions read created, renamed, moved into, moved to the top and deleted" do
+    folder = ->(action, **attributes) do
+      sentence_for(Audit::Event.new({ action:, channel: "admin", subject_type: "Media::Folder", subject_id: 999_999, subject_label: "Trips",
+        user_id: @me.id, occurred_at: Time.current, last_occurred_at: Time.current }.merge(attributes)))
+    end
+
+    assert_equal "You created the folder “Trips”", read(folder.call("media_folder.created"))
+    assert_equal "You renamed the folder “Travel” to “Trips”", read(folder.call("media_folder.renamed", field_changes: { "name" => [ "Travel", "Trips" ] }))
+    assert_equal "You moved the folder “Trips” into “2026”", read(folder.call("media_folder.moved", metadata: { "parent" => "2026" }))
+    assert_equal "You moved the folder “Trips” to the top", read(folder.call("media_folder.moved", field_changes: { "parent_id" => [ 4, nil ] }))
+    assert_equal "You deleted the folder “Trips”", read(folder.call("media_folder.deleted"))
+    assert_equal "Media folder", Audit::Filter::SUBJECT_TYPES.fetch("Media::Folder")
   end
 
   # A form's five actions, its name quoted as a subject.

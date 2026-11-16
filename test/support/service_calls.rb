@@ -338,6 +338,12 @@ module ServiceCalls
         permission: "media.manage", on: asset }
     },
 
+    # Renames a folder: the folder row and an audit event.
+    "Media::SaveFolder" => lambda {
+      folder = Media::Folder.create!(name: "Trips")
+      { call: -> { Media::SaveFolder.call(folder, attributes: { name: "Journeys" }) }, permission: "media.manage", on: folder }
+    },
+
     "Media::Upload" => lambda {
       file = png_upload
       { call: -> { Media::Upload.call(file: file) }, permission: "media.upload", on: Media::Asset }
@@ -817,6 +823,11 @@ module ServiceCalls
       "creating" => lambda {
         { call: -> { Forms::Save.call(Forms::Form.new, attributes: { name: "New form" }, fields: [], destinations: [ { kind: "mail", settings: { recipients: "office@example.com" }, secrets: {} } ]) },
           permission: "forms.manage", on: Forms::Form }
+      }
+    },
+    "Media::SaveFolder" => {
+      "creating" => lambda {
+        { call: -> { Media::SaveFolder.call(attributes: { name: "New folder" }) }, permission: "media.manage", on: Media::Folder }
       }
     },
     "Groups::Save" => {

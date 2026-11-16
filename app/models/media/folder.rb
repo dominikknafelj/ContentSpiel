@@ -27,6 +27,18 @@ class Media::Folder < ApplicationRecord
   validates :name, length: { maximum: NAME_LENGTH, message: "Use at most #{NAME_LENGTH} characters." }
   validate :name_holds_no_control_character
 
+  # THE TREE'S LOCK, the first statement of every write to the folder tree
+  # (`Media::SaveFolder`, `Media::DeleteFolder`): the depth, the count and the
+  # one-name-per-parent rules are judged from a read of the whole tree, which a
+  # second writer would change under the first. SHARE ROW EXCLUSIVE lets plain
+  # reads and image writes go on and excludes every other tree writer until the
+  # transaction ends. Call it inside a transaction, before `FolderTree.load`.
+  def self.lock_tree!
+    # sql: neither Active Record nor Arel has a table lock; a constant statement
+    connection.execute("LOCK TABLE media_folders IN SHARE ROW EXCLUSIVE MODE") # version: none (a folder is never drawn on the site)
+    nil
+  end
+
   private
 
   def name_holds_no_control_character

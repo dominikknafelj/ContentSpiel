@@ -86,6 +86,10 @@ module Audit
       "group.deleted" => [ "deleted the group ", "" ],
       "token.issued" => [ "created the API token ", "" ], "token.revoked" => [ "revoked the API token ", "" ],
       "settings.updated" => [ "edited ", "" ],
+      # A library folder: its subject is the folder, named as it was then. A
+      # rename and a move read their before and after (`folder_parts`).
+      "media_folder.created" => [ "created the folder ", "" ], "media_folder.renamed" => [ "renamed the folder ", "" ],
+      "media_folder.moved" => [ "moved the folder ", "" ], "media_folder.deleted" => [ "deleted the folder ", "" ],
       # Forms: a form is named as one, with its name.
       "form.created" => [ "created the form ", "" ], "form.updated" => [ "changed the form ", "" ],
       "form.trashed" => [ "moved the form ", " to the trash" ], "form.restored" => [ "restored the form ", "" ],
@@ -300,6 +304,7 @@ module Audit
         elsif SPECIAL_ACTIONS.include?(@action) then special_parts
         elsif NOTE_VERBS.key?(@action) then subject_parts(*NOTE_VERBS[@action])
         elsif SUBMISSION_ACTIONS.include?(@action) then submission_parts
+        elsif %w[media_folder.renamed media_folder.moved].include?(@action) then folder_parts
         elsif OTHER_VERBS.key?(@action) then subject_parts(*OTHER_VERBS[@action])
         elsif CONTENT_ACTIONS[prefix]&.include?(verb) || derived_schedule?(prefix, verb) then content_parts(verb)
         else generic_parts
@@ -432,6 +437,25 @@ module Audit
       # in the metadata's ids, never in the sentence.
       def handed_over?
         event.metadata.is_a?(Hash) && event.metadata["answered"] == true
+      end
+
+      # "renamed the folder “Old” to “New”": the old name is the change's own, the
+      # new one the subject's. "moved the folder “Trips” into “2026”", or "to
+      # the top" when the event names no parent (the parent's name is kept in
+      # the event: it may be renamed or deleted since).
+      def folder_parts
+        label = subject_label
+        return subject_parts(OTHER_VERBS.fetch(@action).first) unless label
+
+        if @action == "media_folder.renamed"
+          old = Array(event.field_changes.is_a?(Hash) ? event.field_changes["name"] : nil).first
+          return subject_parts(OTHER_VERBS.fetch(@action).first) if old.blank?
+
+          [ text("renamed the folder “#{old}” to "), Part.new(:subject, label) ]
+        else
+          parent = self.class.metadata_of(event)["parent"].presence
+          [ text("moved the folder "), Part.new(:subject, label), text(parent ? " into “#{parent}”" : " to the top") ]
+        end
       end
 
       def submission_parts
