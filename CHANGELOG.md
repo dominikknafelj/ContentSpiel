@@ -4,7 +4,7 @@
 
 ### Added
 
-- Each post type is switched on or off in Settings (Settings › Post types: a switch per declared type, Resume entry and Now update together under "For a personal site", each with its post count, saved with the save bar and found in ⌘K); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`. `Admin::Ui::TypeStateComponent(content_type:)` is the one "Switched off" chip.
+- Each post type is switched on or off in Settings (Settings › Post types: a switch per declared type, Resume entry and Now update together under "For a personal site", each with its post count, saved with the save bar and found in ⌘K); a switch is recorded as `content_type.switched_on` or `content_type.switched_off`.
 
 ### Changed
 
@@ -23,6 +23,7 @@
 
 ### For a gem or an outside caller
 
+- `Admin::Ui::TypeStateComponent(content_type:)` is the one "Switched off" chip.
 - `t.list_component` and `t.detail_component` take `theme_methods:`; `t.sample`, `t.description` and `t.group` on a content type; `ContentTypes.switched_on`, `.switched_on_names` and `.switched_on?`.
 - MCP: `create_post` and `list_posts` offer the switched-on post types, and `get_post`'s answer says `type_switched_on`.
 
