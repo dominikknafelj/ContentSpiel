@@ -21,3 +21,12 @@ en:
       # The not-found page's link back to the library, when a chosen image is
       # gone (`Admin::MediaController#selected_asset`).
       not_found_back: "Back to Media"
+      # What the folder and move endpoints answer with (`Admin::Answers::FolderDeleted`,
+      # `ImagesMoved`): toasts, drawn by responders, so their keys are not a
+      # view's lazy-lookup scope.
+      answers:
+        folder_deleted: "Folder deleted"
+        no_folder: "Not in a folder"
+        moved:
+          one: "Moved “%{title}” to “%{folder}”."
+          other: "Moved %{count} images to “%{folder}”."

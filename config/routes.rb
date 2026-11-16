@@ -163,6 +163,10 @@ Rails.application.routes.draw do
       # default for this one English word, left as-is rather than overridden
       # with an `:as` this app has no other resource needing.
       resources :media, only: %i[index show create update destroy]
+      # The Folders column's writes and the move of images into a folder
+      # (`Media::SaveFolder`, `DeleteFolder`, `MoveImages`).
+      resources :media_folders, only: %i[create update destroy]
+      post "media/move", to: "media_moves#create", as: :media_move
       # "Download original": the library
       # image's original file, for a holder of `media.upload` alone. Active
       # Storage's own blob routes refuse it to everyone

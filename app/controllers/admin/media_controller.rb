@@ -19,6 +19,7 @@ module Admin
   class MediaController < BaseController
     include AutosaveResponses
     include MediaUploadResponses
+    include MediaPlaces
 
     # "About 48 per page" (design spec §6), by page number (`Pagination`,
     # design pass spec §4): `@pagination.total` is a `COUNT(*)` over the same
@@ -36,12 +37,6 @@ module Admin
     # image is theirs to change is still the service's answer.
     before_action -> { forbidden! unless holds_any?(%w[media.upload media.manage]) }, only: %i[update destroy]
     before_action :set_asset, only: %i[show update destroy]
-
-    # The one builder of a link to a place (the Folders column's rows, the
-    # breadcrumb, the picker's places): `q` and `filter` kept, `folder` the
-    # place's own (nothing for All media), the language, and never `page`
-    # (page 3 of one folder is no page of another), `selected` or `select`.
-    helper_method :place_query
 
     # The grid (design spec §6): search (title, alt in any
     # locale, filename) and the segments All / Unused / Missing alt /
@@ -226,12 +221,6 @@ module Admin
     def raise_place_not_found
       @not_found_back = { label: t("admin.media.not_found_back"), url: admin_media_path(**list_query.except(:page, :folder), **admin_url_options) }
       raise ActiveRecord::RecordNotFound, "Couldn't find Media::Folder"
-    end
-
-    def place_query(place)
-      query = request.query_parameters.slice("q", "filter").select { |_, value| value.is_a?(String) }.symbolize_keys
-      query[:folder] = place.to_param unless place.all?
-      query.merge(admin_url_options.slice(:locale))
     end
 
     # The grid's own state, kept by every link out of the panel and by the

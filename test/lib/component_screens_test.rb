@@ -129,7 +129,15 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/admin/media_controller.rb
       app/controllers/admin/media_originals_controller.rb
       app/controllers/concerns/admin/media_upload_responses.rb
-    ], # media_upload_responses: an upload, the library's or the picker's, is answered with the library's tile
+      app/controllers/admin/media_folders_controller.rb
+      app/controllers/admin/media_moves_controller.rb
+      app/controllers/concerns/admin/media_places.rb
+      app/controllers/admin/answers/folder_deleted.rb
+      app/controllers/admin/answers/folder_refused.rb
+      app/controllers/admin/answers/folder_saved.rb
+      app/controllers/admin/answers/folder_tree_part.rb
+      app/controllers/admin/answers/images_moved.rb
+    ], # media_upload_responses: an upload, the library's or the picker's, is answered with the library's tile; images_moved: a move takes the tiles and counts off the library
     "mind_graph_screen" => %w[
       app/views/admin/mind_graph
       app/controllers/admin/mind_graph_controller.rb
