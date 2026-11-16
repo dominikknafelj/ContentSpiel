@@ -31,6 +31,7 @@ module Setup
       "/#{ContentSpiel::ADMIN_PATH}/sign-out",
       "/#{ContentSpiel::ADMIN_PATH}/password",
       "/up",
+      "/ready",
       "/rails/active_storage"
     ].freeze
     PREFETCH_HEADERS = %w[X-Sec-Purpose Sec-Purpose].freeze

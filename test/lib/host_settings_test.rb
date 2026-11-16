@@ -127,6 +127,12 @@ class HostSettingsTest < ActiveSupport::TestCase
     assert_not HostSettings::HEALTH_CHECK.call(Request.new("/"))
   end
 
+  test "the readiness check is the path /ready and nothing under or beside it" do
+    assert HostSettings::HEALTH_CHECK.call(Request.new("/ready"))
+    assert_not HostSettings::HEALTH_CHECK.call(Request.new("/ready/x"))
+    assert_not HostSettings::HEALTH_CHECK.call(Request.new("/readyz"))
+  end
+
   test "the boot lines say what is served, that the match is exact, and what is refused" do
     assert_equal [
       "[ContentSpiel] Serving https://docs.example.org. Other host names are refused; plain HTTP is redirected.",

@@ -580,6 +580,11 @@ Rails.application.routes.draw do
   # Outside both host constraints: the proxy asks it on either host name.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # `/ready` is `/up` and a round trip to each database (the primary, and the
+  # queue's under Solid Queue): 200 or 503. Outside both host constraints for the
+  # same reason as `/up`, and named in `HostSettings::HEALTH_CHECK`.
+  get "ready" => "readiness#show", as: :readiness_check
+
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
