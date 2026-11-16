@@ -20,7 +20,7 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
   teardown { page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}") }
 
   def open_thread
-    visit "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}"
+    visit_screen "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}"
     await_notes_live
     assert_selector "#notes-drawer [data-notes-view=thread]"
     assert_eventually(message: "the thread never took the focus") { page.evaluate_script("document.activeElement === document.querySelector('#note-thread-#{@thread.id}')") }
@@ -51,7 +51,7 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
 
   def reduce_motion(on) = page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: on ? "reduce" : "" } ])
 
-  test "an image and a PDF are attached to a reply: both are shown, the composer is empty again, and the picture opens in a new tab through the notes action" do
+  test "an image and a PDF are attached to a reply: both are shown, the composer is empty again, and the picture opens in the viewer through the notes action" do
     open_thread
     assert_selector "#{reply} button[data-note-attach][title='Attach up to 5 files, 10 MB each']"
     choose(file_fixture("tiny.png"), pdf_path)
@@ -75,7 +75,10 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
     assert_match %r{\A.*/cs-studio/notes/page/#{@page.id}/threads/#{@thread.id}/messages/#{message.id}/files/\d+\z}, image[:href]
     assert_eventually(message: "the picture never loaded") { page.evaluate_script("document.querySelector(#{"#{note} a[data-note-image] img".to_json}).naturalWidth") > 0 }
     assert_no_selector "#notes-drawer [src*='active_storage'], #notes-drawer [href*='active_storage']", visible: :all
-    tab = window_opened_by { image.click }
+    image.click
+    assert_selector "dialog#image-viewer[open] h2", text: "tiny.png"
+    assert_equal 1, windows.size, "the click opened a window as well"
+    tab = window_opened_by { find("dialog#image-viewer a[data-admin--ui--image-viewer-target=original]").click }
     within_window(tab) { assert_match %r{/files/\d+\z}, current_url }
     tab.close
   end
@@ -352,6 +355,34 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
     find("#{tile} button").click
     assert_selector "#{tile} button", text: "Play"
     assert_equal [ false, true ], [ visible.call("img"), visible.call("canvas") ]
+  ensure
+    reduce_motion(false)
+  end
+
+  # `Admin::Ui::GifComponent`'s keyboard: the picture is a link, and under
+  # reduced motion the Play after it is a button of its own, whose Enter
+  # plays the GIF and pauses it again without the focus leaving it.
+  test "with reduced motion a GIF's Play is the Tab stop after its picture, and Enter plays and pauses it" do
+    as(users(:two)) { assert Notes::Reply.call(@thread, body: "A loop", files: [ fixture_upload("small.gif", name: "loop.gif") ]).ok? }
+    reduce_motion(true)
+    open_thread
+    tile = "#note-thread-#{@thread.id}-messages [data-note-gif]"
+    shown = -> { page.evaluate_script("getComputedStyle(document.querySelector(#{"#{tile} img".to_json})).opacity !== '0'") }
+    assert_selector "#{tile} button", text: "Play"
+
+    stop_on("#{tile} a")
+    page.send_keys(:tab)
+    assert page.evaluate_script("document.activeElement === document.querySelector(#{"#{tile} button".to_json})"), "Play is not the Tab stop after the picture"
+    assert_not shown.call
+
+    page.send_keys(:enter)
+    assert_selector "#{tile} button", text: "Pause"
+    assert shown.call, "the picture is not shown while it plays"
+    assert page.evaluate_script("document.activeElement === document.querySelector(#{"#{tile} button".to_json})"), "the focus left the button"
+
+    page.send_keys(:enter)
+    assert_selector "#{tile} button", text: "Play"
+    assert_not shown.call
   ensure
     reduce_motion(false)
   end

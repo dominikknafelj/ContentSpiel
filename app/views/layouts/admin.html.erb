@@ -220,6 +220,13 @@
         (`Admin::Ui::MediaPickerComponent`'s own comment). %>
     <%= render Admin::Ui::MediaPickerComponent.new(url_options: admin_url_options) %>
 
+    <%# The one image viewer -- here, outside `#content` and every form, so
+        every thread on the page (the rail's, the slide-over's, the sheet's,
+        the Notes screen's) opens the same dialog. Drawn empty: its script
+        fills it from the pressed thumbnail (`Admin::Ui::ImageViewerComponent`'s
+        own comment). %>
+    <%= render Admin::Ui::ImageViewerComponent.new %>
+
     <%# The New page and New post dialogs: once
         each, here, outside `#content` and every form. Every "+ New page" /
         "New post" trigger (tree header and rows, ⌘K, the pages empty state,

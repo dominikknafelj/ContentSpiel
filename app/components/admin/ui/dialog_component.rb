@@ -25,7 +25,7 @@ module Admin
         motion: :none,
         content_edges: %i[long short],
         widths: :fixed_width,
-        interface: %i[id title width destructive open_on_load hang steady],
+        interface: %i[id title width destructive open_on_load hang steady data],
         limits: [
           "It draws the frame, the title, Close and the footer slot: the actions and the form inside are the caller's.",
           "It opens only through admin--ui--dialog on the body, by its id or marked by open_on_load."
@@ -33,14 +33,22 @@ module Admin
         states: %i[rest hover focus],
         script_states: { open: [ "test/system/dialog_test.rb", "a destructive confirm opens on Cancel, Escape backs out, confirming deletes" ] },
         keys: %w[close],
-        slots: %i[footer],
+        slots: %i[footer title_aside],
         controller: nil,
         keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a dialog starts on its first field, its Close is a Tab stop inside it, and Escape or Close gives the focus back to its trigger" ]
       )
 
-      WIDTHS = { confirm: 420, form_narrow: 460, form: 560, picker: 880 }.freeze
+      WIDTHS = { confirm: 420, form_narrow: 460, form: 560, picker: 880, viewer: 1100 }.freeze
 
       renders_one :footer
+
+      # A line of facts beside the title, in the header before Close (the image
+      # viewer's "PNG · 1.2 MB · 800 × 600"). With it the title and the aside
+      # share one `.admin-dialog__titles` element, the h2 first and the aside its
+      # next sibling, so the viewer's phone head can stack them in two lines;
+      # without it the h2 stands alone in the header. It is never dropped on a
+      # phone, and `shrink-0` keeps it whole while a long title truncates.
+      renders_one :title_aside
 
       # `open_on_load:` marks a dialog the server wants open as soon as the page
       # appears (a form dialog whose submission was refused, with the message
@@ -60,7 +68,11 @@ module Admin
       # top edge and lets the foot move; this fixes the height, so nothing of the
       # frame moves, and what is longer scrolls in the body. See the comment on
       # `.admin-dialog[data-dialog-steady]`.
-      def initialize(id:, title:, width: :confirm, destructive: false, open_on_load: false, hang: false, steady: false)
+      #
+      # `data:` goes on the `<dialog>` itself, beside its own attributes: the
+      # controller of a dialog that is a part with a script of its own (the
+      # image viewer's `admin--ui--image-viewer`) and the words it says.
+      def initialize(id:, title:, width: :confirm, destructive: false, open_on_load: false, hang: false, steady: false, data: {})
         raise ArgumentError, "unknown dialog width #{width.inspect}" unless WIDTHS.key?(width)
 
         @id = id
@@ -70,11 +82,12 @@ module Admin
         @open_on_load = open_on_load
         @hang = hang
         @steady = steady
+        @data = data
       end
 
       private
 
-      attr_reader :id, :title, :width, :destructive, :open_on_load, :hang, :steady
+      attr_reader :id, :title, :width, :destructive, :open_on_load, :hang, :steady, :data
     end
   end
 end

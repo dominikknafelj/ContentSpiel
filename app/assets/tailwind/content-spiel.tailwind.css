@@ -495,6 +495,58 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 .admin-dialog[data-dialog-width="form_narrow"] { max-width: 460px; }
 .admin-dialog[data-dialog-width="form"] { max-width: 560px; }
 .admin-dialog[data-dialog-width="picker"] { max-width: 880px; }
+/* The viewer step (the image viewer's frame): nearly the whole screen, with
+   a body that is a flex column the viewer fills edge to edge (its own stage
+   scrolls or pans), so the body takes no padding and no scrollbar. The title
+   truncates on one line here; other dialogs' titles wrap. */
+.admin-dialog[data-dialog-width="viewer"] { max-width: 1100px; height: calc(100dvh - 48px); max-height: none; }
+.admin-dialog[data-dialog-width="viewer"] > .admin-dialog__body { flex: 1 1 auto; min-height: 0; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.admin-dialog[data-dialog-width="viewer"] > header h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* On a phone the viewer is the whole screen, and its head is two lines: the
+   title (15px, 600, truncated) over the facts (12px, meta), the facts never
+   dropped, Close at the right of both. The admin layout's viewport meta
+   leaves `viewport-fit` at its default, so the browser keeps the page inside
+   the safe area and `env(safe-area-inset-*)` is 0: the paddings below are
+   their fallbacks. The `max()` rules are there for a page that covers the
+   safe area, where they clear the notch and the home bar. Only this step:
+   other dialogs keep their frame on a phone. */
+@media (max-width: 639px) {
+  .admin-dialog[data-dialog-width="viewer"] { width: 100vw; max-width: none; height: 100dvh; margin: 0; border-radius: 0; box-shadow: none; }
+  .admin-dialog[data-dialog-width="viewer"] > header > .admin-dialog__titles { flex: 1; flex-direction: column; align-items: stretch; gap: 0; }
+  .admin-dialog[data-dialog-width="viewer"] > header > .admin-dialog__titles > h2 { font-size: 15px; font-weight: 600; }
+  .admin-dialog[data-dialog-width="viewer"] > header > .admin-dialog__titles > [data-dialog-title-aside] { font-size: 12px; color: var(--cs-meta); }
+  .admin-dialog[data-dialog-width="viewer"] > header { padding-top: max(12px, env(safe-area-inset-top)); }
+  .admin-dialog[data-dialog-width="viewer"] > footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .admin-dialog[data-dialog-width="viewer"] > header,
+  .admin-dialog[data-dialog-width="viewer"] > footer { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  /* The foot's two rows: ← "2 of 3" → (a full-width row), then the actions. */
+  .admin-dialog[data-dialog-width="viewer"] > footer { flex-wrap: wrap; }
+}
+/* The image viewer's stage (`Admin::Ui::ImageViewerComponent`): 64px at the
+   sides off a phone, where the round arrows stand over its edges; on a phone
+   16px, or the safe area's inset on a page that covers it, its sunken ground
+   running edge to edge.
+   A size container, so the picture's height is capped in `cqh`: a percentage
+   would resolve against the GIF part's holder, which is the picture's own
+   size, and cap nothing. */
+.admin-image-viewer__stage { container-type: size; padding: 16px 64px; }
+@media (max-width: 639px) {
+  .admin-image-viewer__stage { padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); }
+}
+/* The checkerboard behind the picture's own box, never the stage: 8px
+   squares, the same in both schemes, so a transparent picture (a dark logo)
+   always shows and an opaque one covers it. A GIF's still under reduced
+   motion is a canvas over an invisible picture (`Admin::Ui::GifComponent`),
+   so the canvas carries the same ground, over its own box, which is the
+   picture's. */
+.admin-image-viewer__stage :is(img, canvas) {
+  background-color: var(--cs-checker-a);
+  background-image:
+    linear-gradient(45deg, var(--cs-checker-b) 25%, transparent 25%, transparent 75%, var(--cs-checker-b) 75%),
+    linear-gradient(45deg, var(--cs-checker-b) 25%, transparent 25%, transparent 75%, var(--cs-checker-b) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
 /* The ⌘K palette (Admin::Shell::CommandPaletteComponent): high on the screen, not centred. */
 .admin-palette { margin-top: 10vh; }
 /* A menu's row under the keyboard and the palette's selected row. Their
@@ -1648,15 +1700,17 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-table-scroll--x :is(.admin-forms-table, .admin-form-submissions-table) tbody tr:hover > td { background: var(--cs-paper); }
 }
 
-/* A picture in a note or a still GIF's tile
+/* A picture in a note or a GIF's tile
    (`Admin::NotesScreen::FilesComponent`). Its box is the picture's own size and shows
-   the placeholder gradient behind a picture that is partly transparent.
-   A GIF's Play / Pause is shown with reduced motion only (the component's
-   `motion-reduce:` classes): centred over the still, and in the corner while
-   the picture plays (`data-playing`), so it does not lie over what moves. */
+   the placeholder gradient behind a picture that is partly transparent. */
 .admin-note-picture { background: linear-gradient(135deg, var(--cs-ph-a), var(--cs-ph-b)); }
-.admin-note-gif-button { top: 50%; left: 50%; transform: translate(-50%, -50%); }
-.admin-note-gif-button[data-playing="true"] { top: auto; left: auto; right: 6px; bottom: 6px; transform: none; }
+/* A GIF's Play / Pause (`Admin::Ui::GifComponent`, on a note's tile and the
+   image viewer's stage), shown with reduced motion only (the component's
+   `motion-safe:hidden`): centred over the still, and 8px in from the bottom
+   right while the picture plays (`data-playing`), so it does not lie over
+   what moves. */
+.admin-gif-button { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.admin-gif-button[data-playing="true"] { top: auto; left: auto; right: 8px; bottom: 8px; transform: none; }
 
 /* The bubble of a record's open notes (`Admin::Ui::NoteMarkerComponent` on
    rows, tiles and Waiting for you; `Admin::NotesScreen::MarkerComponent` on a

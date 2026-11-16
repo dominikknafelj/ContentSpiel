@@ -302,7 +302,8 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/users/#{user.id}", params: { user: { name: "Typed name", email_address: user.email_address, group_ids: [ "" ] }, base_updated_at: stale }
 
     assert_response :conflict
-    assert_select "div[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink", count: 1 do |banner|
+    # The shown one: the layout's image viewer holds its own warn notice, hidden.
+    assert_select "div[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink:not([hidden])", count: 1 do |banner|
       assert_includes banner.text.squish, "This user was changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form."
       assert_select "a[href='/cs-studio/users/#{user.id}/edit'][data-save-bar-cancel][data-turbo-frame=content]", text: "Reload"
     end

@@ -274,6 +274,12 @@
      `.admin-form-column` and Settings' grid. */
   --cs-form-max: 760px;
   --cs-form-max-pair: 1144px;
+  /* The image viewer's checkerboard behind a picture's own box
+     (`.admin-image-viewer__stage img`): one value in both schemes, here and
+     not in a scheme's block, since a transparent picture is drawn for a
+     light page and must show the same in dark. */
+  --cs-checker-a: #ffffff;
+  --cs-checker-b: #e7e9ef;
   /* A docked composition (the editors' blocks column, the dashboard's main
      column, a list, each with a rail beside it): the rail, the space
      between, and the widest the whole may grow, one group whose main column
