@@ -8,7 +8,7 @@
     <% else %>
       <%= link_to t(".version", number: row.number), href, class: "admin-row-link text-sm font-semibold text-ink", aria: { current: (current? ? "true" : nil) } %>
       <% if chip_status %>
-        <%= render Admin::Ui::StatusChipComponent.new(status: chip_status, at: row.live_at) %>
+        <%= render Admin::Ui::StatusChipComponent.new(status: chip_status, at: row.at) %>
       <% end %>
     <% end %>
   </div>
@@ -22,7 +22,7 @@
         <span class="min-w-0 truncate"><%= publisher_name %></span>
       </p>
     <% else %>
-      <p class="mt-1 text-small text-meta"><%= t(".kept_when_began") %></p>
+      <p class="mt-1 text-small text-meta"><%= no_publisher_line %></p>
     <% end %>
   <% end %>
 <% end %>

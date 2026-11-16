@@ -16,7 +16,8 @@ module Admin
     # The one primary action, "Restore version 5…", opens the restore dialog
     # (`RestoreDialogComponent`, which the screen draws beside this card,
     # outside its GET form): drawn only when `restore_offered` (the viewer
-    # may restore and the version differs from the working version). It is a
+    # may restore and the version differs from the working version in more
+    # than an image gone since, `Publishing::Changes#none_but_gone_images?`). It is a
     # plain button, so pressing it never submits the comparison's form.
     #
     # A record never published has no version: `.empty(record:)` draws the

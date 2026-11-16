@@ -12,8 +12,8 @@ class Admin::HistoryScreen::VersionRowComponentTest < ViewComponent::TestCase
     @pricing = create_page(title: "Pricing")
   end
 
-  def row_for(number, now: Time.current)
-    Publishing::History.new(@pricing.reload, now: now).rows.find { |row| row.number == number }
+  def row_for(number)
+    Publishing::History.new(@pricing.reload).rows.find { |row| row.number == number }
   end
 
   def draw(**options)
@@ -23,6 +23,7 @@ class Admin::HistoryScreen::VersionRowComponentTest < ViewComponent::TestCase
   test "a version's three lines: its name and chip, when it went live, and who published it" do
     went_live = Time.zone.parse("2026-11-12 09:00")
     Publishing::Version.of(@pricing).update_all(live_at: went_live, created_at: went_live, created_by_id: @dana.id) # version: none (a test) # changes: none (a test)
+    @pricing.update_columns(published_at: went_live) # version: none (a test) # changes: none (a test)
 
     draw(row: row_for(1), href: "/v")
 
@@ -41,12 +42,33 @@ class Admin::HistoryScreen::VersionRowComponentTest < ViewComponent::TestCase
     assert_selector "a[aria-current=true]", text: "Version 1"
   end
 
-  test "a copy kept when history began names no publisher" do
+  test "a first copy with no publisher was kept when history began; a later one's publisher was removed" do
+    Publishing::Version.take!(@pricing.reload, by: @me) # version: none (a test takes a copy)
     Publishing::Version.of(@pricing).update_all(created_by_id: nil) # version: none (a test) # changes: none (a test)
 
     draw(row: row_for(1), href: "/v")
-
     assert_text "Kept when history began"
+
+    draw(row: row_for(2), href: "/v")
+    assert_text "Published by a removed account"
+    assert_no_text "Kept when history began"
+  end
+
+  test "a scheduled record's copy goes live at the record's time, and once that has passed was scheduled" do
+    at = 3.days.from_now.change(hour: 9, min: 0)
+    @pricing.update_columns(published_at: at) # version: none (a test schedules a page) # changes: none (a test schedules a page)
+    shown = I18n.l(at.in_time_zone(Current.site.effective_time_zone), format: :"admin.datetime")
+
+    draw(row: row_for(1), href: "/v")
+
+    assert_selector ".admin-status-chip[title]", text: "Scheduled"
+    assert_equal at.to_i, row_for(1).at.to_i
+    assert_text "Goes live #{shown}"
+    assert_no_text "Went live"
+
+    travel_to(4.days.from_now) { draw(row: row_for(1), href: "/v") }
+
+    assert_text "Went live #{shown} · was scheduled"
   end
 
   test "a pending copy is Scheduled and goes live later; only a copy gone live says it was scheduled" do

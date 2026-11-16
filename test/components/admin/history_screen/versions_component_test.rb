@@ -38,6 +38,19 @@ class Admin::HistoryScreen::VersionsComponentTest < ViewComponent::TestCase
     assert_includes summary.text, "· 2 versions"
   end
 
+  test "a scheduled record's summary names the record's time" do
+    later = create_page(title: "Later")
+    at = 3.days.from_now.change(hour: 9, min: 0)
+    later.update_columns(published_at: at) # version: none (a test schedules a page) # changes: none (a test schedules a page)
+    history = Publishing::History.new(later.reload)
+    as(users(:one)) do
+      render_inline Admin::HistoryScreen::VersionsComponent.new(history: history, chosen: history.find(1), url: ->(number) { "/v/#{number}" }, page_url: ->(number) { "/p/#{number}" })
+    end
+
+    date = I18n.l(at.in_time_zone(Current.site.effective_time_zone).to_date, format: :"admin.short_with_year")
+    assert_includes page.find("summary").text, "Goes live #{date}"
+  end
+
   test "with nothing chosen the summary names the versions" do
     draw(chosen_number: nil)
 

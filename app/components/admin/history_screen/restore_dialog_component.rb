@@ -31,9 +31,12 @@ module Admin
     class RestoreDialogComponent < Admin::AdminComponent
       ID = "history-restore".freeze
 
-      def initialize(record:, version:, changes:, locale:, url_options: {})
+      # `shown_at`: when the version goes or went live for a visitor
+      # (`Publishing::History#shown_at`), which the sentence names.
+      def initialize(record:, version:, shown_at:, changes:, locale:, url_options: {})
         @record = record
         @version = version
+        @shown_at = shown_at
         @changes = changes
         @locale = locale.to_s
         @url_options = url_options
@@ -63,7 +66,7 @@ module Admin
       # until you publish the changes." A copy still waiting for its time
       # goes live; a record the site does not show keeps showing nothing.
       def sentence
-        becomes = t(version.live_at.future? ? ".becomes.goes" : ".becomes.went", title: title, number: number, date: date(version.live_at))
+        becomes = t(@shown_at.future? ? ".becomes.goes" : ".becomes.went", title: title, number: number, date: date(@shown_at))
         on_site = ::Publishing::State.of(record).live? && ::Publishing.current(record)
         t(".sentence", becomes: becomes, site: on_site ? t(".site.shown", number: on_site.number) : t(".site.none"))
       end

@@ -238,6 +238,23 @@ class Admin::HistoryTest < ActionDispatch::IntegrationTest
     assert_equal page.reload.updated_at.iso8601(6), restore_form.at_css("input[name=shown_updated_at]")["value"]
   end
 
+  test "a version that differs only by an image gone since offers no Restore" do
+    page = create_page(title: "Pricing")
+    asset = create_media_asset
+    image = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image", media_asset_id: asset.id }).record
+    publish_changes(page)
+    assert ContentBlocks::Save.call(image, attributes: { media_asset_id: nil }).ok?
+    publish_changes(page)
+    asset.update_columns(trashed_at: Time.current) # version: none (a test trashes an image an older version shows)
+    sign_in_as users(:one)
+
+    get admin_page_history_path(page, version: 2, with: "working")
+
+    assert_response :success
+    assert_nil comparison.at_css("[data-history-restore]")
+    assert_select "dialog#history-restore", count: 0
+  end
+
   test "someone with edit and not publish sees a live page's history with no Restore, and a forged restore is refused and audited" do
     page = two_versions
     AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: {})

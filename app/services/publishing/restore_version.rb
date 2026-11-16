@@ -70,7 +70,8 @@ module Publishing
 
         version = Version.of(@record).find_by(number: @number)
         next refuse(NOT_FOUND) if version.nil?
-        next refuse(format(NOTHING, number: version.number)) if Changes.between(@record, from: version, to: :working).none?
+        # Nothing but an image gone since is nothing a return can put back.
+        next refuse(format(NOTHING, number: version.number)) if Changes.between(@record, from: version, to: :working).none_but_gone_images?
 
         outcome = return_to!(version)
         @left = left_behind(outcome, Changes.between(@record, from: version, to: :working))

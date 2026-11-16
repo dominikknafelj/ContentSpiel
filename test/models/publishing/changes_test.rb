@@ -23,6 +23,25 @@ class Publishing::ChangesTest < ActiveSupport::TestCase
     assert_empty changes.locales
   end
 
+  test "an image that is gone or in the trash reads as none on both sides: a difference of it alone is nothing but gone images" do
+    asset = create_media_asset
+    image = add(nil, block_type: "image", media_asset_id: asset.id)
+    @page.update_columns(hero_media_asset_id: asset.id) # version: none (a test) # changes: none (a test)
+    publish_changes(@page)
+    assert ContentBlocks::Save.call(image.reload, attributes: { media_asset_id: nil }).ok?
+    @page.update_columns(hero_media_asset_id: nil) # version: none (a test) # changes: none (a test)
+
+    assert_not changes.none_but_gone_images?, "an image still in the library comes back"
+
+    asset.update_columns(trashed_at: Time.current) # version: none (a test trashes an image a copy shows)
+    assert_not changes.none?
+    assert changes.none_but_gone_images?
+
+    other = create_media_asset
+    assert ContentBlocks::Save.call(image.reload, attributes: { media_asset_id: other.id }).ok?
+    assert_not changes.none_but_gone_images?, "a kept image where the copy's is gone goes back to none"
+  end
+
   test "typed and typed back is none, though the mark is set" do
     assert Pages::Save.call(@page, translations: { "en" => { title: "Typed" } }).ok?
     assert Pages::Save.call(@page, translations: { "en" => { title: "Pricing" } }).ok?

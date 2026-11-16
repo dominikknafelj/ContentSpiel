@@ -69,6 +69,31 @@ module Publishing
 
     def none? = fields.empty? && blocks.empty?
 
+    # NONE, OR NOTHING BUT IMAGES THAT WENT: what "nothing to restore" means
+    # (`Publishing::RestoreVersion`, the History screen's Restore). A return
+    # writes a library image that is gone or in the trash as none
+    # (`Publishing::ReturnTo`), so a hero or a block whose only difference
+    # is such an image on one side and none on the other is a difference no
+    # restore can make: every press would end in `ReturnTo::IMAGES_GONE`.
+    # Read as `stand_ins` reads it, an image that is not kept is nil on both
+    # sides. One statement for the kept images, and only when something
+    # differs.
+    def none_but_gone_images?
+      return true if none?
+
+      kept = kept_images_of_sides
+      heroes = sides.map { |side| side.fetch("fields", {})["hero_media_asset_id"] }
+      return false unless (fields - %w[hero_media_asset_id]).empty?
+      return false if fields.include?("hero_media_asset_id") && heroes.map { |id| id if kept.include?(id) }.uniq.size > 1
+
+      blocks.all? do |entry|
+        next false unless entry.kind == :changed
+
+        was, now = sides_of(entry)
+        self.class.same_content?(self.class.without_gone_image(was, kept), self.class.without_gone_image(now, kept))
+      end
+    end
+
     # What publishing the rows of `record` at `now` would do to the ADDRESSES
     # of live records, the record's own among them, as data
     # (`PublicSite::Paths.foresee`, a `Foreseen`): `lost`, those left
@@ -170,6 +195,12 @@ module Publishing
     end
 
     private
+
+    # The kept library images among both sides' heroes and blocks.
+    def kept_images_of_sides
+      ids = sides.flat_map { |side| [ side.fetch("fields", {})["hero_media_asset_id"], *side.fetch("blocks", []).map { |block| block["media_asset_id"] } ] }.compact.uniq
+      ids.empty? ? Set.new : Media::Asset.kept.where(id: ids).pluck(:id).to_set
+    end
 
     # reads the rows fresh and takes no lock: the overview must not hold a row
     def side(source)

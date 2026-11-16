@@ -42,8 +42,9 @@ module Admin
         count = t(".count", count: pagination.total)
         return count unless chosen
 
-        time = I18n.l(chosen.live_at.in_time_zone(Current.site.effective_time_zone).to_date, format: :"admin.short_with_year")
-        t(".summary_line", time: t(chosen.live_at.future? ? ".goes_live" : ".went_live", time: time), count: count)
+        at = history.shown_at(chosen)
+        time = I18n.l(at.in_time_zone(Current.site.effective_time_zone).to_date, format: :"admin.short_with_year")
+        t(".summary_line", time: t(at.future? ? ".goes_live" : ".went_live", time: time), count: count)
       end
     end
   end

@@ -40,5 +40,5 @@
 
 <%# The restore dialog, opened by the comparison's "Restore version N…": outside the comparison's GET form, whose form it would otherwise be inside. %>
 <% if @restore_offered %>
-  <%= render Admin::HistoryScreen::RestoreDialogComponent.new(record: @record, version: @version, changes: @restore_changes, locale: admin_locale, url_options: admin_url_options) %>
+  <%= render Admin::HistoryScreen::RestoreDialogComponent.new(record: @record, version: @version, shown_at: @history.shown_at(@version), changes: @restore_changes, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>

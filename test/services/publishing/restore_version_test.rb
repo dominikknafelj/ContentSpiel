@@ -188,6 +188,22 @@ class Publishing::RestoreVersionTest < ActiveSupport::TestCase
     assert_equal({ "number" => 2, "images_missing" => 1 }, Audit::Event.where(action: "page.version_restored").sole.metadata)
   end
 
+  test "a version that differs only by an image gone since has nothing to restore" do
+    asset = create_media_asset
+    image = add(nil, block_type: "image", media_asset_id: asset.id)
+    publish_changes(@page)
+    assert ContentBlocks::Save.call(image, attributes: { media_asset_id: nil }).ok?
+    publish_changes(@page)
+    asset.update_columns(trashed_at: Time.current) # version: none (a test trashes an image an older version shows)
+    before = shape
+
+    result = Publishing::RestoreVersion.call(@page.reload, number: 2)
+
+    assert_equal [ "Nothing to restore: the working version is already version 2." ], result.errors
+    assert_equal before, shape
+    assert_empty Audit::Event.where(action: "page.version_restored")
+  end
+
   test "it records one event of its own with the number, and takes the settings row then the page's row first" do
     publish_two
 

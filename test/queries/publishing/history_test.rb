@@ -38,6 +38,34 @@ class Publishing::HistoryTest < ActiveSupport::TestCase
     assert_equal [ :scheduled ], history(page).rows.map(&:state).uniq
   end
 
+  test "a scheduled record's copy in force goes live at its published_at, and was scheduled once that has passed" do
+    page = create_page(title: "Later")
+    taken = Publishing::Version.of(page).sole.live_at
+    at = 2.days.from_now.change(usec: 0)
+    page.update_columns(published_at: at) # version: none (a test schedules a page) # changes: none (a test schedules a page)
+
+    row = history(page).rows.sole
+    assert_operator taken, :<, at
+    assert_equal at, row.at
+    assert_equal at, history(page).shown_at(Publishing::Version.of(page).sole)
+    assert_equal :scheduled, row.state
+    assert row.was_scheduled
+
+    later = history(page, now: 3.days.from_now).rows.sole
+    assert_equal at, later.at
+    assert_equal :on_site, later.state
+    assert later.was_scheduled
+  end
+
+  test "a live record's copies go live at their own time" do
+    page = create_page(title: "About")
+    second = publish_again(page, "About us")
+    rows = history(page).rows
+
+    assert_equal [ second.live_at, Publishing::Version.of(page).find_by!(number: 1).live_at ], rows.map(&:at)
+    assert_not rows.first.was_scheduled
+  end
+
   test "a first copy with no publisher has none" do
     page = create_page(title: "About")
     Publishing::Version.of(page).update_all(created_by_id: nil) # version: none (a test) # changes: none (a test)
@@ -55,17 +83,15 @@ class Publishing::HistoryTest < ActiveSupport::TestCase
     sql.each { |statement| assert_no_match(/snapshot|blocks/, statement) }
   end
 
-  test "the working version is the same as the copy in force when nothing differs" do
+  test "the working version: whether the mark is set, and when the rows were saved" do
     page = create_page(title: "About")
     working = history(page).working
 
-    assert_equal Publishing.current(page).number, working.same_as
+    assert_not working.changes
     assert_equal page.reload.updated_at, working.saved_at
 
     assert Pages::Save.call(page, attributes: {}, translations: { "en" => { title: "Changed" } }).ok?
-    changed = history(page).working
-    assert changed.changes
-    assert_nil changed.same_as
+    assert history(page).working.changes
   end
 
   test "51 copies make two pages" do

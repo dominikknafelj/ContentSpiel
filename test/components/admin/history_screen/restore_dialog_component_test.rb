@@ -11,7 +11,7 @@ class Admin::HistoryScreen::RestoreDialogComponentTest < ViewComponent::TestCase
     version = Publishing::Version.of(page.reload).find_by!(number: number)
     as(users(:one)) do
       render_inline(Admin::HistoryScreen::RestoreDialogComponent.new(record: page, version: version,
-        changes: Publishing::Changes.between(page, from: :working, to: version), locale: "en"))
+        shown_at: Publishing::History.new(page).shown_at(version), changes: Publishing::Changes.between(page, from: :working, to: version), locale: "en"))
     end
   end
 
@@ -75,6 +75,18 @@ class Admin::HistoryScreen::RestoreDialogComponentTest < ViewComponent::TestCase
     assert_selector "dialog footer button", text: "Close"
     assert_no_selector "button", text: "Cancel"
     assert_no_selector "[data-restore-warnings]"
+  end
+
+  test "a scheduled record's version goes live at the record's time" do
+    page = create_page(title: "Later")
+    at = 3.days.from_now.change(hour: 9, min: 0)
+    page.update_columns(published_at: at) # version: none (a test schedules a page) # changes: none (a test schedules a page)
+    assert Pages::Save.call(page.reload, translations: { "en" => { title: "Later still" } }).ok?
+
+    draw(page, 1)
+
+    date = I18n.l(at.in_time_zone(Current.site.effective_time_zone).to_date, format: :"admin.short_with_year")
+    assert_text "Later still’s working version becomes version 1 as it goes live on #{date}."
   end
 
   private

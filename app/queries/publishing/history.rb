@@ -15,13 +15,14 @@ module Publishing
     PER_PAGE = 50
     COLUMNS = %w[id record_type record_id number live_at created_at created_by_id].freeze
 
-    # `publisher` is nil for a copy kept when history began.
-    # `was_scheduled`: the copy was taken for a later time (a scheduled change).
-    Row = Data.define(:version, :number, :live_at, :publisher, :state, :was_scheduled)
-    # `changes`: the mark is set. `same_as`: the number of the copy in force
-    # when the rows differ from the newest copy in nothing, else nil.
-    # `saved_at`: when the rows were last saved.
-    Working = Data.define(:changes, :same_as, :saved_at)
+    # `at`: when the copy goes or went live for a visitor (`shown_at`).
+    # `publisher` is nil for a copy kept when history began, and for one
+    # whose publisher's account was removed since (`created_by` nullified).
+    # `was_scheduled`: the copy went live later than it was taken: a
+    # scheduled change, or a scheduled record's copy in force.
+    Row = Data.define(:version, :number, :at, :publisher, :state, :was_scheduled)
+    # `changes`: the mark is set. `saved_at`: when the rows were last saved.
+    Working = Data.define(:changes, :saved_at)
 
     attr_reader :record, :now
 
@@ -39,17 +40,29 @@ module Publishing
       @rows ||= begin
         return [] if pagination.out_of_range?
 
-        in_force = Publishing.current(record, now: now)&.id
         copies.select(*COLUMNS).includes(:created_by).order(number: :desc).limit(PER_PAGE).offset(pagination.offset).map do |version|
-          Row.new(version: version, number: version.number, live_at: version.live_at, publisher: version.created_by,
-            state: state_of(version, in_force), was_scheduled: version.live_at > version.created_at)
+          Row.new(version: version, number: version.number, at: shown_at(version), publisher: version.created_by,
+            state: state_of(version), was_scheduled: was_scheduled?(version))
         end
       end
     end
 
     def working
-      @working ||= Working.new(changes: record.unpublished_changes_at.present?, saved_at: record.updated_at,
-        same_as: (Publishing.current(record, now: now)&.number if Changes.of(record).none?))
+      @working ||= Working.new(changes: record.unpublished_changes_at.present?, saved_at: record.updated_at)
+    end
+
+    # WHEN A COPY GOES OR WENT LIVE FOR A VISITOR, which is not always its
+    # `live_at`: a scheduled record's first copy is in force from the moment
+    # it is taken and hidden until `published_at`, the one clock of a
+    # record's visibility (`docs/reference/publishing.md`, "The order of
+    # copies"). So the copy in force of a record with a time shows from the
+    # later of the two (and moves with "Edit schedule"); any other copy at
+    # its own `live_at`. The row's time, the versions' summary and the
+    # restore dialog's sentence all read it here.
+    def shown_at(version)
+      return version.live_at unless timed_in_force?(version)
+
+      [ version.live_at, record.published_at ].max
     end
 
     def find(number) = copies.find_by!(number: number)
@@ -70,11 +83,23 @@ module Publishing
 
     def arel_table = Version.arel_table
 
-    def state_of(version, in_force)
-      return :scheduled if version.live_at > now
-      return :earlier unless version.id == in_force
+    def in_force_id = defined?(@in_force_id) ? @in_force_id : (@in_force_id = Publishing.current(record, now: now)&.id)
 
-      record.published_at.nil? ? :earlier : (record.published_at <= now ? :on_site : :scheduled)
+    def publishing_state = @publishing_state ||= State.of(record, now: now)
+
+    def timed_in_force?(version) = version.id == in_force_id && publishing_state.timed?
+
+    # A copy taken for a later time (a scheduled change), or the copy in
+    # force of a record whose time came after the copy was taken.
+    def was_scheduled?(version)
+      version.live_at > version.created_at || (timed_in_force?(version) && record.published_at > version.live_at)
+    end
+
+    def state_of(version)
+      return :scheduled if version.live_at > now
+      return :earlier unless timed_in_force?(version)
+
+      publishing_state.scheduled? ? :scheduled : :on_site
     end
   end
 end

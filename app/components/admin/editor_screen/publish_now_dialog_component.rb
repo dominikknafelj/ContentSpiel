@@ -66,7 +66,7 @@ module Admin
       # come, since the page was drawn: the answer then says it is no longer
       # scheduled, offers nothing and hides the confirm (the script reads
       # `data-publish-now="gone"`). It never names a time it has not got.
-      def gone? = !record.published_at&.future?
+      def gone? = !::Publishing::State.of(record).scheduled?
 
       def type = PublishChangesDialogComponent.kind_of(record)
       def dialog_id = self.class.dialog_id_for(record)

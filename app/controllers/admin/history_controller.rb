@@ -42,7 +42,9 @@ module Admin
       # that the overview would miss, and the press carries the record's
       # `updated_at` as read here, which the service checks.
       @restore_changes = ::Publishing::Changes.between(@record, from: :working, to: @version) if @may_restore
-      @restore_offered = @may_restore && !@restore_changes.none?
+      # A difference of an image gone since alone is one no restore can
+      # make, as the service judges it: no Restore.
+      @restore_offered = @may_restore && !@restore_changes.none_but_gone_images?
     end
 
     private
