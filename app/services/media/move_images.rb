@@ -72,6 +72,7 @@ module Media
         next failure(nil, [ "An image you chose is gone. Nothing was moved." ]) if locked.size != ids.size
 
         moved = move(locked, target)
+        Media::LibrarySignals.changed(reason: "moved") if moved.any?
         success(nil)
       end
 

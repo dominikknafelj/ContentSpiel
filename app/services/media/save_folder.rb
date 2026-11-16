@@ -33,6 +33,8 @@ module Media
         Media::Folder.lock_tree!
         @tree = Media::FolderTree.load
         write || raise(ActiveRecord::Rollback)
+        Media::LibrarySignals.changed(reason: "folders")
+        true
       end
 
       saved ? success(@folder) : refusal

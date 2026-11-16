@@ -86,6 +86,7 @@ module Media
 
         @folder = locked
         move_up(Media::FolderTree.load)
+        Media::LibrarySignals.changed(reason: "folders")
         true
       end
 
