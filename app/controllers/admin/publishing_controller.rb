@@ -40,13 +40,15 @@ module Admin
     # is from the page view. `part=schedule` answers that alone, with no
     # overview and no trial: what the discard and the cancel dialogs ask
     # when they open, one request per opening like the publish dialog's.
+    # `part=publish_now` is the Publish now dialog's body (D9).
     def changes
       response.set_header("Cache-Control", "no-store")
       return render(Admin::Ui::ChangesOverviewComponent.schedule_only(record: @record), layout: false) if params[:part] == "schedule"
+      return publish_now_answer if params[:part] == "publish_now"
 
-      addresses = can?("#{kind}s.publish", @record) ? ::Publishing::Changes.addresses(@record) : ::PublicSite::Paths::Foreseen.nothing
+      addresses = trial_addresses
       render Admin::Ui::ChangesOverviewComponent.new(record: @record, changes: ::Publishing::Changes.of(@record), lost: addresses.lost, moved: addresses.moved,
-        holds: ::Editing::Holds.on(@record, viewer: Current.user, tab: Current.editing_tab), locale: admin_locale, url_options: admin_url_options), layout: false
+        holds: holds, locale: admin_locale, url_options: admin_url_options), layout: false
     end
 
     # Publishes now, at a time, or at the time the changes are already
@@ -112,6 +114,26 @@ module Admin
     end
 
     def kind = @record.is_a?(Page) ? "page" : "post"
+
+    def holds = ::Editing::Holds.on(@record, viewer: Current.user, tab: Current.editing_tab)
+
+    def trial_addresses = can?("#{kind}s.publish", @record) ? ::Publishing::Changes.addresses(@record) : ::PublicSite::Paths::Foreseen.nothing
+
+    # A CHOICE ONLY WHEN THE ROWS DIFFER from what was scheduled: the mark
+    # (`Publishing::State#changes?`) says that something was saved since, and
+    # the comparison that it still differs (a change typed and taken back
+    # leaves the mark with nothing to publish, and then "with the later
+    # changes" would publish what was scheduled under another name). With a
+    # choice, the trial says which addresses the rows would take away or move,
+    # as the Publish changes dialog does; without one nothing of the rows goes
+    # live, so there is no trial.
+    def publish_now_answer
+      changes = ::Publishing::State.of(@record).changes? ? ::Publishing::Changes.of(@record) : nil
+      changes = nil if changes&.none?
+      addresses = changes ? trial_addresses : ::PublicSite::Paths::Foreseen.nothing
+      render Admin::EditorScreen::PublishNowDialogComponent.answer(record: @record, changes: changes, holds: holds, locale: admin_locale,
+        lost: addresses.lost, moved: addresses.moved, url_options: admin_url_options), layout: false
+    end
 
     def history_path(number)
       public_send(@record.is_a?(Page) ? :admin_page_history_path : :admin_post_history_path, @record, **admin_url_options, version: number)

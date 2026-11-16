@@ -84,6 +84,24 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector ".admin-status-chip[data-status=scheduled]"
   end
 
+  test "a scheduled record's Publish now opens the dialog; a draft's Publish posts at once" do
+    post = create_post(title: "Later", published: false)
+    as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }
+    render_header(post.reload)
+    assert_selector "button.bg-accent[type=button][data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='publish-now-post-#{post.id}']", text: "Publish now…"
+    assert_no_selector "form[action='/cs-studio/posts/#{post.id}/publish'] > button", visible: :all
+    assert_selector "dialog#publish-now-post-#{post.id}", visible: :all
+
+    draft = create_page(title: "About", published: false)
+    render_header(draft)
+    assert_selector "form[action='/cs-studio/pages/#{draft.id}/publish'][data-controller='admin--saving--queue-hold'] button", text: "Publish"
+    assert_no_selector "dialog[id^='publish-now-']", visible: :all
+
+    live = create_page(title: "Live", published: true)
+    render_header(live)
+    assert_no_selector "dialog[id^='publish-now-']", visible: :all
+  end
+
   test "Schedule… and Edit schedule open the Schedule dialog, rendered after the header" do
     page_record = create_page(title: "About", published: false)
     render_header(page_record)

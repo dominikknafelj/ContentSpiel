@@ -1,11 +1,14 @@
 import { Controller } from "@hotwired/stimulus"
 import { drained, enqueue } from "saving/queue"
 import { post } from "editing/requests"
+import { messages } from "i18n/messages"
 
 // The part of the publish, discard and cancel dialogs that is asked from the
 // server each time one of them is opened (`Admin::EditorScreen::
 // PublishChangesDialogComponent`): what a publish would change (the publish
-// dialog's overview), and WHAT IS SCHEDULED NOW (all three).
+// dialog's overview), and WHAT IS SCHEDULED NOW (all three). The Publish now
+// dialog (`PublishNowDialogComponent`, on the `<dialog>` itself so that its
+// footer's confirm is a target) is read the same way: its whole body.
 //
 // ASKED THROUGH THE WRITE QUEUE, by a POST. What a publish publishes is what
 // is SAVED, so the overview is true only once everything this tab still has
@@ -34,15 +37,23 @@ import { post } from "editing/requests"
 // one, else Now); when it does not, the person's choice is left alone.
 //
 // The answer is this application's own markup (`ChangesOverviewComponent`,
-// every name in it escaped by the server), parsed and put into the overview
-// element; nothing in it is a form, so nothing the write queue holds is
-// ever replaced here. The dialogs' own forms are never replaced: fields of
-// theirs are set.
+// every name in it escaped by the server), parsed and its top-level
+// `[data-publishing-overview]` put into the overview element (Publish now's
+// holds the overview of what changed inside its own); nothing in it is a
+// form, so nothing the write queue holds is ever replaced here. The dialogs'
+// own forms are never replaced: fields of theirs are set. Publish now's two
+// radios are the one exception to "no field": they belong to its form by
+// their `form` attribute and come with the answer, since only the answer
+// knows whether there is a choice.
+//
+// THE CONFIRM SAYS WHAT GOES LIVE (Publish now): its label follows the chosen
+// radio, and reads "Publish now" while there is none (`chose`), in the words
+// the dialog's `data-messages` carries.
 //
 // The sentences this script shows are elements or attributes the server
 // wrote: it holds no words of its own.
 export default class extends Controller {
-  static targets = [ "overview", "loading", "failed", "at", "kept", "now", "keptRow", "keptLabel", "discardLine", "cancelLine" ]
+  static targets = [ "overview", "loading", "failed", "at", "kept", "now", "keptRow", "keptLabel", "discardLine", "cancelLine", "confirm" ]
   static values = { url: String }
 
   connect() {
@@ -68,6 +79,7 @@ export default class extends Controller {
       this.loadingTarget.hidden = false
       this.failedTarget.hidden = true
     }
+    this.chose()
 
     await drained()
     if (turn !== this.turn) return
@@ -84,7 +96,8 @@ export default class extends Controller {
     }
     const body = new DOMParser().parseFromString(answer.text, "text/html").body
     this.applySchedule(body.querySelector("[data-publishing-schedule]"))
-    if (this.hasOverviewTarget) this.overviewTarget.replaceChildren(...body.querySelectorAll("[data-publishing-overview]"))
+    if (this.hasOverviewTarget) this.overviewTarget.replaceChildren(...body.querySelectorAll(":scope > [data-publishing-overview]"))
+    this.chose()
   }
 
   applySchedule(facts) {
@@ -107,6 +120,16 @@ export default class extends Controller {
       this.discardLineTarget.hidden = !id
     }
     if (this.hasCancelLineTarget) this.cancelLineTarget.textContent = facts.dataset.cancelLine || ""
+  }
+
+  // Publish now's confirm names the choice that is on.
+  chose() {
+    if (!this.hasConfirmTarget) return
+
+    const choice = this.element.querySelector("input[name=with_changes]:checked")?.value
+    const key = { 0: "components.editor_screen.publish_now_dialog.choices.scheduled.title",
+      1: "components.editor_screen.publish_now_dialog.choices.with_changes.title" }[choice] || "components.editor_screen.publish_now_dialog.confirm"
+    this.confirmTarget.textContent = messages(this.element).t(key)
   }
 
   // A time typed or picked means "At a time": nobody who chose a date should

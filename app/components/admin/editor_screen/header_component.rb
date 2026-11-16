@@ -11,7 +11,7 @@ module Admin
     # reaches the site only with "Publish changes", so a live record has no
     # primary button until its rows differ from what is published (the
     # button is `Publishing::State`'s `publish_changes`) -- while a draft
-    # offers Publish and a scheduled record Publish now plus Edit schedule…. Everything else (History, Activity, Schedule…,
+    # offers Publish and a scheduled record Publish now… (a dialog that asks what goes live, D9) plus Edit schedule…. Everything else (History, Activity, Schedule…,
     # Cancel scheduled change…, Unpublish…, Move to trash…) sits in the ⋯ menu, the destructive item last
     # and after a divider. Every item that opens a dialog ends with an
     # ellipsis (the brand book: "an action that opens a dialog ends with
@@ -24,7 +24,7 @@ module Admin
     # tree column and the sidebar's Trash badge showing what they showed
     # before. A full-page visit re-renders them for free.
     #
-    # The dialogs (schedule, unpublish, delete) are siblings AFTER the `<header>`, not
+    # The dialogs (schedule, Publish now, unpublish, delete) are siblings AFTER the `<header>`, not
     # inside it: the header is sticky with its own stacking context, and a
     # modal opened from within it would be clipped by it. Dialog forms still
     # cannot nest in the editor form -- the header is never inside one.
@@ -183,7 +183,8 @@ module Admin
 
       def can_edit_schedule? = state.action?(:schedule) && scheduled? && may_publish?
 
-      def primary_label = scheduled? ? "Publish now" : "Publish"
+      # A scheduled record's "Publish now…" opens it; a draft's "Publish" posts at once.
+      def publish_now_dialog_id = PublishNowDialogComponent.dialog_id_for(record)
 
       # "Cancel scheduled change" (the state's own action), in the menu; its
       # confirmation and its form are the publish dialogs' (`PublishChangesDialogComponent`).

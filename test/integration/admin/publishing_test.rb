@@ -377,6 +377,48 @@ class Admin::PublishingTest < ActionDispatch::IntegrationTest
     assert_empty statements.grep(/FOR UPDATE|SAVEPOINT/)
   end
 
+  test "part=publish_now answers the choice only when the rows changed since the schedule" do
+    scheduled = create_page(title: "Pricing", published: false)
+    assert Pages::Save.call(scheduled, attributes: { published_at: 2.days.from_now }).ok?
+
+    post admin_publishing_changes_path(kind: "page", id: scheduled.id, part: "publish_now")
+
+    assert_response :success
+    assert_equal "no-store", response.headers["Cache-Control"]
+    assert_select "[data-publishing-schedule][data-pending-id='']", count: 1
+    assert_select "[data-publish-now=plain]", text: /\AIt goes live now instead of at .+, as scheduled\.\z/
+    assert_select "input[name=with_changes]", count: 0
+
+    assert Pages::Save.call(scheduled, translations: { "en" => { title: "Pricing, edited" } }).ok?
+    post admin_publishing_changes_path(kind: "page", id: scheduled.id, part: "publish_now")
+
+    assert_select "[data-publish-now=choice]" do
+      assert_select "p", text: /\AChanges were saved after it was scheduled for .+\.\z/
+      assert_select "[role=radiogroup] input[type=radio][name=with_changes][value='0'][checked]", count: 1
+      assert_select "[role=radiogroup] input[type=radio][name=with_changes][value='1']:not([checked])", count: 1
+      assert_select "details [data-changed-fields]", text: "Title"
+    end
+    assert_select "[data-publish-now=plain]", count: 0
+  end
+
+  test "the Publish now dialog's two choices post to the record's publish: the scheduled version, or the rows" do
+    scheduled = create_page(title: "Pricing", published: false)
+    assert Pages::Save.call(scheduled, attributes: { published_at: 2.days.from_now }).ok?
+    assert Pages::Save.call(scheduled, translations: { "en" => { title: "Pricing, edited" } }).ok?
+
+    post publish_admin_page_path(scheduled), params: { with_changes: "0", pending: "" }
+    assert_match(/\APublished as it was scheduled\./, flash[:notice])
+    assert_equal 1, Publishing.current(scheduled).number
+
+    other = create_page(title: "Other", published: false)
+    assert Pages::Save.call(other, attributes: { published_at: 2.days.from_now }).ok?
+    assert Pages::Save.call(other, translations: { "en" => { title: "Other, edited" } }).ok?
+
+    post publish_admin_page_path(other), params: { with_changes: "1", pending: "" }
+    assert_equal "Published now, with the changes saved since it was scheduled.", flash[:notice]
+    assert_equal 2, Publishing.current(other).number
+  end
+
   test "scheduled since: Now, pressed in a dialog that showed no schedule, publishes nothing, and the dialog reopens saying so with the scheduled time on offer" do
     publish_changes(@page, at: 2.days.from_now)
     pending = Publishing.pending(@page)
