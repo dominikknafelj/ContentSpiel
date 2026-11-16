@@ -4,7 +4,8 @@ module Admin
   module MediaLibrary
     # One image's panel, the content of the Media rail's Image tab
     # (`/media?selected=ID`; `Admin::MediaController#show` redirects there),
-    # top to bottom: the title, the preview, the file's facts, Download
+    # top to bottom: the title, the preview, the file's facts (with its
+    # folder, `FolderFactComponent`), Download
     # original, the language tabs with the save line, an autosaving
     # title/alt/caption form (`Media::Save`, alt/caption per locale), "Used
     # on", the `media.panel.sections` slot, and Move to trash after a rule.
@@ -42,11 +43,20 @@ module Admin
       # locale file's `roles`; a role outside it is named by itself.
       ROLES = %w[hero block_image rich_text published].freeze
 
-      def initialize(asset:, locale:, url_options: {}, link_params: {})
+      # `tree:` is the folder tree the screen already read, which names the
+      # image's folder; without it the panel reads it.
+      def initialize(asset:, locale:, url_options: {}, link_params: {}, tree: nil)
         @asset = asset
         @locale = locale.to_s
         @url_options = url_options
         @link_params = link_params.to_h.symbolize_keys
+        @tree = tree
+      end
+
+      # The Folder fact: the image's folder, and Move to… for a viewer who
+      # may move it (the same rule as editing it, `Media::MoveImages`).
+      def folder_fact
+        FolderFactComponent.new(asset: asset, tree: @tree || Media::FolderTree.load, movable: editable?, query: link_params, url_options: url_options)
       end
 
       def editable?

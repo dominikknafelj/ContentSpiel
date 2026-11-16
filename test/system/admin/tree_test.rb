@@ -286,6 +286,17 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
   end
 
   # The cookie's path is the admin path, so a visitor's page never sees it.
+  test "a fold is written to the cookie its tree names, and only that one" do
+    visit_screen "/cs-studio/pages"
+    assert_equal "cs_tree_open", page.evaluate_script("document.querySelector('#tree-list').dataset.treeOpenCookie")
+    disclosure(root_page).click
+    assert_equal [ "-#{root_page.id}" ], open_set
+
+    cookie = page.evaluate_script("document.cookie").to_s
+    assert_includes cookie, "cs_tree_open="
+    assert_not_includes cookie, "cs_media_open"
+  end
+
   test "after a fold a public page's document.cookie lacks the open set" do
     visit_screen "/cs-studio/pages"
     disclosure(root_page).click

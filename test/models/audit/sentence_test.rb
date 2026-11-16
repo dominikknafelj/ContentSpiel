@@ -143,6 +143,49 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     end
   end
 
+  test "the folder actions read created, renamed, moved into, moved to the top and deleted" do
+    folder = ->(action, **attributes) do
+      sentence_for(Audit::Event.new({ action:, channel: "admin", subject_type: "Media::Folder", subject_id: 999_999, subject_label: "Trips",
+        user_id: @me.id, occurred_at: Time.current, last_occurred_at: Time.current }.merge(attributes)))
+    end
+
+    assert_equal "You created the folder “Trips”", read(folder.call("media_folder.created"))
+    assert_equal "You renamed the folder “Travel” to “Trips”", read(folder.call("media_folder.renamed", field_changes: { "name" => [ "Travel", "Trips" ] }))
+    assert_equal "You moved the folder “Trips” into “2026”", read(folder.call("media_folder.moved", metadata: { "parent" => "2026" }))
+    assert_equal "You moved the folder “Trips” to the top", read(folder.call("media_folder.moved", field_changes: { "parent_id" => [ 4, nil ] }))
+    assert_equal "You deleted the folder “Trips”", read(folder.call("media_folder.deleted"))
+    assert_equal "Media folder", Audit::Filter::SUBJECT_TYPES.fetch("Media::Folder")
+  end
+
+  test "a folder's sentence links to the Media screen at that folder while it exists, and a deleted one has no link" do
+    folder = Media::Folder.create!(name: "Trips")
+    made = event("media_folder.created", subject_type: "Media::Folder", subject_id: folder.id, subject_label: "Trips")
+    route = sentence_for(made).subject_route
+
+    assert_equal [ :admin_media_path, [], { folder: folder.id } ], [ route.name, route.args, route.params ]
+
+    deleted = event("media_folder.deleted", subject_type: "Media::Folder", subject_id: folder.id, subject_label: "Trips")
+    assert_nil sentence_for(deleted).subject_route
+
+    folder.destroy!
+    assert_nil sentence_for(made).subject_route
+  end
+
+  test "media.moved reads moved to a folder or out of every folder, and counted for the dashboard" do
+    moved = ->(**attributes) do
+      Audit::Event.new({ action: "media.moved", channel: "admin", subject_type: "Media::Asset", subject_id: 5, subject_label: "sunset.jpg",
+        user_id: @me.id, occurred_at: Time.current, last_occurred_at: Time.current }.merge(attributes))
+    end
+    library = Audit::Sentence::Target.new(nil, Audit::Sentence.library_route)
+
+    assert_equal "You moved “sunset.jpg” to “Client A”", read(sentence_for(moved.call(metadata: { "folder_name" => "Client A" })))
+    assert_equal "You moved “sunset.jpg” out of every folder", read(sentence_for(moved.call(metadata: { "folder_name" => nil })))
+    assert_equal "You moved 12 images to “Client A”",
+      read(Audit::Sentence.build(moved.call(metadata: { "folder_name" => "Client A" }), viewer: @me, target: library, count: 12))
+    assert_equal "You moved 3 images out of every folder", read(Audit::Sentence.build(moved.call, viewer: @me, target: library, count: 3))
+    assert_includes Audit::Sentence::COUNTED, "media.moved"
+  end
+
   # A form's five actions, its name quoted as a subject.
   test "a form's actions" do
     cases = {
@@ -681,7 +724,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
 
     assert_raises(ArgumentError) { Audit::Sentence.build(published, viewer: @me, target: nil, count: 2) }
     assert_raises(ArgumentError) { Audit::Sentence.build(block, viewer: @me, target: nil, count: 2) }
-    assert_equal %w[block.created block.updated media.uploaded], Audit::Sentence::COUNTED
+    assert_equal %w[block.created block.updated media.uploaded media.moved], Audit::Sentence::COUNTED
   end
 
   # --- passkeys and recovery codes ------------------------------------------

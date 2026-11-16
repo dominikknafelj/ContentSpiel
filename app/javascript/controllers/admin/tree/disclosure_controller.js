@@ -21,7 +21,7 @@ import { expanderOf, idOf, isFolded, openByRule, readOpenSet, setFolded, setOpen
 // keeps it.
 export default class extends Controller {
   connect() {
-    const set = readOpenSet()
+    const set = readOpenSet(this.element)
     this.element.querySelectorAll("[data-tree-node]").forEach((node) => setFolded(node, !openByRule(node, set)))
   }
 

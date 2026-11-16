@@ -1,0 +1,44 @@
+<div class="flex flex-col gap-3" data-admin--media--move-target="choices">
+  <% if refusal %>
+    <%= render(Admin::Ui::NoticeComponent.new(tone: :danger, id: NOTICE_ID, tabindex: "-1")) { refusal } %>
+  <% end %>
+  <% if list? %>
+    <div role="search">
+      <label for="media-move-find" class="sr-only"><%= words(:find) %></label>
+      <div class="relative">
+        <span class="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-meta">
+          <%= helpers.render "admin/shared/icon", name: :search, size: "size-3.5" %>
+        </span>
+        <input type="search" id="media-move-find" placeholder="<%= words(:find) %>" autocomplete="off" aria-controls="media-move-list"
+               class="admin-well block h-8 w-full ps-8 pe-3 text-sm text-ink placeholder:text-meta"
+               data-admin--media--move-target="find">
+      </div>
+    </div>
+    <%= form_with url: form_url, method: form_method, id: FORM_ID do %>
+      <% asset_ids.each do |id| %>
+        <%= hidden_field_tag "asset_ids[]", id, id: nil %>
+      <% end %>
+      <% hidden_fields.each do |name, value| %>
+        <%= hidden_field_tag name, value, id: nil %>
+      <% end %>
+      <div id="media-move-list" role="radiogroup" aria-labelledby="<%= title_id %>" class="max-h-[260px] overflow-y-auto rounded-tile border border-line p-1">
+        <% rows.each do |row| %>
+          <label class="flex h-8 items-center gap-2 rounded-cs pe-2 text-sm <%= indent(row) %> <%= disabled?(row) ? 'text-meta' : 'cursor-pointer text-ink hover:bg-sunken has-[:checked]:bg-accent-tint' %>"
+                 data-move-choice data-move-name="<%= row.label.downcase %>">
+            <%= radio_button_tag choice_name, row.value, false, id: choice_id(row), disabled: disabled?(row), class: "shrink-0",
+                  aria: { describedby: (reason_id(row) if disabled?(row)) } %>
+            <% if row.glyph %>
+              <span class="shrink-0 text-meta"><%= helpers.render "admin/shared/tree_glyph", name: row.glyph %></span>
+            <% end %>
+            <span class="min-w-0 flex-1 truncate"><%= row.label %></span>
+            <% if row.current %>
+              <%= render Admin::Ui::BadgeComponent.new(label: words(:current), id: reason_id(row)) %>
+            <% elsif row.reason %>
+              <span id="<%= reason_id(row) %>" class="shrink-0 text-label text-meta"><%= words(row.reason) %></span>
+            <% end %>
+          </label>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

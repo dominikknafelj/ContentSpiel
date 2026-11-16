@@ -1,0 +1,25 @@
+<%# Posts to `_top`: the answer is a Turbo Stream, and anything else (the
+    sign-in page after a session ended) is a page, never this dialog's
+    frame. `admin--media--folder-dialog` sends it through the write queue. %>
+<%= form_with url: url, method: :post, id: ID, data: { turbo_frame: "_top", "admin--media--folder-dialog-target": "form" } do %>
+  <%= hidden_field_tag "_method", form_method, id: nil, data: { "admin--media--folder-dialog-target": "method" } %>
+  <%= hidden_field_tag "media_folder[parent_id]", parent_id, id: nil, disabled: rename?, data: { "admin--media--folder-dialog-target": "parent" } %>
+  <%= hidden_field_tag "place", place, id: nil, data: { "admin--media--folder-dialog-target": "place" } %>
+  <%= hidden_field_tag "q", search_value(:q), id: nil, data: { "admin--media--folder-dialog-target": "q" } %>
+  <%= hidden_field_tag "filter", search_value(:filter), id: nil, data: { "admin--media--folder-dialog-target": "filter" } %>
+
+  <label for="<%= NAME_ID %>" class="<%= setup_label_class %>"><%= t("admin.components.media_library.folder_dialog.name") %></label>
+  <%= tag.input type: "text", id: NAME_ID, name: "media_folder[name]", value: name, maxlength: Media::Folder::NAME_LENGTH,
+        class: setup_input_class, autocomplete: "off", spellcheck: "false",
+        aria: { invalid: (true if errors.any?), describedby: described_by },
+        data: { "admin--media--folder-dialog-target": "name" } %>
+  <%# The field's frame: what was refused, under the field, never by colour alone. %>
+  <div id="<%= ERRORS_ID %>" class="mt-1 text-sm text-danger-ink" role="alert" data-admin--media--folder-dialog-target="errors">
+    <% errors.each do |field, sentence| %>
+      <p class="flex gap-1.5"><span aria-hidden="true" class="font-semibold">!</span><%= tag.span sentence, data: { media_folder_error: field } %></p>
+    <% end %>
+  </div>
+  <%= tag.p id: WHERE_ID, hidden: where.nil?, class: "mt-2 flex items-center gap-1.5 text-small text-dim", data: { "admin--media--folder-dialog-target": "where" } do %>
+    <%= render "admin/shared/icon", name: :folder, size: "size-3.5" %><span data-admin--media--folder-dialog-target="whereText"><%= where %></span>
+  <% end %>
+<% end %>

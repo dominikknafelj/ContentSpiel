@@ -37,8 +37,9 @@ class Current < ActiveSupport::CurrentAttributes
 
   # The opaque id of the browser tab a CS Studio request came from: the header
   # `X-Notes-Tab`, in the shape `Live::Signals::TAB`, read for EVERY admin
-  # request by `Admin::BaseController`. Only `Editing` reads it: as the
-  # `origin` of its signals and as the tab that holds a reservation. It is not
+  # request by `Admin::BaseController`. `Editing` reads it, as the `origin` of
+  # its signals and as the tab that holds a reservation, and so does
+  # `Media::LibrarySignals`, as the `origin` of the library's. It is not
   # `notes_tab`, which only the notes controllers set: a content request that
   # set that one would put an origin on `Notes::Remove`'s signal, and the tab
   # that deleted a block would skip the refresh of its own notes drawer.

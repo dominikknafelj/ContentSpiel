@@ -33,6 +33,13 @@ when :dashboard %>
     `size` is the block icon's, as for the types' icons below. %>
 <% when :clipboard_list %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><rect x="5" y="4" width="14" height="17" rx="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 4V3.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 .5.5V4M9 10h6M9 14h6M9 18h3" /></svg>
+<%# Media folders: `:folder` (Lucide `folder`) in the folders panel, the folder
+    dialogs and a tile's folder line; `:folder_input` (Lucide `folder-input`)
+    in Move to… buttons and menu items, at `size-4`. %>
+<% when :folder %>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
+<% when :folder_input %>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1M2 13h10M9 16l3-3-3-3" /></svg>
 <% when :trash %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V4.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 .5.5V7" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" /><path stroke-linecap="round" d="M10 11v6M14 11v6" /></svg>
 <% when :menu %>

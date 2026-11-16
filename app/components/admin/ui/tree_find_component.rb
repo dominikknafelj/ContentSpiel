@@ -9,7 +9,8 @@ module Admin
     # field, empty.
     #
     # `noun:` picks the words for what the tree holds: `:pages` (Pages), or
-    # `:nodes` (the mind graph's list, which holds posts and tags too).
+    # `:nodes` (the mind graph's list, which holds posts and tags too), or
+    # `:folders` (the Media screen's Folders column).
     # `moving:` says the tree's rows move by drag, which is off while the
     # tree is narrowed, so a sentence under the status line then says how to
     # move them again.
@@ -21,7 +22,7 @@ module Admin
     class TreeFindComponent < AdminComponent
       include Admin::Ui::Contract
 
-      NOUNS = %i[pages nodes].freeze
+      NOUNS = %i[pages nodes folders].freeze
 
       contract(
         accessibility: "A search landmark round a search field with a real label, naming the tree it narrows and its shortcut, the slash; a polite status line says the count once the typing stops, in one line of room kept from the first key; where the tree moves, “Clear the search to move pages” shows under it with the narrowing, outside the live region, and is the field's aria-describedby while it shows; Down Arrow reaches the first match and Escape clears.",
@@ -41,7 +42,7 @@ module Admin
           filtered: [ "test/system/admin/tree_find_test.rb", "typing narrows the tree to matches and their paths, marks them, and Escape gives back the person's folds" ],
           no_match: [ "test/system/admin/tree_find_test.rb", "no match says No pages match, and no tree is shown" ]
         },
-        keys: %w[label.pages label.nodes placeholder.pages placeholder.nodes count.pages count.nodes none.pages none.nodes no_moving clear],
+        keys: %w[label.pages label.nodes label.folders placeholder.pages placeholder.nodes placeholder.folders count.pages count.nodes count.folders none.pages none.nodes none.folders no_moving clear],
         slots: [],
         controller: "admin--tree--find",
         keyboard: [ "test/system/admin/tree_find_test.rb", "/ focuses the field, Down Arrow reaches the first match, Enter opens it" ]

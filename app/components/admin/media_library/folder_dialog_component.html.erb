@@ -1,0 +1,10 @@
+<%= render Admin::Ui::DialogComponent.new(id: ID, title: title, width: :form_narrow, data: dialog_data) do |dialog| %>
+  <%= render form %>
+  <% dialog.with_footer do %>
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t("admin.components.media_library.folder_dialog.cancel"), variant: :tertiary, type: "submit") %>
+    <% end %>
+    <%= render Admin::Ui::ButtonComponent.new(label: submit_label, variant: :primary, type: "submit", form: Admin::MediaLibrary::FolderFormComponent::ID,
+          data: { "admin--media--folder-dialog-target": "submit" }) %>
+  <% end %>
+<% end %>

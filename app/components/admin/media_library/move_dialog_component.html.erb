@@ -1,0 +1,12 @@
+<%# `hang`: the list arrives after the dialog is open, so it hangs from its
+    top edge rather than moving its own header as it grows. %>
+<%= render Admin::Ui::DialogComponent.new(id: ID, title: t(".title.images", count: 2), width: :form_narrow, hang: true, data: dialog_data) do |dialog| %>
+  <%= tag.turbo_frame id: FRAME_ID, data: { "admin--media--move-target": "frame" } %>
+  <% dialog.with_footer do %>
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, type: "submit") %>
+    <% end %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), variant: :primary, type: "submit", form: Admin::MediaLibrary::MoveChoicesComponent::FORM_ID, disabled: true,
+          data: { "admin--media--move-target": "submit" }) %>
+  <% end %>
+<% end %>

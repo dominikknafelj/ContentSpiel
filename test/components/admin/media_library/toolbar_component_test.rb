@@ -68,4 +68,23 @@ class Admin::MediaLibrary::ToolbarComponentTest < ViewComponent::TestCase
     assert_selector "#media-picker-count-unused", text: "5"
     assert_no_selector "#media-count-unused"
   end
+
+  test "a search in a folder says where and offers the same words in All media" do
+    render_inline Admin::MediaLibrary::ToolbarComponent.new(counts: COUNTS, filter: "unused", q: "logo", place: "7", place_name: "Client A", url_options: { locale: "de" })
+
+    assert_selector "p.text-small.text-dim", text: /Searching in Client A\./
+    href = page.find("a", text: "Search all media for “logo” →")[:href]
+    assert_equal({ "q" => "logo", "filter" => "unused", "locale" => "de" }, Rack::Utils.parse_query(URI.parse(href).query))
+  end
+
+  test "no line without a search, in All media or in the picker" do
+    render_inline Admin::MediaLibrary::ToolbarComponent.new(counts: COUNTS, filter: "all", q: nil, place: "7", place_name: "Client A")
+    assert_no_text "Searching in"
+
+    render_inline Admin::MediaLibrary::ToolbarComponent.new(counts: COUNTS, filter: "all", q: "logo")
+    assert_no_text "Searching in"
+
+    render_inline Admin::MediaLibrary::ToolbarComponent.new(counts: COUNTS, filter: "all", q: "logo", place: "7", place_name: "Client A", picker: true)
+    assert_no_text "Searching in"
+  end
 end

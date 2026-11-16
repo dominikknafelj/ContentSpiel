@@ -80,6 +80,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         document.body.append(container)
         const graph = document.createElement("div")
         graph.dataset.treeOpenPath = #{"/#{ContentSpiel::ADMIN_PATH}".to_json}
+        graph.dataset.treeOpenCookie = "cs_tree_open"
         graph.dataset.treeLocale = "de"
         graph.dataset.treeOpen = #{open.to_json}
         const calls = []
@@ -120,7 +121,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       (() => {
         const { tree, item, name, list, stops, expanded, done } = #{tree_script}
         const items = Array.from(tree.querySelectorAll("[role=treeitem]"), (each) => [ name(each), each.getAttribute("aria-level"), expanded(name(each)), each.getAttribute("tabindex") ])
-        const own = [ tree.id, tree.getAttribute("role"), tree.getAttribute("aria-label"), tree.dataset.treeOpenPath, tree.dataset.treeLocale, tree.dataset.treeOpen, tree.classList.contains("admin-tree") ]
+        const own = [ tree.id, tree.getAttribute("role"), tree.getAttribute("aria-label"), tree.dataset.treeOpenPath, tree.dataset.treeOpenCookie, tree.dataset.treeLocale, tree.dataset.treeOpen, tree.classList.contains("admin-tree") ]
         // What a find and the open set read: each node's row, its own focus.
         const hooks = [ "page-1", "page-3", "post-1", "type-blog", "pages" ].map((id) => { const row = item(id).firstElementChild; return [ item(id).hasAttribute("data-tree-node"), item(id).hasAttribute("data-tree-focus"), row.dataset.treeId ?? "-", row.dataset.treeTitle ?? "-", row.dataset.treePath ?? "-" ] })
         const root = [ item("page-1").hasAttribute("data-tree-root"), tree.querySelectorAll("[data-tree-root]").length ]
@@ -137,7 +138,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
                    [ "posts", "1", "true", "-1" ], [ "post-1", "2", "-", "-1" ], [ "tags", "1", "true", "-1" ], [ "tag-1", "2", "-", "-1" ],
                    [ "types", "1", "true", "-1" ], [ "type-blog", "2", "true", "-1" ], [ "more-type-blog", "3", "-", "-1" ] ], result["items"],
       "a group heading is an item at level 1 and open; Home is open by default and Docs folded; a leaf, a post and a tag say no aria-expanded; a hub with a pill is open; one Tab stop, the first item"
-    assert_equal [ "mind-graph-tree", "tree", "Pages, posts and tags", "/#{ContentSpiel::ADMIN_PATH}", "de", "", true ], result["own"],
+    assert_equal [ "mind-graph-tree", "tree", "Pages, posts and tags", "/#{ContentSpiel::ADMIN_PATH}", "cs_tree_open", "de", "", true ], result["own"],
       "the tree is named by the region and carries the graph's open set, its path and its language"
     assert_equal [ [ true, true, "1", "Home", "/" ], [ true, true, "3", "Guide", "/docs/guide" ], [ true, true, "post-1", "Post", "-" ], [ true, true, "type-blog", "Blog", "-" ], [ true, true, "-", "-", "-" ] ], result["hooks"],
       "a page's row says its bare id, its title and its address; any other node's its own id; a heading's row is no row a find reads"

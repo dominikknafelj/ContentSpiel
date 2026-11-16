@@ -1,0 +1,19 @@
+<%= render Admin::Ui::ConfirmDialogComponent.new(id: ID, title: title, destructive: true) do |dialog| %>
+  <% dialog.with_details do %>
+    <p data-media-folder-delete-body><%= body %></p>
+    <% renames.each do |sentence| %>
+      <p class="mt-2" data-media-folder-delete-rename><%= sentence %></p>
+    <% end %>
+    <p class="mt-2 text-small text-dim"><%= words(:undone) %></p>
+  <% end %>
+  <% dialog.with_confirm_action do %>
+    <%# To `_top`, like the folder dialog's form, and through the write queue. %>
+    <%= form_with url: url, method: :delete, id: FORM_ID,
+          data: { turbo_frame: "_top", controller: "admin--media--folder-dialog", action: dialog_actions } do %>
+      <%= hidden_field_tag "place", folder.id, id: nil %>
+      <%= hidden_field_tag "q", search_value(:q), id: nil %>
+      <%= hidden_field_tag "filter", search_value(:filter), id: nil %>
+      <%= render Admin::Ui::ButtonComponent.new(label: words(:confirm), variant: :danger, type: "submit") %>
+    <% end %>
+  <% end %>
+<% end %>
