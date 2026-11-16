@@ -27,6 +27,9 @@ module Publishing
     include ContentBlocks::Structure
     include ShownSchedule
 
+    # authorize: none (the steps' own: `PublishChanges` and the save service check `publish`; a refusal inside the rolled-back transaction is recorded again through `denied`)
+    # audit: none (the steps record `changes_published` and `published` themselves)
+
     def initialize(record, with_changes: false, shown_pending: NOT_ASKED, now: Time.current, actor: Current.actor)
       @record = record
       @with_changes = with_changes
