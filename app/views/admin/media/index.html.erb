@@ -68,7 +68,7 @@
       data: { media_place: @place.to_param, media_query: @place_query.to_json, controller: [ "admin--media--drag", ("admin--media--selection" if @selecting) ].compact.join(" "),
               "admin--media--drag-move-url-value": admin_media_move_path(**admin_url_options),
               "admin--media--drag-folder-url-value": admin_media_folder_path("FOLDER_ID", **admin_url_options),
-              "admin--media--drag-drop-class": Admin::Ui::TreeItemComponent::CLASSES[:drop_target],
+              "admin--media--drag-drop-class": Admin::Ui::TreeItemComponent::CLASSES[:drop_into],
               messages: drag_messages, **selection } do %>
 <%# The drag's ghost: a pill at elevation 4 with the dragged tile's
     thumbnail, the title or "%{count} images", and the count when it is more

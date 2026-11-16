@@ -483,16 +483,17 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 .admin-tree-drop-target > .admin-tree-row { background: var(--cs-sunken); box-shadow: inset 0 0 0 1.5px var(--cs-field-line); }
 /* THE FOLDERS COLUMN AS A DROP (`admin--media--drag`, the card
    StudioMediaFolders' D5 and D8). The row under a dragged image or folder
-   that takes it carries the drop target's class on the row itself (never on
-   its node, which is the Pages tree's): the accent's tint with a 1px accent
+   that takes it carries the drop-into class on the row itself (the Pages
+   tree's `admin-tree-drop-target` is on a node and means only a folded
+   parent opened by a sort): the accent's tint with a 1px accent
    edge inside the row's box, the mark in accent and the open folder. A row
    that cannot take a dragged folder (`data-media-drop-refused`) shows no
    target: its title and mark turn meta, and the script puts the reason
    where its count stood. */
-.admin-tree-row.admin-tree-drop-target { background: var(--cs-accent-tint); box-shadow: inset 0 0 0 1px var(--cs-accent); }
-.admin-tree-row.admin-tree-drop-target > .admin-tree-row__mark { color: var(--cs-accent); }
-.admin-tree-row.admin-tree-drop-target > .admin-tree-row__mark:has(> [data-tree-glyph="folder_open"]) > [data-tree-glyph="folder"] { display: none; }
-.admin-tree-row.admin-tree-drop-target > .admin-tree-row__mark:has(> [data-tree-glyph="folder"]) > [data-tree-glyph="folder_open"] { display: block; }
+.admin-tree-row.admin-tree-row--drop-into { background: var(--cs-accent-tint); box-shadow: inset 0 0 0 1px var(--cs-accent); }
+.admin-tree-row.admin-tree-row--drop-into > .admin-tree-row__mark { color: var(--cs-accent); }
+.admin-tree-row.admin-tree-row--drop-into > .admin-tree-row__mark:has(> [data-tree-glyph="folder_open"]) > [data-tree-glyph="folder"] { display: none; }
+.admin-tree-row.admin-tree-row--drop-into > .admin-tree-row__mark:has(> [data-tree-glyph="folder"]) > [data-tree-glyph="folder_open"] { display: block; }
 .admin-tree-row[data-media-drop-refused] > :is(.admin-tree-row__mark, .admin-tree-row__title),
 .admin-tree-row[data-media-drop-refused] > .admin-tree-row__title > a { color: var(--cs-meta); }
 .admin-tree-row[data-media-drop-refused] [data-media-drop-reason] { font-weight: 400; }

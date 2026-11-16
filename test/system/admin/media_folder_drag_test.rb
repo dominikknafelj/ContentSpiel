@@ -30,7 +30,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
 
   def status = "#media-library [role=status][data-admin--media--drag-target=status]"
 
-  def target = "#media-folder-tree .admin-tree-row.admin-tree-drop-target"
+  def target = "#media-folder-tree .admin-tree-row.admin-tree-row--drop-into"
 
   def center(selector)
     page.evaluate_script(<<~JS)
@@ -75,7 +75,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     assert_selector tile(@logo)
 
     drag(tile(@logo), row(@events)) do
-      assert_selector "#{row(@events)}.admin-tree-drop-target"
+      assert_selector "#{row(@events)}.admin-tree-row--drop-into"
       # The ghost follows the pointer: the tile's thumbnail and its title.
       assert_selector "body > .admin-media-drag-ghost img[data-media-drag-thumb]"
       assert_selector "body > .admin-media-drag-ghost [data-media-drag-label]", text: "logo"
@@ -110,7 +110,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     drag("#{tile(@poster)} > button", row(@events)) do
       assert_selector "body > .admin-media-drag-ghost [data-media-drag-label]", text: "2 images"
       assert_selector "body > .admin-media-drag-ghost [data-media-drag-count]", text: "2"
-      assert_selector "#{row(@events)}.admin-tree-drop-target"
+      assert_selector "#{row(@events)}.admin-tree-row--drop-into"
     end
 
     assert_eventually(message: "both selected images moved") { [ @logo, @poster ].all? { |asset| asset.reload.folder_id == @events.id } }
@@ -129,7 +129,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     page.execute_script("window.donePresses = 0; document.querySelector('[data-admin--media--selection-target=done]').addEventListener('click', () => window.donePresses++)")
 
     drag("#{tile(@logo)} > button", row(@events)) do
-      assert_selector "#{row(@events)}.admin-tree-drop-target"
+      assert_selector "#{row(@events)}.admin-tree-row--drop-into"
       page.send_keys(:escape)
       assert_no_selector target
     end
@@ -153,7 +153,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     drag(tile(@logo), row(@events), release: false) { assert_no_selector target }.up
     assert_equal @events.id, @logo.reload.folder_id
 
-    drag(tile(@logo), row("none")) { assert_selector "#{row('none')}.admin-tree-drop-target" }
+    drag(tile(@logo), row("none")) { assert_selector "#{row('none')}.admin-tree-row--drop-into" }
 
     assert_eventually(message: "the image left its folder") { @logo.reload.folder_id.nil? }
     assert_no_selector tile(@logo)
@@ -166,13 +166,17 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     assert_no_selector row(@client_a)
 
     drag(tile(@logo), row(@clients)) do
-      assert_selector "#{row(@clients)}.admin-tree-drop-target"
+      # The look is at once, on the folded row, before it opens; the open
+      # folder's glyph shows in accent.
+      assert_selector "#{row(@clients)}.admin-tree-row--drop-into"
+      assert_selector "#{row(@clients)} > .admin-tree-row__mark [data-tree-glyph=folder_open]", visible: :visible
+      assert_no_selector "#{row(@clients)}.admin-tree-drop-target"
       # Opened after a rest, stored open as a person's open.
       assert_selector row(@client_a)
       assert_includes page.evaluate_script("document.cookie").to_s[/(?:^|; )cs_media_open=([^;]*)/, 1].to_s.split("."), @clients.id.to_s
       drag_on = center(row(@client_a))
       page.driver.browser.mouse.move(x: drag_on["x"], y: drag_on["y"])
-      assert_selector "#{row(@client_a)}.admin-tree-drop-target"
+      assert_selector "#{row(@client_a)}.admin-tree-row--drop-into"
     end
 
     assert_eventually(message: "the image moved into the folder the hover opened") { @logo.reload.folder_id == @client_a.id }
@@ -183,7 +187,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
 
     drag(handle(@events), row(@clients)) do
       assert_selector "body > li.admin-drag-fallback", visible: :all
-      assert_selector "#{row(@clients)}.admin-tree-drop-target"
+      assert_selector "#{row(@clients)}.admin-tree-row--drop-into"
     end
     assert_eventually(message: "Events moved into Clients") { @events.reload.parent_id == @clients.id }
     # The column is drawn again with Events inside Clients, which the move
@@ -191,7 +195,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     assert_selector "li[data-tree-node]:has(> #{row(@clients)}) #{row(@events)}"
     await_sortables
 
-    drag(handle(@events), row("all")) { assert_selector "#{row('all')}.admin-tree-drop-target" }
+    drag(handle(@events), row("all")) { assert_selector "#{row('all')}.admin-tree-row--drop-into" }
     assert_eventually(message: "Events moved to the top") { @events.reload.parent_id.nil? }
     assert_selector "#media-folder-tree > li[data-tree-node] > #{row(@events)}"
   end
@@ -249,7 +253,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     overlay = "[data-admin--media--drop-target=overlay]"
 
     drag(tile(@logo), row(@events)) do
-      assert_selector "#{row(@events)}.admin-tree-drop-target"
+      assert_selector "#{row(@events)}.admin-tree-row--drop-into"
       assert_selector overlay, visible: :hidden
       assert_no_selector overlay, visible: :visible
     end
@@ -287,7 +291,7 @@ class Admin::MediaFolderDragSystemTest < ApplicationSystemTestCase
     mouse.up
 
     # An image can still be dropped on a row the find shows.
-    drag(tile(@logo), row(@events)) { assert_selector "#{row(@events)}.admin-tree-drop-target" }
+    drag(tile(@logo), row(@events)) { assert_selector "#{row(@events)}.admin-tree-row--drop-into" }
     assert_eventually(message: "the image moved") { @logo.reload.folder_id == @events.id }
 
     find("#media-folder-tree-find, input[type=search][aria-controls=media-folder-tree]", match: :first).set("")

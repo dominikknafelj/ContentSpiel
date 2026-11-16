@@ -54,8 +54,8 @@ const REASONS = {
 // a folder row or Not in a folder, but not the place shown (where it
 // stands); a folder by a folder row (into it) or All
 // media (to the top), but not by the row of the folder it is in now (it
-// would go nowhere). A row that takes the drag carries the drop target's
-// class (`TreeItemComponent::CLASSES[:drop_target]`, the `drop` class). A
+// would go nowhere). A row that takes the drag carries the drop-into
+// class (`TreeItemComponent::CLASSES[:drop_into]`, the `drop` class). A
 // row that cannot take a folder says why, read from the rows'
 // `data-media-folder-*` (depth, height, parent, name) and the tree's
 // `data-media-drag-max-depth`: itself or a folder under it ("this folder"),

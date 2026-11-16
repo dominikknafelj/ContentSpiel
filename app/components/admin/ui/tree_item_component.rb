@@ -57,7 +57,11 @@ module Admin
         keyboard: [ "test/system/admin/tree_test.rb", "a row's disclosure folds and unfolds its branch by mouse and by keyboard" ]
       )
 
-      # The class names of the `.admin-tree` block, by part and state.
+      # The class names of the `.admin-tree` block, by part and state. Two
+      # drops, two classes: `drop_target` is a folded Pages parent a sort
+      # opened (on its node, a sunken ground); `drop_into` is a row that
+      # takes what is dropped on it (on the row, the accent's tint), which
+      # the Folders column's drag sets at once, before a folded folder opens.
       CLASSES = {
         tree: "admin-tree",
         row: "admin-tree-row",
@@ -74,7 +78,8 @@ module Admin
         add: "admin-tree-row__add",
         handle: "admin-tree-node__handle",
         children: "admin-tree__children",
-        drop_target: "admin-tree-drop-target"
+        drop_target: "admin-tree-drop-target",
+        drop_into: "admin-tree-row--drop-into"
       }.freeze
 
       # The drag handle, in the gutter left of the row.
