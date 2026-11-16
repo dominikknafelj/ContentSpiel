@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- The image viewer (`Admin::Ui::ImageViewerComponent`): a note's picture opens over CS Studio, fitted to the window, with its name and facts in the head, arrows to step through the message's pictures, the position, Open original and Download. Escape, Close or the backdrop close it. The Dialog has a `viewer` width, a `title_aside` slot and a `data:` option, and a GIF is one shared part, `Admin::Ui::GifComponent` (`docs/reference/design-system.md`, "Shared components"; `docs/reference/notes.md`, "Files").
+
+### Changed
+
+- A plain click on a note's picture opens it in the image viewer; a click with ⌘, Ctrl or Shift, a middle click and the viewer's Open original open it in a tab.
+
 ## 0.7.0 (2026-11-15)
 
 ### Added
