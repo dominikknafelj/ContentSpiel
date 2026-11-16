@@ -172,6 +172,14 @@ class SeedsTest < ActiveSupport::TestCase
       assert_no_difference [ "Media::Asset.count", "Page.count", "ContentBlock.count" ] do
         DevelopmentShowcase.call(root: root_page, image: hero)
       end
+
+      # A showcase image in the trash is not handed to a sample again: a
+      # new one of its title is made.
+      first, second, third = images.to_a
+      second.update_columns(trashed_at: Time.current) # version: none (an image trashed around the services)
+      found = assert_difference("Media::Asset.count", 1) { DevelopmentShowcase.sample_images }
+      assert_equal [ first, third ], found.values_at(0, 2)
+      assert_not_equal second.id, found.second.id
     ensure
       BlockTypes.reset!
       saved.each { |definition| BlockTypes.registry_put(definition) }

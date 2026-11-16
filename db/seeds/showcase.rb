@@ -148,12 +148,13 @@ module DevelopmentShowcase
   # The library images the samples ask for (`images: n`): as many as the
   # largest ask, tinted PNGs from libvips titled "Showcase image N", the n
   # first of them handed to a sample asking for n. Found again by that title
-  # on a later run, since `Media::Upload` never dedupes.
+  # on a later run, since `Media::Upload` never dedupes, and only out of the
+  # trash: a trashed image cannot be chosen for a block.
   def sample_images
     count = content_types.map { |definition| definition.sample.images }.max.to_i
     (1..count).map do |number|
       title = "#{IMAGE_TITLE} #{number}"
-      Media::Asset.find_by(title: title) || upload_image(title, number)
+      Media::Asset.kept.find_by(title: title) || upload_image(title, number)
     end
   end
 
