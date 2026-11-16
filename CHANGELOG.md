@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Breaking
+
+- A new top-level name, `Alerts` (`app/models/alerts.rb`): a gem whose hook owner is `alerts` is refused at boot. A gem with such an owner renames it.
+- A new top-level name, `ReadinessController` (`app/controllers/readiness_controller.rb`): a gem whose hook owner is `readiness_controller` is refused at boot. A gem with such an owner renames it.
+
+### Migrations
+
+- `20261116120000_create_alerts`: the table `alerts` (one row per error or security alert: its kind, a unique fingerprint, the fixed details of its kind, how often it was seen, when first and last, and when it was last mailed). It writes no row.
+
 ## 0.8.0 (2026-11-16)
 
 ### Added

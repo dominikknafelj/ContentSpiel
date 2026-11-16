@@ -1,0 +1,17 @@
+_fixture:
+  model_class: Alerts::Alert
+
+error_page:
+  kind: error
+  fingerprint: error-page-fixture
+  details: { error_class: RuntimeError, place: "app/models/page.rb:120", source: application.action_dispatch, handled: false }
+  occurrences: 3
+  first_seen_at: <%= 2.hours.ago.to_fs(:db) %>
+  last_seen_at: <%= 1.hour.ago.to_fs(:db) %>
+
+owner_ana:
+  kind: owner_changed
+  fingerprint: owner-ana-fixture
+  details: { audit_event_id: 1, subject_label: Ana, actor_name: Ben, now_owner: true }
+  first_seen_at: <%= 3.hours.ago.to_fs(:db) %>
+  last_seen_at: <%= 3.hours.ago.to_fs(:db) %>
