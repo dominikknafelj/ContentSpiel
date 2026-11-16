@@ -30,7 +30,7 @@ class Admin::MediaMovesTest < ActionDispatch::IntegrationTest
     assert_includes targets, [ "replace", "media-folder-tree-part" ]
     assert_includes targets, [ "update", "media-count-all" ]
     count = streams.find { |stream| stream["target"] == "media-place-count" }
-    assert_equal "0", count.text.strip
+    assert_equal "0 images", count.text.strip
   end
 
   test "a move in All media removes no tile" do

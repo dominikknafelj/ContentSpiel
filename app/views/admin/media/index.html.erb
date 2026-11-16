@@ -51,7 +51,7 @@
     tile per file at the start of the grid, one at a time, nothing reloads). The
     Ui::FileDropComponent inside is the visible zone and the labelled file input; it
     stops its own drops from reaching the document-level handler twice
-    (file_drop_controller.js). The header's button opens the same input. A
+    (file_drop_controller.js). The heading's button opens the same input. A
     progress tile takes the finished tile's box (`tile-class`), and its words are
     the `data-messages` here. %>
 <div class="mb-4 flex flex-col gap-4"
@@ -61,10 +61,10 @@
      data-admin--media--upload-button-class-value="<%= Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>"
      data-messages="<%= messages_data(*Admin::MediaLibrary::TileComponent::UPLOAD_MESSAGES) %>"
      data-action="admin--media--drop:dropped->admin--media--upload#dropped">
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
-    <%= render Admin::Ui::ButtonComponent.new(label: t(".upload"), variant: :primary, type: "button", data: { action: "admin--media--upload#browse" }) %>
-  </div>
+  <%# The place heading: the breadcrumb, the place's name as the `h1`, its count
+      and Upload images (`Admin::MediaLibrary::PlaceHeadingComponent`), inside
+      the upload wrapper because its button is the upload controller's. %>
+  <%= render Admin::MediaLibrary::PlaceHeadingComponent.new(place: @place, tree: @folder_tree, count: @counts.fetch(:all), query: @place_query, manage: can?("media.manage")) %>
   <%# The zone is the empty library's invitation: once the library holds a kept
       image (whatever the search shows) the wrapper is hidden. The file input
       stays in the document, the header button's and the full-window drop's
@@ -86,7 +86,7 @@
   </div>
 </div>
 
-<%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], selected_id: @selected&.id, url_options: admin_url_options, place: (@place.to_param unless @place.all?)) %>
+<%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], selected_id: @selected&.id, url_options: admin_url_options, place: (@place.to_param unless @place.all?), place_name: (@folder_tree.find(@place.folder).name if @place.folder)) %>
 </div>
 
 <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :selected, :folder).merge("page" => page)) } %>
@@ -99,7 +99,8 @@
     <% if @pagination.out_of_range? %>
       <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
     <% else %>
-      <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options, selected_id: @selected&.id, link_params: @link_params) %>
+      <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options, selected_id: @selected&.id, link_params: @link_params,
+            place: @place, tree: @folder_tree, subfolders: (@place.folder ? @folder_tree.children(@place.folder) : [])) %>
       <% if @pagination.total_pages > 1 %>
         <div class="mt-4 rounded-card bg-surface shadow-1">
           <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) %>

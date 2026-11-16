@@ -24,6 +24,10 @@ module Admin
     # for All media): it rides along as a hidden field, and Clear keeps it (it
     # clears the search and the segment, never the place).
     #
+    # With a search inside a folder a line stands under the bar, "Searching in
+    # Client A." and "Search all media for “q” →": the search never leaves the
+    # folder by itself, and the way out is one link.
+    #
     # `picker: true` is the same toolbar inside `Admin::Ui::MediaPickerComponent`'s own
     # frame (`media-picker-grid`): the form targets that frame (no history, the
     # dialog is not a page), carries `picker=1` so every later request is the
@@ -37,8 +41,9 @@ module Admin
 
       def self.count_id(key, picker: false) = "media-#{"picker-" if picker}count-#{key}"
 
-      def initialize(counts:, filter:, q:, selected_id: nil, url_options: {}, picker: false, place: nil)
+      def initialize(counts:, filter:, q:, selected_id: nil, url_options: {}, picker: false, place: nil, place_name: nil)
         @place = place
+        @place_name = place_name
         @picker = picker
         @counts = counts
         @filter = filter.to_s
@@ -78,13 +83,25 @@ module Admin
         end
       end
 
+      # A search inside a folder (`place_name:` is the folder's name, nil for
+      # the other places and in the picker): the line that says where it looks
+      # and the same words in All media (`q` and `filter` kept, `folder` and
+      # `page` dropped).
+      def searching_in_folder? = !picker? && place_name.present? && q.is_a?(String) && q.present?
+
+      def search_all_path
+        kept = { q: q }
+        kept[:filter] = filter unless filter == "all"
+        helpers.admin_media_path(**kept, **url_options.slice(:locale))
+      end
+
       def hidden_locale? = url_options.key?(:locale)
 
       def active? = q.is_a?(String) && q.present? || filter != "all"
 
       private
 
-      attr_reader :counts, :filter, :q, :selected_id, :url_options, :place
+      attr_reader :counts, :filter, :q, :selected_id, :url_options, :place, :place_name
     end
   end
 end

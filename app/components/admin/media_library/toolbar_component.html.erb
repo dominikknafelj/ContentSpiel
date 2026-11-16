@@ -26,3 +26,9 @@
           data: (picker? ? { turbo_frame: "media-picker-grid" } : { turbo_frame: "content", turbo_action: "replace" }) %>
   <% end %>
 <% end %>
+<% if searching_in_folder? %>
+  <p class="mt-2 text-small text-dim" data-media-searching-in>
+    <%= t(".searching_in", name: place_name) %>
+    <%= link_to t(".search_all", q: q), search_all_path, class: "text-accent", data: { turbo_frame: "content", turbo_action: "advance" } %>
+  </p>
+<% end %>

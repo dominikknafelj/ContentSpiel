@@ -132,4 +132,79 @@ class Admin::MediaLibrary::GridComponentTest < ViewComponent::TestCase
     ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { yield }
     count
   end
+
+  def folder(name, parent = nil) = Media::Folder.create!(name: name, parent: parent)
+
+  test "an empty folder offers the upload into it and links its subfolders" do
+    clients = folder("Clients")
+    year = folder("2026", clients)
+    press = folder("Press", clients)
+    tree = Media::FolderTree.load
+
+    grid(Media::Asset.none, place: Media::Place.new(:folder, clients.id), tree: tree, subfolders: tree.children(clients.id))
+
+    assert_selector "[data-media-empty] [data-empty-state-title]", text: "No images in this folder yet"
+    assert_text "Drop images here, or use Upload images: they go into Clients."
+    assert_text "It holds 2 folders: 2026, Press."
+    assert_equal [ "2026", "Press" ], page.all("[data-media-empty] a").map(&:text)
+    assert_includes page.all("[data-media-empty] a").first[:href], "folder=#{year.id}"
+    assert_includes page.all("[data-media-empty] a").last[:href], "folder=#{press.id}"
+  end
+
+  test "an empty folder with one subfolder says folder, and with none says nothing of folders" do
+    clients = folder("Clients")
+    folder("2026", clients)
+    tree = Media::FolderTree.load
+
+    grid(Media::Asset.none, place: Media::Place.new(:folder, clients.id), tree: tree, subfolders: tree.children(clients.id))
+    assert_text "It holds 1 folder: 2026."
+
+    grid(Media::Asset.none, place: Media::Place.new(:folder, clients.id), tree: tree, subfolders: [])
+    assert_no_text "It holds"
+  end
+
+  test "an empty Not in a folder says every image is in a folder" do
+    grid(Media::Asset.none, place: Media::Place::NONE, tree: Media::FolderTree.load)
+
+    assert_text "Every image is in a folder."
+  end
+
+  test "a search that matches nothing in a folder is no matches, not an empty folder" do
+    clients = folder("Clients")
+
+    grid(Media::Asset.none, at: "/cs-studio/media?q=zzz", place: Media::Place.new(:folder, clients.id), tree: Media::FolderTree.load)
+
+    assert_text "No matches."
+    assert_no_text "No images in this folder yet"
+  end
+
+  test "a folder's subfolders are never tiles" do
+    clients = folder("Clients")
+    folder("2026", clients)
+    asset = create_media_asset
+    asset.update!(folder_id: clients.id)
+    tree = Media::FolderTree.load
+
+    grid(loaded(asset), place: Media::Place.new(:folder, clients.id), tree: tree, subfolders: tree.children(clients.id))
+
+    assert_selector "ul.admin-media-grid > li", count: 1
+    assert_no_text "2026"
+  end
+
+  test "under a search in All media a tile in a folder names its folder; in a folder's own place none does" do
+    clients = folder("Clients")
+    client_a = folder("Client A", clients)
+    asset = create_media_asset
+    asset.update!(folder_id: client_a.id)
+    tree = Media::FolderTree.load
+
+    grid(loaded(asset), at: "/cs-studio/media?q=tiny", tree: tree)
+    assert_selector "#media-asset-#{asset.id} [title='Clients / Client A']", text: "Client A"
+
+    grid(loaded(asset), at: "/cs-studio/media", tree: tree)
+    assert_no_selector "[title='Clients / Client A']"
+
+    grid(loaded(asset), at: "/cs-studio/media?q=tiny", place: Media::Place.new(:folder, client_a.id), tree: tree)
+    assert_no_selector "[title='Clients / Client A']"
+  end
 end

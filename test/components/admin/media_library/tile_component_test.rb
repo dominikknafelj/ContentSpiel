@@ -147,4 +147,18 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false)
     assert_no_selector ".admin-notes-marker"
   end
+
+  test "in All media with a search a tile in a folder names it, its path as the title" do
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: create_media_asset, url: "/x", unused: false, folder_path: "Clients / Client A")
+
+    assert_selector "span.text-label.text-meta[title='Clients / Client A'] svg", count: 1
+    assert_selector "span[title='Clients / Client A'] span.truncate", text: "Client A"
+  end
+
+  test "without a search no tile names its folder" do
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: create_media_asset, url: "/x", unused: false)
+
+    assert_no_selector "[title]"
+    assert_no_selector "svg"
+  end
 end

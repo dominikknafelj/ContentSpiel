@@ -46,6 +46,11 @@ module Admin
     # something there is unread and addressed to the viewer, nothing at zero.
     # Never in the picker, whose grid reads none.
     #
+    # `folder_path:` is the whole path of the image's folder ("Clients / Client
+    # A"), the caller's to say and only for a search in All media: the tile
+    # then adds a third line, the folder mark and the folder's name, truncated,
+    # with the path as its `title`.
+    #
     # `unused:` is the caller's to say, not read here: a grid answers it for a
     # whole page in one query (`GridComponent#used_ids`), which a per-tile
     # `asset.used?` would turn into one query per tile.
@@ -65,7 +70,8 @@ module Admin
 
       PICK_ACTIONS = "click->admin--media--select#select dblclick->admin--media--select#choose keydown->admin--media--select#key".freeze
 
-      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false)
+      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false, folder_path: nil)
+        @folder_path = folder_path
         @asset = asset
         @url = url
         @unused = unused
@@ -77,6 +83,11 @@ module Admin
       end
 
       def pick? = @pick
+
+      attr_reader :folder_path
+
+      # The folder's own name, the path's last part, which the line shows.
+      def folder_name = folder_path.split(" / ").last
 
       def open_notes = @open_notes.to_i
 

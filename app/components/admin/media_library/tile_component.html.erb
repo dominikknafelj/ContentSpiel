@@ -18,6 +18,9 @@
       <% if no_alt? %><%= render Admin::Ui::BadgeComponent.new(label: t(".no_alt"), tone: :warn) %><% end %>
       <% if unused? %><%= render Admin::Ui::BadgeComponent.new(label: t(".unused")) %><% end %>
     </span>
+    <% if folder_path %>
+      <span class="flex items-center gap-1 text-label text-meta" title="<%= folder_path %>"><%= render "admin/shared/icon", name: :folder, size: "size-3" %><span class="truncate"><%= folder_name %></span></span>
+    <% end %>
   </span>
 <% end %>
 <li id="<%= dom_id %>">

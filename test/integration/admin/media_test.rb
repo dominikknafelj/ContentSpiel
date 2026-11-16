@@ -1117,7 +1117,8 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { folder: folder.id, selected: assets.last.id, q: "tiny" }
     assert_response :success
-    hrefs = css_select("#media-library a[href*='/cs-studio/media?'], #media-library a[href='/cs-studio/media']").map { |link| link["href"] }
+    hrefs = css_select("#media-library a[href*='/cs-studio/media?'], #media-library a[href='/cs-studio/media']")
+               .reject { |link| link.ancestors("nav, p[data-media-searching-in]").any? }.map { |link| link["href"] } # but the links to other places: the breadcrumb and the way out of a search
     assert_predicate hrefs, :any?
     assert(hrefs.all? { |href| href.include?("folder=#{folder.id}") }, hrefs.reject { |href| href.include?("folder=") }.inspect)
     assert_select "#media-library form input[name=folder][value=?]", folder.id.to_s
@@ -1253,5 +1254,25 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/999999999"
     assert_response :not_found
     assert_select "a", text: "Back to the dashboard"
+  end
+
+  test "the page title stays Media and the h1 is the place's name" do
+    sign_in_as(users(:one))
+    clients = Media::Folder.create!(name: "Clients")
+    client_a = Media::Folder.create!(name: "Client A", parent: clients)
+
+    get "/cs-studio/media"
+    assert_select "title", text: /\AMedia ·/
+    assert_select "h1", text: "All media"
+    assert_select "#media-place-count", text: /\A\d+ images?\z/
+
+    get "/cs-studio/media", params: { folder: client_a.id }
+    assert_select "title", text: /\AMedia ·/
+    assert_select "h1", count: 1, text: "Client A"
+    assert_select "nav[aria-label='Where you are'] a", text: "Clients"
+    assert_select "[data-empty-state-title]", text: "No images in this folder yet"
+
+    get "/cs-studio/media", params: { folder: "none" }
+    assert_select "h1", text: "Not in a folder"
   end
 end
