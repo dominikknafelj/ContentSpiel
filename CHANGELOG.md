@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+
+- Error alerts: every error report (`Rails.error`, handled or not, but not an error Rails answers with a 4xx, and not a failure of the alert jobs themselves) becomes a log line, an `error.reported` span event and an alert, folded by the error's class and its place in the code and counted; never its message. Owners get them by mail.
+- Security alerts, found by a job that runs every minute and reads the audit log: 20 failed sign-ins, 20 denied requests, or any request over a limit in 15 minutes; every owner change and every API token made.
+- The alert digest mail to every owner: at most one every 10 minutes, up to 20 alerts, an alert seen again mailed again after an hour. While mail is not set up the alerts wait, unmarked.
+- `request.limited`, an audit event for the first refusal of a rate limit's window on a CS Studio door (not on the public site's forms, search and suggestions).
+- `GET /ready`: 200 when the databases answer, 503 when one does not, for an uptime monitor; `/up` stays the proxy's boot check. Both are outside host authorization, the HTTPS redirect and the setup redirect, and answer on both hosts.
+- System status's Alerts card: the newest ten alerts of the last seven days, so a site without mail still sees them.
+- `docs/reference/alerting.md`.
+
+### Changed
+
+- Production's databases connect with `connect_timeout: 5`: an unreachable database fails in five seconds.
+
 ### Breaking
 
 - A new top-level name, `Alerts` (`app/models/alerts.rb`): a gem whose hook owner is `alerts` is refused at boot. A gem with such an owner renames it.
