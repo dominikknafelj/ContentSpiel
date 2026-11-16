@@ -17,7 +17,7 @@
             <% menu.with_item { tag.button(t(".new_inside"), type: "button", data: new_inside_data) } %>
           <% end %>
           <% menu.with_item { tag.button(t(".rename"), type: "button", data: rename_data) } %>
-          <%# SLOT: "Move to…" (the folder moved) stands here, before the separator. %>
+          <% menu.with_item { tag.button(move_label, type: "button", data: move_data) } %>
           <% menu.with_item { tag.div(role: "separator", class: "my-1 border-t border-line") } %>
           <% menu.with_item { tag.button(t(".delete"), type: "button", class: "text-danger-ink", data: delete_data) } %>
         <% end %>

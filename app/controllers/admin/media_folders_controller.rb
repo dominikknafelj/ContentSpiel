@@ -12,6 +12,10 @@ module Admin
   # field for a rename and as an error toast for a delete or a move
   # (`#gone`). `place` is the place the screen was showing (the `folder` words of
   # the listing), which the answer keeps or leaves.
+  #
+  # A move sent by the Move to… dialog (`dialog=move`, no name) is refused
+  # in the dialog instead: its list drawn again with the sentences on top
+  # (`Admin::Answers::MoveRefused`); a folder gone by then has no list.
   class MediaFoldersController < BaseController
     include MediaPlaces
 
@@ -31,7 +35,7 @@ module Admin
 
     def update
       result = Media::SaveFolder.call(@folder, attributes: folder_attributes)
-      return saved(result, created: false) if result.ok?
+      return saved(result, created: false, moved: !sent_name? && folder_attributes.key?(:parent_id)) if result.ok?
 
       refused(result)
     end
@@ -55,6 +59,7 @@ module Admin
     # address it was sent to; a delete or a move says it in a toast.
     def gone
       refusal = Admin::Answers::FolderRefused.new(view: view_context)
+      return refused_in_move_dialog(Media::Folder.new(id: 0), [ GONE ], :not_found) if action_name == "update" && from_move_dialog?
       return answer(refusal.toast(sentences: [ GONE ], status: :not_found)) unless action_name == "update" && sent_name?
 
       form = Admin::MediaLibrary::FolderFormComponent.new(
@@ -75,9 +80,9 @@ module Admin
       attributes
     end
 
-    def saved(result, created:)
+    def saved(result, created:, moved: false)
       place = shown_place(Media::FolderTree.load)
-      answer(Admin::Answers::FolderSaved.new(view: view_context, url: place_url, column: method(:folder_column_for)).answer(folder: result.record, place: place, created: created))
+      answer(Admin::Answers::FolderSaved.new(view: view_context, url: place_url, column: method(:folder_column_for)).answer(folder: result.record, place: place, created: created, moved: moved))
     end
 
     # A create or a rename (a name was sent) draws the dialog's form again,
@@ -95,7 +100,13 @@ module Admin
 
     def refused_without_form(result)
       sentences = result.record.respond_to?(:errors) && result.record.errors.any? ? result.record.errors.map(&:message) : result.errors
+      return refused_in_move_dialog(@folder, sentences, Admin::RefusalStatus.for(result)) if action_name == "update" && from_move_dialog?
+
       answer(Admin::Answers::FolderRefused.new(view: view_context).toast(sentences: sentences, status: Admin::RefusalStatus.for(result)))
+    end
+
+    def refused_in_move_dialog(folder, sentences, status)
+      answer(Admin::Answers::MoveRefused.new(view: view_context).answer(choices: move_choices_for({ kind: :folder, folder: folder }, refusal: sentences), status: status))
     end
 
     def sent_name? = params[:media_folder].respond_to?(:key?) && params[:media_folder].key?(:name)

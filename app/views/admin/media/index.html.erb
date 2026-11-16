@@ -142,7 +142,7 @@
       <%= render Admin::Ui::RailTabsComponent.new(rail_id: rail_id, tabs: [ Admin::Ui::RailTabsComponent::Tab.new(key: "image", label: t(".image_tab")) ],
             slot_tabs: rail_slot.tabs, current: current, label: t(".rail_label")) %>
       <%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "image", current: current == "image") do %>
-        <%= render Admin::MediaLibrary::PanelComponent.new(asset: @selected, locale: admin_locale, url_options: admin_url_options, link_params: @link_params) %>
+        <%= render Admin::MediaLibrary::PanelComponent.new(asset: @selected, locale: admin_locale, url_options: admin_url_options, link_params: @link_params, tree: @folder_tree) %>
       <% end %>
       <%= render rail_slot %>
       <%= link_to admin_media_path(**@link_params, **admin_url_options),
@@ -165,6 +165,9 @@
     (the Folders column's, outside the frame, find it by its id, as every
     dialog is found); the delete confirm exists only in a folder, worded for
     that folder (`Media::DeleteFolder.preview`). %>
+<%# The Move to… dialog, for everyone on the screen (an uploader moves their
+    own images): its list is loaded for the trigger pressed. %>
+<%= render Admin::MediaLibrary::MoveDialogComponent.new(url_options: admin_url_options) %>
 <% if can?("media.manage") %>
   <%= render Admin::MediaLibrary::FolderDialogComponent.new(tree: @folder_tree, place: @place.to_param, query: @place_query) %>
   <% if @delete_preview %>

@@ -43,11 +43,46 @@ module Admin
       )
     end
 
+    # The Move to… dialog's list for `subject` (`{ kind: :images, ids: }` or
+    # `{ kind: :folder, folder: }`), from the tree as it is now. Its current
+    # place is the folder's parent (the top: `Media::Place::NONE`), or the
+    # one place every image stands in (none when they stand in several).
+    # `refusal` is the sentences of a move it sent that was refused.
+    def move_choices_for(subject, refusal: nil)
+      tree = Media::FolderTree.load
+      Admin::MediaLibrary::MoveChoicesComponent.new(
+        tree: tree, subject: subject, current: current_place_of(subject, tree), refusal: refusal,
+        place: params[:place].is_a?(String) ? params[:place] : "", query: shown_query, url_options: admin_url_options
+      )
+    end
+
+    # A move sent by the Move to… dialog, whose refusal draws its list again.
+    def from_move_dialog? = params[:dialog] == Admin::MediaLibrary::MoveChoicesComponent::DIALOG
+
+    # An image's Folder fact after a move, for a mover (who may move it).
+    def folder_fact_for(asset, tree)
+      Admin::MediaLibrary::FolderFactComponent.new(asset: asset, tree: tree, movable: true, query: shown_query, url_options: admin_url_options)
+    end
+
     # The place the screen was showing when a write was sent (`place`, the
     # same words as `folder`), All media when it is absent or names no folder
     # (a folder deleted meanwhile).
     def shown_place(tree)
       Media::Place.parse(params[:place], tree: tree) || Media::Place::ALL
+    end
+
+    def current_place_of(subject, tree)
+      if subject.fetch(:kind) == :folder
+        node = tree.find(subject.fetch(:folder).id)
+        return nil unless node
+
+        return node.parent_id ? Media::Place.new(:folder, node.parent_id) : Media::Place::NONE
+      end
+
+      folders = Media::Asset.kept.where(id: subject.fetch(:ids)).distinct.pluck(:folder_id)
+      return nil unless folders.size == 1
+
+      folders.first ? Media::Place.new(:folder, folders.first) : Media::Place::NONE
     end
   end
 end

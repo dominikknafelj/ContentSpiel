@@ -2,7 +2,10 @@ module Admin
   module Answers
     # A folder created, renamed or moved: the column's part, and the place to
     # go to. A create goes to the new folder; a rename or a move keeps the
-    # place shown. No toast: the folder appearing in the column is the answer.
+    # place shown. No toast for a create or a rename: the folder appearing in
+    # the column is the answer. A move says where the folder went ("Moved
+    # “Client A” to “Events”.", or to the top of the library), since its row
+    # may now stand under a folded branch.
     class FolderSaved
       include FolderTreePart
 
@@ -17,9 +20,20 @@ module Admin
         @turbo_stream = Answers.stream_builder(view)
       end
 
-      def answer(folder:, place:, created:)
+      def answer(folder:, place:, created:, moved: false)
         go = created ? Media::Place.new(:folder, folder.id) : place
-        Answer.new(streams: [ tree_part_stream(go, go_to: @url.call(go)) ], status: created ? :created : :ok)
+        streams = [ tree_part_stream(go, go_to: @url.call(go)) ]
+        streams << Admin::ToastStream.for(@turbo_stream, moved_toast(folder)) if moved
+        Answer.new(streams: streams, status: created ? :created : :ok)
+      end
+
+      private
+
+      def moved_toast(folder)
+        parent = folder.parent
+        return I18n.t("admin.media.answers.folder_moved_to_top", name: folder.name) unless parent
+
+        I18n.t("admin.media.answers.folder_moved", name: folder.name, parent: parent.name)
       end
     end
   end

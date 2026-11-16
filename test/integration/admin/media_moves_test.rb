@@ -82,4 +82,112 @@ class Admin::MediaMovesTest < ActionDispatch::IntegrationTest
     send_move([ first.id ], folder: "none")
     assert_equal "Moved “Beach” to “Not in a folder”.", toast_text
   end
+
+  # The Move to… dialog's list (`GET /media/move/new`, D7).
+
+  def choices = Nokogiri::HTML.fragment(response.body)
+
+  def radio(value) = choices.at_css("[role=radiogroup] input[type=radio][value='#{value}']")
+
+  test "the choices for images mark the current place and are behind media.upload" do
+    sign_in_as(users(:author))
+    first, second = create_media_asset, create_media_asset
+    [ first, second ].each { |asset| asset.update_columns(folder_id: @folder.id) } # version: none (a test's own rows)
+
+    get "/cs-studio/media/move/new", params: { asset_ids: [ first.id, second.id ].map(&:to_s), place: @folder.id.to_s, q: "logo" },
+      headers: { "Turbo-Frame" => "media-move-choices" }
+
+    assert_response :success
+    frame = choices.at_css("turbo-frame#media-move-choices")
+    assert frame, "the answer is the dialog's frame"
+    assert_nil choices.at_css("html, body"), "with no layout"
+    assert radio(@folder.id)["disabled"], "the current place cannot be chosen"
+    assert_includes radio(@folder.id).parent.text, "Current"
+    assert_nil radio("none")["disabled"]
+    assert_equal [ first.id, second.id ].map(&:to_s), choices.css("form input[name='asset_ids[]']").map { |input| input["value"] }
+    assert_equal @folder.id.to_s, choices.at_css("form input[name=place]")["value"]
+    assert_equal "logo", choices.at_css("form input[name=q]")["value"]
+
+    # Images in two places have no current place.
+    second.update_columns(folder_id: nil) # version: none (a test's own rows)
+    get "/cs-studio/media/move/new", params: { asset_ids: [ first.id, second.id ].map(&:to_s) }
+    assert_empty choices.css("[role=radiogroup] input[disabled]")
+
+    sign_in_as(users(:reader))
+    get "/cs-studio/media/move/new", params: { asset_ids: [ first.id.to_s ] }
+    assert_response :forbidden
+  end
+
+  test "the choices for a folder need media.manage" do
+    clients = Media::Folder.create!(name: "Clients")
+    @folder.update!(parent: clients)
+
+    sign_in_as(users(:author))
+    get "/cs-studio/media/move/new", params: { folder_id: @folder.id.to_s }
+    assert_response :forbidden
+
+    sign_in_as(users(:one))
+    get "/cs-studio/media/move/new", params: { folder_id: @folder.id.to_s }
+    assert_response :success
+    assert_equal "/cs-studio/media_folders/#{@folder.id}", choices.at_css("form#media-move-form")["action"]
+    assert radio(clients.id)["disabled"], "its parent is where it stands"
+    assert radio(@folder.id)["disabled"], "itself"
+    assert_nil radio("")["disabled"]
+
+    get "/cs-studio/media/move/new", params: { folder_id: (Media::Folder.maximum(:id) + 1000).to_s }
+    assert_response :success
+    assert_equal "That folder is gone.", choices.at_css("[role=alert]").text.squish
+    assert_nil choices.at_css("[role=radiogroup]")
+  end
+
+  test "a move the dialog sent is refused in its list, with the notice on top" do
+    sign_in_as(users(:author))
+    theirs = create_media_asset
+    mine = create_media_asset
+    mine.update_columns(created_by_id: users(:author).id) # version: none (a test's own rows)
+
+    send_move([ mine.id, theirs.id ], folder: @folder.id, dialog: "move", place: "all")
+
+    assert_response :forbidden
+    assert_equal [ [ "update", "media-move-choices" ] ], targets
+    assert_equal "1 of these images is not yours to move. Nothing was moved.", streams.first.at_css("[role=alert]").text.squish
+    assert streams.first.at_css("[role=radiogroup]")
+    assert_nil mine.reload.folder_id
+  end
+
+  test "a folder move from the dialog says where it went, and a refused one is drawn in the dialog" do
+    sign_in_as(users(:one))
+    events = Media::Folder.create!(name: "Events")
+    child = Media::Folder.create!(name: "Inner", parent: @folder)
+
+    patch "/cs-studio/media_folders/#{@folder.id}", params: { media_folder: { parent_id: events.id.to_s }, dialog: "move", place: @folder.id.to_s }, as: :turbo_stream
+    assert_response :success
+    assert_equal events.id, @folder.reload.parent_id
+    assert_equal "Moved “Client A” to “Events”.", toast_text
+
+    patch "/cs-studio/media_folders/#{@folder.id}", params: { media_folder: { parent_id: "" }, dialog: "move" }, as: :turbo_stream
+    assert_equal "Moved “Client A” to the top of the library.", toast_text
+
+    patch "/cs-studio/media_folders/#{@folder.id}", params: { media_folder: { parent_id: child.id.to_s }, dialog: "move" }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_equal [ [ "update", "media-move-choices" ] ], targets
+    assert_equal "A folder can't go inside itself.", streams.first.at_css("[role=alert]").text.squish
+    assert_nil @folder.reload.parent_id
+
+    gone = Media::Folder.maximum(:id) + 1000
+    patch "/cs-studio/media_folders/#{gone}", params: { media_folder: { parent_id: "" }, dialog: "move" }, as: :turbo_stream
+    assert_response :not_found
+    assert_equal "That folder is gone.", streams.first.at_css("[role=alert]").text.squish
+  end
+
+  test "a move's answer draws the moved image's Folder fact again" do
+    sign_in_as(users(:one))
+    asset = create_media_asset
+
+    send_move([ asset.id ], folder: @folder.id)
+
+    fact = streams.find { |stream| stream["target"] == "media-panel-folder-#{asset.id}" }
+    assert_equal "replace", fact["action"]
+    assert_includes fact.at_css("template").inner_html, "Client A"
+  end
 end

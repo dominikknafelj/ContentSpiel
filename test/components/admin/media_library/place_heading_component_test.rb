@@ -59,7 +59,12 @@ class Admin::MediaLibrary::PlaceHeadingComponentTest < ViewComponent::TestCase
     menu = page.find("[data-controller='admin--ui--menu']")
     assert_equal "Folder actions", menu.find("button[aria-haspopup=menu]")["aria-label"]
     items = menu.all("[role=menu] button, [role=menu] [role=separator]", visible: :all).map { |item| item[:role] == "separator" ? "-" : item.text(:all) }
-    assert_equal [ "New folder inside…", "Rename…", "-", "Delete folder…" ], items
+    assert_equal [ "New folder inside…", "Rename…", "Move to…", "-", "Delete folder…" ], items
+    move = menu.find("button", text: "Move to…", visible: :all)
+    assert_equal "media-move-dialog", move["data-admin--ui--dialog-id-param"]
+    assert_equal client_a.id.to_s, move["data-admin--media--move-folder-id-param"]
+    assert_equal "Client A", move["data-admin--media--move-title-param"]
+    assert move.has_css?("svg[aria-hidden=true]", visible: :all)
     inside = menu.find("button", text: "New folder inside…", visible: :all)
     assert_equal client_a.id.to_s, inside["data-admin--media--folder-dialog-parent-id-param"]
     assert_equal "Clients / Client A", inside["data-admin--media--folder-dialog-parent-path-param"]
@@ -72,7 +77,7 @@ class Admin::MediaLibrary::PlaceHeadingComponentTest < ViewComponent::TestCase
     assert_equal "media-folder-delete-dialog", delete["data-admin--ui--dialog-id-param"]
 
     heading(Media::Place.new(:folder, deepest.id))
-    assert_equal [ "Rename…", "Delete folder…" ], page.all("[role=menu] button", visible: :all).map { |item| item.text(:all) }
+    assert_equal [ "Rename…", "Move to…", "Delete folder…" ], page.all("[role=menu] button", visible: :all).map { |item| item.text(:all) }
 
     heading(Media::Place.new(:folder, client_a.id), manage: false)
     assert_no_selector "[data-controller='admin--ui--menu']", visible: :all

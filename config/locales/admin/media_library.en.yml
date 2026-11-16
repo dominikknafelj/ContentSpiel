@@ -50,6 +50,24 @@ en:
           cancel: "Cancel"
           create: "Create folder"
           rename: "Rename"
+        # The Move to… dialog (`Admin::MediaLibrary::MoveDialogComponent`,
+        # its list `MoveChoicesComponent`): `admin--media--move` words the
+        # title for each opening. "this folder" and "too deep" say why a place
+        # cannot take a folder.
+        move_dialog:
+          title:
+            images:
+              one: "Move “%{title}”"
+              other: "Move %{count} images"
+            folder: "Move “%{name}”"
+          find: "Find a folder"
+          none: "Not in a folder"
+          top: "Top of the library"
+          current: "Current"
+          this_folder: "this folder"
+          too_deep: "too deep"
+          cancel: "Cancel"
+          submit: "Move here"
         # The confirm before a folder is deleted
         # (`Admin::MediaLibrary::DeleteFolderDialogComponent`): what moves
         # where (`Media::DeleteFolder.preview`). A part with nothing to move is
@@ -93,6 +111,7 @@ en:
           menu: "Folder actions"
           new_inside: "New folder inside…"
           rename: "Rename…"
+          move: "Move to…"
           delete: "Delete folder…"
         toolbar:
           searching_in: "Searching in %{name}."
@@ -126,9 +145,15 @@ en:
           facts:
             file: "File"
             type: "Type"
+            folder: "Folder"
             uploaded: "Uploaded"
             # `%{name}` is the uploader's name as `UserNameComponent` draws it.
             uploaded_by_html: "by %{name} · %{date}"
+          # The Folder fact's words (drawn by `FolderFactComponent`, which a
+          # move's answer draws again): no folder, and the Move to… for a
+          # viewer who may move the image.
+          no_folder: "Not in a folder"
+          move: "Move to…"
           download_original: "Download original"
           download_hint: "Only editors can download the original."
           alt_placeholder: "Add alt text"

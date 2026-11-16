@@ -167,6 +167,8 @@ Rails.application.routes.draw do
       # (`Media::SaveFolder`, `DeleteFolder`, `MoveImages`).
       resources :media_folders, only: %i[create update destroy]
       post "media/move", to: "media_moves#create", as: :media_move
+      # The Move to… dialog's list for images or a folder (its frame's answer).
+      get "media/move/new", to: "media_moves#new", as: :new_media_move
       # "Download original": the library
       # image's original file, for a holder of `media.upload` alone. Active
       # Storage's own blob routes refuse it to everyone

@@ -28,9 +28,11 @@ module Admin
     # THE FOLDER'S MENU (D10), after the count: in a folder, for `manage:`
     # (the viewer holds `media.manage`), the ⋯ "Folder actions" with "New
     # folder inside…" (levels 1 to 3: a folder at level 4 can hold none),
-    # "Rename…", and after a separator "Delete folder…". The first two open
-    # the one folder dialog (`FolderDialogComponent`), told by their params
-    # what for (`admin--media--folder-dialog`); the last opens the delete
+    # "Rename…", "Move to…", and after a separator "Delete folder…". The
+    # first two open the one folder dialog (`FolderDialogComponent`), told by
+    # their params what for (`admin--media--folder-dialog`); "Move to…" the
+    # Move to… dialog for this folder (`MoveDialogComponent`, the keyboard's
+    # and a coarse pointer's way to move a folder); the last the delete
     # confirm the Media screen draws for this folder
     # (`DeleteFolderDialogComponent`).
     class PlaceHeadingComponent < AdminComponent
@@ -92,6 +94,15 @@ module Admin
           "admin--media--folder-dialog-folder-id-param": node.id.to_s,
           "admin--media--folder-dialog-folder-name-param": node.name,
           "admin--media--folder-dialog-parent-path-param": (node.parent_id ? tree.path_name(node.parent_id) : "") }
+      end
+
+      def move_data = MoveDialogComponent.folder_trigger(tree.find(place.folder))
+
+      # The icon (`folder_input`) and the words, on one line.
+      def move_label
+        tag.span(class: "inline-flex items-center gap-2") do
+          safe_join([ helpers.render("admin/shared/icon", name: :folder_input, size: "size-4").strip.html_safe, t(".move") ])
+        end
       end
 
       def delete_data = dialog_trigger(DeleteFolderDialogComponent::ID)

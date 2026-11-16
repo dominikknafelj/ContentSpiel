@@ -1,0 +1,7 @@
+<%# The Move to… dialog's list, the answer of its frame
+    (`Admin::MediaLibrary::MoveDialogComponent`): rendered without the
+    layout, so it costs the list and nothing else. `MediaMovesController#new`
+    built `@choices`. %>
+<%= tag.turbo_frame id: Admin::MediaLibrary::MoveDialogComponent::FRAME_ID do %>
+  <%= render @choices %>
+<% end %>
