@@ -60,7 +60,8 @@ module Alerts
 
     # The fingerprint of an error alert: one row per class and place, whatever
     # the message said (`place` nil when no frame was the application's).
-    def self.fingerprint_for_error(error_class, place) = Digest::SHA256.hexdigest("error|#{error_class}|#{place}")
+    # `::Digest`: inside `module Alerts`, `Digest` is `Alerts::Digest`.
+    def self.fingerprint_for_error(error_class, place) = ::Digest::SHA256.hexdigest("error|#{error_class}|#{place}")
 
     # When the last digest went out, nil if none did.
     def self.last_mailed_at = maximum(:mailed_at)

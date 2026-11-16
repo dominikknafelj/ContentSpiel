@@ -31,13 +31,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   RAW_COLOUR = /(?<![\w#&\/-])#(?:\h{8}|\h{6}|\h{3,4})(?![\w-])|\b(?:rgb|hsl)a?\(/
 
   # The mails: the mailer layout, the button and every mailer's views
-  # (`app/views/*_mailer`, so a new mailer's are read too). A mail has no
-  # tokens and a client reads no stylesheet, so its colours are named CSS
-  # colours written inline, with one exception: the button's violet,
+  # (`app/views/**/*_mailer`, so a new mailer's are read too, a namespaced
+  # one's included). A mail has no tokens and a client reads no stylesheet,
+  # so its colours are named CSS colours written inline, with one exception: the button's violet,
   # `MAIL_ACCENT`, which is `--cs-accent`'s light value (a mail has no dark
   # scheme). The exception admits that spelling and no other, in a mail
   # source alone.
-  MAIL_SOURCES = (Dir[Rails.root.join("app/views/layouts/mailer.*")] + Dir[Rails.root.join("app/views/{mails,*_mailer}")].select { |path| File.directory?(path) })
+  MAIL_SOURCES = (Dir[Rails.root.join("app/views/layouts/mailer.*")] + Dir[Rails.root.join("app/views/{mails,**/*_mailer}")].select { |path| File.directory?(path) })
     .map { |path| Pathname(path).relative_path_from(Rails.root).to_s }.sort.freeze
   MAIL_ACCENT = "#6236d9".freeze
   # The violet as a whole literal: `#6236d9ff` is another colour, and stays caught.
@@ -91,7 +91,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       root = Rails.root.join("app", directory).to_s
       assert ADMIN_SOURCES.any? { |path| path.start_with?("#{root}/") }, "app/#{directory} has no .erb, .rb or .js file: the design rules look at nothing there"
     end
-    mailers = Dir[Rails.root.join("app/mailers/*_mailer.rb")].map { |path| File.basename(path, ".rb") } - %w[application_mailer]
+    mailers = Dir[Rails.root.join("app/mailers/**/*_mailer.rb")].map { |path| path.delete_prefix("#{Rails.root}/app/mailers/").delete_suffix(".rb") } - %w[application_mailer]
     mailers.each { |mailer| assert_includes MAIL_SOURCES, "app/views/#{mailer}", "#{mailer}'s views are read by the colour rule" }
     assert_includes MAIL_SOURCES, "app/views/mails"
     assert_includes MAIL_SOURCES, "app/views/layouts/mailer.html.erb"

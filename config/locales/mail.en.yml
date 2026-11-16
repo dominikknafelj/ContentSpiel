@@ -76,3 +76,44 @@ en:
         language: "Language: %{language}"
         page: "From the page: %{page}"
         no_page: "From no page that still exists."
+    # The owners' digest of alerts (`Alerts::DigestMailer#digest`): %{count}
+    # is the alerts (in `more`, those past the 20 listed), %{site} the site's
+    # name, %{time} when an alert was last seen, in the site's zone, and
+    # %{minutes} a figure of `Alerts::Alert` (the window a finding is counted
+    # over; in `outro`, the least time between two digests). A sentence's
+    # values come from an alert's details (`Alerts::Alert#sentence`): an
+    # error's class and its place in the code, never its message; none holds
+    # an address or a typed email.
+    alerts_mailer:
+      digest:
+        subject:
+          one: "1 alert on %{site}"
+          other: "%{count} alerts on %{site}"
+        intro:
+          one: "1 alert on %{site} since the last mail:"
+          other: "%{count} alerts on %{site} since the last mail:"
+        kinds:
+          error: "Error"
+          security: "Security"
+        sentences:
+          error: "%{error_class} in %{place}"
+          error_nowhere: "%{error_class}"
+          sign_in_failures: "%{failed} failed sign-ins in %{minutes} minutes"
+          owner_made: "%{subject_label} was made an owner"
+          owner_made_by: "%{subject_label} was made an owner by %{actor_name}"
+          owner_removed: "%{subject_label} is no longer an owner"
+          owner_removed_by: "%{subject_label} is no longer an owner, by %{actor_name}"
+          token_issued: "API token “%{token_name}” issued"
+          token_issued_by: "API token “%{token_name}” issued by %{actor_name}"
+          access_denied_burst:
+            one: "%{denied} actions refused in %{minutes} minutes, by one account"
+            other: "%{denied} actions refused in %{minutes} minutes, by %{count} accounts"
+          request_limited:
+            one: "A limit on requests was reached once in %{minutes} minutes: %{limits}"
+            other: "Limits on requests were reached %{count} times in %{minutes} minutes: %{limits}"
+        facts:
+          one: "Once · last %{time}"
+          other: "%{count} times · last %{time}"
+        more: "and %{count} more"
+        button: "Open System status"
+        outro: "You get this mail as an owner of %{site}. At most one mail every %{minutes} minutes."
