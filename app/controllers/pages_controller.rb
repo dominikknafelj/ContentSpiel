@@ -98,6 +98,10 @@ class PagesController < PublicController
       #   theme moves none of the revision's three sources in a way that is
       #   promised, and a template the theme replaced is as much "what the
       #   response is built from" as one of the CMS's;
+      # - the built stylesheet's digest (`Theme::Stylesheet`), whose CSS a
+      #   small stylesheet's page holds: a development rebuild moves no other
+      #   key, and a 304 would confirm the old styles (or, linked, the old
+      #   digested address);
       # - the year, which the footer prints: a 304 on 1 January would
       #   otherwise confirm last year's copyright line;
       # - in development, the stale-stylesheet notice, which changes the body
@@ -119,7 +123,7 @@ class PagesController < PublicController
       # is actually rendered.
       cache_for_visitors
       keys = light ? [ etag_key_of(result.record) ] : [ @page, @post ].map { |record| etag_key_of(record) } # public: rows (the ETag names the copy's id, not content)
-      if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Theme.current.fingerprint, Time.current.year, Forms::Encryption.available?, *origin_etag_key, *stale_stylesheet_etag_key ], public: true)
+      if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Theme.current.fingerprint, Theme::Stylesheet.current&.digest, Time.current.year, Forms::Encryption.available?, *origin_etag_key, *stale_stylesheet_etag_key ], public: true)
         assign_record(result.record) if light # public: rows (assign_record reads the copy through as_published)
         preload_page_images(@page)
         render :show

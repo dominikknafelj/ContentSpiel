@@ -9,6 +9,34 @@ class ThemeCssTest < ActiveSupport::TestCase
   PLAIN = ThemeTestHelper::PLAIN
   ROOT = Rails.root
 
+  # Drawn into the page or linked (`ThemeCss::INLINE_LIMIT`): the weighed
+  # size is the gzipped one, at or under the limit is drawn in under
+  # `:automatic`, the one mode there is, and the line the build prints says
+  # which, with both sizes in KB of 1,024 bytes.
+  test "a stylesheet at or under the gzipped limit is drawn in, over it linked, and the build's line says which" do
+    small = ".a{color:red}" * 10
+    size = ThemeCss.compressed_size(small)
+    assert_equal Zlib.gzip(small).bytesize, size
+    assert ThemeCss.inline_for?(:automatic, size, limit: size)
+    assert_not ThemeCss.inline_for?(:automatic, size, limit: size - 1)
+    assert ThemeCss.inline_for?(:automatic, 14 * 1024)
+    assert_not ThemeCss.inline_for?(:automatic, 14 * 1024 + 1)
+    assert_raises(ArgumentError) { ThemeCss.inline_for?(:always, size) }
+    assert_not ThemeCss.inline_for?(:automatic, ThemeCss.compressed_size(Random.new(1).bytes(20 * 1024))), "20 KB that do not compress are over the limit"
+    assert ThemeCss.inline_for?(:automatic, ThemeCss.compressed_size("a" * 200_000)), "a large file that compresses well is weighed by what crosses the wire"
+    assert_equal "11.4", ThemeCss.kilobytes(11_674)
+
+    Dir.mktmpdir("root") do |dir|
+      root = Pathname(dir)
+      assert_nil ThemeCss.inline_sentence(root: root), "nothing built, nothing said"
+      root.join(ThemeCss::OUTPUT).dirname.mkpath
+      root.join(ThemeCss::OUTPUT).write(small)
+      assert_match(/\A\[ContentSpiel\] The public stylesheet \(0\.1 KB, 0\.\d KB gzipped\) is drawn into each public page: it is at or under 14 KB gzipped\.\z/,
+        ThemeCss.inline_sentence(root: root))
+      assert_match(/is linked from each public page: it is over 0 KB gzipped\./, ThemeCss.inline_sentence(root: root, limit: 10))
+    end
+  end
+
   test "without a theme the entry is the default theme's file, and its folder for the watch, and nothing else" do
     assert_equal <<~CSS, ThemeCss.entry(ThemeFolder.new(nil), root: ROOT)
       @import "../../app/assets/tailwind/themes/default/theme.css";

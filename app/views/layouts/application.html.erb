@@ -12,7 +12,8 @@
     The CMS's tags, which a theme cannot remove: the <title> element, the
     viewport, the CSP tag, the script that picks light or dark before the
     first paint, the description and Open Graph tags (pages/_seo_meta), the
-    canonical and language links, the stylesheet link and the import map.
+    canonical and language links, the stylesheet (drawn in or linked) and the
+    import map.
     `test/integration/theme_pages_test.rb` ("every tag the CMS writes into
     the head is there exactly once under both themes, ahead of the theme's
     own") holds the list. A theme's `_head` can print more markup, a tag of
@@ -93,9 +94,31 @@
 
     <%# The one public stylesheet (theming spec §4): the default theme's
         styles and then the theme's, built together (`ThemeCss`) -- never the
-        product stylesheet. `site` is the public site's entry point:
-        `application` plus the theme's controllers (app/javascript/site.js). %>
-    <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>
+        product stylesheet. Drawn in as a `<style>` when the built file is
+        small (`Theme::Stylesheet`, `ThemeCss::INLINE_LIMIT`), so a page's
+        first paint waits for no request; linked above the limit, which is
+        also what sends its `Link: rel=preload` header (Rails' asset helper),
+        so a stylesheet drawn in is preloaded by nobody.
+
+        Both carry `data-turbo-track="reload"`: Turbo compares the tracked
+        elements of the head, nonce left out, and reloads the page when they
+        differ, so a changed stylesheet, drawn in or linked, or one that
+        moved from one to the other, is a full load and never a visit that
+        keeps the old styles. A `<style>` the same as the current page's is
+        not added again (Turbo merges a head's stylesheets by their markup),
+        so a visit keeps exactly one.
+
+        The nonce is the inline scripts' (`shared/_theme_head`): nothing
+        while no nonce generator is configured, the request's nonce once a
+        `style-src` with one is (config/initializers/content_security_policy.rb).
+        The CSS is printed unescaped: an entity is not decoded inside
+        `<style>`, and `Theme::Stylesheet` links a stylesheet whose text
+        holds `</style`. %>
+    <% if (stylesheet = Theme::Stylesheet.current)&.inline? %>
+      <%= tag.style(stylesheet.css.html_safe, nonce: content_security_policy_nonce, data: { turbo_track: "reload" }) %>
+    <% else %>
+      <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>
+    <% end %>
     <%= javascript_importmap_tags "site" %>
   </head>
 
