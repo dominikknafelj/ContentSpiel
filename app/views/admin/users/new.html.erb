@@ -1,13 +1,21 @@
 <%# "New user": email and a password up front (`has_secure_password` requires
     one on create), the group tiles, "Create user". There is no owner zone
     here: owner rights are an action on a saved user
-    (`PATCH users/:id/owner`). Up to 880px, left-aligned under the heading. %>
+    (`PATCH users/:id/owner`). %>
 <% content_for :title, t(".title") %>
-<div class="max-w-[880px]">
-  <p class="mb-1 text-label text-meta"><%= link_to t(".breadcrumb"), admin_users_path(**admin_url_options), class: "text-meta" %> /</p>
-  <h1 class="mb-4 text-h1 text-ink"><%= t(".title") %></h1>
+<%# The page frame, a form screen: the head row spans the frame, the body is
+    `--cs-form-max` (760px) at the left. %>
+<div class="admin-page admin-page--form">
+  <div class="admin-page__head">
+    <div class="min-w-0">
+      <p class="mb-1 text-label text-meta"><%= link_to t(".breadcrumb"), admin_users_path(**admin_url_options), class: "text-meta" %> /</p>
+      <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+    </div>
+  </div>
+  <div class="admin-page__body">
 
   <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
   <%= render "admin/users/form", user: @user, url: admin_users_path(**admin_url_options), method: :post, state: :editable %>
+  </div>
 </div>

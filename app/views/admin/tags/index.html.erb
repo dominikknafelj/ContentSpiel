@@ -28,8 +28,8 @@
 <%# The largest readable count on the screen: each row's bar is its own count over it. %>
 <% largest = @readable_counts.values.max || 0 %>
 
-<div class="admin-list-rail">
-  <div class="admin-list-rail__head">
+<div class="admin-page admin-page--wide admin-list-rail">
+  <div class="admin-page__head admin-list-rail__head">
     <div>
       <h1 class="mb-2 text-h1 text-ink"><%= t(".title") %></h1>
       <p class="text-meta"><%= t(".intro") %></p>
@@ -40,7 +40,7 @@
       focus into the detail once it has loaded, and on Close or Escape puts
       the empty line back from the template and the focus on the row's
       Details. %>
-  <div class="admin-list-rail__grid" data-controller="admin--tags--detail"
+  <div class="admin-page__body admin-list-rail__grid" data-controller="admin--tags--detail"
        data-action="turbo:click->admin--tags--detail#chose turbo:frame-load->admin--tags--detail#loaded turbo:before-fetch-request->admin--tags--detail#hold">
     <template data-admin--tags--detail-target="empty"><%= render Admin::TagsScreen::EmptyDetailComponent.new %></template>
 

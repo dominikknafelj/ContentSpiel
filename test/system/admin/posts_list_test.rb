@@ -223,6 +223,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
         const panel = document.querySelector("form#posts-filters .admin-filter-panel")
         return {
           container: box(document.querySelector(".admin-list-rail")),
+          shell_main: box(document.querySelector("main.admin-shell__main")),
           head: box(document.querySelector(".admin-list-rail__head")),
           bar: box(document.querySelector("form#posts-filters .admin-filter-bar")),
           panel: box(panel),
@@ -258,17 +259,18 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "at 2400px the list stops at the content max, centred" do
+  # The page frame: past the content max the spare width stays on the right,
+  # never centred.
+  test "at 2400px the list stops at the content max at the left" do
     at_window(2400) do
       visit_screen admin_posts_path
       boxes = layout
       assert docked?(boxes), boxes.inspect
       assert_in_delta 1680, boxes["panel"]["right"] - boxes["list"]["left"], 1, "the composition stops at the content max"
       assert_in_delta 1292, boxes["list"]["width"], 1
-      left = boxes["list"]["left"] - boxes["container"]["left"]
-      right = boxes["container"]["right"] - boxes["panel"]["right"]
-      assert_operator left, :>, 150, "the premise: the window leaves spare width"
-      assert_in_delta left, right, 1, "the spare width is split evenly either side"
+      assert_in_delta boxes["container"]["left"], boxes["list"]["left"], 1, "the list starts at the frame's left edge"
+      assert_in_delta 1680, boxes["container"]["width"], 1, "the frame stops at the content max"
+      assert_operator boxes["shell_main"]["right"] - boxes["panel"]["right"], :>, 150, "the spare width stays on the right"
       assert_in_delta boxes["list"]["left"], boxes["head"]["left"], 1, "the heading row starts with the composition"
       assert_in_delta boxes["panel"]["right"], boxes["head"]["right"], 1, "the heading row stops with the composition"
     end

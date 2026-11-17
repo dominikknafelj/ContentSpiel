@@ -3,7 +3,7 @@ require "application_system_test_case"
 # The editors' rail (`admin/pages/show` and `Admin::EditorScreen::PostFormComponent`,
 # `.admin-rail-grid`, `admin--ui--rail`): where the editor area has 1200px, the
 # page settings stand in a 360px rail 28px right of a blocks column that takes
-# the rest, up to 1680px for the whole (`--cs-content-max`, centred past it), with
+# the rest, up to 1680px for the whole (`--cs-content-max`, at the left past it), with
 # a Page and a Section tab, and a post's settings in the same rail beside its
 # title, address and body, under the one heading Post; below that the page
 # settings stand above the blocks and a post's settings below its main
@@ -115,7 +115,9 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "at a 2400px content width the editor stops at the content max, centred" do
+  # The page frame's rule holds for the editors too: past the content max
+  # the spare width stays on the right, never centred.
+  test "at a 2400px content width the editor stops at the content max, at the left" do
     wide_blocks
     visit_editor(@page)
     fold_tree
@@ -127,10 +129,13 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       grid = box("#editor-grid")
       assert_in_delta 2400, area[2] - area[0], 1
       assert_in_delta 1680, grid[2] - grid[0], 1, "the composition stops at the content max"
-      assert_in_delta grid[0] - area[0], area[2] - grid[2], 1, "the spare width is split evenly either side"
+      assert_in_delta area[0], grid[0], 1, "the composition starts at the area's left edge"
+      assert_operator area[2] - grid[2], :>, 600, "the spare width stays on the right"
+      # The header's row stands in the header's padding, 4px in from the
+      # area's edge (28px inside a header that bleeds 24px over <main>'s).
       row = box(".admin-editor-header > div:first-child")
-      assert_in_delta grid[0], row[0], 1, "the header row starts with the composition"
-      assert_in_delta grid[2], row[2], 1, "and stops with it, so Publish stands over the rail's right edge"
+      assert_in_delta grid[0] + 4, row[0], 1, "the header row starts with the composition"
+      assert_in_delta grid[2] + 4, row[2], 1, "and stops with it, so Publish stands over the rail's right edge"
       assert_operator box(".admin-editor-header")[2] - box(".admin-editor-header")[0], :>, 2400, "the header's own line keeps the window's width"
       assert_in_delta 1292, width_of(".admin-content-blocks"), 1
       assert_in_delta grid[2], box("#editor-grid-panel-page")[2], 1, "the rail ends the composition"

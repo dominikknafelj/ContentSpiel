@@ -1,4 +1,11 @@
 <% content_for :title, t(".title") %>
-<h1 class="mb-4 text-h1 text-ink"><%= t(".title") %></h1>
+<%# The page frame, a wide screen: the permission matrix needs the width. %>
+<div class="admin-page admin-page--wide">
+<div class="admin-page__head">
+  <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+</div>
+<div class="admin-page__body">
 <%= render "admin/groups/form", group: @group, grants: @grants, stale: nil, members: @members, view_only: false,
       url: admin_groups_path(**admin_url_options), method: :post %>
+</div>
+</div>

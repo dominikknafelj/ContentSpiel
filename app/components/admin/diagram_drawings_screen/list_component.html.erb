@@ -1,4 +1,4 @@
-<%= tag.div class: "flex max-w-[900px] flex-col gap-3.5", data: root_data do %>
+<%= tag.div class: "admin-page admin-page--wide flex flex-col gap-3.5", data: root_data do %>
   <%= render Admin::DiagramDrawingsScreen::RunHeadComponent.new(count: count) %>
   <%= insecure_notice %>
   <%= render Admin::DiagramDrawingsScreen::PublishCardComponent.new %>

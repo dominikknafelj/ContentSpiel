@@ -290,7 +290,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_operator boxes[1][0], :<, boxes[2][0]
     assert_in_delta boxes[0][1], boxes[1][1], 4, "Notify is not on Back's row"
     assert_in_delta boxes[0][1], boxes[2][1], 4, "Back to the page is not on Back's row"
-    # (The sheet's frame is centred and at most 720px wide.)
+    # (The sheet's frame takes the sheet's width.)
     frame_right = page.evaluate_script("document.querySelector('#notes-drawer turbo-frame#notes').getBoundingClientRect().right")
     assert_operator frame_right - boxes[2][2], :<, 24
     # The thread starts where the sheet does: no gap where the header was.

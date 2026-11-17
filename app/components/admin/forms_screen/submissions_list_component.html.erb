@@ -1,5 +1,8 @@
-<div class="mb-4 flex flex-col gap-3">
+<%# The page frame's head row; the screen (`admin/form_submissions/index`) draws the frame. %>
+<div class="admin-page__head">
   <h1 class="text-h1 text-ink"><%= form.name %></h1>
+</div>
+<div class="mb-4 flex flex-col gap-3">
   <%= render Admin::FormsScreen::TabsComponent.new(form: form, current: :submissions, url_options: url_options) %>
   <div class="flex flex-wrap items-center justify-between gap-3">
     <p class="text-small text-meta"><%= keeping_line %></p>

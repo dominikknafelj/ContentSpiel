@@ -74,10 +74,13 @@
     top bar where there is one (`--admin-top-offset`), so the page does not
     scroll and the canvas takes what is left. Below that width the box has
     a height of its own and the page scrolls. %>
-<div class="<%= "flex min-h-[560px] flex-col lg:h-[calc(100vh_-_3rem_-_var(--admin-top-offset))]" if graph %>">
-<div class="mb-4">
-  <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
-  <p class="mt-1 text-meta"><%= t(".intro") %></p>
+<%# The page frame, a wide screen: the box takes the frame's width. %>
+<div class="admin-page admin-page--wide<%= " flex min-h-[560px] flex-col lg:h-[calc(100vh_-_3rem_-_var(--admin-top-offset))]" if graph %>">
+<div class="admin-page__head">
+  <div class="min-w-0">
+    <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+    <p class="mt-1 text-meta"><%= t(".intro") %></p>
+  </div>
 </div>
 
 <% if !graph %>

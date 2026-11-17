@@ -1,9 +1,14 @@
-<div class="admin-form-column flex flex-col gap-4">
-  <div class="flex flex-col gap-1">
-    <p><%= link_to t(".back"), back_path, class: "text-sm text-accent hover:text-accent-hover hover:underline", data: { turbo_frame: "content" } %></p>
-    <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
-    <p class="text-meta"><%= meta %></p>
+<%# The page frame, a form screen (reading): the body is `--cs-form-max`
+    (760px) at the left. %>
+<div class="admin-page admin-page--form">
+  <div class="admin-page__head">
+    <div class="flex min-w-0 flex-col gap-1">
+      <p><%= link_to t(".back"), back_path, class: "text-sm text-accent hover:text-accent-hover hover:underline", data: { turbo_frame: "content" } %></p>
+      <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+      <p class="text-meta"><%= meta %></p>
+    </div>
   </div>
+  <div class="admin-page__body flex flex-col gap-4">
 
   <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "submission-answers", heading: t(".answers"), **Admin::FormsScreen::BuilderComponent.card_chip) do %>
     <div class="p-4">
@@ -65,4 +70,5 @@
       <% end %>
     <% end %>
   <% end %>
+  </div>
 </div>

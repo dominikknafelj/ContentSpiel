@@ -2,6 +2,8 @@
     field changes as word diffs, the raw snapshot, and Older / Newer through
     the list's own order with the filters kept. %>
 <% filter_params = @filter.to_params.symbolize_keys %>
+<%# The page frame, a wide screen. %>
+<div class="admin-page admin-page--wide">
 <%= render Admin::AuditScreen::EventHeaderComponent.new(event: @event, sentence: @sentence,
       back_path: admin_audit_events_path(**filter_params, **admin_url_options)) %>
 
@@ -27,3 +29,4 @@
     <%= link_to t(".newer"), admin_audit_event_path(@newer_id, **filter_params, **admin_url_options), rel: "prev", class: setup_secondary_link_class %>
   <% end %>
 </nav>
+</div>

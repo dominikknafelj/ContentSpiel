@@ -4,10 +4,15 @@
     nest). A built-in group shows its note in the zone's place; a group the
     viewer can only view shows neither. %>
 <% content_for :title, @group.name_was.presence || t(".title") %>
-<h1 class="mb-4 text-h1 text-ink"><%= @group.name_was.presence || @group.name %></h1>
+<%# The page frame, a wide screen: the permission matrix needs the width. %>
+<div class="admin-page admin-page--wide">
+<div class="admin-page__head">
+  <h1 class="text-h1 text-ink"><%= @group.name_was.presence || @group.name %></h1>
+</div>
+<div class="admin-page__body">
 
 <% if @stale_form %>
-  <div class="mb-4 max-w-[1000px]">
+  <div class="mb-4">
     <%= render "admin/shared/stale_banner", words: "admin.groups.edit.stale", change: @stale_change, reload_path: edit_admin_group_path(@group, **admin_url_options) %>
   </div>
 <% end %>
@@ -18,3 +23,5 @@
 <% unless @view_only %>
   <%= render Admin::GroupsScreen::DeleteZoneComponent.new(group: @group, member_count: @member_count, tokens: @tokens, url_options: admin_url_options) %>
 <% end %>
+</div>
+</div>

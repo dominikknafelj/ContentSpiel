@@ -33,10 +33,10 @@
       `admin--notes--drawer` keeps for the way back from a thread, and a
       thread's reply sticks to its bottom. `overscroll-contain`: the editor
       underneath stays where it is when the list reaches its end. The frame
-      is centred and at most 720px wide, which only the sheet is wide enough
-      to show. %>
-  <div class="flex min-h-0 flex-1 justify-center overflow-y-auto overscroll-contain" data-notes-scroller>
-    <%= tag.turbo_frame id: "notes", class: "block min-h-full w-full max-w-[720px]",
+      takes the panel's whole width, at the left like everything in CS
+      Studio. %>
+  <div class="flex min-h-0 flex-1 overflow-y-auto overscroll-contain" data-notes-scroller>
+    <%= tag.turbo_frame id: "notes", class: "block min-h-full w-full",
           data: { "admin--notes--drawer-target": "frame", action: "turbo:frame-load->admin--notes--drawer#loaded turbo:before-fetch-request->admin--notes--drawer#leaving" } do %>
       <p class="px-4 py-3.5 text-[13px] text-meta"><%= t(".loading") %></p>
     <% end %>

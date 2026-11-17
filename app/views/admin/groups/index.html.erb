@@ -6,14 +6,17 @@
     The heading row is "Groups" and its intro, with "New group" (the one
     primary) at its end, wrapping under the heading below 640px. %>
 <% content_for :title, t(".title") %>
-<div class="flex max-w-[1000px] flex-col gap-4">
-  <div class="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
-    <div class="flex flex-col gap-1.5">
+<%# The page frame, a wide screen (lists, tables, logs, overviews). %>
+<div class="admin-page admin-page--wide">
+  <div class="admin-page__head">
+    <div class="flex min-w-0 flex-col gap-1.5">
       <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
-      <p class="max-w-[600px] text-small text-dim"><%= t(".intro") %></p>
+      <p class="max-w-(--cs-text-measure) text-small text-dim"><%= t(".intro") %></p>
     </div>
     <%= link_to t(".new_group"), new_admin_group_path(**admin_url_options), data: { turbo_frame: "content" }, class: Admin::Ui::ButtonComponent.classes(:primary) %>
   </div>
 
-  <%= render Admin::GroupsScreen::ListComponent.new(groups: @groups, member_counts: @member_counts, token_counts: @token_counts) %>
+  <div class="admin-page__body">
+    <%= render Admin::GroupsScreen::ListComponent.new(groups: @groups, member_counts: @member_counts, token_counts: @token_counts) %>
+  </div>
 </div>

@@ -1164,7 +1164,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     grid = docked.first[/\.admin-dashboard__grid\s*\{([^}]*)\}/, 1]
     assert grid, "the docked block lays out .admin-dashboard__grid"
     assert_grows_to_content_max(grid)
-    assert_match(/\.admin-dashboard__head,\s*\.admin-dashboard__notice\s*\{\s*max-width:\s*var\(--cs-content-max\);\s*margin-inline:\s*auto;\s*\}/, docked.first, "the heading row and the mail notice stop with the composition")
     tiles = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard-main \(min-width: 64rem\)\s*\{/)
     assert_equal 1, tiles.size, "the draft tiles take a fourth column from 64rem of the main column"
     assert_match(/\.admin-draft-tiles\s*\{\s*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);\s*\}/, tiles.first)
@@ -1207,7 +1206,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       assert_match(/#{declaration};/, rail, "docked, the list's rail sticks and scrolls inside itself")
     end
     assert_no_match(/>\s*\.admin-list-rail__rail/, css, "the rail is matched anywhere in the grid, not only as a child")
-    assert_match(/\.admin-list-rail__head\s*\{[^}]*max-width:\s*var\(--cs-content-max\);/, docked.first, "the heading row stops with the composition")
     # The Tags screen's detail docks in the same block: shown with its empty
     # line, and on the rail's ground through `.admin-list-rail__rail`, which
     # stands after its card rule and so wins on order.
@@ -1341,56 +1339,91 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # The one rule for spare width: a docked composition is a
   # main column that takes what the rail leaves and the rail at its right,
-  # the whole stopping at `--cs-content-max` and centred past it by its
-  # auto inline margins (0 below the cap, so at the content's left edge
-  # there); no `justify-content` of its own, so the grid's tracks start at
-  # its own left edge.
+  # the whole stopping at `--cs-content-max` and never centred (the page
+  # frame, Design System 1794894016-5ccc: past the cap the spare width
+  # stays on the right); no `justify-content` of its own, so the grid's
+  # tracks start at its own left edge.
   def assert_grows_to_content_max(grid)
     assert_match(/grid-template-columns:\s*minmax\(0, 1fr\) var\(--cs-rail-width\);/, grid, "the main column takes what the rail leaves")
     assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid)
-    assert_centres_past_content_max(grid)
+    assert_stops_at_content_max_on_the_left(grid)
     assert_no_match(/justify-content/, grid, "the tracks start at the composition's own left edge")
   end
 
-  def assert_centres_past_content_max(rule, what = "the composition")
+  def assert_stops_at_content_max_on_the_left(rule, what = "the composition")
     assert_match(/max-width:\s*var\(--cs-content-max\);/, rule, "#{what} grows to the content max and no further")
-    assert_match(/margin-inline:\s*auto;/, rule, "#{what} is centred past the content max")
+    assert_no_match(/margin/, rule, "#{what} is never centred")
   end
 
-  # The page frame: one frame, at the left, up to the content max; a head
-  # row across it; two body widths. Settings and Your account stand in it
-  # (the other screens follow).
+  # The page frame (Design System 1794894016-5ccc, FoundationLayout "The
+  # page frame"): one frame, at the left, up to the content max; a head row
+  # across it; two body widths. In `@layer components`, so a screen's
+  # utility wins over it.
   test "the page frame stops at the content max at the left, its head spans it, and its form body is --cs-form-max" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    frame = css[/(?:\A|\})\s*\.admin-page\s*\{([^}]*)\}/, 1]
+    layer = self.class.css_blocks("content-spiel.tailwind.css", /@layer components\s*\{/)
+    assert_equal 1, layer.size, "the frame's rules stand in one components layer"
+    frame = layer.first[/(?:\A|[{}])\s*\.admin-page\s*\{([^}]*)\}/, 1]
     assert frame, "the frame's own rule"
     assert_match(/max-width:\s*var\(--cs-content-max\);/, frame)
     assert_no_match(/margin/, frame, "the frame is never centred")
-    head = css[/\.admin-page__head\s*\{([^}]*)\}/, 1]
+    head = layer.first[/\.admin-page__head\s*\{([^}]*)\}/, 1]
     assert_match(/justify-content:\s*space-between;/, head, "the action stands at the frame's right end")
     assert_match(/flex-wrap:\s*wrap;/, head)
-    assert_match(/\.admin-page--form > \.admin-page__body\s*\{\s*max-width:\s*var\(--cs-form-max\);\s*\}/, css)
+    assert_match(/\.admin-page--form > \.admin-page__body\s*\{\s*max-width:\s*var\(--cs-form-max\);\s*\}/, layer.first)
     assert_match(/class="admin-page admin-page--wide admin-settings-layout"/, Rails.root.join("app/views/admin/settings/show.html.erb").read)
     assert_match(/class="admin-page admin-page--form"/, Rails.root.join("app/views/admin/accounts/edit.html.erb").read)
   end
 
-  # Design System v122: past the cap the spare width is split evenly either
-  # side, for every docked composition and the head row over it, and only
-  # inside its docked rule: undocked, nothing centres (a one-column screen
-  # stays at the left under its heading). Written here, never as `mx-auto`
-  # in a view ("nothing inside CS Studio is centred…"). Settings stands in
-  # the page frame and is centred no more (the test above); the other
-  # screens follow it there.
-  test "every docked composition and its head row centre past --cs-content-max" do
+  # Every screen's heading stands in the frame's head row: a file of CS
+  # Studio that draws an `h1` draws `.admin-page__head`, but for the 403 and
+  # 404 messages (centred, the only ones), the sign-in pages' heading (their
+  # own layout), the recovery codes (a dialog or the enrolment page) and the
+  # editors' header (their own composition, held to the same rule below).
+  test "every CS Studio screen's heading stands in the page frame's head row" do
+    outside = %w[app/views/admin/errors/forbidden.html.erb app/views/admin/errors/not_found.html.erb app/views/admin/shared/_auth_heading.html.erb
+                 app/components/admin/ui/recovery_codes_component.html.erb app/components/admin/editor_screen/header_component.html.erb
+                 app/components/admin/forms_screen/new_form_dialog_component.html.erb]
+    headings = Dir[Rails.root.join("app/{views,components}/admin/**/*.erb")].map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+      .select { |path| Rails.root.join(path).read.include?("<h1") }
+    assert_operator headings.size, :>, 25, "the screens' headings were found"
+    assert_empty headings - outside - headings.select { |path| Rails.root.join(path).read.include?("admin-page__head") }, "a screen's h1 outside the frame's head row"
+    # The New form page draws its h1 in the frame; the dialog's is the dialog's own title.
+    assert_match(/admin-page__head/, Rails.root.join("app/components/admin/forms_screen/new_form_dialog_component.html.erb").read)
+    (outside - %w[app/components/admin/forms_screen/new_form_dialog_component.html.erb]).each do |path|
+      assert Rails.root.join(path).read.include?("<h1"), "#{path} is listed but draws no h1: take it off the list"
+    end
+  end
+
+  # The fixed body widths are gone: a screen picks `.admin-page--wide` or
+  # `.admin-page--form`, and no part of CS Studio's views or components
+  # writes a width in pixels or rem of its own (`max-w-[880px]`). A box that
+  # needs a cap takes a token (`max-w-(--cs-text-measure)`) or Tailwind's
+  # scale; the Design System names no exception.
+  test "no screen body carries a fixed max-w-[…px] width of its own" do
+    offenders = Dir[Rails.root.join("app/{views,components}/admin/**/*.{erb,rb}"), Rails.root.join("app/views/layouts/admin.html.erb")]
+      .flat_map do |path|
+        Rails.root.join(path).read.each_line.with_index(1).filter_map do |line, number|
+          "#{Pathname(path).relative_path_from(Rails.root)}:#{number}" if line.match?(/\bmax-w-\[\d+(?:\.\d+)?(?:px|rem)\]/)
+        end
+      end
+    assert_empty offenders, "a fixed width: pick the frame's wide or form body instead"
+  end
+
+  # Nothing is centred past the content max, the docked compositions and
+  # the editor's header row included: each stops at `--cs-content-max`
+  # from the left, the spare width on the right. Nothing in the stylesheet
+  # carries an auto inline margin.
+  test "no docked composition or head row is centred past --cs-content-max" do
     { "admin-editor" => [ ".admin-rail-grid" ],
-      "admin-dashboard" => [ ".admin-dashboard__grid", ".admin-dashboard__head,\n  .admin-dashboard__notice" ],
-      "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ],
-      "admin-media" => [ ".admin-media-library__head,\n  .admin-media-selection-bar", ".admin-media-library__grid" ] }.each do |container, selectors|
+      "admin-dashboard" => [ ".admin-dashboard__grid" ],
+      "admin-list" => [ ".admin-list-rail__grid" ],
+      "admin-media" => [ ".admin-media-library__grid" ] }.each do |container, selectors|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).first
       selectors.each do |selector|
         rule = docked[/(?:\A|[};])\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/, 1]
         assert rule, "#{container}'s docked block lays out #{selector}"
-        assert_centres_past_content_max(rule, selector)
+        assert_stops_at_content_max_on_the_left(rule, selector)
       end
     end
 
@@ -1399,15 +1432,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     header = css[/\.admin-editor-header:has\(~ \.admin-editor-area \[data-rail-docked\]\) > \*,\s*\.admin-editor-area:has\(\[data-rail-docked\]\) \.admin-editor-header > \*\s*\{([^}]*)\}/, 1]
     assert header, "the page's header (the editor area's sibling) and the post's (inside it) are held to the docked grid"
-    assert_centres_past_content_max(header, "the editor's header row")
-
-    # Undocked nothing centres: no rule outside a docked block carries an
-    # auto inline margin but the header's, which applies only while docked.
-    outside = %w[admin-editor admin-dashboard admin-list admin-settings admin-media].reduce(css) do |rest, container|
-      width = container == "admin-settings" ? "1140px" : "1200px"
-      self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: #{width}\)\s*\{/).reduce(rest) { |text, block| text.sub(block, "") }
-    end
-    assert_equal 1, outside.scan(/margin-inline:\s*auto/).size, "only the docked header row centres outside a docked block"
+    assert_stops_at_content_max_on_the_left(header, "the editor's header row")
+    assert_empty css.scan(/margin-inline:\s*auto|margin:\s*0 auto/), "nothing in CS Studio is centred"
   end
 
   test "every docked composition grows to --cs-content-max from the rail's tokens, at the one threshold" do

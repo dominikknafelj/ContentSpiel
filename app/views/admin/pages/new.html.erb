@@ -12,13 +12,18 @@
 <%# `@form` is built (and gated on) by `#new`; a refused create re-renders from what was typed. %>
 <% form = @form || Admin::EditorScreen::NewPageFormComponent.new(url_options: admin_url_options, locale: admin_locale,
       parent_id: @page.parent_id, title: new_page_params[:title], template: new_page_params[:template], errors: @page.errors) %>
-<div class="max-w-md">
-  <h1 class="mb-4 text-base font-semibold"><%= t("#{words}.page.title") %></h1>
+<%# The page frame, a form screen: the form at the left, 760px at most. %>
+<div class="admin-page admin-page--form">
+  <div class="admin-page__head">
+    <h1 class="text-h1 text-ink"><%= t("#{words}.page.title") %></h1>
+  </div>
+  <div class="admin-page__body">
 
   <%= render form %>
 
   <div class="mt-4 flex gap-2">
     <%= render Admin::Ui::ButtonComponent.new(label: t("#{words}.page.create"), variant: :primary, type: "submit", form: form.form_id) %>
     <%= link_to t("#{words}.cancel"), admin_pages_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_tertiary_link_class %>
+  </div>
   </div>
 </div>

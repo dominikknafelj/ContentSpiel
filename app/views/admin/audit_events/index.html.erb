@@ -2,13 +2,16 @@
     bands, newest first -- every event `audit.view` holders may see
     (`Admin::AuditEventsController`'s own comment: this module is never
     content-scoped), a subject linked only where the viewer can open it. %>
-<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+<%# The page frame, a wide screen (lists, tables, logs, overviews). %>
+<div class="admin-page admin-page--wide">
+<div class="admin-page__head">
   <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
   <%# One record's activity: its History, for whoever may open it (`history_url`). %>
   <% if @history_url %>
     <%= link_to t(".history"), @history_url, class: Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>
   <% end %>
 </div>
+<div class="admin-page__body">
 
 <%= render Admin::AuditScreen::ToolbarComponent.new(filter: @filter, users: @users, other_actions: @other_actions,
       url_options: admin_url_options, locale: admin_locale) %>
@@ -46,3 +49,5 @@
     </div>
   <% end %>
 <% end %>
+</div>
+</div>

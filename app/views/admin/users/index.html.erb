@@ -12,23 +12,26 @@
     for a refused invite, with the dialog open: `@invite` and its companions
     are set only there. %>
 <% content_for :title, t(".title") %>
-<div class="mb-4">
-  <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+<%# The page frame, a wide screen (lists, tables, logs, overviews). %>
+<div class="admin-page admin-page--wide">
+<div class="admin-page__head">
+  <div class="min-w-0">
     <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
-    <div class="flex flex-wrap items-center gap-2">
+    <% if !invites_offered? && Current.user&.owner? %>
+      <p class="mt-1 text-small text-meta" data-invites-need-mail>
+        <%= t(".invites_need_mail") %>
+        <%= link_to t(".set_up_mail"), admin_settings_path(anchor: "mail", **admin_url_options), data: { turbo_frame: "_top" } %>
+      </p>
+    <% end %>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
       <% if invites_offered? %>
         <%= render Admin::Ui::ButtonComponent.new(label: t(".invite"), variant: :secondary, data: dialog_trigger(Admin::UsersScreen::InviteDialogComponent::DIALOG_ID)) %>
       <% end %>
       <%= link_to t(".new_user"), new_admin_user_path(**admin_url_options), data: { turbo_frame: "content" }, class: Admin::Ui::ButtonComponent.classes(:primary) %>
-    </div>
   </div>
-  <% if !invites_offered? && Current.user&.owner? %>
-    <p class="mt-1 text-small text-meta" data-invites-need-mail>
-      <%= t(".invites_need_mail") %>
-      <%= link_to t(".set_up_mail"), admin_settings_path(anchor: "mail", **admin_url_options), data: { turbo_frame: "_top" } %>
-    </p>
-  <% end %>
 </div>
+<div class="admin-page__body">
 
 <% if invites_offered? || @invite %>
   <%= render Admin::UsersScreen::InviteDialogComponent.new(groups: all_groups, assignable_ids: assignable_group_ids, invite: @invite,
@@ -37,3 +40,5 @@
 <% end %>
 
 <%= render Admin::UsersScreen::ListComponent.new(users: @users, invitations: @invitations, last_sign_ins: @last_sign_ins, current_user: Current.user) %>
+</div>
+</div>
