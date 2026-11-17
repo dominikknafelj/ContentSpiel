@@ -121,6 +121,7 @@ en:
         image_quality_avif: "AVIF quality"
         image_widths: "Image widths"
         image_max_upload_mb: "Largest upload"
+        stylesheet_mode: "Theme stylesheet"
     errors:
       models:
         # Settings → Mail: each refusal is a whole sentence, the same under
@@ -154,6 +155,9 @@ en:
             image_max_upload_mb:
               format: "%{message}"
               upload_range: "Largest upload must be a whole number of MB, from 1 to 50."
+            stylesheet_mode:
+              format: "%{message}"
+              inclusion: "Theme stylesheet must be Automatic, Always in the page or Always a separate file."
             form_keep_days:
               format: "%{message}"
               keep_days_range: "Days to keep submissions must be a whole number of days, from 1 to 3650."

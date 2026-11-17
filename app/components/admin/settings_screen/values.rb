@@ -49,6 +49,9 @@ module Admin
       # none is stored.
       def passkey_policy = field(:passkey_policy) { site.effective_passkey_policy }
 
+      # The Page speed card's choice (`ThemeCss::MODES`).
+      def stylesheet_mode = field(:stylesheet_mode) { site.stylesheet_mode }
+
       # The Mail card's five fields of this form (never the login, which is
       # not a field of it and never rendered).
       def mail(name) = field(name) { site.public_send(name) }
@@ -162,10 +165,10 @@ module Admin
 
       SINGLE_FIELDS = %i[time_zone trash_retention_days form_keep_days ai_provider ai_model
         mail_server mail_port mail_security mail_sender_name mail_sender_address
-        image_format image_quality_webp image_quality_avif image_widths image_max_upload_mb passkey_policy].freeze
+        image_format image_quality_webp image_quality_avif image_widths image_max_upload_mb passkey_policy stylesheet_mode].freeze
       SINGLE_READERS = {
         time_zone: [ :time_zone ], trash_retention_days: [ :trash_retention_days ], form_keep_days: [ :form_keep_days ],
-        ai_provider: [ :ai_provider ], ai_model: [ :ai_model ], passkey_policy: [ :passkey_policy ],
+        ai_provider: [ :ai_provider ], ai_model: [ :ai_model ], passkey_policy: [ :passkey_policy ], stylesheet_mode: [ :stylesheet_mode ],
         image_format: [ :image, :image_format ], image_quality_webp: [ :image, :image_quality_webp ], image_quality_avif: [ :image, :image_quality_avif ],
         image_widths: [ :image, :image_widths ], image_max_upload_mb: [ :image, :image_max_upload_mb ]
       }.freeze

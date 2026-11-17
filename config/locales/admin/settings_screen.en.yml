@@ -19,6 +19,7 @@ en:
           mail: "Mail"
           sign_in: "Sign-in"
           images: "Images"
+          page_speed: "Page speed"
         nav:
           label: "Settings sections"
           # The select that stands for the links on a phone.
@@ -202,6 +203,28 @@ en:
             other: "%{count} people this covers have no passkey yet. Each is asked to add one at their next sign-in; until then, nothing changes for them."
           all_covered: "Everyone this covers has a passkey."
           saved: "Sign-in policy saved."
+        # The Page speed card (`PageSpeedComponent`, named after the
+        # section): how visitors' browsers get the theme's stylesheet. The
+        # legend is also the save bar's name for the field.
+        page_speed:
+          intro: "How visitors' browsers get your theme's stylesheet. A change applies to the next page they open."
+          legend: "Theme stylesheet"
+          choices:
+            automatic:
+              label: "Automatic"
+              help: "In the page while it is small (14 KB or less, compressed), otherwise a separate file."
+            inline:
+              label: "Always in the page"
+              help: "The first page a visitor opens draws sooner. Every later page downloads the stylesheet again."
+            file:
+              label: "Always a separate file"
+              help: "The browser keeps the file and reuses it on every later page. The first page waits for one more request."
+          # KB is 1,024 bytes, one decimal (`ThemeCss.kilobytes`).
+          size:
+            inline: "Your theme's stylesheet is %{size} KB compressed, so Automatic puts it in the page."
+            file: "Your theme's stylesheet is %{size} KB compressed, so Automatic links it as a separate file."
+            unknown: "The stylesheet's size is known once it is built."
+          cdn_help: "Behind a CDN that sends Early Hints (on Cloudflare: Speed › Optimization › Early Hints), a separate file starts loading before the page arrives, which takes away most of the first page's wait. ContentSpiel can't tell whether your CDN does this."
         images_card:
           intro: "How the images of the library are made for the public site. Saving these settings changes no image; Regenerate images does."
           format: "Format"

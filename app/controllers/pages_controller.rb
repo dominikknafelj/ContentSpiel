@@ -86,9 +86,11 @@ class PagesController < PublicController
       # template digest (of `pages/show` alone) doesn't cover:
       # - the resolved record and the site's content version (`PublicSite`,
       #   three queries, already read by `read_content_version_first`);
-      # - the settings row, which every page prints (title, tagline, footer),
-      #   so the ETag is right even in the instant between a settings commit
-      #   and its bump;
+      # - the settings row, which every page prints (title, tagline, footer)
+      #   and whose `stylesheet_mode` decides whether the stylesheet is drawn
+      #   in or linked (Settings → Page speed): its `updated_at` is in the
+      #   key, so the ETag is right even in the instant between a settings
+      #   commit and its bump, and a changed mode is a 200 with the new head;
       # - `RichText.code_revision`, the deployed revision: the version moves
       #   only with published content, so without it a deploy that changed a
       #   component, the layout or the stylesheet's digest would keep being

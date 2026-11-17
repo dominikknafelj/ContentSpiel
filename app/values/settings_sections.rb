@@ -27,7 +27,9 @@ module SettingsSections
     Section.new(id: "ai", permission: "settings.manage", family: :code, icon: :assistant),
     Section.new(id: "mail", permission: "settings.manage", family: :media, icon: :at_sign),
     Section.new(id: "sign_in", permission: "settings.manage", family: :neutral, icon: :fingerprint, owner_only: true),
-    Section.new(id: "images", permission: "settings.manage", family: :media, icon: :image)
+    Section.new(id: "images", permission: "settings.manage", family: :media, icon: :image),
+    # Last: it is about the public site's delivery, not its content.
+    Section.new(id: "page_speed", permission: "settings.manage", family: :code, icon: :status)
   ].freeze
 
   # The sections whose right `holds` says the viewer has, in the nav's order,

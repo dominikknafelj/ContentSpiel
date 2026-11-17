@@ -94,11 +94,16 @@
 
     <%# The one public stylesheet (theming spec §4): the default theme's
         styles and then the theme's, built together (`ThemeCss`) -- never the
-        product stylesheet. Drawn in as a `<style>` when the built file is
-        small (`Theme::Stylesheet`, `ThemeCss::INLINE_LIMIT`), so a page's
-        first paint waits for no request; linked above the limit, which is
-        also what sends its `Link: rel=preload` header (Rails' asset helper),
-        so a stylesheet drawn in is preloaded by nobody.
+        product stylesheet. Drawn in as a `<style>` or linked as the site's
+        mode says (Settings → Page speed, `SiteSetting#stylesheet_mode`):
+        Automatic, the default, draws it in when the built file is small
+        (`Theme::Stylesheet`, `ThemeCss::INLINE_LIMIT`), so a page's first
+        paint waits for no request, and links it above the limit; "inline"
+        and "file" fix one way. Linked is also what sends its
+        `Link: rel=preload` header (Rails' asset helper), so a stylesheet
+        drawn in is preloaded by nobody. The settings row is a key of the
+        public ETag (`PagesController#show`), so a changed mode is never
+        confirmed with a 304 of the old page.
 
         Both carry `data-turbo-track="reload"`: Turbo compares the tracked
         elements of the head, nonce left out, and reloads the page when they
@@ -114,7 +119,7 @@
         The CSS is printed unescaped: an entity is not decoded inside
         `<style>`, and `Theme::Stylesheet` links a stylesheet whose text
         holds `</style`. %>
-    <% if (stylesheet = Theme::Stylesheet.current)&.inline? %>
+    <% if (stylesheet = Theme::Stylesheet.current)&.inline?(Current.site.stylesheet_mode) %>
       <%= tag.style(stylesheet.css.html_safe, nonce: content_security_policy_nonce, data: { turbo_track: "reload" }) %>
     <% else %>
       <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>

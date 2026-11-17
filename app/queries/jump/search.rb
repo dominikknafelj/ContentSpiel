@@ -61,7 +61,8 @@ module Jump
       "ai" => "Settings › AI translation",
       "mail" => "Settings › Mail",
       "sign_in" => "Settings › Sign-in",
-      "images" => "Settings › Images"
+      "images" => "Settings › Images",
+      "page_speed" => "Settings › Page speed"
     }.freeze
 
     def initialize(actor:, query:, modules:)

@@ -3,7 +3,8 @@ require "test_helper"
 # The public stylesheet drawn into the page or linked (`Theme::Stylesheet`,
 # `ThemeCss::INLINE_LIMIT`; `docs/reference/theming.md`, "Drawn into the
 # page, or linked"). The suite's built stylesheet is the default theme's,
-# which is under the limit; the linked way is shown by a lower limit.
+# which is under the limit; the linked way is shown by a lower limit, or by
+# the site's mode (Settings → Page speed, `SiteSetting#stylesheet_mode`).
 class PublicStylesheetTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -60,12 +61,60 @@ class PublicStylesheetTest < ActionDispatch::IntegrationTest
     assert_includes link_header, "<#{links.first["href"]}>; rel=preload; as=style"
   end
 
+  # Settings → Page speed: "inline" draws in a stylesheet over the limit,
+  # "file" links one under it, each with what goes with that way (the
+  # preload header for a link and nothing for a `<style>`), and Automatic is
+  # what a site does by default.
+  test "the site's mode decides: Automatic by the size, Always in the page whatever the size, Always a separate file whatever the size" do
+    site = site_settings(:default)
+    assert_equal "automatic", site.stylesheet_mode, "a site starts on Automatic"
+
+    site.update!(stylesheet_mode: "file")
+    get "/about"
+    assert_response :success
+    assert_empty drawn_style, "a small stylesheet is linked when the site asks for a file"
+    link = css_select("head link[rel=stylesheet][data-turbo-track=reload]")
+    assert_equal 1, link.size
+    assert_includes link_header, "<#{link.first["href"]}>; rel=preload; as=style"
+
+    site.update!(stylesheet_mode: "inline")
+    Theme::Stylesheet.with_limit(1) { get "/about" }
+    assert_response :success
+    assert_empty css_select("link[rel=stylesheet]"), "a stylesheet over the limit is drawn in when the site asks for it in the page"
+    assert_not_includes link_header, "theme"
+    assert_equal built.compiled_content.force_encoding(Encoding::UTF_8), drawn_style.first.text
+
+    site.update!(stylesheet_mode: "automatic")
+    Theme::Stylesheet.with_limit(1) { get "/about" }
+    assert_empty drawn_style, "Automatic links a stylesheet over the limit"
+    get "/about"
+    assert_equal 1, drawn_style.size, "Automatic draws in one under it"
+  end
+
+  # The settings row is a key of the public ETag, so a changed mode is a new
+  # page at the visitor's next request, never a 304 of the old head; a
+  # shared cache in front, which keys on the address, takes the new page
+  # once its `s-maxage` is spent and it asks again with the old ETag.
+  test "a change of the mode changes the ETag, so the next page has the new head" do
+    get "/about"
+    etag = response.headers["ETag"]
+    get "/about", headers: { "If-None-Match" => etag }
+    assert_response :not_modified
+
+    Settings::Save.call(site_settings(:default), attributes: { stylesheet_mode: "file" }, actor: users(:one))
+    get "/about", headers: { "If-None-Match" => etag }
+    assert_response :success
+    assert_not_equal etag, response.headers["ETag"]
+    assert_empty drawn_style
+    assert_equal 1, css_select("head link[rel=stylesheet]").size
+  end
+
   test "a stylesheet that would change by being drawn in is linked: a relative address, an import, or the end of the style element in its text" do
     [ %(.a{background:url("mark.svg")}), %(.a{src:url(font.woff2)}), %(@import "more.css";.a{}), %(.a::after{content:"</style>"}), %(.a::after{content:"</STYLE"}) ].each do |css|
-      assert_not stylesheet_of(css, digest: "x").inline?, css
+      ThemeCss::MODES.each { |mode| assert_not stylesheet_of(css, digest: "x").inline?(mode), "#{mode}: #{css}" }
     end
     [ %(.a{background:url("/assets/mark-1a2b3c4d.svg")}), %(.a{background:url(data:image/png;base64,AA)}), %(.a{mask:url(#m)}), %(@import url("https://fonts.example/a.css");.a{}), %(.a>.b{content:"<p>"}) ].each do |css|
-      assert stylesheet_of(css, digest: "x").inline?, css
+      assert stylesheet_of(css, digest: "x").inline?("automatic"), css
     end
   end
 

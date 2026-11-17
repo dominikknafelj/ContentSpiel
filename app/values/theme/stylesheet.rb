@@ -3,9 +3,11 @@ class Theme
   # `docs/reference/theming.md`, "Drawn into the page, or linked"): its CSS
   # drawn into the head as a `<style>`, when the built file is at or under
   # `ThemeCss::INLINE_LIMIT` compressed (the reason is that constant's), or
-  # the `<link>` every theme had before, above it. Every theme gets this,
-  # the default included, and nothing of a theme decides it but the size of
-  # its built stylesheet.
+  # the `<link>` every theme had before, above it: that is the site's
+  # default mode, Automatic, and Settings → Page speed may fix it to either
+  # way instead (`SiteSetting#stylesheet_mode`, `#inline?`). Every theme gets
+  # this, the default included, and nothing of a theme decides it but the
+  # size of its built stylesheet.
   #
   # WHAT IS DRAWN IN IS WHAT PROPSHAFT SERVES at the digested address: the
   # asset's compiled content, whose `url(…)` of a font or an image is
@@ -37,23 +39,20 @@ class Theme
     class << self
       # The stylesheet as the layout draws it now: `nil` when there is no
       # built file (the layout then links it, as it did before, and the
-      # asset helper says what is missing).
+      # asset helper says what is missing). Whether it is drawn in is asked
+      # of it with the site's mode (`#inline?`), so one object serves every
+      # mode and a change of the setting reads and weighs nothing again.
       def current
         asset = Rails.application.assets.load_path.find(LOGICAL_PATH)
         return unless asset
 
         @mutex.synchronize do
-          @current = nil unless @current && @current.digest == asset.digest && @current.limit == limit && @current.mode == mode
-          @current ||= new(asset, limit: limit, mode: mode)
+          @current = nil unless @current && @current.digest == asset.digest && @current.limit == limit
+          @current ||= new(asset, limit: limit)
         end
       end
 
       def limit = @limit || ThemeCss::INLINE_LIMIT
-
-      # How the site asks for its stylesheet to be taken
-      # (`ThemeCss.inline_for?`): `:automatic`, by its size, and no other
-      # yet.
-      def mode = :automatic
 
       # FOR TESTS ONLY: another limit for the length of the block, as
       # `Theme.with` is another theme. Process-wide, like it.
@@ -67,19 +66,24 @@ class Theme
     end
 
     # `compressed_size` is the built file gzipped, in bytes, what the
-    # decision weighed (`ThemeCss.kilobytes` says it in KB).
-    attr_reader :digest, :limit, :mode, :compressed_size, :css
+    # decision weighs (`ThemeCss.kilobytes` says it in KB). `css` is the
+    # compiled content when a `<style>` would not change what it does, nil
+    # otherwise: it is drawn in only when `#inline?` says so too.
+    attr_reader :digest, :limit, :compressed_size, :css
 
-    def initialize(asset, limit:, mode: :automatic)
+    def initialize(asset, limit:)
       @digest = asset.digest
       @limit = limit
-      @mode = mode
       @compressed_size = ThemeCss.compressed_size(asset.content)
       css = asset.compiled_content.to_s.dup.force_encoding(Encoding::UTF_8)
-      @css = css if ThemeCss.inline_for?(mode, compressed_size, limit: limit) && drawable?(css)
+      @css = css if drawable?(css)
     end
 
-    def inline? = !css.nil?
+    # Drawn in for the site's `mode` (`SiteSetting#stylesheet_mode`,
+    # `ThemeCss::MODES`): what `ThemeCss.inline_for?` decides from the mode
+    # and the size, and never a stylesheet a `<style>` would change, whatever
+    # the mode ("Always in the page" included).
+    def inline?(mode) = !css.nil? && ThemeCss.inline_for?(mode, compressed_size, limit: limit)
 
     private
 

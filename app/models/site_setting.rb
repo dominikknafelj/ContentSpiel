@@ -139,6 +139,11 @@ class SiteSetting < ApplicationRecord
   PASSKEY_POLICIES = %w[nobody owners_and_admins everyone].freeze
   validates :passkey_policy, inclusion: { in: PASSKEY_POLICIES }, allow_nil: true
 
+  # How visitors' browsers get the theme's stylesheet (Settings → Page speed):
+  # `ThemeCss::MODES`, decided by `ThemeCss.inline_for?`. The column's check
+  # holds the same three; this names a forged value as a field error first.
+  validates :stylesheet_mode, inclusion: { in: ThemeCss::MODES }
+
   after_commit :reset_cached_state
 
   # Titled in the new row's own default language, not the ambient

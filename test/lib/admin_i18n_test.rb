@@ -167,6 +167,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/language_dialogs_component.html.erb
     app/components/admin/settings_screen/publishing_card_component.rb
     app/components/admin/settings_screen/publishing_card_component.html.erb
+    app/components/admin/settings_screen/page_speed_component.rb
+    app/components/admin/settings_screen/page_speed_component.html.erb
     app/components/admin/settings_screen/ai_card_component.rb
     app/components/admin/settings_screen/ai_card_component.html.erb
     app/components/admin/settings_screen/ai_key_component.rb

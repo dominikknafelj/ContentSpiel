@@ -1,0 +1,18 @@
+<%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(SettingsSections.find("page_speed"), self), id: "settings-page_speed-card", intro: t(".intro")) do %>
+  <%# The wrapper's first child is the fieldset, so the save bar's changed dot
+      stands after its legend (`[data-save-bar-changed] > fieldset:first-child
+      > legend::after`); the radios mark no well. %>
+  <div class="admin-column p-4" data-field-name="stylesheet_mode" <%= tag.attributes(data: { save_bar_changed: values.saved_change("stylesheet_mode") }) %>>
+    <%= tag.fieldset role: "radiogroup", class: "flex flex-col gap-2",
+          aria: { labelledby: legend_id, describedby: [ size_id, help_id, (errors_id if errors.any?) ].compact.join(" ") } do %>
+      <legend id="<%= legend_id %>" class="text-label text-meta"><%= t(".legend") %></legend>
+      <p id="<%= size_id %>" class="text-small text-dim" data-stylesheet-size><%= size_line %></p>
+      <% choices.each do |choice| %>
+        <%= render Admin::Ui::ChoiceTileComponent.new(name: "site_setting[stylesheet_mode]", value: choice[:value], id: choice[:id],
+              title: choice[:title], line: choice[:line], checked: choice[:checked]) %>
+      <% end %>
+    <% end %>
+    <p id="<%= help_id %>" class="mt-2 text-small text-meta"><%= t(".cdn_help") %></p>
+    <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
+  </div>
+<% end %>
