@@ -61,8 +61,8 @@ module Admin
       # What the dialog read, to the microsecond Postgres keeps.
       def shown_updated_at = record.updated_at.iso8601(6)
 
-      # "Pricing’s working version becomes version 5 as it went live on
-      # 3 Nov 2026. Nothing is published: the site keeps showing version 7
+      # "The working version of “Pricing” becomes version 5 as it went live
+      # on 3 Nov 2026. Nothing is published: the site keeps showing version 7
       # until you publish the changes." A copy still waiting for its time
       # goes live; a record the site does not show keeps showing nothing.
       def sentence

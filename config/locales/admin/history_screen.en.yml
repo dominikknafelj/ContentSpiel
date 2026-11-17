@@ -75,11 +75,12 @@ en:
         # `Admin::HistoryScreen::RestoreDialogComponent`, "Restore version 5?".
         restore_dialog:
           title: "Restore version %{number}?"
-          # "Pricing’s working version becomes version 5 as it went live on 3 Nov 2026. Nothing is published: …"
+          # "The working version of “Pricing” becomes version 5 as it went live on 3 Nov 2026. Nothing is published: …"
+          # No possessive on the title: it breaks for "Prices" and in other languages.
           sentence: "%{becomes} %{site}"
           becomes:
-            went: "%{title}’s working version becomes version %{number} as it went live on %{date}."
-            goes: "%{title}’s working version becomes version %{number} as it goes live on %{date}."
+            went: "The working version of “%{title}” becomes version %{number} as it went live on %{date}."
+            goes: "The working version of “%{title}” becomes version %{number} as it goes live on %{date}."
           site:
             shown: "Nothing is published: the site keeps showing version %{number} until you publish the changes."
             none: "Nothing is published."

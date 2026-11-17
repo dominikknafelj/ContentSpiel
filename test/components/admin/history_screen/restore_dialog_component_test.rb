@@ -45,7 +45,7 @@ class Admin::HistoryScreen::RestoreDialogComponentTest < ViewComponent::TestCase
 
     assert_selector "dialog[data-dialog-width=form][data-dialog-steady]"
     assert_selector "h2", text: "Restore version 2?"
-    assert_text "Pricing for teams’s working version becomes version 2 as it went live on"
+    assert_text "The working version of “Pricing for teams” becomes version 2 as it went live on"
     assert_text "Nothing is published: the site keeps showing version 3 until you publish the changes."
     assert_selector "[data-publishing-overview] [data-change=added]", text: "Deleted since"
     assert_selector "[data-publishing-overview] [data-change=removed]", text: "Added since"
@@ -86,7 +86,7 @@ class Admin::HistoryScreen::RestoreDialogComponentTest < ViewComponent::TestCase
     draw(page, 1)
 
     date = I18n.l(at.in_time_zone(Current.site.effective_time_zone).to_date, format: :"admin.short_with_year")
-    assert_text "Later still’s working version becomes version 1 as it goes live on #{date}."
+    assert_text "The working version of “Later still” becomes version 1 as it goes live on #{date}."
   end
 
   private
