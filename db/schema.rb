@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_17_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -520,10 +520,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
     t.datetime "created_at", null: false
     t.datetime "settled_at"
     t.boolean "kept_when_history_began", default: false, null: false
+    t.boolean "holds_search", default: false, null: false
     t.index ["live_at"], name: "index_published_versions_on_live_at"
     t.index ["live_at"], name: "index_published_versions_on_live_at_unsettled", where: "(settled_at IS NULL)"
     t.index ["record_type", "record_id", "live_at"], name: "index_published_versions_on_record_and_live_at"
     t.index ["record_type", "record_id", "number"], name: "index_published_versions_on_record_and_number", unique: true
+    t.index ["record_type", "record_id"], name: "index_published_versions_holding_search", where: "holds_search"
     t.index ["tag_ids"], name: "index_published_versions_on_tag_ids", using: :gin
   end
 

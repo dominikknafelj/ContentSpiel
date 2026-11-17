@@ -10,18 +10,16 @@ module SiteSearch
   # (`SiteSearch::FirstHolder`, which `TagPage` shares).
   #
   # NO QUERY THE PUBLIC ETAG CANNOT SEE: everything read is what the content
-  # version covers. A copy's `blocks` change only when a copy is taken
+  # version covers. A copy's `holds_search` is written only when it is taken
   # (the service that takes a copy bumps), and the visibility, the trash and
   # the addresses it also reads are rows whose every writer bumps too. So a
   # page that gains or loses a Search block moves the version, and so does
   # every page's ETag that draws a form pointing here.
   class SearchPage
-    # The containment that finds the copies holding a block of a `:search`
-    # type, or nil when no type has the capability.
-    def self.holding
-      names = BlockTypes.with_capability(:search).map(&:name)
-      names.map { |name| SqlNodes.json_contains(Publishing::Version.arel_table[:blocks], [ { "block_type" => name } ]) }.reduce(:or)
-    end
+    # The copies holding a block of a `:search` type: the flag written when a
+    # copy is taken (`Publishing::Snapshot.holds_search?`), never a test of
+    # the copy's `blocks` (`FirstHolder.copies_holding` says why).
+    def self.holding = Publishing::Version.arel_table[:holds_search].eq(true)
 
     def initialize(now: Time.current, locale: I18n.locale)
       @now = now
@@ -45,9 +43,6 @@ module SiteSearch
       @holders ||= find_holders
     end
 
-    def find_holders
-      holding = self.class.holding or return []
-      FirstHolder.copies_holding(holding, now: @now).pluck(:record_id)
-    end
+    def find_holders = FirstHolder.copies_holding(self.class.holding, now: @now).pluck(:record_id)
   end
 end

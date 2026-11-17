@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Changed
+
+- A public page reads its texts' and tables' renders from the cache in one batched read, where each Rich text, Note and Table block was a round trip of its own, and a block of a published page is named in the cache by its copy and its id, so no document is walked for its key on every view (the guide's largest page, 117 blocks: about 100 ms down to about 70 ms locally). Every cached render is drawn once again after the upgrade.
+
+### Fixed
+
+- The page a theme's header search box points at (`search_page`) is found from a flag each published copy carries, `holds_search`, instead of reading the blocks of every copy ever published, a scan that grew with every publish (about 44 ms on every page of a site republished many times). A Search block in an older copy only no longer counts, as before.
+
+### Migrations
+
+- `20261117130000_add_holds_search_to_published_versions`: `published_versions.holds_search` (whether the copy holds a Search block), filled for every existing page copy from its blocks, with a partial index on the copies that hold one.
+
 ## 0.9.1 (2026-11-16)
 
 ### Fixed

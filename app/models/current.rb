@@ -24,6 +24,11 @@ class Current < ActiveSupport::CurrentAttributes
   # `PublicSite.current_content_version`'s per-request memo.
   attribute :content_version
 
+  # `RichText::RenderCache`'s per-request memo: the renders a page read in
+  # one batch (`RenderCache.prefetch`), by the key's expanded name. Nil until
+  # a page asks; never filled by a preview.
+  attribute :rich_text_renders
+
   # `AccessControl::ActorGrants`' per-request memo: a Hash keyed by actor
   # of the grants that actor acts under. Cleared after any grant or
   # membership commits (see ActorGrants).

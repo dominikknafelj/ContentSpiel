@@ -258,6 +258,14 @@ class ContentBlock < ApplicationRecord
   # and never remembers the answer: its settings can change under it.
   attr_writer :listed_tag_id
 
+  # The id of the published copy this block was rebuilt from
+  # (`Publishing::Snapshot.blocks_from`), nil for a row. A copy never changes,
+  # so the copy, the block and the language name its body for the render
+  # cache without a walk of the document (`RichText::RenderCache`).
+  attr_accessor :published_copy_id
+
+  def body_cache_identity(locale) = published_copy_id && [ "copy", published_copy_id, id, locale.to_s ]
+
   def listed_tag_id
     return @listed_tag_id if instance_variable_defined?(:@listed_tag_id)
 

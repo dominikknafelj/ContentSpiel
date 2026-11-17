@@ -5,8 +5,11 @@ module Admin
     # as the History screen's comparison does. Both sides are built in
     # memory, in the form a copy stores them, so the preview needs no row.
     class ChangesOverviewComponentPreview < ViewComponent::Preview
-      # A copy's side as `Publishing::Changes` reads one.
-      Side = Data.define(:snapshot, :blocks, :live_at)
+      # A copy's side as `Publishing::Changes` reads one, with no id: it is no
+      # row (`Publishing::Snapshot.blocks_from` names a block's copy by it).
+      Side = Data.define(:snapshot, :blocks, :live_at) do
+        def id = nil
+      end
 
       def names = render(overview(:names))
 
