@@ -54,7 +54,8 @@
      "mail_security" => "settings-mail_security", "mail_sender_name" => "settings-mail_sender_name",
      "mail_sender_address" => "settings-mail_sender_address", "image_format" => "settings-image_format",
      "image_quality_webp" => "settings-image_quality_webp", "image_quality_avif" => "settings-image_quality_avif",
-     "image_widths" => "settings-image_widths", "content_types" => Admin::SettingsScreen::PostTypesCardComponent.first_switch_id, "image_max_upload_mb" => "settings-image_max_upload_mb" } %>
+     "image_widths" => "settings-image_widths", "content_types" => Admin::SettingsScreen::PostTypesCardComponent.first_switch_id, "image_max_upload_mb" => "settings-image_max_upload_mb",
+     "stylesheet_mode" => Admin::SettingsScreen::PageSpeedComponent.first_choice_id } %>
 
 <%# The page frame, wide: the head row (the `h1`, over the nav, at the
     frame's left), then the layout from the frame's left edge, spare width
@@ -108,6 +109,8 @@
             <% end %>
             <%= render Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: images_progress, avif_available: ImageSettings.avif_available?,
                   errors: (@errors if @errors.respond_to?(:full_messages_for)), status_link: can?("system_status.view")) %>
+            <%= render Admin::SettingsScreen::PageSpeedComponent.new(values: values, stylesheet: Theme::Stylesheet.current,
+                  errors: field_errors.call(:stylesheet_mode)) %>
           <% end %>
 
           <%= render Admin::Ui::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options)) %>

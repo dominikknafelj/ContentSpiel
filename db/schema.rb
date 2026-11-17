@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_17_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_17_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -636,6 +636,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_130000) do
     t.integer "form_keep_days", default: 90, null: false
     t.string "passkey_policy"
     t.jsonb "content_types", default: ["blog"], null: false
+    t.string "stylesheet_mode", default: "automatic", null: false
+    t.check_constraint "stylesheet_mode::text = ANY (ARRAY['automatic'::text, 'inline'::text, 'file'::text])", name: "site_settings_stylesheet_mode_known"
   end
 
   create_table "tags", force: :cascade do |t|

@@ -68,9 +68,9 @@ class Jump::SearchTest < ActiveSupport::TestCase
   test "the Settings rows are SettingsSections', titled one each" do
     assert_equal SettingsSections.ids, Jump::Search::SETTINGS_TITLES.keys
     assert_equal [ "Settings › Site", "Settings › Languages", "Settings › Post types", "Settings › Trash", "Settings › Forms", "Settings › AI translation",
-      "Settings › Mail", "Settings › Sign-in", "Settings › Images" ], Jump::Search::SETTINGS_TITLES.values
+      "Settings › Mail", "Settings › Sign-in", "Settings › Images", "Settings › Page speed" ], Jump::Search::SETTINGS_TITLES.values
 
-    %w[forms mail images].each do |id|
+    %w[forms mail images page_speed].each do |id|
       rows = search(Jump::Search::SETTINGS_TITLES.fetch(id).delete_prefix("Settings › ")).find { |g| g[:label] == "Settings" }[:rows]
       assert_includes rows, { title: Jump::Search::SETTINGS_TITLES.fetch(id), route: [ :admin_settings_path, [], { anchor: id } ] }
     end

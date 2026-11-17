@@ -80,8 +80,8 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
   test "the screen is a nav of anchors, one card per section, and one footer" do
     get "/cs-studio/settings"
 
-    assert_select "nav[aria-label='Settings sections'] a", 9
-    %w[site languages post_types publishing forms ai mail sign_in images].each do |id|
+    assert_select "nav[aria-label='Settings sections'] a", 10
+    %w[site languages post_types publishing forms ai mail sign_in images page_speed].each do |id|
       assert_select "nav[aria-label='Settings sections'] a[href='##{id}']"
       assert_select "##{id}"
     end
@@ -517,16 +517,16 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     user
   end
 
-  test "a settings.manage-only user sees the Site, Publishing, Forms, AI, Mail and Images cards and no Languages" do
+  test "a settings.manage-only user sees the Site, Publishing, Forms, AI, Mail, Images and Page speed cards and no Languages" do
     sign_in_as(user_holding("settings.manage"))
 
     get "/cs-studio/settings"
 
     assert_response :success
-    assert_select "nav[aria-label='Settings sections'] a", 7
+    assert_select "nav[aria-label='Settings sections'] a", 8
     assert_select "nav[aria-label='Settings sections'] a[href='#languages']", count: 0
     assert_select "#languages", count: 0
-    %w[site post_types publishing forms ai mail images].each { |id| assert_select "##{id}" }
+    %w[site post_types publishing forms ai mail images page_speed].each { |id| assert_select "##{id}" }
     assert_select "form#settings-form"
   end
 
@@ -541,7 +541,8 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "form#settings-form section[aria-labelledby=languages]"
     assert_select "form#settings-form .admin-save-bar"
     assert_select "#settings-site-card", count: 0
-    assert_select "#publishing, #ai", count: 0
+    assert_select "#publishing, #ai, #page_speed", count: 0
+    assert_select "input[name='site_setting[stylesheet_mode]']", count: 0
     assert_select "form#settings-form input[name^='site_setting[translations]']", count: 0
     assert_select "nav[aria-label='Modules'] a", text: "Settings"
   end

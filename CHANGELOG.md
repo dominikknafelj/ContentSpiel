@@ -4,6 +4,7 @@
 
 ### Added
 
+- Settings → Page speed, a tenth section, last in the nav (`settings.manage`): how visitors' browsers get the theme's stylesheet, "Automatic" (the default, as before: in the page while it is 14 KB or less compressed, otherwise a separate file), "Always in the page" or "Always a separate file", three choice tiles saved with the save bar ("Theme stylesheet") and recorded in `settings.updated`. A line above the tiles says the served stylesheet's compressed size and what Automatic does with it, and a line under them what a CDN's Early Hints do for a separate file. A change applies at a visitor's next page: the settings row is in the public ETag. ⌘K offers "Settings › Page speed". `ThemeCss::MODES` are the three, and `Theme::Stylesheet#inline?` takes the mode. The build's line ends with "(Settings › Page speed: Automatic)".
 - A shared cache in front of the site (a CDN, Varnish, nginx) may keep published public pages for a time the host chooses: `PUBLIC_SHARED_CACHE_SECONDS=60` makes a published page or post say `Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=86400`, in standard HTTP only, so a published change shows within that time plus the cache's own. Browsers still ask again on every visit, and the ETag and its 304 are as before. A search's results, the preview, CS Studio, a 404, a redirect and an error never take it. Unset or `0`, nothing changes; a value that is not a whole number of 0 or more stops the boot. Cloudflare needs a Cache Rule to cache HTML at all (`docs/reference/hosting.md`, "Behind a shared cache").
 
 ### Changed
@@ -30,6 +31,7 @@
 
 ### Migrations
 
+- `20261117140000_add_stylesheet_mode_to_site_settings`: `site_settings.stylesheet_mode` (`automatic`, `inline` or `file`, NOT NULL, `automatic` for every existing site, which is what its pages did), with the check `site_settings_stylesheet_mode_known`.
 - `20261117130000_add_holds_search_to_published_versions`: `published_versions.holds_search` (whether the copy holds a Search block), filled for every existing page copy from its blocks, with a partial index on the copies that hold one.
 
 ## 0.9.1 (2026-11-16)

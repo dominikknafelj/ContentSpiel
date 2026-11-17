@@ -11,8 +11,8 @@ class ThemeCssTest < ActiveSupport::TestCase
 
   # Drawn into the page or linked (`ThemeCss::INLINE_LIMIT`): the weighed
   # size is the gzipped one, at or under the limit is drawn in under
-  # `:automatic`, the one mode there is, and the line the build prints says
-  # which, with both sizes in KB of 1,024 bytes.
+  # `automatic`, the default mode, and the line the build prints says which,
+  # with both sizes in KB of 1,024 bytes.
   test "a stylesheet at or under the gzipped limit is drawn in, over it linked, and the build's line says which" do
     small = ".a{color:red}" * 10
     size = ThemeCss.compressed_size(small)
@@ -22,6 +22,7 @@ class ThemeCssTest < ActiveSupport::TestCase
     assert ThemeCss.inline_for?(:automatic, 14 * 1024)
     assert_not ThemeCss.inline_for?(:automatic, 14 * 1024 + 1)
     assert_raises(ArgumentError) { ThemeCss.inline_for?(:always, size) }
+    assert_raises(ArgumentError) { ThemeCss.inline_for?(nil, size) }
     assert_not ThemeCss.inline_for?(:automatic, ThemeCss.compressed_size(Random.new(1).bytes(20 * 1024))), "20 KB that do not compress are over the limit"
     assert ThemeCss.inline_for?(:automatic, ThemeCss.compressed_size("a" * 200_000)), "a large file that compresses well is weighed by what crosses the wire"
     assert_equal "11.4", ThemeCss.kilobytes(11_674)
@@ -31,10 +32,24 @@ class ThemeCssTest < ActiveSupport::TestCase
       assert_nil ThemeCss.inline_sentence(root: root), "nothing built, nothing said"
       root.join(ThemeCss::OUTPUT).dirname.mkpath
       root.join(ThemeCss::OUTPUT).write(small)
-      assert_match(/\A\[ContentSpiel\] The public stylesheet \(0\.1 KB, 0\.\d KB gzipped\) is drawn into each public page: it is at or under 14 KB gzipped\.\z/,
+      assert_match(/\A\[ContentSpiel\] The public stylesheet \(0\.1 KB, 0\.\d KB gzipped\) is drawn into each public page: it is at or under 14 KB gzipped \(Settings › Page speed: Automatic\)\.\z/,
         ThemeCss.inline_sentence(root: root))
-      assert_match(/is linked from each public page: it is over 0 KB gzipped\./, ThemeCss.inline_sentence(root: root, limit: 10))
+      assert_match(/is linked from each public page: it is over 0 KB gzipped \(Settings › Page speed: Automatic\)\./, ThemeCss.inline_sentence(root: root, limit: 10))
     end
+  end
+
+  # Settings → Page speed: "inline" draws in whatever the size, "file" links
+  # whatever the size, and a mode may be a String (the stored column) or a
+  # Symbol.
+  test "the two fixed modes decide alone, whatever the size, and the modes are the column's three" do
+    assert_equal %w[automatic inline file], ThemeCss::MODES
+    [ 0, 14 * 1024 + 1, 200 * 1024 ].each do |size|
+      assert ThemeCss.inline_for?("inline", size)
+      assert ThemeCss.inline_for?(:inline, size)
+      assert_not ThemeCss.inline_for?("file", size)
+    end
+    assert ThemeCss.inline_for?("automatic", 14 * 1024)
+    assert_not ThemeCss.inline_for?("automatic", 14 * 1024 + 1)
   end
 
   test "without a theme the entry is the default theme's file, and its folder for the watch, and nothing else" do

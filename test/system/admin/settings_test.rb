@@ -609,6 +609,30 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal [ "en" ], site_settings(:default).reload.locale_entry("de")["fallbacks"]
   end
 
+  # Settings → Page speed: a tile is pressed anywhere (the label is the
+  # tile), the save bar names the choice by its legend and marks the legend,
+  # and Save stores it.
+  test "choosing a Page speed tile is one change named Theme stylesheet, marked on its legend, and Save stores it" do
+    visit_screen admin_settings_path
+
+    radio = find("#settings-stylesheet_mode-automatic", visible: :all)
+    assert radio.checked?
+    find("label", text: "Always a separate file").click
+    assert find("#settings-stylesheet_mode-file", visible: :all).checked?
+    assert_selector footer, text: "1 unsaved change · Theme stylesheet"
+    assert_selector "[data-field-name=stylesheet_mode][data-save-bar-changed]"
+    dot = page.evaluate_script(<<~JS)
+      (() => { const after = getComputedStyle(document.querySelector("#settings-stylesheet_mode-legend"), "::after"); return [after.display, after.width] })()
+    JS
+    assert_equal [ "inline-block", "8px" ], dot, "the legend carries the save bar's changed dot"
+
+    click_on "Save changes"
+    assert_selector "#toasts .admin-toast", text: "Settings saved"
+    assert_equal "file", site_settings(:default).reload.stylesheet_mode
+    assert find("#settings-stylesheet_mode-file", visible: :all).checked?
+    assert_no_selector "[data-field-name=stylesheet_mode][data-save-bar-changed]"
+  end
+
   test "Make default opens the dialog with its count, Cancel changes nothing, and confirming changes the default" do
     Mobility.with_locale(:de) { site_settings(:default).update!(title: "Danas Notizen") }
     visit admin_settings_path

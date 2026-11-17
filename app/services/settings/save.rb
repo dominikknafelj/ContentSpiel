@@ -58,6 +58,12 @@ module Settings
   # are in the settings event's changes like any other, and change no image
   # until Regenerate images is pressed.
   #
+  # HOW VISITORS' BROWSERS GET THE THEME'S STYLESHEET (`stylesheet_mode`,
+  # Settings → Page speed, `ThemeCss::MODES`) is a plain `attributes` key too,
+  # in the settings event's changes like any other; the public layout reads
+  # it at the next page, and the settings row being a key of the public ETag
+  # is what keeps a 304 from confirming the old way.
+  #
   # WITHOUT ENCRYPTION KEYS (spec "Security rules") writing the AI key or the
   # mail login raises `ActiveRecord::Encryption::Errors::Configuration` at
   # the first encryption, inside the transaction: it is answered with one

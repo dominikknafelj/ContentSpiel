@@ -237,21 +237,30 @@ module ThemeCss
   # may show (in KB of 1,024 bytes, `kilobytes`).
   def compressed_size(text) = Zlib.gzip(text.b).bytesize
 
+  # How a site asks for its stylesheet to be taken (Settings → Page speed,
+  # `SiteSetting#stylesheet_mode`, the column's check holds the same three):
+  # - `automatic`, the default: drawn in at or under the limit, linked over it;
+  # - `inline`: always drawn in, whatever its size;
+  # - `file`: always linked.
+  MODES = %w[automatic inline file].freeze
+
   # THE ONE DECISION, drawn in or linked, from how the site asks for its
-  # stylesheet to be taken and the stylesheet's gzipped size. The site asks
-  # one way today, `:automatic` (`Theme::Stylesheet.mode`): drawn in at or
-  # under the limit, linked over it. A stored choice is a further mode
-  # handed in here, and nothing else changes for it.
+  # stylesheet to be taken (`MODES`, a String or a Symbol) and the
+  # stylesheet's gzipped size. Any other mode raises: a stored value is held
+  # by the column's check, so another one is a caller's mistake.
   def inline_for?(mode, compressed_size, limit: INLINE_LIMIT)
-    case mode
-    when :automatic then compressed_size <= limit
+    case mode.to_s
+    when "automatic" then compressed_size <= limit
+    when "inline" then true
+    when "file" then false
     else raise ArgumentError, "no such way to take the stylesheet: #{mode.inspect}"
     end
   end
 
   # The line `theme_css:build` prints after a build (not in the test
   # environment), so a theme's author sees which way their site goes under
-  # `:automatic`.
+  # `automatic`, the default. The build reads no database, so the line says
+  # what Automatic does and names the setting a site may have changed.
   def inline_sentence(root:, limit: INLINE_LIMIT)
     path = Pathname(root).join(OUTPUT)
     return unless path.file?
@@ -260,7 +269,7 @@ module ThemeCss
     size = compressed_size(text)
     sizes = "#{kilobytes(text.bytesize)} KB, #{kilobytes(size)} KB gzipped"
     way = inline_for?(:automatic, size, limit: limit) ? "is drawn into each public page: it is at or under" : "is linked from each public page: it is over"
-    "[ContentSpiel] The public stylesheet (#{sizes}) #{way} #{limit / 1024} KB gzipped."
+    "[ContentSpiel] The public stylesheet (#{sizes}) #{way} #{limit / 1024} KB gzipped (Settings › Page speed: Automatic)."
   end
 
   # KB of 1,024 bytes, one decimal: "11.4".
