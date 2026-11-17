@@ -23,7 +23,25 @@ class Alerts::MailingTest < ActiveSupport::TestCase
                           first_seen_at: seen, last_seen_at: seen, mailed_at: mailed)
   end
 
-  def deliver(now: Time.current) = Alerts::Mailing.new(now: now).deliver
+  # The waits between attempts are recorded, never slept.
+  def deliver(now: Time.current)
+    @waits = []
+    Alerts::Mailing.new(now: now, wait: ->(seconds) { @waits << seconds }).deliver
+  end
+
+  # The digest's sends raise `errors` in turn, each marked a delivery's error
+  # as `SmtpDelivery` marks one, then go through as they would.
+  def failing_sends(*errors)
+    original = Alerts::DigestMailer.method(:digest)
+    tries = 0
+    failing = Struct.new(:error) { def deliver_now = raise(error) }
+    build = lambda do |*args|
+      tries += 1
+      error = errors.shift
+      error ? failing.new(MailFailure.mark(error, :mail)) : original.call(*args)
+    end
+    with_singleton_override(Alerts::DigestMailer, :digest, build) { yield -> { tries } }
+  end
 
   def sent_to = ActionMailer::Base.deliveries.flat_map(&:to)
 
@@ -157,6 +175,57 @@ class Alerts::MailingTest < ActiveSupport::TestCase
             "tried again #{minutes} minutes after the failure"
           assert_nil alert.mailed_at
         end
+      end
+    end
+  end
+
+  test "a connection failure is tried again: once refused, then sent, records no failure" do
+    with_site_address(SITE) do
+      with_mail_state(:working) do
+        alert = make
+        failing_sends(Errno::ECONNREFUSED.new) do |tries|
+          assert_emails(2) { assert_equal 2, deliver }
+          assert_equal 3, tries.call, "the first owner's send twice, the second's once"
+        end
+        assert_equal [ Alerts::Mailing::ATTEMPT_WAITS.first ], @waits
+        assert_equal [ NOW, 0 ], [ alert.reload.mailed_at, alert.digest_failures ]
+        assert_nil SiteSetting.instance.reload.mail_failed_at
+        assert_equal :working, MailSettings.current.state
+      end
+    end
+  end
+
+  test "a connection failure on every attempt is recorded once, after the last, and starts the backoff" do
+    with_site_address(SITE) do
+      with_mail_state(:working) do
+        alert = make
+        recorded = 0
+        record = MailSettings.method(:record_failure!)
+        with_singleton_override(MailSettings, :record_failure!, ->(**args) { recorded += 1; record.call(**args) }) do
+          failing_sends(*Array.new(Alerts::Mailing::ATTEMPTS * 2) { Net::OpenTimeout.new }) do |tries|
+            capture_log { assert_no_emails { assert_equal 0, deliver } }
+            assert_equal MailDeliveryJob::ATTEMPTS, tries.call, "as many attempts as a queued mail's; the other owner is not tried on a server that does not answer"
+          end
+        end
+        assert_equal Alerts::Mailing::ATTEMPT_WAITS, @waits
+        assert_equal 1, recorded
+        assert_equal :failed, MailSettings.current.state
+        assert_equal [ nil, 1, NOW ], [ alert.reload.mailed_at, alert.digest_failures, alert.digest_failed_at ]
+      end
+    end
+  end
+
+  test "a refused login is recorded at once and not tried again" do
+    with_site_address(SITE) do
+      with_mail_state(:working) do
+        alert = make
+        failing_sends(*Array.new(4) { Net::SMTPAuthenticationError.new("535 5.7.8 Authentication failed") }) do |tries|
+          capture_log { assert_equal 0, deliver }
+          assert_equal 2, tries.call, "one attempt for each owner"
+        end
+        assert_empty @waits
+        assert_equal :failed, MailSettings.current.state
+        assert_equal [ nil, 1 ], [ alert.reload.mailed_at, alert.digest_failures ]
       end
     end
   end

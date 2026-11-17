@@ -24,9 +24,21 @@ module Alerts
   # every one since, never longer while alerts wait. A send that went out
   # puts both back and, as any mail that goes out, makes mail working again
   # (`MailSettings.record_success!`). Mail working again first (a test mail
-  # from Settings) lets the digest go at the next run. The failure itself is
-  # mail's state, recorded at once, a connection failure too
-  # (`ApplicationMailer.sent_now?`): the retries are this schedule.
+  # from Settings) lets the digest go at the next run.
+  #
+  # A CONNECTION FAILURE IS TRIED AGAIN AT ONCE, as `MailDeliveryJob` tries a
+  # queued mail: up to its `ATTEMPTS` (four in all) for its list of
+  # passing errors (`MailFailure::CONNECTION_ERRORS`), `ATTEMPT_WAITS` apart
+  # (1, 2 and 3 seconds), and recorded as mail's state, and as the digest's
+  # failure, only after the last: one blip the next attempt gets through
+  # must not put "Last send failed" on Settings and System status. Any other
+  # failure (a refused login, a refused sender) is recorded at once and not
+  # tried again. The check job runs every minute, so the attempts are kept
+  # well inside one: no attempt begins after `SEND_BUDGET`, 20 seconds, of
+  # this run's sending (that one is its last), and a server that failed every
+  # attempt is not asked again for the next owner. With the mail settings'
+  # timeouts (`MailSettings::OPEN_TIMEOUT`, `READ_TIMEOUT`) a run that meets
+  # a server that never answers ends in about 35 seconds.
   #
   # SENT, NOT QUEUED. The digest is delivered here, in the check job, and not
   # through `MailDeliveryJob`, because an alert is marked mailed only by a
@@ -61,6 +73,12 @@ module Alerts
     # How long after its last failure the digest is tried again, by how many
     # sends failed in a row: the last figure for every one past them.
     RETRY_AFTER = [ 10.minutes, 30.minutes, 1.hour ].freeze
+    # The attempts of one owner's send within a run, as a queued mail's.
+    ATTEMPTS = MailDeliveryJob::ATTEMPTS
+    # The waits between them, in seconds: one fewer than the attempts.
+    ATTEMPT_WAITS = [ 1, 2, 3 ].freeze
+    # No attempt begins after this many seconds of a run's sending.
+    SEND_BUDGET = 20
 
     # Why no digest can go now, as System status says it: nil when one can;
     # while outgoing mail is not working, its state's reason (`MAIL_STATES`:
@@ -92,8 +110,10 @@ module Alerts
 
     # `now` to the microsecond, the column's precision, so the claim reads
     # back exactly the rows it wrote.
-    def initialize(now: Time.current)
+    # `wait` sleeps between attempts; a test hands one that only records.
+    def initialize(now: Time.current, wait: ->(seconds) { sleep(seconds) })
       @now = now.floor(6)
+      @wait = wait
     end
 
     # Sends the digests that are due; answers how many mails went out.
@@ -136,11 +156,39 @@ module Alerts
     # the alerts back. Answers how many went out.
     def send_digests(owners, ids, before)
       fingerprint = MailSettings.current.fingerprint
+      @started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      @unreachable = false
       sent = 0
-      owners.each { |owner| sent += 1 if ApplicationMailer.sent_now?(DigestMailer.digest(owner, ids), fingerprint: fingerprint) }
+      owners.each do |owner|
+        break if @unreachable
+
+        sent += 1 if send_one(owner, ids, fingerprint)
+      end
       sent
     ensure
       give_back(before) if sent.to_i.zero?
+    end
+
+    # One owner's digest, tried again on a connection failure while attempts
+    # and the run's budget last; a send whose last attempt followed a
+    # connection failure and failed too leaves the server unreachable.
+    def send_one(owner, ids, fingerprint)
+      attempt = 1
+      begin
+        final = attempt >= ATTEMPTS || out_of_time?(ATTEMPT_WAITS[attempt - 1])
+        ApplicationMailer.sent_now?(DigestMailer.digest(owner, ids), fingerprint: fingerprint, final_attempt: final).tap do |sent|
+          @unreachable = true if !sent && attempt > 1
+        end
+      rescue ApplicationMailer::TryAgain
+        @wait.call(ATTEMPT_WAITS[attempt - 1])
+        attempt += 1
+        retry
+      end
+    end
+
+    # Whether waiting `seconds` would begin the next attempt past the budget.
+    def out_of_time?(seconds)
+      Process.clock_gettime(Process::CLOCK_MONOTONIC) - @started + seconds.to_i > SEND_BUDGET
     end
 
     # Each alert back to the `mailed_at` it had, one more failed send in a

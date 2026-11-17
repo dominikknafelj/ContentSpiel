@@ -80,15 +80,24 @@ class ApplicationMailer < ActionMailer::Base
     record_failed(error)
   end
 
+  # A connection failure before a send's last attempt (`sent_now?`):
+  # recorded nowhere, raised with no cause so the reply is not reachable.
+  class TryAgain < StandardError; end
+
   # Delivers now, from inside a job of its own, and records the outcome as
-  # the test mail's path does; answers whether a mail went out. For a job
-  # whose own state follows the send (`Alerts::Mailing`, which marks its
-  # alerts mailed only then): false when the mailer built nothing, when the
-  # settings are not complete (no `perform_deliveries`), and when the
-  # delivery failed, which is recorded at once, a connection failure too
-  # (the caller tries again on its own schedule). An error raised before the
-  # delivery is a bug and is raised on.
-  def self.sent_now?(delivery, fingerprint:)
+  # `MailDeliveryJob` would; answers whether a mail went out. For a job whose
+  # own state follows the send (`Alerts::Mailing`, which marks its alerts
+  # mailed only then), and which makes the attempts itself:
+  #
+  #   - false when the mailer built nothing or the settings are not complete
+  #     (no `perform_deliveries`), recording nothing;
+  #   - a connection failure (`MailFailure::CONNECTION_ERRORS`, the list
+  #     `MailDeliveryJob` retries) before the last attempt: `TryAgain`,
+  #     recorded nowhere, as the job records none per attempt;
+  #   - any other failure of the delivery, and a connection failure on the
+  #     last attempt: recorded (`record_failed`), and false;
+  #   - an error raised before the delivery is a bug and is raised on.
+  def self.sent_now?(delivery, fingerprint:, final_attempt: true)
     message = delivery.deliver_now
     return false unless message.is_a?(Mail::Message) && message.perform_deliveries
 
@@ -96,6 +105,7 @@ class ApplicationMailer < ActionMailer::Base
     true
   rescue StandardError => error
     raise unless MailFailure.delivery?(error)
+    raise TryAgain, cause: nil if !final_attempt && MailFailure::CONNECTION_ERRORS.any? { error.is_a?(it) }
 
     record_failed(error)
     false
