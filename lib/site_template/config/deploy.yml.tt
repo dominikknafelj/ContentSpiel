@@ -132,6 +132,12 @@ env:
     #   { curl -fsS https://www.cloudflare.com/ips-v4; echo; curl -fsS https://www.cloudflare.com/ips-v6; } | grep . | paste -sd, -
     # TRUSTED_PROXIES: 173.245.48.0/20,2400:cb00::/32
 
+    # Behind a CDN that caches pages: how many seconds it may keep a published
+    # page, so a published change shows within that time. Cloudflare caches
+    # HTML only with a Cache Rule of its own (docs/reference/hosting.md,
+    # "Behind a shared cache").
+    # PUBLIC_SHARED_CACHE_SECONDS: 60
+
     # The bot check on sign-in after repeated failures (Cloudflare
     # Turnstile): the widget's site key here, its secret below. Both or
     # neither.
