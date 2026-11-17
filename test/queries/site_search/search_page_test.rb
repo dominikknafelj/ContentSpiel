@@ -55,4 +55,48 @@ class SiteSearch::SearchPageTest < ActiveSupport::TestCase
     assert_equal page.id, search_page(locale: :en).id
     assert_nil search_page(locale: :de)
   end
+
+  test "an older copy that held a Search block no longer makes a page the search page" do
+    page = publish_changes(add_search(create_page(title: "Was the search page")))
+    assert_equal page.id, search_page.id
+
+    assert ContentBlocks::Destroy.call(page.content_blocks.sole).ok?
+    publish_changes(page)
+    assert Publishing::Version.of(page).where(holds_search: true).exists?, "the copy that held the block is still in the history"
+    assert_nil search_page, "only the copy in force counts"
+  end
+
+  test "a Search block in a change scheduled for later is not it until its time, and a trashed page is never it" do
+    page = publish_changes(create_page(title: "Scheduled"))
+    publish_changes(add_search(page), at: 2.days.from_now)
+    assert_nil search_page
+    travel 3.days do
+      assert_equal page.id, search_page.id
+    end
+
+    trashed = publish_changes(add_search(create_page(title: "Trashed")))
+    assert_equal trashed.id, search_page.id
+    assert Trash::Move.call(trashed).ok?
+    assert_nil search_page
+  end
+
+  test "taking a copy writes whether it holds a Search block" do
+    page = publish_changes(create_page(title: "Flagged"))
+    assert_not Publishing::Version.of(page).order(:id).last.holds_search
+    publish_changes(add_search(page))
+    assert Publishing::Version.of(page).order(:id).last.holds_search
+  end
+
+  # The holders were once found by testing `blocks @> [{"block_type":
+  # "search"}]` of the copies in force as a filter of the whole table, which
+  # Postgres ran as a scan reading every copy's `blocks`, the history's too
+  # (`FirstHolder.copies_holding`).
+  test "the search page is found from the flags and never reads a copy's blocks" do
+    page = publish_changes(add_search(create_page(title: "Findable")))
+    3.times { publish_changes(page) }
+
+    statements = capture_sql { assert_equal page.id, search_page.id }.select { |sql| sql.include?(%("published_versions")) }
+    assert statements.any? { |sql| sql.include?(%("published_versions"."holds_search" = TRUE)) }, "the holders are read from the flag"
+    statements.each { |sql| assert_not_includes sql, %("published_versions"."blocks"), "no statement reads a copy's blocks: #{sql}" }
+  end
 end

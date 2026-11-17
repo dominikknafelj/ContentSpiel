@@ -14,12 +14,29 @@ module SiteSearch
   # One pass over every holder answers each group of them (`#first(among)`),
   # so a caller with several groups (one per tag) asks the tree once.
   class FirstHolder
-    # The pages' copies in force at `now` whose `blocks` meet `condition`
-    # (an Arel node over `Publishing::Version.arel_table[:blocks]`).
+    # The pages' copies in force at `now` that carry `flag` (an Arel node over
+    # a copy's flags, `holds_search` or `lists_posts`, written when the copy
+    # is taken) and meet `condition`, when there is one (a node over the
+    # copy's `blocks`).
+    #
+    # NEVER A COPY OF THE HISTORY: the grouping that finds each page's copy in
+    # force is narrowed INSIDE to the pages one of whose copies ever carried
+    # the flag (`index_published_versions_holding_search` serves the search
+    # flag), and the flag is asked again of the copies in force, before
+    # `condition`. Asking `blocks @>` of the copies in force as a filter of
+    # the whole table was a sequential scan that read and decompressed the
+    # `blocks` of every copy ever taken, about 44 ms on every page of a site
+    # republished many times, and more with every publish
+    # (`test/queries/site_search/search_page_test.rb`: "the search page is
+    # found from the flags and never reads a copy's blocks").
+    #
     # Taking a copy deletes the pending one (`Publishing::Version`), so `max(id)` in force is the greatest `(live_at, id)`, as `Version.current_for`.
-    def self.copies_holding(condition, now:)
-      newest = Publishing::Version.unscoped.where(record_type: "Page").in_force(now).group(:record_id).select(Publishing::Version.arel_table[:id].maximum)
-      Publishing::Version.unscoped.where(id: newest).where(condition)
+    def self.copies_holding(flag, now:, condition: nil)
+      versions = Publishing::Version.unscoped
+      ever = versions.where(record_type: "Page").where(flag).select(:record_id)
+      newest = versions.where(record_type: "Page", record_id: ever).in_force(now).group(:record_id).select(Publishing::Version.arel_table[:id].maximum)
+      current = versions.where(id: newest).where(flag)
+      condition ? current.where(condition) : current
     end
 
     # The first of `ids` in reading order that a visitor can reach, a row,

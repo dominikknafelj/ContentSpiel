@@ -80,8 +80,15 @@ module Publishing
       end
     end
 
-    def lists_posts?(data)
-      data.fetch("blocks", []).any? { |block| BlockTypes.find(block["block_type"])&.capability?(:lists_posts) }
+    def lists_posts?(data) = holds?(data, :lists_posts)
+
+    # Whether the copy holds a Search block (`holds_search`), what
+    # `SiteSearch::SearchPage` and `SiteSearch::TagPage` read in place of the
+    # copy's `blocks`, which no index serves.
+    def holds_search?(data) = holds?(data, :search)
+
+    def holds?(data, capability)
+      data.fetch("blocks", []).any? { |block| BlockTypes.find(block["block_type"])&.capability?(capability) }
     end
 
     # `without_body:` leaves the view with no body at all (a missing
@@ -117,6 +124,7 @@ module Publishing
         attributes.each { |name, value| block.write_attribute(name, value) if name != "id" && block.has_attribute?(name) }
         block.clear_changes_information
         block.listed_tag_id = attributes["listed_tag_id"] if attributes.key?("listed_tag_id")
+        block.published_copy_id = version.id
         block.association(:owner).target = owner
         block.readonly!
         block.extend(Rebuilt)

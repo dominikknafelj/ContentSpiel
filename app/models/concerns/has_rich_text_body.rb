@@ -37,8 +37,14 @@ module HasRichTextBody
   # rather than nil, so callers never have to special-case "no document".
   def body_document(locale:)
     value = body(locale: locale.to_s)
-    value.is_a?(Hash) ? RichText::Document.new(value) : RichText::Document.empty
+    value.is_a?(Hash) ? RichText::Document.new(value, body_cache_identity(locale)) : RichText::Document.empty
   end
+
+  # What names this locale's body in the render cache when the record's
+  # source names it already (`RichText::Document#cache_identity`), or nil,
+  # and the body is named by its digest. Only a body that can never change
+  # may have one: `ContentBlock`'s, for a block rebuilt from a published copy.
+  def body_cache_identity(_locale) = nil
 
   # Writes `document` as this locale's body (marks in canonical order,
   # `#normalize`), leaving every other locale's alone. Accepts what the write path actually receives: a document Hash

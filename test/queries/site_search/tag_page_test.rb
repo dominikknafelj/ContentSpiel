@@ -77,4 +77,15 @@ class SiteSearch::TagPageTest < ActiveSupport::TestCase
   test "no tags ask nothing" do
     assert_queries_count(0) { assert_equal({}, tag_pages([])) }
   end
+
+  # The search page alone is found from the copies' flags, as `SearchPage`
+  # finds it (`FirstHolder.copies_holding`): with no tag to look for, no
+  # statement reads a copy's blocks.
+  test "with_search_page and no tag reads no copy's blocks" do
+    ContentBlocks::Save.call(ContentBlock.new(owner: root_page), attributes: { block_type: "search" })
+    publish_changes(root_page)
+
+    statements = capture_sql { assert_equal root_page.id, SiteSearch::TagPage.with_search_page([], locale: "en", now: Time.current).last.id }
+    statements.each { |sql| assert_not_includes sql, %("published_versions"."blocks"), sql }
+  end
 end

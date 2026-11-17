@@ -421,9 +421,26 @@ module ThemeHelper
     (@link_targets_read ||= {}.compare_by_identity)[outline] ||= begin
       references = outline.reading_order.flat_map { |block| block.settings.to_h.values.filter_map { |value| ContentModel::LinkReference.parse(value) } }
       public_urls.prefetch_targets(references) if references.any?
+      prefetch_renders(outline)
       true
     end
     outline
+  end
+
+  # Every block's rendered text read from the render cache in one batch
+  # (`RichText::RenderCache.prefetch`), where each Rich text, Note and Table
+  # block once made a round trip of its own: the body each component will
+  # read (`Locales.read`, in the visitor's language), as a table's cells
+  # when the type's body is a table (`Blocks::TableComponent`) and as a
+  # body's HTML otherwise. A block it guessed wrong is read on its own when
+  # drawn. Nothing in a preview, which never meets the cache.
+  def prefetch_renders(outline)
+    wanted = outline.reading_order.filter_map do |block|
+      next unless block.definition && (document = ::Locales.read(block, :body))
+
+      [ block.body_content_kind == :table ? :table_cells : :html, document ]
+    end
+    RichText::RenderCache.prefetch(wanted, locale: I18n.locale, urls: public_urls)
   end
 
   # The anchors of the shown page's sections, from the blocks the page was

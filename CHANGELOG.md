@@ -2,12 +2,19 @@
 
 ## Unreleased
 
+### Changed
+
+- A public page reads its texts' and tables' renders from the cache in one batched read, where each Rich text, Note and Table block was a round trip of its own, and a block of a published page is named in the cache by its copy and its id, so no document is walked for its key on every view (the guide's largest page, 117 blocks: about 100 ms down to about 70 ms locally). Every cached render is drawn once again after the upgrade.
+
 ### Fixed
+
+- The page a theme's header search box points at (`search_page`) is found from a flag each published copy carries, `holds_search`, instead of reading the blocks of every copy ever published, a scan that grew with every publish (about 44 ms on every page of a site republished many times). A Search block in an older copy only no longer counts, as before.
 
 - The alert digest no longer waits for another mail to succeed after a failed send: it is sent from the alert check itself and retries on its own, 10 minutes after the failure, then 30, then every hour (never longer while alerts wait), and an alert is marked mailed only by a send that went out. A successful digest makes mail working again, as any mail does. While mail is not set up, or saved but not tested, alerts still wait.
 
 ### Migrations
 
+- `20261117130000_add_holds_search_to_published_versions`: `published_versions.holds_search` (whether the copy holds a Search block), filled for every existing page copy from its blocks, with a partial index on the copies that hold one.
 - `20261117120000_add_digest_retry_to_alerts`: `alerts.digest_failures` (how many sends of the alert's digest failed in a row, 0 for every existing row) and `alerts.digest_failed_at` (when the last one did), which say when the digest tries again. It writes no row.
 
 ## 0.9.0 (2026-11-16)

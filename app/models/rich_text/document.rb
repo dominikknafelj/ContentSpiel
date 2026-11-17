@@ -90,9 +90,25 @@ module RichText
       result_holder[0]
     end
 
-    def initialize(hash)
+    # `identity` names the document for the render cache when its source
+    # already does (`#cache_identity`): a body read from a published copy,
+    # which never changes, is named by the copy and the block
+    # (`HasRichTextBody#body_cache_identity`). Without one the document is
+    # named by its digest. Positional, not a keyword: a caller's braceless
+    # Hash of String keys (`Document.new("type" => "doc", ...)`) would be read
+    # as keywords.
+    def initialize(hash, identity = nil)
       @hash = hash.nil? ? EMPTY_HASH.deep_dup : self.class.stringify(hash)
+      @identity = identity
     end
+
+    # What names this document in the render cache's key
+    # (`RichText::RenderCache.key`): the identity it was built with, else its
+    # digest. The digest walks the whole document (about 0.1 ms for a long
+    # body, 13 to 16 ms on every request of a page of 117 blocks), so a body
+    # whose source names it already is never walked for its key. An identity
+    # is an Array whose first word is never a digest's hex.
+    def cache_identity = @identity || digest
 
     # Parses `markdown` (design spec §3.4) into `[RichText::Document,
     # warnings]`, where `warnings` is an Array of Strings, empty when
@@ -209,11 +225,15 @@ module RichText
     # the code itself. `Schema.version` only changes when a type's
     # *attributes* do; a changed `html` block or component template doesn't
     # touch it, and Solid Cache outlives a deploy.
+    #
+    # The key is `RichText::RenderCache.key`, and the read goes through
+    # `RenderCache.fetch`, which answers from a page's one batched read
+    # (`RenderCache.prefetch`) when the page asked for one.
     def to_html(locale: I18n.locale, urls: PublicSite::Urls.new)
       context = RichText::RenderContext.new(locale: locale, urls: urls, document: self)
       return RichText::HtmlRenderer.new(context).render(self) if context.preview
 
-      Rails.cache.fetch(render_cache_key("rich_text", locale, context)) do
+      RichText::RenderCache.fetch(RichText::RenderCache.key(:html, self, locale, context.content_version)) do
         RichText::HtmlRenderer.new(context).render(self)
       end
     end
@@ -224,7 +244,7 @@ module RichText
     # component pairs each with the cell's `header` and `align` by position.
     #
     # The same render cache as `#to_html`, under the same key but for its
-    # first word (`render_cache_key`): the digest, the schema, the locale, the
+    # first word (`RichText::RenderCache.key`): the document, the schema, the locale, the
     # content version and the code revision say everything a cell's HTML
     # depends on, as they do for a body, and a preview is drawn every time for
     # the same reason. Before this a public page drew every cell itself,
@@ -243,7 +263,7 @@ module RichText
         if context.preview
           draw_table_cells(context)
         else
-          Rails.cache.fetch(render_cache_key("rich_text_table_cells", locale, context)) { draw_table_cells(context) }
+          RichText::RenderCache.fetch(RichText::RenderCache.key(:table_cells, self, locale, context.content_version)) { draw_table_cells(context) }
         end
       cells.map { |row| row.map(&:html_safe) }
     end
@@ -427,15 +447,6 @@ module RichText
     FLANKING_MARKS = %w[bold italic strike].freeze
 
     private
-
-    # The render cache's key (`#to_html`): what a public render is drawn from,
-    # each part's reason in `#to_html`'s comment. It names no preview and no
-    # actor, because neither ever reaches it: a preview is drawn every time. `kind` keeps a body's render and
-    # a table's cells (`#table_cells_html`) apart, since both are drawn from
-    # one document.
-    def render_cache_key(kind, locale, context)
-      [ kind, digest, RichText::Schema.version, locale, context.content_version, RichText.code_revision ]
-    end
 
     # Every cell drawn in one pass, then put back into its rows. Plain Strings,
     # for the cache (`#table_cells_html`).

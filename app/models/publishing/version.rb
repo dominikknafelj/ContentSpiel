@@ -97,6 +97,7 @@ module Publishing
         data = Snapshot.of(row, row: row)
         version = create!(record_type: row.class.polymorphic_name, record_id: row.id, number: number, live_at: live_at,
           snapshot: data.except("blocks"), blocks: data.fetch("blocks", []), lists_posts: Snapshot.lists_posts?(data),
+          holds_search: Snapshot.holds_search?(data),
           tag_ids: data.fetch("tags", []).map { |tag| tag["id"] }.sort, created_by_id: by&.id, created_at: now,
           settled_at: (now if live_at <= now && row.published_at&.<=(now)))
         # A scheduled record shows nothing yet, so its copy changes nothing the

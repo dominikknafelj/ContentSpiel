@@ -65,7 +65,9 @@ module SiteSearch
       wanted = tag_ids.to_set
       listing = Hash.new { |all, key| all[key] = [] }
       searching = []
-      FirstHolder.copies_holding([ listing_condition, search_condition ].compact.reduce(:or), now: now).pluck(:record_id, listed, searched).each do |page_id, copy_blocks, holds_search|
+      versions = Publishing::Version.arel_table
+      flag = [ (versions[:lists_posts].eq(true) if listing_condition), search_condition ].compact.reduce(:or)
+      FirstHolder.copies_holding(flag, now: now, condition: [ listing_condition, search_condition ].compact.reduce(:or)).pluck(:record_id, listed, searched).each do |page_id, copy_blocks, holds_search|
         searching << page_id if holds_search
         (copy_blocks || []).each do |block|
           next unless names.include?(block["block_type"]) && wanted.include?(block["listed_tag_id"])
