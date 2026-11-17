@@ -16,7 +16,7 @@ module Admin
     #
     # An alert's "Show in audit log" link narrows to one event or to some
     # actions between two instants (`Audit::Filter#narrowed?`): one more such
-    # chip, "Event #812" or "16 Nov, 14:00 to 14:15 · 3 actions", its values
+    # chip, "Event #<id>" or "16 Nov, 14:00 to 14:15 · 3 actions", its values
     # riding along as hidden fields, its × the same filters without them.
     #
     # The User options are bounded (`MAX_USERS`, the controller's list, plus the

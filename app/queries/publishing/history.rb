@@ -85,7 +85,7 @@ module Publishing
     # else: a later copy with no publisher is never that, whatever its date);
     # `:system` for any other copy nobody was behind (the console, a seed,
     # `bin/load`). A scheduled change is credited to whoever scheduled it,
-    # since the copy is taken when it is scheduled (`Version.take!`, `by:`),
+    # since the copy is taken when it is scheduled (`take!`'s `by:`),
     # and comes into force with no write when its time passes.
     def self.credit_of(version)
       return :person if version.created_by
