@@ -9,6 +9,28 @@ class ThemeCssTest < ActiveSupport::TestCase
   PLAIN = ThemeTestHelper::PLAIN
   ROOT = Rails.root
 
+  # Drawn into the page or linked (`ThemeCss::INLINE_LIMIT`): the weighed
+  # size is the compressed one, at or under the limit is drawn in, and the
+  # line the build prints says which, with both sizes.
+  test "a stylesheet at or under the compressed limit is drawn in, over it linked, and the build's line says which" do
+    small = ".a{color:red}" * 10
+    assert ThemeCss.inline?(small, limit: ThemeCss.compressed_size(small))
+    assert_not ThemeCss.inline?(small, limit: ThemeCss.compressed_size(small) - 1)
+    random = Random.new(1).bytes(40 * 1024)
+    assert_not ThemeCss.inline?(random), "40 KB that do not compress are over the limit"
+    assert ThemeCss.inline?("a" * 200_000), "a large file that compresses well is weighed by what crosses the wire"
+
+    Dir.mktmpdir("root") do |dir|
+      root = Pathname(dir)
+      assert_nil ThemeCss.inline_sentence(root: root), "nothing built, nothing said"
+      root.join(ThemeCss::OUTPUT).dirname.mkpath
+      root.join(ThemeCss::OUTPUT).write(small)
+      assert_match(/\A\[ContentSpiel\] The public stylesheet \(0\.1 KB, 0\.\d KB compressed\) is drawn into each public page: it is at or under 24 KiB compressed\.\z/,
+        ThemeCss.inline_sentence(root: root))
+      assert_match(/is linked from each public page: it is over 0 KiB compressed\./, ThemeCss.inline_sentence(root: root, limit: 10))
+    end
+  end
+
   test "without a theme the entry is the default theme's file, and its folder for the watch, and nothing else" do
     assert_equal <<~CSS, ThemeCss.entry(ThemeFolder.new(nil), root: ROOT)
       @import "../../app/assets/tailwind/themes/default/theme.css";

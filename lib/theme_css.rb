@@ -1,6 +1,7 @@
 require "pathname"
 require "fileutils"
 require "securerandom"
+require "zlib"
 
 # The public stylesheet's build (theming spec §4). ONE stylesheet, built from
 # an entry file this module writes:
@@ -202,6 +203,47 @@ module ThemeCss
     system(*command(root: root, executable: executable), exception: true)
     stamp!(folder, root: root, fingerprint: fingerprint)
   end
+
+  # WHETHER THE BUILT STYLESHEET IS DRAWN INTO EACH PUBLIC PAGE, or linked
+  # (`Theme::Stylesheet` draws it; `theme_css:build` says which). Linked, it
+  # is the one request that holds back a public page's first paint: a round
+  # trip the visitor waits for after the HTML has arrived. Drawn in, it
+  # costs its bytes again on every page a visitor opens, where a linked one
+  # is fetched once and kept for a year under its digested address. So the
+  # size weighed is what crosses the wire, the file compressed (zlib's
+  # default level, gzip's; a proxy's Brotli is smaller still), never the
+  # raw file, which says little about that cost.
+  #
+  # THE LIMIT IS 24 KiB COMPRESSED. A link costs a first view at least one
+  # round trip; drawn in, the stylesheet costs each later page its transfer
+  # time. On a slow mobile connection (Lighthouse's: 150 ms, 1.6 Mbit/s)
+  # one round trip moves about 30 KB, so under that size a later page pays
+  # less than the round trip the link costs the first one, with room left
+  # for the page's own HTML. The default theme's stylesheet is about 12 KB
+  # compressed (69 KB raw), and a theme that adds a few pages of styles of
+  # its own stays under the limit; one that brings a component library's
+  # worth is linked, as every theme was before. Decided from the built file
+  # alone (never the request, never the page), so the build's line and the
+  # running site agree.
+  INLINE_LIMIT = 24 * 1024
+
+  def compressed_size(text) = Zlib::Deflate.deflate(text.b).bytesize
+
+  def inline?(text, limit: INLINE_LIMIT) = compressed_size(text) <= limit
+
+  # The line `theme_css:build` prints after a build (not in the test
+  # environment), so a theme's author sees which way their site goes.
+  def inline_sentence(root:, limit: INLINE_LIMIT)
+    path = Pathname(root).join(OUTPUT)
+    return unless path.file?
+
+    text = path.binread
+    sizes = "#{kilobytes(text.bytesize)} KB, #{kilobytes(compressed_size(text))} KB compressed"
+    way = inline?(text, limit: limit) ? "is drawn into each public page: it is at or under" : "is linked from each public page: it is over"
+    "[ContentSpiel] The public stylesheet (#{sizes}) #{way} #{limit / 1024} KiB compressed."
+  end
+
+  def kilobytes(bytes) = format("%.1f", bytes / 1000.0)
 
   # For the watch (lib/tasks/theme_css.rake): a thread that keeps the stamp
   # true while a theme is written. Tailwind's watcher rebuilds the

@@ -64,7 +64,12 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
         assert_response :success
         unexpected = named_resources.reject { |name| allowed_public_resource?(name) }
         assert_empty unexpected, "a public page under the #{theme} theme names a resource that is not the site's or the theme's"
-        assert_equal [ "theme" ], css_select("link[rel=stylesheet]").map { |link| asset_name(link["href"]) }, "the theme's one stylesheet"
+        # The theme's one stylesheet: drawn in when it is small, which the
+        # suite's default build is, and then named by no address at all
+        # (`test/integration/public_stylesheet_test.rb` has the linked one).
+        assert Theme::Stylesheet.current.inline?, "the suite's built stylesheet is small enough to be drawn in"
+        assert_empty css_select("link[rel=stylesheet]"), "a stylesheet drawn into the page is linked as well"
+        assert_equal 1, css_select("head style[data-turbo-track=reload]").size, "the theme's one stylesheet"
         assert_select "meta[name=action-cable-url]", count: 0
       end
       theme == :plain ? with_plain_theme(&run) : run.call

@@ -21,6 +21,12 @@ namespace :theme_css do
       warn "[ContentSpiel] The public stylesheet was built for a theme and is now the default theme's (the tests build it). " \
            "For development under the theme, run bin/rails tailwindcss:build with THEME_PATH set, or start bin/dev again."
     end
+    # Which way the public pages take the stylesheet (`ThemeCss::INLINE_LIMIT`):
+    # said where a theme's author builds it, in development and in an
+    # image's build, and not in every test run's.
+    if !Rails.env.test? && (sentence = ThemeCss.inline_sentence(root: Rails.root))
+      puts sentence
+    end
   end
 
   # One whole build, then Tailwind's watcher on the same entry with the

@@ -15,7 +15,10 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     "meta[property='og:title']", "meta[property='og:type']", "meta[property='og:url']", "meta[property='og:locale']",
     "link[rel=canonical]", "link[rel=alternate][hreflang=en]", "link[rel=alternate][hreflang=x-default]"
   ].freeze
-  CMS_HEAD_AFTER_THEME = [ "link[rel=stylesheet]", "script[type=importmap]" ].freeze
+  # The stylesheet is one element whichever way it is taken: drawn in as a
+  # `<style>` or linked (`Theme::Stylesheet`), each tracked by Turbo.
+  CMS_STYLESHEET = "link[rel=stylesheet][data-turbo-track=reload], style[data-turbo-track=reload]".freeze
+  CMS_HEAD_AFTER_THEME = [ CMS_STYLESHEET, "script[type=importmap]" ].freeze
 
   # A `_head` that prints tags that are the CMS's to print, behind a marker
   # that says where the theme's part of the head starts.
@@ -1629,7 +1632,9 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
 
         assert_response :success
         assert_select "[data-stale-stylesheet]", text: /bin\/rails tailwindcss:build/
-        assert_select "head link[rel=stylesheet]"
+        assert_select "head", count: 1 do
+          assert_select CMS_STYLESHEET, count: 1
+        end
       end
     end
   end

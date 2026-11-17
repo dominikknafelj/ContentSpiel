@@ -157,12 +157,21 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "the public layout links only the theme stylesheet" do
+  # Drawn in while it is small (`Theme::Stylesheet`), which the suite's
+  # build is, and linked over the limit: the theme's either way, never the
+  # product's.
+  test "the public layout takes only the theme stylesheet, drawn in or linked" do
     Page.create!(title: "Home", slug: "", published_at: Time.current)
     get "/"
 
+    assert_select "head style[data-turbo-track=reload]", count: 1
+    assert_includes css_select("head style[data-turbo-track=reload]").first.text, "--th-paper"
+    assert_select "link[rel=stylesheet]", count: 0
+
+    Theme::Stylesheet.with_limit(1) { get "/" }
     assert_select "link[rel=stylesheet][href*='/theme-']"
     assert_select "link[rel=stylesheet][href*='/tailwind-']", count: 0
+    assert_select "head style[data-turbo-track=reload]", count: 0
   end
 
   test "sign-in uses the product layout and stylesheet" do
