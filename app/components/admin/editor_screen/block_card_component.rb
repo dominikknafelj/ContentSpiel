@@ -428,7 +428,7 @@ module Admin
       # neutral, so it is read where it stands; nil for a type with none.
       def editor_note
         key = definition.editor_note or return nil
-        Admin::Ui::NoticeComponent.new(tone: :neutral, role: "note", class: "mt-2.5 max-w-[560px]").with_content(t("admin.components.fields.#{key}"))
+        Admin::Ui::NoticeComponent.new(tone: :neutral, role: "note", class: "mt-2.5 max-w-xl").with_content(t("admin.components.fields.#{key}"))
       end
 
       def uses_columns = definition.uses_columns

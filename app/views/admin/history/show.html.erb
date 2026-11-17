@@ -20,10 +20,10 @@
   <div hidden data-tree-open-page="<%= @record.id %>"></div>
 <% end %>
 
-<div class="admin-list-rail">
+<div class="admin-page admin-page--wide admin-list-rail">
   <%= render Admin::HistoryScreen::HeadComponent.new(record: @record, locale: admin_locale, url_options: admin_url_options) %>
 
-  <div class="admin-list-rail__grid">
+  <div class="admin-page__body admin-list-rail__grid">
     <%= render Admin::HistoryScreen::VersionsComponent.new(history: @history, chosen: @version,
           url: ->(number) { history_url.call(version: number, with: with_param, page: params[:page]) },
           page_url: ->(number) { history_url.call(version: params[:version], with: with_param, page: number) }) %>

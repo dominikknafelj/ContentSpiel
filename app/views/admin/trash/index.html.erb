@@ -4,13 +4,11 @@
     at its end, the actions wrapping under the heading below 640px; under it the
     retention line, with its Change link for a `settings.manage` holder. The
     list and every row's actions are `Admin::TrashScreen::ListComponent`'s. %>
-<div class="mb-4">
-  <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
-    <% if @everything %>
-      <%= render Admin::TrashScreen::EmptyTrashComponent.new(**@everything, url_options: admin_url_options) %>
-    <% end %>
-  </div>
+<%# The page frame, a wide screen (lists, tables, logs, overviews). %>
+<div class="admin-page admin-page--wide">
+<div class="admin-page__head">
+  <div class="min-w-0">
+  <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
   <p class="mt-1 text-small text-meta">
     <%= @retention_days.zero? ? t(".retention.never") : t(".retention.days", count: @retention_days) %>
     <% if can?("settings.manage") %>
@@ -21,7 +19,12 @@
             class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
     <% end %>
   </p>
+  </div>
+  <% if @everything %>
+    <%= render Admin::TrashScreen::EmptyTrashComponent.new(**@everything, url_options: admin_url_options) %>
+  <% end %>
 </div>
+<div class="admin-page__body">
 
 <div class="mb-4 flex">
   <%= render Admin::TrashScreen::TabsComponent.new(counts: (can?("forms.manage") ? @counts : @counts.except("form")), current: @tab,
@@ -36,3 +39,5 @@
     <% list.with_footer { render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) } %>
   <% end %>
 <% end %>
+</div>
+</div>

@@ -71,7 +71,7 @@
     part of the page (`data-live-part`). %>
 <% selection = (@selecting ? { action: "keydown.esc@document->admin--media--selection#escape" } : {}) %>
 <% drag_messages = messages_data("components.media_library.drag.count", "components.media_library.drag.moved", "components.media_library.drag.refused", "components.media_library.drag.too_deep", "components.media_library.drag.this_folder", "components.media_library.drag.name_taken") %>
-<%= tag.div id: "media-library", class: "admin-media-library",
+<%= tag.div id: "media-library", class: "admin-page admin-page--wide admin-media-library",
       data: { media_place: @place.to_param, media_place_digest: @place.digest(@folder_tree), media_query: @place_query.to_json,
               controller: [ "admin--media--drag", "admin--media--live", ("admin--media--selection" if @selecting) ].compact.join(" "),
               live_part: "waiting",
@@ -151,7 +151,7 @@
     under the grid in a narrow library): no `order-*` swap, so tab order never
     contradicts what is drawn. `admin--media--panel` moves focus into the
     panel when a tile was chosen, and back to the tile when the rail is closed. %>
-<div class="admin-media-library__grid" data-controller="admin--media--panel">
+<div class="admin-page__body admin-media-library__grid" data-controller="admin--media--panel">
   <div class="admin-media-library__main">
     <div data-admin--media--live-target="slot"></div>
     <% if @pagination.out_of_range? %>

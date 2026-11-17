@@ -15,8 +15,8 @@
 <% new_label = ->(type) { t(".new_type", type: type.label) } %>
 <% new_post_trigger = ->(type) { dialog_trigger("new-post-dialog").merge(turbo_frame: "content", "new-post-type-param": type.name) } %>
 
-<div class="admin-list-rail">
-  <div class="admin-list-rail__head">
+<div class="admin-page admin-page--wide admin-list-rail">
+  <div class="admin-page__head admin-list-rail__head">
     <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
     <% if creatable_types.any? %>
       <div class="flex">
@@ -35,7 +35,7 @@
     <% end %>
   </div>
 
-  <div class="admin-list-rail__grid">
+  <div class="admin-page__body admin-list-rail__grid">
     <%= render Admin::PostsScreen::ToolbarComponent.new(scope: @scope, counts: @counts, content_types: @content_types, off_types: @types_present_off, tags: @tags, filters: @filters,
           url_options: admin_url_options, locale: admin_locale) %>
 

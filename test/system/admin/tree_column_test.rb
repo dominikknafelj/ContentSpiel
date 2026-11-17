@@ -570,11 +570,10 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
   # padding: the editor area starts 68px right of the sidebar, whatever width
   # was chosen before the fold, and no band is left between them. At a width
   # where the rail docks below the content max the composition starts there
-  # too; one past the content max, the area still starts there and the
-  # composition is centred in it (`margin-inline: auto`), the room left of it
-  # equal to the room right of it, so a gap left of the editor is never more
-  # than that half.
-  test "folded, the editor starts 68px right of the sidebar at 1600px, and at 2600px its composition is centred in the area that does" do
+  # too; one past the content max, the composition starts there as well and
+  # stops at the content max, the spare width on its right (the page frame:
+  # nothing in CS Studio is centred).
+  test "folded, the editor and its composition start 68px right of the sidebar at 1600px and at 2600px" do
     open_editor
     page.execute_script("window.localStorage.setItem('#{WIDTH_KEY}', '480'); window.localStorage.setItem('cs-tree-folded', '1')")
     [ 1600, 2600 ].each do |width|
@@ -587,16 +586,12 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
         assert_in_delta sidebar + 68, area[0], 1, "at #{width}px the editor area starts 68px right of the sidebar"
         assert page.evaluate_script("document.getElementById('editor-grid').hasAttribute('data-rail-docked')"), "at #{width}px the rail docks"
         grid = box("#editor-grid")
-        if area[2] - area[0] < 1680
-          [ "#editor-grid", ".admin-rail__main", ".admin-content-blocks" ].each do |part|
-            assert_in_delta sidebar + 68, box(part)[0], 1, "at #{width}px #{part} starts 68px right of the sidebar"
-          end
-        else
+        [ "#editor-grid", ".admin-rail__main", ".admin-content-blocks" ].each do |part|
+          assert_in_delta sidebar + 68, box(part)[0], 1, "at #{width}px #{part} starts 68px right of the sidebar"
+        end
+        if area[2] - area[0] >= 1680
           assert_in_delta 1680, grid[2] - grid[0], 1, "at #{width}px the composition stops at the content max"
-          assert_in_delta grid[0] - area[0], area[2] - grid[2], 1, "at #{width}px the room left of the composition equals the room right of it"
-          [ ".admin-rail__main", ".admin-content-blocks" ].each do |part|
-            assert_in_delta grid[0], box(part)[0], 1, "at #{width}px #{part} starts with the composition"
-          end
+          assert_operator area[2] - grid[2], :>, 100, "at #{width}px the spare width stays on the right"
         end
       end
     end

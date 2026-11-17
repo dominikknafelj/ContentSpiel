@@ -15,12 +15,13 @@
   <meta name="turbo-cache-control" content="no-cache">
 <% end %>
 
-<div class="admin-dashboard">
+<%# The page frame, a wide screen: the heading row spans it, "New post…" at its right end. %>
+<div class="admin-page admin-page--wide admin-dashboard">
 <%# The heading row. "New post…" is the screen's one primary, last, by a
     header's convention, and "New page…" its secondary before it. Each
     opens the layout's dialog, and without it falls through to its
     standalone page; each is drawn only for whoever may create one. %>
-<div class="admin-dashboard__head mb-4">
+<div class="admin-page__head admin-dashboard__head">
   <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
   <% if can?("pages.create") || can?("posts.create") %>
     <div class="admin-dashboard__buttons">
@@ -51,7 +52,7 @@
 <% going_live = @feed.going_live_next %>
 <% arrow = tag.span("→", aria: { hidden: true }) %>
 
-<div class="admin-dashboard__grid">
+<div class="admin-page__body admin-dashboard__grid">
   <div class="admin-dashboard__main">
     <%# Two frames, each answered again by its own GET when a live note
         arrives: Waiting for you, the records with open threads or

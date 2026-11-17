@@ -5,7 +5,7 @@
   <%= tag.div class: "admin-image-viewer__stage relative isolate grid min-h-0 flex-1 place-items-center bg-sunken", data: target("stage") do %>
     <%= render Admin::Ui::GifComponent.new(src: nil, name: "", placement: :stage, gif: false, image: picture_html,
           class: "col-start-1 row-start-1 min-w-0", data: target("frame")) %>
-    <%= render Admin::Ui::NoticeComponent.new(tone: :warn, hidden: true, class: "col-start-1 row-start-1 max-w-[420px]", data: target("notice")) do %><%= t(".failed") %><% end %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :warn, hidden: true, class: "col-start-1 row-start-1 max-w-md", data: target("notice")) do %><%= t(".failed") %><% end %>
     <%# Shown by the script when a picture has neither loaded nor failed 400 ms
         after a step or the opening, so a cached picture never flickers. %>
     <%= tag.div role: "status", hidden: true, class: "col-start-1 row-start-1 flex flex-col items-center gap-2.5 text-small text-meta", data: target("loading") do %>

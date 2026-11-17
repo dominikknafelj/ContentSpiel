@@ -1,4 +1,4 @@
-<%# The group editor, new and edit, up to 1000px and left-aligned: the Group
+<%# The group editor, new and edit, the page frame's wide body: the Group
     card (name, description, members), then the permission matrix's two
     cards, then the save footer. Members send a blank first value so an
     empty list still arrives as one.
@@ -23,7 +23,7 @@
     therefore enabled from the start (`always:`: no change is counted, the footer
     shows no count, and leaving doesn't ask). %>
 <% drops_dormant = !view_only && stale.present? && stale.dead.any?(&:dormant) %>
-<div class="max-w-[1000px]">
+<div>
 <%= render Admin::Ui::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
 <% if view_only %>

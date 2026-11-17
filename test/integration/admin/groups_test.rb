@@ -357,7 +357,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     AccessControl::BuiltIns.register
   end
 
-  test "the editor is a Group card and eleven rows and the switches in their bands, up to 1000px, with the key as each row's title" do
+  test "the editor is a Group card and eleven rows and the switches in their bands, in the page frame's wide body, with the key as each row's title" do
     sign_in_as(users(:one))
     get "/cs-studio/groups/new"
 
@@ -370,7 +370,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
       assert_select ".admin-field > input#group_description ~ #group_description-errors"
       assert_select ".admin-column input#group_member_ids"
     end
-    assert_select ".max-w-\\[1000px\\]"
+    assert_select "div.admin-page.admin-page--wide > .admin-page__body #group-form"
     assert_select "[class*='mx-auto']", count: 0
   end
 

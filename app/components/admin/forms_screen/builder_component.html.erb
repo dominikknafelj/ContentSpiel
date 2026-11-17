@@ -1,5 +1,10 @@
-<%= tag.div class: "admin-form-column flex flex-col gap-4", data: { controller: "admin--forms--builder", messages: messages, "admin--forms--builder-max-fields-value": max_fields } do %>
-  <h1 class="text-h1 text-ink"><%= heading %></h1>
+<%# The page frame, a form screen: the head row spans the frame, the
+    builder is its form body (`--cs-form-max`, 760px) at the left. %>
+<%= tag.div class: "admin-page admin-page--form", data: { controller: "admin--forms--builder", messages: messages, "admin--forms--builder-max-fields-value": max_fields } do %>
+  <div class="admin-page__head">
+    <h1 class="text-h1 text-ink"><%= heading %></h1>
+  </div>
+  <div class="admin-page__body flex flex-col gap-4">
   <%= render Admin::FormsScreen::TabsComponent.new(form: form, current: :form, url_options: url_options) %>
 
   <% if languages? %>
@@ -107,4 +112,5 @@
 
   <%# After the form, never inside it: the zone's button opens a dialog whose own form sends the DELETE. %>
   <%= render Admin::FormsScreen::TrashZoneComponent.new(form: form, placements: placements, url_options: url_options) %>
+  </div>
 <% end %>

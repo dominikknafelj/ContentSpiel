@@ -1,7 +1,7 @@
-<div class="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
+<div class="admin-page__head mb-0">
   <div>
     <h1 class="text-h1 text-ink"><%= words(:title) %></h1>
-    <p class="mt-1 max-w-[620px] text-small text-meta"><%= words(:lead) %></p>
+    <p class="mt-1 max-w-(--cs-text-measure) text-small text-meta"><%= words(:lead) %></p>
     <% if runnable? %>
       <%= tag.p class: "text-small text-meta", data: target("count") do %><%= words(:count, count: count) %><% end %>
     <% end %>
@@ -9,7 +9,7 @@
   <% if runnable? %>
     <div class="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
       <%= render Admin::Ui::ButtonComponent.new(label: words(:draw_all), data: { **target("start"), action: "click->#{CONTROLLER}#toggle" }) %>
-      <%= tag.p words(:insecure_short), id: reason_id, class: "max-w-[260px] text-small text-meta sm:text-right", hidden: true, data: target("insecure") %>
+      <%= tag.p words(:insecure_short), id: reason_id, class: "max-w-64 text-small text-meta sm:text-right", hidden: true, data: target("insecure") %>
     </div>
   <% end %>
 </div>

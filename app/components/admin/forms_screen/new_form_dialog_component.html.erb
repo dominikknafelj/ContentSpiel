@@ -24,12 +24,17 @@
 <% end %>
 
 <% if page? %>
-  <div class="max-w-md">
-    <h1 class="mb-4 text-h1 text-ink"><%= t(".title") %></h1>
-    <%= fields %>
-    <div class="mt-4 flex gap-2">
-      <%= render Admin::Ui::ButtonComponent.new(label: t(".create"), variant: :primary, type: "submit", form: FORM_ID) %>
-      <%= link_to t(".cancel"), cancel_path, data: { turbo_frame: "content" }, class: setup_tertiary_link_class %>
+  <%# The page frame, a form screen. %>
+  <div class="admin-page admin-page--form">
+    <div class="admin-page__head">
+      <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+    </div>
+    <div class="admin-page__body">
+      <%= fields %>
+      <div class="mt-4 flex gap-2">
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".create"), variant: :primary, type: "submit", form: FORM_ID) %>
+        <%= link_to t(".cancel"), cancel_path, data: { turbo_frame: "content" }, class: setup_tertiary_link_class %>
+      </div>
     </div>
   </div>
 <% else %>

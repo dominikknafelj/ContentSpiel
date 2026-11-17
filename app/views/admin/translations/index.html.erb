@@ -3,8 +3,15 @@
     (`Admin::TranslationScreen::MatrixComponent`), 50 per page
     (`Admin::TranslationsController`). A tile narrows the matrix to its
     language, and the chosen one widens it back. %>
-<h1 class="mb-2 text-h1 text-ink"><%= t(".title") %></h1>
-<p class="mb-4 text-meta"><%= t(".intro", language: Locales.name(Translations.primary_locale, native: true)) %></p>
+<%# The page frame, a wide screen (lists, tables, logs, overviews). %>
+<div class="admin-page admin-page--wide">
+<div class="admin-page__head">
+  <div class="min-w-0">
+    <h1 class="mb-2 text-h1 text-ink"><%= t(".title") %></h1>
+    <p class="text-meta"><%= t(".intro", language: Locales.name(Translations.primary_locale, native: true)) %></p>
+  </div>
+</div>
+<div class="admin-page__body">
 
 <div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3" data-translation-summary>
   <% @target_locales.each do |locale| %>
@@ -43,3 +50,5 @@
     </div>
   <% end %>
 <% end %>
+</div>
+</div>

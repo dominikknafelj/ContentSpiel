@@ -979,10 +979,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    block's drawing): no box and no gap in its form's column, until its error
    slot holds a message (a `p`, `admin/shared/_field_errors`). */
 .admin-field--hidden:not(:has(p)) { display: none; }
-/* The dashboard's heading row: the heading, then New page… and New post…
-   at its end. It wraps, so on a narrow screen the buttons go under the
-   heading rather than crushing it. */
-.admin-dashboard__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+/* The dashboard's buttons, New page… and New post…, the action of its
+   heading row (the page frame's `.admin-page__head`). */
 .admin-dashboard__buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
 /* A dashboard panel (`Admin::DashboardScreen::PanelComponent`): a card
    (elevation 1, `rounded-card`) whose head holds its heading and one line.
@@ -1073,11 +1071,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    cards, one column, two from 40rem. Docked, the main column takes what
    the rail leaves, the rail `--cs-rail-width` wide and `--cs-rail-gap`
    right of it on the rail's ground, and the whole grows to
-   `--cs-content-max` and no further: its auto inline margins are 0 below
-   the cap, so it stands at the content's left edge, and on a wider window
-   they split the spare width evenly either side. The heading row and the
-   mail notice stop at the same cap and are centred the same way, so New
-   post… stands over the rail's right edge. On that ground an information panel has no
+   `--cs-content-max` and no further, from the content's left edge and
+   never centred: past the cap the spare width stays on the right (the
+   page frame, `.admin-page`, stops the heading row and the mail notice at
+   the same cap, so New post… stands over the rail's right edge). On that ground an information panel has no
    card and no band, and its heading keeps its warm ink; its rows, its empty
    line and its footer lose their inset with the head's, so all start at
    the rail's padding. The main column is a container of its own
@@ -1109,15 +1106,13 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-dashboard__rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container admin-dashboard (min-width: 1200px) {
-  .admin-dashboard__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; align-items: start; }
+  .admin-dashboard__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); align-items: start; }
   .admin-dashboard__rail { grid-template-columns: minmax(0, 1fr); background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4); }
   .admin-dashboard__rail .admin-dashboard-panel { background: transparent; box-shadow: none; }
   .admin-dashboard__rail .admin-dashboard-panel .admin-dashboard-panel__head { background: transparent; padding-inline: 0; }
   .admin-dashboard__rail .admin-dashboard-panel > ul,
   .admin-dashboard__rail .admin-dashboard-panel > [data-panel-empty],
   .admin-dashboard__rail .admin-dashboard-panel > footer { padding-inline: 0; }
-  .admin-dashboard__head,
-  .admin-dashboard__notice { max-width: var(--cs-content-max); margin-inline: auto; }
 }
 /* The lists' rail (the posts list's filters; the Tags screen's detail). The
    container is the LIST's own width, never the window's (the sidebar and
@@ -1147,11 +1142,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    order. Docked, the list takes what the rail leaves, the rail
    `--cs-rail-width` wide and `--cs-rail-gap` right of it, across the first
    two rows, on the rail's ground; the whole grows to `--cs-content-max`
-   and no further: its auto inline margins are 0 below the cap, so it
-   stands at the content's left edge, and on a wider window they split the
-   spare width evenly either side. The heading row stops at the same cap
-   and is centred the same way, so New post stands over the rail's right
-   edge.
+   and no further, from the content's left edge and never centred: past
+   the cap the spare width stays on the right. The heading row is the page
+   frame's (`.admin-page__head`), which stops at the same cap, so New post
+   stands over the rail's right edge.
    Docked, the rail sticks under the window's top (`--admin-top-offset`)
    with `--cs-sp-4` above and below it, and scrolls inside itself when it is
    taller than that, so the filters and a tag's detail stay in reach down a
@@ -1173,7 +1167,6 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    border, outside the padding) but the column's first item, inside the
    rail's padding. */
 .admin-list-rail { container: admin-list / inline-size; }
-.admin-list-rail__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
 .admin-list-rail__grid { display: grid; grid-template-columns: minmax(0, 1fr); }
 .admin-filter-panel { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; min-width: 0; margin: 0 0 1rem; border: 0; padding: 0; }
 .admin-filter-panel > div { display: flex; flex-direction: column; gap: 0.25rem; min-width: 10rem; }
@@ -1209,8 +1202,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    that shows the empty line, wherever either stands. */
 .admin-list-rail__grid:has(#tags-list [data-empty-state-title]) .admin-tag-detail { display: none; }
 @container admin-list (min-width: 1200px) {
-  .admin-list-rail__head { max-width: var(--cs-content-max); margin-inline: auto; }
-  .admin-list-rail__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; align-items: start; }
+  .admin-list-rail__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); align-items: start; }
   .admin-list-rail__rail { grid-column: 2; grid-row: 1 / span 2; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4);
     position: sticky; top: calc(var(--admin-top-offset) + var(--cs-sp-4)); max-height: calc(100dvh - var(--admin-top-offset) - 2 * var(--cs-sp-4)); overflow-y: auto; overscroll-behavior: contain; }
   .admin-filter-panel { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0; }
@@ -1236,12 +1228,21 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    `.admin-page--wide`, the frame's full width (lists, tables, logs,
    overviews, Settings' nav, column and rail), or `.admin-page--form`,
    `--cs-form-max` (760px) at the left under the `h1` (forms and reading:
-   Your account). */
-.admin-page { width: 100%; max-width: var(--cs-content-max); }
-.admin-page__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; column-gap: var(--cs-sp-4); row-gap: var(--cs-sp-2); margin-bottom: 1rem; }
-.admin-page--form > .admin-page__body { max-width: var(--cs-form-max); }
-@media (max-width: 639.98px) {
-  .admin-page__head { flex-direction: column; }
+   Your account, a user's editor, a form's builder, Connect an AI
+   assistant's steps, whose token table stands after the body at the
+   frame's width). Every CS Studio screen stands in it, the editors aside:
+   they have their own composition (the rail grid), held to the same rule,
+   left-aligned and never centred.
+   In `@layer components`, so a screen's utility (`mb-0` where a wrapper's
+   gap already spaces the head) wins over it. */
+@layer components {
+  .admin-page { width: 100%; max-width: var(--cs-content-max); }
+  .admin-page__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; column-gap: var(--cs-sp-4); row-gap: var(--cs-sp-2); margin-bottom: 1rem; }
+  .admin-page--form > .admin-page__body { max-width: var(--cs-form-max); }
+  @media (max-width: 639.98px) {
+    .admin-page__head { flex-direction: column; }
+    .admin-page__head > * { max-width: 100%; }
+  }
 }
 /* Settings' layout and its "At a glance" rail
    (`Admin::SettingsScreen::GlanceComponent`). `.admin-settings-layout` is
@@ -1398,7 +1399,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-rail__tab [data-tab-count] { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--cs-radius-pill); background: var(--cs-people-tint); color: var(--cs-people); font-weight: 600; }
 .admin-rail__tab [data-tab-count][data-unread] { background: var(--cs-accent); color: var(--cs-on-accent); }
 @container admin-editor (min-width: 1200px) {
-  .admin-rail-grid { --admin-rail-docked: 1; grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; }
+  .admin-rail-grid { --admin-rail-docked: 1; grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); }
   .admin-rail-grid::before { content: ""; grid-column: 2; grid-row: 1 / 3; position: sticky; top: var(--admin-rail-top); background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
   .admin-rail-grid .admin-rail__main { grid-column: 1; grid-row: 1 / -1; }
   /* As tall as its own content, not the rail's: a rail taller than a short
@@ -1505,21 +1506,21 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-rail-grid .admin-post-main .admin-translation-pair > .admin-reference-card > details > summary::before { display: none; }
 }
 /* The editor's header row over a docked rail: each of its rows stops at
-   `--cs-content-max` and is centred as the grid under it is, so past the
-   cap Publish stands over the rail's right edge and not out in the spare
-   width; the header itself, its line and its ground, keeps the window's
-   width. The header is no item of the grid, and the page editor's stands
+   `--cs-content-max`, as the grid under it does, from the left and never
+   centred, so past the cap Publish stands over the rail's right edge and
+   not out in the spare width on the right; the header itself, its line
+   and its ground, keeps the window's width. The header is no item of the grid, and the page editor's stands
    outside the editor area (`#editing`, the container the rail docks by),
    so the docked state is read from the mark `admin--ui--rail` writes on
    the grid (`data-rail-docked`), which follows the container query: the
-   page's header is the area's sibling, the post's stands inside it. Below
-   the cap the auto margins are 0. The grid centres from the first paint, by
-   the query, and the header row only once the controller has connected and
-   written the mark: past the cap the row moves once, on load, from the
-   window's width to the grid's. No query reaches the page's header, which
+   page's header is the area's sibling, the post's stands inside it. The
+   grid stops at the cap from the first paint, by the query, and the header
+   row only once the controller has connected and written the mark: past
+   the cap the row's end moves once, on load, from the window's width to
+   the grid's. No query reaches the page's header, which
    stands outside the container, so the mark is the one shared answer. */
 .admin-editor-header:has(~ .admin-editor-area [data-rail-docked]) > *,
-.admin-editor-area:has([data-rail-docked]) .admin-editor-header > * { max-width: var(--cs-content-max); margin-inline: auto; }
+.admin-editor-area:has([data-rail-docked]) .admin-editor-header > * { max-width: var(--cs-content-max); }
 /* THE MEDIA RAIL (`app/views/admin/media/index.html.erb`, `#media-rail`):
    the chosen image's rail, drawn with the editors' rail parts and script
    (`admin--ui--rail`). `#media-library` is the container (`admin-media`),
@@ -1538,8 +1539,8 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
      container query cannot read a custom property, it docks: the grid
      takes what the rail leaves, the rail `--cs-rail-width` wide and
      `--cs-rail-gap` right of it, on the rail's ground at elevation 2, the
-     whole stopping at `--cs-content-max` and centred past it with the head
-     above it. The tabs stand at the rail's top and only the current panel
+     whole stopping at `--cs-content-max` (the page frame's), from the
+     left and never centred. The tabs stand at the rail's top and only the current panel
      is shown, scrolling inside itself under them. `--admin-rail-docked` is
      the docked state `admin--ui--rail` reads.
    Close is the rail's last child, over its top-right corner at every
@@ -1549,8 +1550,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-media-library { container: admin-media / inline-size; }
 /* Selection mode's bar (`Admin::MediaLibrary::SelectionBarComponent`), a
    child of the library and not of the head, so it stays stuck under the top
-   offset over the whole grid; over the tiles (`sticky`), centred with them
-   past 1200px. */
+   offset over the whole grid; over the tiles (`sticky`). */
 .admin-media-selection-bar { position: sticky; top: var(--admin-top-offset); z-index: var(--cs-z-sticky); margin-bottom: var(--cs-sp-4); }
 /* A dragged image's ghost (`admin--media--drag`, the view's `<template>`):
    a pill at elevation 4 that follows the pointer, with a 32x24 thumbnail,
@@ -1580,9 +1580,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
     overflow-y: auto; overscroll-behavior: contain; }
 }
 @container admin-media (min-width: 1200px) {
-  .admin-media-library__head,
-  .admin-media-selection-bar { max-width: var(--cs-content-max); margin-inline: auto; }
-  .admin-media-library__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; }
+  .admin-media-library__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); }
   .admin-media-rail { --admin-rail-docked: 1; gap: 0; padding: 0; overflow: hidden; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
   .admin-media-rail .admin-rail__tabs { display: flex; flex: none; align-items: flex-end; gap: var(--cs-sp-4); height: 3rem; box-sizing: border-box; padding: 0 3.5rem 0 var(--cs-sp-4); }
   .admin-media-rail .admin-rail__heading { align-items: center; gap: 0.375rem; }

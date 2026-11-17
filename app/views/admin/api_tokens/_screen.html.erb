@@ -6,18 +6,27 @@
     every `secret` on `pagehide` reaches both steps; each Copy is its own copy
     box's `admin--ui--clipboard`. "Create token" in step 1 is the page's one
     primary. %>
-<div data-controller="admin--tokens--reveal" class="flex max-w-[880px] flex-col gap-4">
-  <div class="flex flex-col gap-1.5">
-    <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
-    <p class="max-w-[600px] text-small text-dim"><%= t(".intro") %></p>
+<%# The page frame, a form screen: the two steps in the form body
+    (`--cs-form-max`, 760px, at the left), the Tokens table under it at the
+    frame's full width. %>
+<div data-controller="admin--tokens--reveal" class="admin-page admin-page--form">
+  <div class="admin-page__head">
+    <div class="flex min-w-0 flex-col gap-1.5">
+      <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+      <p class="max-w-(--cs-text-measure) text-small text-dim"><%= t(".intro") %></p>
+    </div>
   </div>
 
-  <%= render Admin::TokensScreen::CreateStepComponent.new(
-        groups: @assignable_groups, form_url: admin_api_tokens_path(**admin_url_options), selected_id: @selected_group_id,
-        name: @name.to_s, name_errors: @name_errors, group_errors: @group_errors, raw_token: raw_token) %>
+  <div class="admin-page__body flex flex-col gap-4">
+    <%= render Admin::TokensScreen::CreateStepComponent.new(
+          groups: @assignable_groups, form_url: admin_api_tokens_path(**admin_url_options), selected_id: @selected_group_id,
+          name: @name.to_s, name_errors: @name_errors, group_errors: @group_errors, raw_token: raw_token) %>
 
-  <%= render Admin::TokensScreen::ConnectStepComponent.new(
-        mcp_url: mcp_url, config: mcp_client_config(raw_token || "YOUR_TOKEN"), raw_token: raw_token) %>
+    <%= render Admin::TokensScreen::ConnectStepComponent.new(
+          mcp_url: mcp_url, config: mcp_client_config(raw_token || "YOUR_TOKEN"), raw_token: raw_token) %>
+  </div>
 
-  <%= render Admin::TokensScreen::TableComponent.new(tokens: @api_tokens) %>
+  <div class="mt-4">
+    <%= render Admin::TokensScreen::TableComponent.new(tokens: @api_tokens) %>
+  </div>
 </div>

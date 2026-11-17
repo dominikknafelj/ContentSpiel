@@ -283,8 +283,8 @@
   /* A docked composition (the editors' blocks column, the dashboard's main
      column, a list, each with a rail beside it): the rail, the space
      between, and the widest the whole may grow, one group whose main column
-     takes what the rail leaves, at the content's left edge below the cap
-     and centred past it. Read by `.admin-rail-grid`,
+     takes what the rail leaves, from the content's left edge and never
+     centred: past the cap the spare width stays on the right. Read by `.admin-rail-grid`,
      `.admin-dashboard__grid` and `.admin-list-rail__grid` in
      content-spiel.tailwind.css; CS Studio's alone. */
   --cs-rail-width: 360px;
