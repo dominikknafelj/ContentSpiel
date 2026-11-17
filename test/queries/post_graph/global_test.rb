@@ -759,7 +759,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
 
     result = vanishing(b) { graph }
 
-    assert_equal [ pid(a), pid(c) ], result[:nodes].map { |node| node[:id] }.sort
+    assert_equal [ pid(a), pid(c) ].sort, result[:nodes].map { |node| node[:id] }.sort
     assert_no_match(/#{pid(b)}\b/, result.to_json, "nothing of the answer names it")
     assert_whole result
     assert_equal [ 2, 2 ], result.values_at(:shown, :total), "it is not one of the posts shown, nor of the connected ones"
