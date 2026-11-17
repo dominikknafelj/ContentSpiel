@@ -1,18 +1,21 @@
 // Registers Stimulus controllers from the import map.
 //
-// On its own (imported by the `application` entry point) this registers the
-// site's own controllers -- everything under `controllers/` except CS
-// Studio's `controllers/admin/*` and a theme's `controllers/theme/*`. CS
-// Studio's are registered by the separate `admin` entry point
-// (app/javascript/admin.js, final fix wave D), which only CS Studio's layout
-// imports, so a public page never imports -- or, per config/importmap.rb's
+// This file only says how and what: each entry point calls
+// `registerControllers` with its own choice. `application` (setup and
+// sign-in, and through `admin` CS Studio too) registers the site's own
+// controllers -- everything under `controllers/` except CS Studio's
+// `controllers/admin/*`, a theme's `controllers/theme/*` and `PUBLIC_ONLY`.
+// CS Studio's are registered by the separate `admin` entry point
+// (app/javascript/admin.js), which only CS Studio's layout imports, so a
+// public page never imports -- or, per config/importmap.rb's
 // `preload: "admin"`, even modulepreloads -- an admin controller, the editor,
-// or anything they import. A theme's are registered by the `site` entry
-// point (app/javascript/site.js), which only the public layout imports.
-// So are the site's own controllers in `PUBLIC_ONLY`: a visitor's page
-// alone runs them, and CS Studio, sign-in and setup never import them
-// (they are preloaded with the rest of `controllers/`: importmap gives a
-// directory's files one preload).
+// or anything they import. A visitor's page loads the `site` entry point
+// (app/javascript/site.js) and not `application`: it registers `SITE`, the
+// site's own controllers a public page draws, and a theme's. So the sign-in,
+// password, invitation and setup controllers are neither imported nor
+// preloaded on a public page: config/importmap.rb preloads `SITE` alone for
+// `site` (its `site_controllers`, held to this list by
+// test/integration/public_javascript_test.rb).
 //
 // Eager: each controller is imported and registered as soon as the page
 // loads (a dynamic `import()` per controller, as stimulus-loading's own
@@ -43,4 +46,9 @@ export function registerControllers(include) {
 // through the public layout, which loads `site`).
 export const PUBLIC_ONLY = [ "controllers/search_suggest_controller", "controllers/gallery_carousel_controller" ]
 
-registerControllers((path) => !path.startsWith("controllers/admin/") && !path.startsWith("controllers/theme/") && !PUBLIC_ONLY.includes(path))
+// Every controller of the site's own a public page draws, and so all that
+// `site` registers of `controllers/` besides a theme's: the light/dark
+// switch, the Code block's copy, the Form block's send, and `PUBLIC_ONLY`.
+// A controller a public template starts to use joins this list and
+// `site_controllers` in config/importmap.rb.
+export const SITE = [ "controllers/theme_controller", "controllers/code_copy_controller", "controllers/form_send_controller", ...PUBLIC_ONLY ]

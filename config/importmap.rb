@@ -21,18 +21,41 @@
 # the import map itself (it's one shared lookup table), which is harmless:
 # a mapping is only fetched when something imports it.
 #
-# `pin_all_from` directories override one another in declaration order, so
-# the `controllers/admin` line must come after the general `controllers`
-# one to give those modules `preload: "admin"` instead of `true`.
 
-pin "application"
+# `application` is not the public site's: a visitor's page loads `site`
+# alone, so it preloads neither `application` nor what `application`
+# registers and the site does not.
+pin "application", preload: %w[application admin]
 pin "admin", preload: "admin"
-# The public site's entry point: `application` plus the theme's controllers
-# (app/javascript/site.js). Only layouts/application.html.erb asks for it.
+# The public site's entry point: Turbo, the site's own controllers a public
+# page draws and the theme's controllers (app/javascript/site.js). Only
+# layouts/application.html.erb asks for it.
 pin "site", preload: "site"
 pin "@hotwired/turbo-rails", to: "turbo.min.js"
 pin "@hotwired/stimulus", to: "stimulus.min.js"
-pin_all_from "app/javascript/controllers", under: "controllers"
+# The site's own controllers, the files at the top of
+# app/javascript/controllers, pinned one by one rather than by `pin_all_from`
+# (which gives every file of a directory one preload, and overrides a `pin`
+# of one of them): setup, sign-in and CS Studio preload them all, and a
+# visitor's page only `site_controllers`, the ones a public page draws, which
+# `site.js` registers (`SITE` in controllers/index.js, held to this list by
+# test/integration/public_javascript_test.rb). So a public page does not
+# preload the sign-in, password, invitation and setup controllers it never
+# runs. `controllers` (index.js) and Stimulus' `controllers/application` are
+# every entry point's. A subfolder is not pinned here: `controllers/admin`
+# has its own line below, and a theme's are pinned from its folder. The
+# files are read when the map is drawn, at boot, so a new controller file
+# needs a restart in development.
+# `public_only` are the two that `site` alone registers (`PUBLIC_ONLY`), so
+# only it preloads them.
+public_only = %w[search_suggest gallery_carousel].map { |name| "controllers/#{name}_controller" }
+site_controllers = %w[theme code_copy form_send].map { |name| "controllers/#{name}_controller" } + public_only
+pin "controllers", to: "controllers/index.js"
+pin "controllers/application"
+Rails.root.glob("app/javascript/controllers/*_controller.js").map { |file| "controllers/#{file.basename(".js")}" }.sort.each do |name|
+  preload = if public_only.include?(name) then "site" elsif site_controllers.include?(name) then true else %w[application admin] end
+  pin name, preload:
+end
 # A theme's Stimulus controllers, from <theme>/javascript/controllers
 # (`docs/reference/theming.md`): `ThemeFolder#pins` says how. Under `controllers/theme/`,
 # so `copy_controller.js` is the identifier `theme--copy` and cannot be one

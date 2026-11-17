@@ -50,6 +50,7 @@
 ### Changed
 
 - Production's databases connect with `connect_timeout: 5`: an unreachable database fails in five seconds.
+- A public page loads none of CS Studio's, sign-in's or setup's scripts: the `site` entry point no longer imports `application` and registers only the site's own controllers a public page draws (`SITE` in `controllers/index.js`: `theme`, `code-copy`, `form-send`, `search-suggest`, `gallery-carousel`) and a theme's, and `config/importmap.rb` pins the top-level controllers one by one so a visitor's page preloads only those. `bot_check`, `file_drop`, `invitation_token`, `mail_port`, `passkey_sign_in`, `password_field`, `reset_token`, `application.js` and `i18n/messages` are neither preloaded nor fetched there any more; sign-in, the password reset, an invitation, setup and CS Studio load them as before. A new controller file at the top of `app/javascript/controllers` needs a restart in development.
 
 ### Fixed
 

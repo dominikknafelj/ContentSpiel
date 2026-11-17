@@ -1,8 +1,9 @@
 require "test_helper"
 
 # Final fix wave (D, P12/P14): the public site and CS Studio load separate
-# import-map entry points. A public page imports `application` -- Turbo and
-# the site's own controllers only -- and modulepreloads nothing of CS
+# import-map entry points. A public page imports `site` -- Turbo, the site's
+# own controllers a public page draws and a theme's -- and modulepreloads
+# nothing of sign-in's, setup's or CS
 # Studio's: not its controllers (`controllers/admin/*`), not the editor's
 # own modules (`rich_text/*`), not Tiptap/ProseMirror, SortableJS or D3
 # (which no page preloads at all: only the mind graph's worker loads it).
@@ -14,20 +15,95 @@ require "test_helper"
 class PublicJavascriptTest < ActionDispatch::IntegrationTest
   ADMIN_ONLY = %w[controllers/admin/ rich_text/ saving/ live/ notes/ editing/ editor/ search/ i18n/ media/ mind_graph/ @tiptap prosemirror linkifyjs sortablejs d3-force].freeze
 
-  test "a public page loads the application entry point without any admin module" do
+  test "a public page loads the site entry point without any admin module" do
     create_page(title: "About")
 
     get "/"
 
     assert_response :success
     preloads = modulepreloads
-    assert preloads.any? { |href| href.include?("application") }, "expected the application entry point to be preloaded"
+    assert preloads.any? { |href| href.include?("/site-") }, "expected the site entry point to be preloaded"
+    assert_not_includes preloaded_modules, "application", "a public page does not load the application entry point"
     ADMIN_ONLY.each do |name|
       assert preloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on a public page: #{preloads.grep(/#{Regexp.escape(name)}/).inspect}"
     end
     assert_includes entry_point_script, %(import "site")
     assert_not_includes entry_point_script, %(import "admin")
     assert preloads.none? { |href| href.include?("controllers/admin/") }
+  end
+
+  # A visitor's page preloads, of the site's own controllers, exactly `SITE`
+  # (controllers/index.js), which `site.js` registers: not the sign-in,
+  # password, invitation and setup controllers, which it never runs and
+  # which competed with the theme's fonts on a phone. `site_controllers` in
+  # config/importmap.rb is the Ruby side of that list.
+  test "a public page preloads, of the site's own controllers, only the ones site.js registers" do
+    create_page(title: "About")
+    get "/"
+
+    assert_equal site_set, preloaded_controllers - theme_controller_assets, "a public page preloads SITE, and no other controller of controllers/"
+    assert_operator top_level_controllers.size, :>, site_set.size, "controllers/ holds more than the site's set"
+    assert_includes site_set, "controllers/theme_controller"
+    assert preloaded_modules.include?("controllers/index") && preloaded_modules.include?("controllers/application"), "the registration and Stimulus' application are preloaded"
+  end
+
+  # Everything a visitor's page names to fetch, held to an allow-list: the
+  # `site` entry point and what it preloads, the theme's one stylesheet and
+  # the icons. Nothing of CS Studio's or of sign-in's, setup's, an
+  # invitation's or the password reset's: not their entry points, not their
+  # controllers, not `i18n/` (the strings `password_field` fetched when the
+  # site's registration still imported it), not the product stylesheet
+  # (`tailwind`) and no Action Cable address. The import map itself lists
+  # every pin, which is one lookup table and fetches nothing; what the
+  # scripts fetch when they run is test/system/public_resources_test.rb's.
+  test "a public page names no resource but the site entry point's and the theme's, under both themes" do
+    page = create_page(title: "About")
+    [ :default, :plain ].each do |theme|
+      run = -> do
+        get "/"
+        assert_response :success
+        unexpected = named_resources.reject { |name| allowed_public_resource?(name) }
+        assert_empty unexpected, "a public page under the #{theme} theme names a resource that is not the site's or the theme's"
+        assert_equal [ "theme" ], css_select("link[rel=stylesheet]").map { |link| asset_name(link["href"]) }, "the theme's one stylesheet"
+        assert_select "meta[name=action-cable-url]", count: 0
+      end
+      theme == :plain ? with_plain_theme(&run) : run.call
+    end
+    assert page
+  end
+
+  # Sign-in, the password reset, an invitation and setup draw the product
+  # and setup layouts, which load `application`: they preload every
+  # controller of the site's own but the two only a visitor's page runs, so
+  # theirs (password_field, reset_token, invitation_token, passkey_sign_in,
+  # bot_check, mail_port) are there without a waterfall of imports. CS
+  # Studio, through `admin`, too.
+  test "sign-in, the password reset, an invitation and CS Studio preload their controllers" do
+    own = top_level_controllers - public_only_set
+    expect = ->(name, path, params = {}) do
+      get path, params: params
+      assert_response :success
+      assert_includes entry_point_script, %(import "application"), name
+      assert_equal own, preloaded_controllers, "#{name} preloads every controller of the site's own but PUBLIC_ONLY"
+    end
+
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    expect.("sign-in", admin_sign_in_path)
+    expect.("the password reset", admin_edit_password_path)
+    expect.("an invitation", "/#{ContentSpiel::ADMIN_PATH}/invitation", token: open_invitation("dana@example.com", name: "Dana").generate_token_for(:accept))
+
+    sign_in_as(users(:one))
+    get "/cs-studio"
+    assert_includes entry_point_script, %(import "admin")
+    assert_equal own, preloaded_controllers, "CS Studio preloads every controller of the site's own but PUBLIC_ONLY"
+  end
+
+  test "setup preloads its controllers" do
+    start_fresh_install
+    get setup_step_path("token")
+    assert_response :success
+    assert_includes entry_point_script, %(import "application")
+    assert_equal top_level_controllers - public_only_set, preloaded_controllers
   end
 
   # Theming spec §4, "Scripts": a theme's controllers are registered by the
@@ -55,9 +131,12 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     index = Rails.root.join("app/javascript/controllers/index.js").read
     site = Rails.root.join("app/javascript/site.js").read
 
-    assert_includes index, %(registerControllers((path) => !path.startsWith("controllers/admin/") && !path.startsWith("controllers/theme/") && !PUBLIC_ONLY.includes(path)))
-    assert_includes site, %(import "application")
-    assert_includes site, %(registerControllers((path) => path.startsWith("controllers/theme/") || PUBLIC_ONLY.includes(path)))
+    application = Rails.root.join("app/javascript/application.js").read
+
+    assert_not_includes index.gsub(%r{^\s*//.*$}, ""), "registerControllers((", "controllers/index.js registers nothing by itself: each entry point chooses"
+    assert_includes application, %(registerControllers((path) => !path.startsWith("controllers/admin/") && !path.startsWith("controllers/theme/") && !PUBLIC_ONLY.includes(path)))
+    assert_not_includes site, %(import "application")
+    assert_includes site, %(registerControllers((path) => path.startsWith("controllers/theme/") || SITE.includes(path)))
   end
 
   test "CS Studio loads the admin entry point and preloads the editor stack" do
@@ -281,7 +360,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     importing = code.select { |_, text| text.match?(/\bimport\b[^\n]*["']site["']|\bimport\s*\(\s*["']site["']/) }.keys
     assert_empty importing, "imports the site entry point"
     naming = code.select { |_, text| text.include?("controllers/theme/") }.keys
-    assert_equal %w[app/javascript/controllers/index.js app/javascript/site.js], naming.sort,
+    assert_equal %w[app/javascript/application.js app/javascript/site.js], naming.sort,
       "controllers/theme/ is named where the site's registration leaves it out and where `site` takes it in"
     assert_match(/\Aimport "application"\nimport \{ registerControllers \} from "controllers"\n\nregisterControllers\(\(path\) => path\.startsWith\("controllers\/admin\/"\)\)\n\z/,
       code.fetch("app/javascript/admin.js").lstrip, "CS Studio's entry point registers controllers/admin/ and nothing else")
@@ -327,11 +406,9 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
   # Search 2 spec §4.5: the suggestions' script is the site's own, at the
   # top level like `code-copy`, but a visitor's page alone runs it: `site`
-  # registers it (`PUBLIC_ONLY` in `controllers/index.js`, which the site's
-  # own registration leaves out), and no CS Studio screen, sign-in or setup
-  # imports it. It is preloaded with the rest of `controllers/` (importmap
-  # gives a directory's files one preload, and a pin of one of them is
-  # overridden by the directory), so the import is what is held.
+  # registers it (`PUBLIC_ONLY` in `controllers/index.js`, which
+  # `application`'s registration leaves out), and no CS Studio screen,
+  # sign-in or setup imports or preloads it.
   test "search_suggest is registered by site.js and imported on no CS Studio screen" do
     page = create_page(title: "Help")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "search" }).ok?
@@ -346,11 +423,13 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_includes index, %("controllers/search_suggest_controller"), "PUBLIC_ONLY names it"
     assert_match(/export const PUBLIC_ONLY = \[[^\]]*"controllers\/search_suggest_controller"/m, index)
 
-    assert_includes index, %(&& !PUBLIC_ONLY.includes(path)), "the site's own registration, which every entry point runs, leaves it out"
-    assert_includes Rails.root.join("app/javascript/site.js").read, %(|| PUBLIC_ONLY.includes(path)), "the site entry point registers it"
+    assert_includes Rails.root.join("app/javascript/application.js").read, %(&& !PUBLIC_ONLY.includes(path)), "application's registration, which sign-in, setup and CS Studio run, leaves it out"
+    assert_includes Rails.root.join("app/javascript/site.js").read, %(|| SITE.includes(path)), "the site entry point registers it"
+    assert_match(/export const SITE = \[[^\]]*\.\.\.PUBLIC_ONLY/, index, "SITE holds PUBLIC_ONLY")
 
     get admin_sign_in_path
     assert_not_includes entry_point_script, "search_suggest"
+    assert modulepreloads.none? { |href| href.include?("search_suggest") }, "sign-in does not preload it"
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_as(users(:one))
     [ "/cs-studio", "/cs-studio/pages/#{page.id}" ].each do |path|
@@ -414,6 +493,54 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
   private
 
   def modulepreloads = css_select("link[rel=modulepreload]").map { |link| link["href"] }
+
+  # Every address the page's head and body name to fetch: links but the
+  # page's own canonical and language links, scripts with a source, and
+  # images.
+  def named_resources
+    links = css_select("link[href]").reject { |link| %w[canonical alternate].include?(link["rel"]) }.map { |link| link["href"] }
+    (links + css_select("script[src], img[src]").map { |node| node["src"] }).map { |href| asset_name(href) }.uniq
+  end
+
+  # A theme's controllers by their asset's name: pinned as
+  # `controllers/theme/<name>`, served as `controllers/<name>.js` from the
+  # theme's folder (`ThemeFolder#pins`).
+  def theme_controller_assets
+    JSON.parse(importmap_json).fetch("imports").select { |name, _| name.start_with?("controllers/theme/") }.values.map { |href| asset_name(href) }
+  end
+
+  # `/assets/controllers/theme_controller-1a2b.js` -> `controllers/theme_controller`.
+  def asset_name(href) = URI(href).path.delete_prefix("/assets/").sub(/-\h+\.\w+\z/, "")
+
+  # What the `site` entry point and a theme may name: Turbo, Stimulus, the
+  # registration, SITE, a theme's controllers, the theme's stylesheet, and
+  # an icon (the CMS's at the root, or a theme's from its assets).
+  def allowed_public_resource?(name)
+    %w[site @hotwired/turbo-rails turbo.min stimulus.min controllers/index controllers/application theme].include?(name) ||
+      site_set.include?(name) || theme_controller_assets.include?(name) || name.match?(%r{\A/icon\.(png|svg)\z}) ||
+      name.match?(/\A[\w-]+\z/) && !top_level_controllers.include?("controllers/#{name}") && Rails.root.glob("test/fixtures/themes/plain/assets/images/#{name}.*").any?
+  end
+
+  # The preloaded modules by name: an href is `/assets/<name>-<digest>.js`.
+  def preloaded_modules = modulepreloads.map { |href| href.delete_prefix("/assets/").sub(/-\h+\.js\z/, "") }
+
+  # The preloaded controllers of the site's own: those at the top of
+  # app/javascript/controllers, not a theme's or CS Studio's.
+  def preloaded_controllers = preloaded_modules.grep(%r{\Acontrollers/[a-z_]+_controller\z}).sort
+
+  def top_level_controllers = Rails.root.glob("app/javascript/controllers/*_controller.js").map { |file| "controllers/#{file.basename(".js")}" }.sort
+
+  # `SITE` and `PUBLIC_ONLY` as controllers/index.js writes them (`SITE`
+  # spreads `PUBLIC_ONLY` into its own names).
+  def site_set = (controller_list("SITE") + public_only_set).sort
+
+  def public_only_set = controller_list("PUBLIC_ONLY")
+
+  def controller_list(name)
+    list = Rails.root.join("app/javascript/controllers/index.js").read[/^export const #{name} = \[([^\]]*)\]/, 1]
+    assert list, "controllers/index.js exports #{name}"
+    list.scan(/"(controllers\/[a-z_]+_controller)"/).flatten
+  end
 
   def entry_point_script = css_select("script[type=module]").map(&:text).join("\n")
 
