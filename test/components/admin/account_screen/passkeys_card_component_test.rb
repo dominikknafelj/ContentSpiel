@@ -95,6 +95,28 @@ class Admin::AccountScreen::PasskeysCardComponentTest < ViewComponent::TestCase
     assert_selector "#passkey-#{held.id}", text: "MacBook"
     assert_selector "#passkey-#{held.id} button[aria-label='Rename the passkey MacBook']"
     assert_selector "[data-passkeys-foot]", text: "1 passkey"
+    # The foot says why there is no Add, after the count.
+    assert_selector "[data-passkeys-foot] p.text-small.text-dim + p.text-small.text-meta[data-passkeys-not-addable]",
+      text: "Passkeys can be added only at the site's own address, not at an IP address."
+  end
+
+  test "where a passkey can be made the foot says nothing of IP addresses" do
+    card
+
+    assert_no_selector "[data-passkeys-not-addable]"
+  end
+
+  # Design System v262, A3: the recovery codes are the card's second
+  # section, under a line, after the foot; no section without a passkey.
+  test "the recovery codes are the card's second section, drawn only while the person holds a passkey" do
+    with_request_url("/cs-studio/account") { render_inline Admin::AccountScreen::PasskeysCardComponent.for(@user, addable: true) }
+    assert_no_selector "#account-recovery", visible: :all
+    assert_selector "section#account-passkeys", count: 1
+
+    passkey("MacBook")
+    with_request_url("/cs-studio/account") { render_inline Admin::AccountScreen::PasskeysCardComponent.for(@user, addable: true) }
+    assert_selector "section#account-passkeys > [data-passkeys-foot] ~ section#account-recovery.border-t h3", text: "Recovery codes"
+    assert_selector "#account-recovery [data-recovery-status]", text: "You have no recovery codes."
   end
 
   test "after a sign-in with a recovery code the card opens on the warn notice, by how many are left" do

@@ -3,6 +3,9 @@
   <% card.with_head_end do %>
     <%= render Admin::SettingsScreen::MailStateComponent.new(mail_settings: mail_settings) %>
   <% end %>
+  <% card.with_head_note do %>
+    <%= render Admin::SettingsScreen::MailStateComponent.new(mail_settings: mail_settings, part: :note) %>
+  <% end %>
 
   <div class="flex flex-col gap-4 p-4">
     <% if all_from_host? %>

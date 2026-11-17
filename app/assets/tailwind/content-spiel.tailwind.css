@@ -1225,13 +1225,33 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
     .admin-history-versions__heading { position: static; width: auto; height: auto; margin: 0 0.375rem 0.5rem; overflow: visible; clip-path: none; white-space: normal; }
   }
 }
+/* The page frame (Design System 1794894016-5ccc, FoundationLayout "The page frame"):
+   every screen's content in one frame, `.admin-page`, from `<main>`'s
+   padding, as wide as `<main>` allows up to `--cs-content-max`, and always
+   at the left: nothing in CS Studio is centred (the 403 and 404 messages
+   alone). Its head row (`.admin-page__head`: the `h1`, its one line, the
+   screen's action) spans the whole frame, the action at the right end;
+   below 640px the row wraps and the action goes under the `h1`, at the
+   left. Its body (`.admin-page__body`) is one of two widths and no other:
+   `.admin-page--wide`, the frame's full width (lists, tables, logs,
+   overviews, Settings' nav, column and rail), or `.admin-page--form`,
+   `--cs-form-max` (760px) at the left under the `h1` (forms and reading:
+   Your account). */
+.admin-page { width: 100%; max-width: var(--cs-content-max); }
+.admin-page__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; column-gap: var(--cs-sp-4); row-gap: var(--cs-sp-2); margin-bottom: 1rem; }
+.admin-page--form > .admin-page__body { max-width: var(--cs-form-max); }
+@media (max-width: 639.98px) {
+  .admin-page__head { flex-direction: column; }
+}
 /* Settings' layout and its "At a glance" rail
    (`Admin::SettingsScreen::GlanceComponent`). `.admin-settings-layout` is
    the container, so the rail docks by the room the Settings area has,
    never the window's (the sidebar takes room the window does not show).
-   It docks at 1200px, the editors', the dashboard's and the lists'
-   threshold, written here again because a container query cannot read a
-   custom property (`admin_design_rules_test` holds them to one).
+   It docks at 1140px, Settings' own threshold, under the editors', the
+   dashboard's and the lists' 1200px: a 1440px window leaves the Settings
+   area about 1185px, and the rail docks there, the cards' column narrowing
+   to about 554px at the threshold and 600px at 1185px
+   (`admin_design_rules_test` holds the one width).
 
    The grid (`__grid`) holds, in document order, the nav's wrapper (the
    heading and the nav, `__nav`), the rail, then the cards' column
@@ -1248,8 +1268,9 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
      `--cs-rail-width` wide and `--cs-rail-gap` right of the cards, on the
      rail's ground and sticky under the window's top with `--cs-sp-4`
      above it, scrolling inside itself when it is taller than the window.
-     Spare width falls right of the rail; the whole stops at
-     `--cs-content-max` and past it is centred in the content area. */
+     Spare width falls right of the rail, at every width: the layout is
+     the page frame's body (`.admin-page`, which stops at
+     `--cs-content-max`), from its left edge, and never centred. */
 .admin-settings-layout { container: admin-settings / inline-size; }
 .admin-settings-layout__grid { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "nav" "glance" "cards"; align-items: start; column-gap: var(--cs-rail-gap); row-gap: 1rem; }
 .admin-settings-layout__nav { grid-area: nav; }
@@ -1258,10 +1279,22 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 @media (min-width: 1024px) {
   .admin-settings-layout__grid { grid-template-columns: 170px minmax(0, var(--cs-form-max)); grid-template-areas: "nav glance" "nav cards"; }
 }
-@container admin-settings (min-width: 1200px) {
-  .admin-settings-layout__grid { grid-template-columns: 170px minmax(0, var(--cs-form-max)) var(--cs-rail-width); grid-template-areas: "nav cards glance"; max-width: var(--cs-content-max); margin-inline: auto; }
+@container admin-settings (min-width: 1140px) {
+  .admin-settings-layout__grid { grid-template-columns: 170px minmax(0, var(--cs-form-max)) var(--cs-rail-width); grid-template-areas: "nav cards glance"; }
   .admin-settings-glance { max-width: none; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail);
     position: sticky; top: calc(var(--admin-top-offset) + var(--cs-sp-4)); max-height: calc(100dvh - var(--admin-top-offset) - 2 * var(--cs-sp-4)); overflow-y: auto; overscroll-behavior: contain; }
+}
+/* A settings card's head (`Admin::Ui::SettingsCardComponent`) on a narrow
+   card: the head is its own container (as wide as the card; the head and
+   not the card, so the card's body, its menus and its stacking stay
+   uncontained), and below 560px of it the head's end (the Mail card's
+   state, the Site card's language tabs) leaves the heading's row for a row
+   of its own under the heading and the intro, so it never stands over
+   them; tabs that still do not fit scroll sideways inside it. The head's
+   note follows under it. */
+.admin-settings-card__head { container: admin-settings-card-head / inline-size; }
+@container admin-settings-card-head (max-width: 559.98px) {
+  .admin-settings-card__end { grid-column: 2 / -1; grid-row: auto; justify-self: stretch; min-width: 0; margin-top: 0.5rem; overflow-x: auto; }
 }
 /* The editors' rail. The editor area (`#editing`, the live region) is the
    container, so what the rail asks is the room the editor has, never the

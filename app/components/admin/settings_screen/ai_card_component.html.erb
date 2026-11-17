@@ -22,14 +22,18 @@
 
     <%= render Admin::SettingsScreen::AiKeyComponent.new(site_setting: site_setting) %>
 
-    <div>
+    <%# Drawn only while there is something to test: a provider chosen and
+        a key saved (`testable?`, and `admin--settings--ai#refresh` as the
+        provider changes or a key write answers). Otherwise the key's chip
+        ("Off", "No key") already says why. %>
+    <%= tag.div hidden: !testable?, data: { "admin--settings--ai-target": "testRow" } do %>
       <div class="flex flex-wrap items-center gap-3">
         <%# Its own form (a sibling after the main one). Not a pending-lock control: see the class comment. %>
-        <%= render Admin::Ui::ButtonComponent.new(label: t(".test"), variant: :secondary, type: "submit", form: TEST_FORM,
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".test"), variant: :secondary, size: :small, type: "submit", form: TEST_FORM,
               data: { "admin--settings--ai-target": "test", busy_label: t(".testing") }) %>
         <span class="text-sm text-meta" data-admin--settings--ai-target="testHint" hidden></span>
       </div>
       <%= render Admin::SettingsScreen::AiTestResultComponent.new %>
-    </div>
+    <% end %>
   </div>
 <% end %>

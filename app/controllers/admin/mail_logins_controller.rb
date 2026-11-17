@@ -58,7 +58,8 @@ module Admin
         turbo_stream.replace("settings-mail-login-forms", partial: "admin/settings/mail_login_forms", locals: { site_setting: site, main_base: forms_base }),
         # A new or removed login is a change of the delivery settings: a
         # verified site is untested again (`MailSettings`' fingerprint).
-        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: settings))
+        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: settings)),
+        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::NOTE_ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: settings, part: :note))
       ]
       respond_with_streams(streams, anchor: "mail", glance: "mail", moved_to: moved_to, notice: notice, error: error, toast: toast, status: status)
     end

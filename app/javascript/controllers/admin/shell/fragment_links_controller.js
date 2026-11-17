@@ -104,10 +104,12 @@ export function targetWithinThePage(url) {
 }
 
 // What following the fragment would have done, without the history entry.
+// Exported for a control that stands for such links (Settings' section
+// select on a phone, `admin--settings--nav#choose`).
 // `scrollIntoView` with no `behavior` jumps unless the page's CSS asks for
 // smooth scrolling, so it is named: no animation for a reader who asked for
 // reduced motion.
-function jumpTo(element) {
+export function jumpTo(element) {
   if (element.tabIndex < 0 && !element.hasAttribute("tabindex")) element.setAttribute("tabindex", "-1")
   element.focus({ preventScroll: true })
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches

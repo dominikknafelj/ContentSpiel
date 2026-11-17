@@ -46,7 +46,7 @@ module Admin
           "Its columns, MailSettings fields and ports are its constants (FIELDS, SETTING, SECURITIES, PORTS), read by Settings, the wizard and Values."
         ],
         states: %i[rest from_host],
-        keys: %w[server_group sender_group server server_placeholder port security starttls tls sender_name sender_address sender_address_placeholder],
+        keys: %w[server_group sender_group server login_heading server_placeholder port security starttls tls sender_name sender_address sender_address_placeholder],
         slots: %i[login],
         controller: nil,
         keyboard: [ "test/system/admin/settings_mail_test.rb", "the Mail card's fields are Tab stops in order, Security's radios move with the arrow keys and Send test mail answers on Enter" ]

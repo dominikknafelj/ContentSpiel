@@ -130,7 +130,7 @@ module Admin
       @sessions = Current.user.open_sessions.to_a
     end
 
-    # The Passkeys and Recovery codes cards, and whether Confirm it's you
+    # The Passkeys card (its recovery codes its second section), and whether Confirm it's you
     # offers a passkey, for every answer that draws the screen. After a
     # sign-in with a recovery code (`SecondFactorsController#code`) the
     # Passkeys card says how many codes are left. "Add a passkey…" is drawn
@@ -140,7 +140,6 @@ module Admin
       return if Current.user.sso_linked?
 
       @passkeys_card = AccountScreen::PasskeysCardComponent.for(Current.user, addable: passkey_relying_party.present?, recovery_left: flash[:recovery_code_left]&.to_i, url_options: admin_url_options)
-      @recovery_card = AccountScreen::RecoveryCardComponent.for(Current.user, url_options: admin_url_options)
       @confirm_with_passkey = Current.user.passkeys.exists?
     end
 

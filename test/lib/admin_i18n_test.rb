@@ -258,8 +258,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/account_screen/passkey_dialog_component.html.erb
     app/components/admin/account_screen/passkey_rename_fields_component.rb
     app/components/admin/account_screen/passkey_rename_fields_component.html.erb
-    app/components/admin/account_screen/recovery_card_component.rb
-    app/components/admin/account_screen/recovery_card_component.html.erb
+    app/components/admin/account_screen/recovery_section_component.rb
+    app/components/admin/account_screen/recovery_section_component.html.erb
     app/components/admin/account_screen/sso_card_component.rb
     app/components/admin/account_screen/sso_card_component.html.erb
     app/controllers/admin/passkeys_controller.rb

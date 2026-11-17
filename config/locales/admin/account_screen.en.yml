@@ -64,6 +64,9 @@ en:
             one: "1 passkey"
             other: "%{count} passkeys"
           none: "You have no passkeys. You sign in with your password."
+          # Under the count while no passkey can be made here (no relying
+          # party: the site reached at an IP address).
+          not_addable: "Passkeys can be added only at the site's own address, not at an IP address."
           add: "Add a passkey…"
         # The card's three dialogs: Add (the Name, then the browser's
         # prompt), Rename and Remove. `name_blank` and `failed` are said by
@@ -82,14 +85,13 @@ en:
           remove_last: "It's your last passkey: you'll sign in with your password again."
           remove_confirm: "Remove passkey"
           cancel: "Cancel"
-        # The Recovery codes card: how many are left and when they were made,
-        # and Generate… or Regenerate….
-        recovery_card:
+        # The Passkeys card's Recovery codes section: how many are left and
+        # when they were made, and Generate… or Regenerate….
+        recovery_section:
           title: "Recovery codes"
           intro: "Sign in with one when your passkeys aren't at hand. Each code works once."
           left: "%{left} of 10 codes left · made %{date}"
           none: "You have no recovery codes."
-          passkey_first: "Recovery codes come with your first passkey."
           low:
             one: "1 code left. Regenerate them before you run out."
             other: "%{count} codes left. Regenerate them before you run out."

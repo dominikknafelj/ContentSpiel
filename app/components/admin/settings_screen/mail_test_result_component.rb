@@ -37,7 +37,7 @@ module Admin
           safe_join([
             tag.div(class: "flex flex-wrap items-center gap-3") do
               safe_join([
-                render(Admin::Ui::ButtonComponent.new(label: t(".send"), variant: :secondary, type: "submit", form: TEST_FORM,
+                render(Admin::Ui::ButtonComponent.new(label: t(".send"), variant: :secondary, size: :small, type: "submit", form: TEST_FORM,
                   data: { "admin--saving--pending-lock-target": "control", "admin--settings--mail-target": "test", busy_label: t(".sending") })),
                 tag.span(t(".sends_to", address: @address), class: "text-sm text-meta")
               ])

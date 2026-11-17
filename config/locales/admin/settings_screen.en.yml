@@ -13,7 +13,7 @@ en:
           site: "Site"
           languages: "Languages"
           post_types: "Post types"
-          publishing: "Publishing"
+          publishing: "Trash"
           forms: "Forms"
           ai: "AI translation"
           mail: "Mail"
@@ -21,6 +21,8 @@ en:
           images: "Images"
         nav:
           label: "Settings sections"
+          # The select that stands for the links on a phone.
+          select: "Section"
         # The "At a glance" rail (`GlanceComponent`) and its rows
         # (`GlanceRowComponent`, which reads these by full key). The AI and
         # Mail rows say `ai_state.*` and `admin.mail.states.*.word`, as their
@@ -72,7 +74,9 @@ en:
           falls_back_to: "Falls back to"
           # Said after "Falls back to" to a screen reader only.
           falls_back_for: "for %{language}"
-          no_fallback: "None (default)"
+          # The blank fallback, which is the default language, named in its
+          # own language as the rows name it.
+          no_fallback: "%{language}, the default"
           turn_off: "Turn off…"
           turn_off_label: "Turn off %{language}"
           add_label: "Add a language"
@@ -127,7 +131,6 @@ en:
           intro: "Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider."
           all_from_host: "These settings come from the host's environment."
         mail_login:
-          heading: "Login"
           username: "Username"
           password: "Password"
           save: "Save login"
@@ -149,6 +152,12 @@ en:
           pending: "Save your changes first"
         mail_state:
           label: "Mail state"
+          # The note under the card's intro: what the state means for the
+          # site. A working mail has none.
+          notes:
+            not_set_up: "Password resets and invites are off until mail is set up."
+            untested: "Mail is saved but not tested yet."
+            failed: "The last mail could not be sent."
         # `Admin::SettingsScreen::AiState`'s words, one per state: the key's
         # chip, Test connection's result and the rail say them alike.
         ai_state:
@@ -198,8 +207,8 @@ en:
           format: "Format"
           webp: "WebP"
           avif: "AVIF"
-          format_help: "WebP is shown by every current browser. AVIF makes smaller files."
-          avif_note: "Smaller files, slower to make; very old browsers show no image. Animated images are always made in WebP, at the WebP quality."
+          format_help: "WebP: shown by every current browser."
+          avif_note: "AVIF: smaller files, slower to make; very old browsers show no image. Animated images are still made in WebP, at the WebP quality."
           avif_unavailable: "AVIF is not available: this server cannot write it."
           image_quality_webp: "WebP quality"
           image_quality_avif: "AVIF quality"

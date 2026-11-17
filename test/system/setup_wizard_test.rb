@@ -146,7 +146,7 @@ class SetupWizardTest < ApplicationSystemTestCase
     ActionMailer::Base.deliveries.clear
 
     assert_equal "Send test mail", find("#setup-mail-actions").all("button, a").first.text.strip
-    fill_in "Server", with: "smtp.enter.test"
+    fill_in "Host", with: "smtp.enter.test"
     fill_in "Sender address", with: "hello@site.test"
     find_field("Sender address").send_keys(:enter)
 

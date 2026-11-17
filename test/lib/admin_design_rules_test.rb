@@ -1257,13 +1257,16 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/grid-template-columns:\s*170px minmax\(0, var\(--cs-form-max\)\);/, window.first)
     assert_match(/grid-template-areas:\s*"nav glance" "nav cards";/, window.first, "the nav spans both rows; the rail stands above the cards")
 
-    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-settings \(min-width: 1200px\)\s*\{/)
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-settings \(min-width: 1140px\)\s*\{/)
     assert_equal 1, docked.size, "one block docks Settings' rail"
     docked_grid = docked.first[/\.admin-settings-layout__grid\s*\{([^}]*)\}/, 1]
     assert docked_grid, "the docked block lays out the grid"
     assert_match(/grid-template-columns:\s*170px minmax\(0, var\(--cs-form-max\)\) var\(--cs-rail-width\);/, docked_grid, "the cards' column narrows as the area does; the rail keeps its width")
     assert_match(/grid-template-areas:\s*"nav cards glance";/, docked_grid)
     assert_no_match(/justify-content/, docked_grid, "spare width below the max falls right of the rail")
+    # The page frame (Design System 1794894016-5ccc): Settings stands from
+    # the frame's left edge and is never centred, past the max included.
+    assert_no_match(/margin-inline|max-width/, docked_grid, "the frame stops the layout at the content max; nothing centres it")
     rail = docked.first[/\.admin-settings-glance\s*\{([^}]*)\}/, 1]
     assert rail, "the docked block grounds the rail"
     [ 'background:\s*var\(--cs-rail\)', 'box-shadow:\s*var\(--cs-shadow-2\)', 'border-radius:\s*var\(--cs-radius-rail\)', 'position:\s*sticky',
@@ -1354,16 +1357,34 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/margin-inline:\s*auto;/, rule, "#{what} is centred past the content max")
   end
 
+  # The page frame: one frame, at the left, up to the content max; a head
+  # row across it; two body widths. Settings and Your account stand in it
+  # (the other screens follow).
+  test "the page frame stops at the content max at the left, its head spans it, and its form body is --cs-form-max" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    frame = css[/(?:\A|\})\s*\.admin-page\s*\{([^}]*)\}/, 1]
+    assert frame, "the frame's own rule"
+    assert_match(/max-width:\s*var\(--cs-content-max\);/, frame)
+    assert_no_match(/margin/, frame, "the frame is never centred")
+    head = css[/\.admin-page__head\s*\{([^}]*)\}/, 1]
+    assert_match(/justify-content:\s*space-between;/, head, "the action stands at the frame's right end")
+    assert_match(/flex-wrap:\s*wrap;/, head)
+    assert_match(/\.admin-page--form > \.admin-page__body\s*\{\s*max-width:\s*var\(--cs-form-max\);\s*\}/, css)
+    assert_match(/class="admin-page admin-page--wide admin-settings-layout"/, Rails.root.join("app/views/admin/settings/show.html.erb").read)
+    assert_match(/class="admin-page admin-page--form"/, Rails.root.join("app/views/admin/accounts/edit.html.erb").read)
+  end
+
   # Design System v122: past the cap the spare width is split evenly either
   # side, for every docked composition and the head row over it, and only
   # inside its docked rule: undocked, nothing centres (a one-column screen
   # stays at the left under its heading). Written here, never as `mx-auto`
-  # in a view ("nothing inside CS Studio is centred…").
+  # in a view ("nothing inside CS Studio is centred…"). Settings stands in
+  # the page frame and is centred no more (the test above); the other
+  # screens follow it there.
   test "every docked composition and its head row centre past --cs-content-max" do
     { "admin-editor" => [ ".admin-rail-grid" ],
       "admin-dashboard" => [ ".admin-dashboard__grid", ".admin-dashboard__head,\n  .admin-dashboard__notice" ],
       "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ],
-      "admin-settings" => [ ".admin-settings-layout__grid" ],
       "admin-media" => [ ".admin-media-library__head,\n  .admin-media-selection-bar", ".admin-media-library__grid" ] }.each do |container, selectors|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).first
       selectors.each do |selector|
@@ -1383,7 +1404,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     # Undocked nothing centres: no rule outside a docked block carries an
     # auto inline margin but the header's, which applies only while docked.
     outside = %w[admin-editor admin-dashboard admin-list admin-settings admin-media].reduce(css) do |rest, container|
-      self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).reduce(rest) { |text, block| text.sub(block, "") }
+      width = container == "admin-settings" ? "1140px" : "1200px"
+      self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: #{width}\)\s*\{/).reduce(rest) { |text, block| text.sub(block, "") }
     end
     assert_equal 1, outside.scan(/margin-inline:\s*auto/).size, "only the docked header row centres outside a docked block"
   end
@@ -1513,7 +1535,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # A container query cannot read a custom property, so the threshold is a
   # number written in five places (the media library's too); this holds them to one.
-  test "the editors' rail, the dashboard's, the lists' and Settings' dock at one threshold" do
+  test "the editors' rail, the dashboard's and the lists' dock at one threshold, and Settings' at its own" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     # The editor area asks one other width: 1244px, where a docked post's
     # main column's content box (the area less the rail, its gap and the
@@ -1532,7 +1554,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     dashboard = css.scan(/@container admin-dashboard \(min-width: ([^)]+)\)/).flatten
     assert_equal [ "40rem", editor.first ].sort, dashboard.sort, "the dashboard's container widths"
     assert_equal [ editor.first ], css.scan(/@container admin-list \(min-width: ([^)]+)\)/).flatten, "the lists' container asks the threshold alone"
-    assert_equal [ editor.first ], css.scan(/@container admin-settings \(min-width: ([^)]+)\)/).flatten, "the Settings area's container asks the threshold alone"
+    # Settings docks at a width of its own (Design System v262, S13): a
+    # 1440px window leaves its area about 1185px, which docks the rail.
+    assert_equal [ "1140px" ], css.scan(/@container admin-settings \(min-width: ([^)]+)\)/).flatten, "the Settings area's container asks its own threshold alone"
     # The media library asks the threshold and 760px, where its rail stands
     # beside the grid as a card.
     assert_equal [ "1200px", "760px" ].sort, css.scan(/@container admin-media \(min-width: ([^)]+)\)/).flatten.sort

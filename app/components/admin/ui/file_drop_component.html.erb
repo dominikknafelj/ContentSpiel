@@ -5,7 +5,7 @@
   <p class="text-ink">Drop an image here or</p>
   <%# A label drawn as the secondary button: the file input it names is the
       focusable control (`peer`), so the label rings when the input is focused. %>
-  <label for="<%= id %>" class="mt-2 <%= Admin::Ui::ButtonComponent.classes(:secondary) %> peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent">Choose file</label>
+  <label for="<%= id %>" class="mt-2 <%= Admin::Ui::ButtonComponent.classes(:secondary, size: size) %> peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent">Choose file</label>
   <% if hint %>
     <p id="<%= hint_id %>" class="mt-2 text-sm text-meta"><%= hint %></p>
   <% end %>

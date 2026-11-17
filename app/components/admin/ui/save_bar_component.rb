@@ -27,6 +27,7 @@ module Admin
           "The count, the names, the dot, the blocked hint and Save's disabled state are written by admin--saving--save-bar on the form; without JavaScript Save is a plain working submit.",
           "It names at most three changed fields, then how many more; a field it cannot name is counted and not named.",
           "It must stand inside the form that carries admin--saving--save-bar.",
+          "A contained footer says nothing at rest; only the floating bar says No unsaved changes.",
           "Its parts are targets of admin--saving--save-bar, which the form around it attaches."
         ],
         states: %i[rest contained hover focus],
@@ -48,8 +49,10 @@ module Admin
       # `contained: true` is the footer of ONE card, drawn inside it: under a
       # line, within the card's padding, on the card's own surface, not stuck to
       # the window and with no dot -- the card is short and its footer is where
-      # the card ends. Put it in the card as its last part. The default is the
-      # floating bar of a whole form.
+      # the card ends. Put it in the card as its last part. At rest its count
+      # line is empty (it keeps its height): "No unsaved changes" is the
+      # floating bar's alone, which is always on screen and has to say why
+      # its Save is off. The default is the floating bar of a whole form.
       def initialize(form_id:, cancel_url:, save_label: nil, save_data: {}, contained: false)
         @form_id = form_id
         @contained = contained
@@ -70,6 +73,8 @@ module Admin
       # The words' size: the floating bar's line is 14px on a 20px line
       # (`text-sm`); a card's footer is the type scale's 13px, `text-small`.
       def line_class = contained? ? "text-small" : "text-sm"
+
+      def count_class = [ line_class, "text-dim", ("min-h-[1lh]" if contained?) ].compact.join(" ")
 
       # Sticky at `--cs-sp-3` above the window's edge, so the bar floats clear
       # of it over the fields and stands under them at the form's end.

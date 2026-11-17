@@ -4,7 +4,7 @@ module Admin
     # `admin--saving--save-bar` writes its count and enables Save, so each
     # example wraps it in the controller with one field: type in it to see
     # both change. `rest` is a form's footer, `contained` the footer of one
-    # card, under a line inside it.
+    # card, under a line inside it, whose count line is empty until a change.
     class SaveBarComponentPreview < ViewComponent::Preview
       def rest
         render_with_template

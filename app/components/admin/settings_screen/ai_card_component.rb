@@ -5,7 +5,9 @@ module Admin
     # Test connection are instant actions of their own, associated with the
     # forms in `#settings-ai-key-forms` (rendered by `show` AFTER the main
     # form -- forms can't nest) through `form=`. Test connection is a
-    # secondary: the save bar's Save is the screen's one primary.
+    # small secondary: the save bar's Save is the screen's one primary. It is
+    # drawn only while a provider is chosen and a key is saved: with neither
+    # there is nothing to test, and the key's chip says why.
     #
     # `admin--settings--ai` (this card's root) owns Replace/Cancel and gates
     # Test connection: it tests the SAVED settings, so it is disabled while
@@ -38,6 +40,10 @@ module Admin
       end
 
       def saved_provider = site_setting.ai_provider.to_s
+
+      # Test connection is drawn while a provider is chosen (typed or stored)
+      # and a key is saved; the script keeps it so in the page.
+      def testable? = values.ai_provider.present? && site_setting.ai_api_key_set?
 
       def saved_model = site_setting.ai_model.to_s
 

@@ -425,7 +425,8 @@ export default class extends Controller {
   }
 
   // The count in bold, then the names in the count line's own colour; "No
-  // unsaved changes" in meta. The names sentence is the key's, and the count
+  // unsaved changes" in meta, but for a footer inside its card
+  // (`data-save-bar-quiet`), whose line is empty at rest. The names sentence is the key's, and the count
   // is cut out of it where the key put it, so a language may order the two
   // as it likes.
   writeCount(count, names, unsaved) {
@@ -435,7 +436,8 @@ export default class extends Controller {
     target.classList.toggle("text-meta", !unsaved)
     target.classList.toggle("text-dim", unsaved)
     if (count === 0) {
-      target.textContent = unsaved ? text.t("components.ui.save_bar.unsaved") : (this.alwaysValue ? "" : text.t("components.ui.save_bar.no_changes"))
+      const quiet = this.alwaysValue || target.hasAttribute("data-save-bar-quiet")
+      target.textContent = unsaved ? text.t("components.ui.save_bar.unsaved") : (quiet ? "" : text.t("components.ui.save_bar.no_changes"))
       return
     }
     const changes = text.t("components.ui.save_bar.changes", { count })

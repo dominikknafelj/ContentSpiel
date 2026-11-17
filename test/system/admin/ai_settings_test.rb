@@ -26,6 +26,8 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     assert_selector "#settings-ai-key [data-ai-key-state=unset]", text: "No key"
+    # With no key there is nothing to test (Design System v262, S6).
+    assert_no_button "Test connection"
     within("#settings-ai-key") { click_on "Add key" }
     fill_in "API key", with: KEY
     click_on "Save key"
@@ -67,6 +69,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     within("#settings-ai-remove-key-dialog") { click_on "Remove key" }
     assert_selector "#settings-ai-key", text: "No key"
     assert_nil site_settings(:default).reload.ai_api_key
+    assert_no_button "Test connection"
   end
 
   test "Replace opens the input empty and Cancel closes it" do

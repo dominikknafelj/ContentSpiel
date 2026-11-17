@@ -16,13 +16,33 @@ class Admin::SettingsScreen::AiCardComponentTest < ViewComponent::TestCase
     assert_selector "input[name='site_setting[ai_model]'][value='typed-model'][data-saved-value='claude-opus-5']"
   end
 
-  test "Test connection is a button of its own form, not a pending-lock control, with a hint slot and a result slot" do
+  test "Test connection is a small button of its own form, not a pending-lock control, with a hint slot and a result slot" do
+    SiteSetting.instance.update!(ai_provider: "anthropic", ai_api_key: "sk-ant-card-test")
     render_card
 
     assert_selector "button[type=submit][form='settings-ai-test-form'][data-admin--settings--ai-target=test]", text: "Test connection"
+    assert_empty Admin::Ui::ButtonComponent.classes(:secondary, size: :small).split - page.find("button", text: "Test connection")[:class].split
     assert_no_selector "button[form='settings-ai-test-form'][data-admin--saving--pending-lock-target]"
     assert_selector "[data-admin--settings--ai-target=testHint][hidden]", visible: :all
     assert_selector "#settings-ai-test-result"
+  end
+
+  # Design System v262, S6: with no provider or no key there is nothing to
+  # test, and the key's chip ("Off", "No key") says why.
+  test "Test connection is drawn only while a provider is chosen and a key is saved" do
+    SiteSetting.instance.update!(ai_provider: "anthropic")
+    render_card
+    assert_selector "[data-admin--settings--ai-target=testRow][hidden]", visible: :all
+    assert_selector "#settings-ai-key[data-ai-key-set=false]"
+
+    SiteSetting.instance.update!(ai_provider: nil, ai_api_key: "sk-ant-card-test")
+    render_card
+    assert_selector "[data-admin--settings--ai-target=testRow][hidden]", visible: :all
+
+    SiteSetting.instance.update!(ai_provider: "anthropic")
+    render_card
+    assert_selector "[data-admin--settings--ai-target=testRow]:not([hidden]) button", text: "Test connection"
+    assert_selector "#settings-ai-key[data-ai-key-set=true]"
   end
 
   test "renders the key component and the per-field errors" do

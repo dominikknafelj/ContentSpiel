@@ -11,6 +11,16 @@ class Admin::Ui::FileDropComponentTest < ViewComponent::TestCase
     assert_selector "[data-file-drop-target=name][aria-live=polite]"
   end
 
+  test "size: :small draws Choose file as a small secondary, and the default is the regular one" do
+    render_inline(Admin::Ui::FileDropComponent.new(name: "logo", id: "logo", size: :small))
+    classes = page.find("label[for=logo]")[:class].split
+    assert_empty Admin::Ui::ButtonComponent.classes(:secondary, size: :small).split - classes
+    assert_includes page.find("label[for=logo]")[:class], "rounded-button-sm"
+
+    render_inline(Admin::Ui::FileDropComponent.new(name: "logo", id: "logo"))
+    assert_not_includes page.find("label[for=logo]")[:class].split, "rounded-button-sm"
+  end
+
   test "accepts the library's image types by default and merges the caller's data attributes onto the input" do
     render_inline(Admin::Ui::FileDropComponent.new(name: "file", id: "upload", data: { action: "change->x#y" }))
     assert_selector "input#upload[accept='#{Media::Asset::ALLOWED_CONTENT_TYPES.join(',')}']", visible: :all

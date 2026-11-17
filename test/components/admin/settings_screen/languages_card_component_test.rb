@@ -22,16 +22,21 @@ class Admin::SettingsScreen::LanguagesCardComponentTest < ViewComponent::TestCas
     # No radio group: a tag on the default row, a dialog trigger on the others.
     assert_no_selector "input[type=radio]"
     assert_selector "#language-de [data-default-tag]", text: "Default"
-    assert_no_selector "#language-de button", text: "Make default"
+    assert_no_selector "#language-de button:not([disabled])", text: "Make default"
     assert_selector "#language-en button[aria-label='Make English the default language'][data-admin--ui--dialog-id-param='language-default-dialog-en'][data-admin--saving--pending-lock-target=control]", text: "Make default"
-    assert_selector "button", text: "Make default…", count: 2
+    assert_selector "button:not([disabled])", text: "Make default…", count: 2
     assert_selector "#language-en-fallback option[selected][value=de]"
     assert_selector "#language-de-fallback[disabled]"
     assert_selector "button[aria-label='Move English']"
     assert_selector "button[data-admin--saving--pending-lock-target=control]", text: "Turn off…", count: 2
-    # The default's row holds the button's place with an unseen, inert copy,
-    # so its tag and select line up with the rows that have the real one.
+    # The default's row holds the actions' place with unseen, inert copies,
+    # so its select lines up with the rows that have the real ones.
     assert_selector "#language-de span.invisible[aria-hidden=true] button[disabled][tabindex='-1']:not([data-action])", text: "Turn off…", count: 1
+    assert_selector "#language-de span.invisible[aria-hidden=true] button[disabled][tabindex='-1']:not([data-action])", text: "Make default…", count: 1
+    # Three groups, the row wrapping between them: the language with its
+    # badge, the fallback, the actions.
+    assert_equal 3, page.find("#language-de").all(:xpath, "./div").size
+    assert_selector "#language-de > div:first-of-type [data-default-tag]"
     assert_no_selector "#language-en span.invisible"
   end
 
@@ -74,10 +79,10 @@ class Admin::SettingsScreen::LanguagesCardComponentTest < ViewComponent::TestCas
     turn_offs = page.all("#language-de button, #language-es button", text: "Turn off…")
     assert_equal 2, turn_offs.size
     assert turn_offs.all? { |button| drawn_as?(button, :danger_text, size: :small) }, "Turn off… is the small danger text"
-    spacer = page.find("#language-en span.invisible[data-turn-off-spacer] button", visible: :all)
+    spacer = page.find("#language-en span.invisible[data-turn-off-spacer] button", text: "Turn off…", visible: :all)
     assert drawn_as?(spacer, :danger_text, size: :small), "the default's unseen spacer is drawn as the button it stands for"
-    page.all("button", text: "Make default…").each { |button| assert drawn_as?(button, :secondary, size: :small) }
-    assert drawn_as?(page.find("button", text: "Add language"), :secondary)
+    page.all("button:not([disabled])", text: "Make default…").each { |button| assert drawn_as?(button, :secondary, size: :small) }
+    assert drawn_as?(page.find("button", text: "Add language"), :secondary, size: :small), "an instant action in a card is small"
     badge = page.find("#language-en [data-default-tag]", text: "Default")
     assert_empty Admin::Ui::BadgeComponent::TONES.fetch(:neutral).split - badge[:class].split, "Default is the neutral badge"
   end

@@ -64,7 +64,7 @@ module Admin
       # `addable: true`: this action answers only where a relying party is.
       streams = [
         turbo_stream.replace(AccountScreen::PasskeysCardComponent::ID, AccountScreen::PasskeysCardComponent.for(Current.user, addable: true, url_options: admin_url_options)),
-        turbo_stream.replace(AccountScreen::RecoveryCardComponent::ID, AccountScreen::RecoveryCardComponent.for(Current.user, url_options: admin_url_options)),
+        turbo_stream.replace(AccountScreen::RecoverySectionComponent::ID, AccountScreen::RecoverySectionComponent.for(Current.user, url_options: admin_url_options)),
         turbo_stream.replace(Ui::ConfirmIdentityDialogComponent::ID, Ui::ConfirmIdentityDialogComponent.new(passkey: true, url_options: admin_url_options)),
         Admin::ToastStream.for(turbo_stream, t("admin.accounts.passkeys.added"))
       ]

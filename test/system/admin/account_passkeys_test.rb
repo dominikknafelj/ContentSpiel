@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# Your account's Passkeys and Recovery codes cards as a person meets them:
+# Your account's Passkeys card, with its Recovery codes section, as a person meets them:
 # adding a passkey through Chrome's virtual authenticator
 # (`PasskeyHelper#with_virtual_authenticator`), renaming and removing one,
 # making codes and seeing them once, and Confirm it's you before each change

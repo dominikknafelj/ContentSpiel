@@ -11,26 +11,39 @@ class Admin::SettingsScreen::MailCardComponentTest < ViewComponent::TestCase
 
   def drawn_as?(button, variant, size: :regular) = (Admin::Ui::ButtonComponent.classes(variant, size: size).split - button[:class].split).empty?
 
-  test "each state is a state chip, its tone and its word, and its sentence" do
-    { not_set_up: [ "Not set up", "Not set up. Password resets and invites are off.", :off ],
-      untested: [ "Saved, not tested", "Saved, not tested. Send a test mail to turn on resets and invites.", :warn ],
-      working: [ "Working", "Working. Last mail sent", :ok ],
-      failed: [ "Last send failed", "Last send failed", :danger ] }.each do |state, (word, sentence, tone)|
+  test "each state is a state chip alone at the head's end, its tone and its word, and what it means as the head's note" do
+    { not_set_up: [ "Not set up", "Password resets and invites are off until mail is set up.", :off ],
+      untested: [ "Saved, not tested", "Mail is saved but not tested yet.", :warn ],
+      working: [ "Working", nil, :ok ],
+      failed: [ "Last send failed", "The last mail could not be sent.", :danger ] }.each do |state, (word, note, tone)|
       with_mail_state(state) { render_card }
 
       assert_equal tone, Admin::SettingsScreen::MailStateComponent::TONES.fetch(state)
       assert_selector "#settings-mail-state[data-mail-state=#{state}] .admin-state-chip[data-state-tone=#{tone}]", text: word
       assert_selector "#settings-mail-state .admin-state-chip > span[aria-hidden=true]", visible: :all
-      assert_selector "#settings-mail-state p", text: sentence
+      assert_equal word, page.find("#settings-mail-state").text.strip, "the head's end holds the chip alone"
+      assert_selector ".admin-settings-card__note #settings-mail-state-note[data-mail-state=#{state}]", visible: :all
+      if note
+        assert_selector "#settings-mail-state-note p.text-small.text-dim", text: note
+        assert_no_text word.downcase == "not set up" ? "Not set up." : "Saved, not tested."
+      else
+        assert_no_selector "#settings-mail-state-note p"
+      end
     end
   end
 
-  test "a failed send shows its short reason, the failure's sentence and the server's line in mono" do
+  test "a site that is not set up for a reason the person must fix keeps that reason's sentence as the note" do
+    with_mail_state(:not_set_up, mail_sender_address: "two@one.test, three@one.test") { render_card }
+
+    assert_selector "#settings-mail-state-note p", text: "Not set up: the sender address is not one address, like no-reply@example.com."
+  end
+
+  test "a failed send shows the note, then the failure's sentence and the server's line in mono" do
     with_mail_state(:failed) { render_card }
 
-    assert_selector "#settings-mail-state p", text: /Last send failed \d{1,2} \w{3}, \d{2}:\d{2}: the server refused the login\./
-    assert_selector "#settings-mail-state [role=alert]", text: "The server refused the login. Check username and password."
-    assert_selector "#settings-mail-state [role=alert] code.font-cs-mono", text: "535 5.7.8 Authentication failed"
+    assert_selector "#settings-mail-state-note p", text: "The last mail could not be sent."
+    assert_selector "#settings-mail-state-note [role=alert]", text: "The server refused the login. Check username and password."
+    assert_selector "#settings-mail-state-note [role=alert] code.font-cs-mono", text: "535 5.7.8 Authentication failed"
   end
 
   test "the fields, security as STARTTLS by default, the login entry open with nothing set, and the test button" do
@@ -83,17 +96,18 @@ class Admin::SettingsScreen::MailCardComponentTest < ViewComponent::TestCase
     assert_selector "#settings-mail_sender_name-errors", text: "Sender name can't contain a line break."
   end
 
-  test "the state stands at the head's end, as the Site card's tabs do, and the head's note holds nothing of Mail's" do
+  test "the state stands at the head's end, as the Site card's tabs do, and while mail works its note is empty" do
     with_mail_state(:working) { render_card }
 
     assert_selector ".admin-settings-card__head > .admin-settings-card__end #settings-mail-state[data-mail-state=working]"
-    assert_no_selector ".admin-settings-card__note"
+    assert_equal "", page.find(".admin-settings-card__note", visible: :all).text(:all).strip
   end
 
-  test "Save login is a secondary: the save bar is the screen's one primary" do
+  test "Save login and Send test mail are small secondaries: the save bar is the screen's one primary" do
     with_mail_state(:not_set_up) { render_card }
 
-    assert drawn_as?(page.find("#settings-mail-login button[form=settings-mail-login-form]", text: "Save login"), :secondary)
+    assert drawn_as?(page.find("#settings-mail-login button[form=settings-mail-login-form]", text: "Save login"), :secondary, size: :small)
+    assert drawn_as?(page.find("button", text: "Send test mail"), :secondary, size: :small)
     assert_no_selector "button.bg-accent", visible: :all
   end
 

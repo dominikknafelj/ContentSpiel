@@ -1,5 +1,16 @@
-<nav aria-label="<%= t(".label") %>" class="admin-settings-nav flex flex-col gap-0.5" data-controller="admin--settings--nav" data-action="turbo:before-cache@document->admin--settings--nav#reset">
-  <% sections.each do |section| %>
-    <%= tag.a href: "##{section.id}", class: "flex items-center gap-2 rounded-cs px-2 py-1.5 text-sm text-dim hover:bg-sunken hover:text-ink", data: { "admin--settings--nav-target": "link" } do %><%= render Admin::Ui::IconChipComponent.new(icon: section.icon, family: section.family, size: :small) %><%= word(section) %><% end %>
-  <% end %>
+<nav aria-label="<%= t(".label") %>" class="admin-settings-nav" data-controller="admin--settings--nav" data-action="turbo:before-cache@document->admin--settings--nav#reset">
+  <%# Below 640px the links would be a whole screen before the first
+      setting: a select stands for them, and choosing a section jumps to its
+      card as its link does (`admin--settings--nav#choose`). It has no name
+      and stands outside every form, so it is no field and no change. %>
+  <div class="sm:hidden">
+    <label for="settings-section-select" class="<%= setup_label_class %>"><%= t(".select") %></label>
+    <%= select_tag nil, options_for_select(sections.map { |section| [ word(section), section.id ] }), id: "settings-section-select", class: setup_select_class,
+          data: { "admin--settings--nav-target": "select", action: "change->admin--settings--nav#choose" } %>
+  </div>
+  <div class="flex flex-col gap-0.5 max-sm:hidden">
+    <% sections.each do |section| %>
+      <%= tag.a href: "##{section.id}", class: "flex items-center gap-2 rounded-cs px-2 py-1.5 text-sm text-dim hover:bg-sunken hover:text-ink", data: { "admin--settings--nav-target": "link" } do %><%= render Admin::Ui::IconChipComponent.new(icon: section.icon, family: section.family, size: :small) %><%= word(section) %><% end %>
+    <% end %>
+  </div>
 </nav>

@@ -40,6 +40,10 @@ import { messages } from "i18n/messages"
 //    goes to the chip's button (Replace / Add key), or stays in the input
 //    when the answer re-opened the entry with an error.
 //
+// 5. Test connection is drawn only while there is something to test: a
+//    provider chosen and a key saved (`showTest`). The server draws it so;
+//    the script keeps it so as the provider changes or a key write answers.
+//
 // Like `admin--saving--pending-lock`, it asks the save bar for its state once on
 // connect (each controller arrives by its own dynamic import, and a form
 // re-rendered after a refusal is unsaved from the start).
@@ -48,7 +52,7 @@ const PENDING_HINT = "components.ui.save_bar.blocked"
 const KEY_HINT = "components.settings_screen.ai_key.hold"
 
 export default class extends Controller {
-  static targets = ["provider", "model", "test", "testHint", "chip", "entry", "input"]
+  static targets = ["provider", "model", "test", "testHint", "testRow", "chip", "entry", "input"]
 
   connect() {
     this.pending = false
@@ -102,6 +106,7 @@ export default class extends Controller {
   entryTargetConnected(entry) {
     if (!this.started) return
     this.holdKey()
+    this.refresh()
     const lost = !document.activeElement || document.activeElement === document.body
     if (!lost) return
     if (entry.hidden) this.chipTarget.querySelector("button")?.focus()
@@ -145,11 +150,21 @@ export default class extends Controller {
     this.inputTarget.removeAttribute("aria-describedby")
   }
 
+  // See 5. Test connection stands only while a provider is chosen (as the
+  // select has it) and a key is saved (as the key component, drawn again by
+  // every key write, says).
+  showTest() {
+    if (!this.hasTestRowTarget || !this.hasProviderTarget) return
+    const keySet = this.element.querySelector("[data-ai-key-set]")?.dataset.aiKeySet === "true"
+    this.testRowTarget.hidden = !(this.providerTarget.value.trim() !== "" && keySet)
+  }
+
   get changed() {
     return [this.providerTarget, this.modelTarget].some((field) => field.value.trim() !== (field.dataset.savedValue || "").trim())
   }
 
   refresh() {
+    this.showTest()
     if (!this.hasTestTarget) return
     const changed = this.changed
     const key = changed ? SPECIFIC_HINT : this.pending ? PENDING_HINT : null

@@ -20,6 +20,9 @@ class Admin::Ui::MailFieldsComponentTest < ViewComponent::TestCase
     assert server.has_css?("span[aria-hidden=true].bg-ic-media-bg svg")
     %w[mail_server mail_port mail_security].each { |name| assert server.has_css?("[data-field-name=#{name}]"), name }
     assert server.has_css?("#login-slot")
+    assert_equal "Login (if your provider needs one)", server.find("[data-mail-login-heading]").text.strip
+    assert server.find("[data-mail-login-heading]").matches_css?(".text-label.text-meta")
+    assert_selector "label[for=settings-mail_server]", text: "Host"
     assert_equal %w[mail_server mail_port mail_security], server.all("[data-field-name]").map { |node| node["data-field-name"] }
 
     sender = page.find("[role=group][aria-labelledby=settings-mail-sender-group]")

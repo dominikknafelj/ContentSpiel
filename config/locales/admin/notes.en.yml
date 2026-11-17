@@ -135,14 +135,15 @@ en:
             one: "%{count} new message ↓"
             other: "%{count} new messages ↓"
           gone: "This thread was deleted"
-    # The account screen's "Notes" card (`admin/accounts/edit.html.erb`, read
+    # The account screen's notes section, the Profile card's second (`admin/accounts/edit.html.erb`, read
     # with full keys): two settings of the person's, and what this browser
     # says about showing notifications. The screen's other keys are in
     # `accounts.en.yml`.
     accounts:
       notes:
-        title: "Notes"
-        description: "What happens in this browser when someone mentions you in a note."
+        # The heading of the Profile card's second section, and its whole
+        # introduction: the switches are the person's, in every browser.
+        title: "When someone mentions you in a note"
         notes_sound: "Play a sound when I'm mentioned"
         notes_desktop: "Show a desktop notification when I'm mentioned"
         permission:

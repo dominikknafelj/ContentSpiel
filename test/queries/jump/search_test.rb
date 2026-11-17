@@ -67,7 +67,7 @@ class Jump::SearchTest < ActiveSupport::TestCase
 
   test "the Settings rows are SettingsSections', titled one each" do
     assert_equal SettingsSections.ids, Jump::Search::SETTINGS_TITLES.keys
-    assert_equal [ "Settings › Site", "Settings › Languages", "Settings › Post types", "Settings › Publishing", "Settings › Forms", "Settings › AI translation",
+    assert_equal [ "Settings › Site", "Settings › Languages", "Settings › Post types", "Settings › Trash", "Settings › Forms", "Settings › AI translation",
       "Settings › Mail", "Settings › Sign-in", "Settings › Images" ], Jump::Search::SETTINGS_TITLES.values
 
     %w[forms mail images].each do |id|

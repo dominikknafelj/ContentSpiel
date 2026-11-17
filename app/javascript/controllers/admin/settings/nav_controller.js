@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { jumpTo } from "controllers/admin/shell/fragment_links_controller"
 
 // Settings' in-page nav marks the section in view (Admin::SettingsScreen::NavComponent).
 //
@@ -12,8 +13,14 @@ import { Controller } from "@hotwired/stimulus"
 // Turbo's snapshot would keep what is written here, so `reset` takes it back at
 // turbo:before-cache, and the page that is shown decides again at connect.
 // Listeners are the window's and are removed in disconnect.
+//
+// Below 640px the links are hidden and a select stands for them: `choose`
+// makes the jump a link makes (`admin--shell--fragment-links`' `jumpTo`: the
+// heading focused and in view, no history entry, no visit, so no leave
+// guard). The select keeps the section last chosen: the jump centres the
+// heading, which the 40% rule above can still count as the section before.
 export default class extends Controller {
-  static targets = [ "link" ]
+  static targets = [ "link", "select" ]
 
   connect() {
     this.headings = this.linkTargets.map((link) => document.getElementById(link.hash.slice(1)))
@@ -26,6 +33,11 @@ export default class extends Controller {
   disconnect() {
     window.removeEventListener("scroll", this.listener)
     window.removeEventListener("resize", this.listener)
+  }
+
+  choose() {
+    const heading = document.getElementById(this.selectTarget.value)
+    if (heading) jumpTo(heading)
   }
 
   reset() {

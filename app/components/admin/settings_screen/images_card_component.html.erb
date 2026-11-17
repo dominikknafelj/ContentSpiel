@@ -36,7 +36,7 @@
     </div>
 
     <div class="admin-column" data-field-name="image_max_upload_mb" <%= tag.attributes(data: { save_bar_changed: values.saved_change("image_max_upload_mb") }) %>>
-      <div class="flex flex-wrap items-center gap-2 text-ink">
+      <div class="flex flex-wrap items-center gap-2 text-sm text-ink">
         <label for="<%= input_id(:image_max_upload_mb) %>"><%= t(".max_upload") %></label>
         <%= number_field_tag "site_setting[image_max_upload_mb]", value(:image_max_upload_mb), id: input_id(:image_max_upload_mb),
               min: upload_range.min, max: upload_range.max, step: 1, class: "#{setup_input_class} !mt-0 !w-18",
@@ -64,7 +64,7 @@
       <p class="text-sm text-meta"><%= t(".regenerate_help") %></p>
       <div>
         <%# Outside the form's Save: a button of its own that opens the dialog (rendered after the form, which holds the POST). %>
-        <%= render Admin::Ui::ButtonComponent.new(label: t(".regenerate"), variant: :secondary, data: dialog_trigger(DIALOG).merge("admin--saving--pending-lock-target": "control")) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".regenerate"), variant: :secondary, size: :small, data: dialog_trigger(DIALOG).merge("admin--saving--pending-lock-target": "control")) %>
       </div>
       <p class="text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
     </div>

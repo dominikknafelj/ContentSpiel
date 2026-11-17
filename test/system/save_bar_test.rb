@@ -555,10 +555,11 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     # The current password alone is not a change (a password manager fills it
     # in on load): only what would be saved counts.
     fill_in "Current password", with: "whatever"
-    assert_selector "#password-form .admin-save-bar", text: "No unsaved changes"
+    # A footer inside its card says nothing at rest (Design System v262).
+    assert_no_selector "#password-form .admin-save-bar", text: /unsaved/i
     fill_in "New password", with: "a-new-long-password"
 
-    # One under each form, never covering each other.
+    # One inside each form's card, never covering each other.
     rects = page.evaluate_script("Array.from(document.querySelectorAll('.admin-save-bar')).map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.bottom] })")
     first, second = rects.sort_by(&:first)
     assert_operator first.last, :<=, second.first + 1
@@ -608,9 +609,10 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_selector "#account-identity span[title='Kept Both']"
     assert_equal "a-new-long-password", find_field("New password").value
     assert_equal "password", find_field("Current password").value
-    # The name form took what it saved as its baseline: clean, Save disabled,
-    # and typing the old value back is a change again.
-    assert_selector "#profile-form .admin-save-bar", text: "No unsaved changes"
+    # The name form took what it saved as its baseline: clean (a contained
+    # footer says nothing then), Save disabled, and typing the old value back
+    # is a change again.
+    assert_no_selector "#profile-form .admin-save-bar", text: /unsaved/i
     assert_selector "#profile-form button[type=submit][disabled]", text: /\ASave changes\z/
     assert_selector "#password-form .admin-save-bar", text: "1 unsaved change"
     fill_in "Your name", with: "Kept Both, again"

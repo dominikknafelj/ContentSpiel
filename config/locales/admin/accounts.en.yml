@@ -11,14 +11,21 @@ en:
       # The first form's toast: the app's own "Settings saved" (no full stop,
       # as on the Settings screen).
       saved: "Settings saved"
+      # The first card: the name, the email shown read only, and the notes
+      # switches (`notes.en.yml`'s `admin.accounts.notes`).
       profile:
         title: "Profile"
+        email: "Email"
+        # Under the address: who may change it (in Users).
+        email_help: "Someone who manages users can change it."
         name: "Your name"
-      # The third card: the password form, with what a change does to the
+        # `PersonName.of`'s rule.
+        name_help: "Shown with your notes and edits. Left empty, the start of your email address is shown."
+      # The second card: the password form, with what a change does to the
       # person's sessions under its title.
       password:
         title: "Password"
-        sessions: "You'll stay signed in here. Other sessions are signed out."
+        sessions: "Changing it keeps you signed in here and signs you out everywhere else."
         current: "Current password"
         new: "New password"
         confirmation: "Confirm new password"
