@@ -706,11 +706,11 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_selector bar, text: "1 unsaved change · Provider"
     fill_in "settings-mail_server", with: "smtp.named.test"
     fill_in "settings-mail_port", with: "2525"
-    assert_selector bar, text: "3 unsaved changes · Provider, Server, Port"
+    assert_selector bar, text: "3 unsaved changes · Provider, Host, Port"
     fill_in "settings-mail_sender_name", with: "Named Sender"
     fill_in "settings-mail_sender_address", with: "named@example.org"
 
-    assert_selector bar, text: "5 unsaved changes · Provider, Server, Port and 2 more"
+    assert_selector bar, text: "5 unsaved changes · Provider, Host, Port and 2 more"
     assert_selector "#{bar} strong", text: /\A5 unsaved changes\z/
     assert_selector "#{bar} [data-admin--saving--save-bar-target=dot]:not([hidden])", visible: :all
   end
@@ -750,6 +750,6 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{server}[data-save-bar-changed]"
     assert_equal "none", shadow.call
     assert_selector ".admin-save-bar", text: /Security/
-    assert_no_selector ".admin-save-bar", text: /Server/
+    assert_no_selector ".admin-save-bar", text: /Host/
   end
 end

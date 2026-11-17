@@ -1249,8 +1249,9 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    never the window's (the sidebar takes room the window does not show).
    It docks at 1140px, Settings' own threshold, under the editors', the
    dashboard's and the lists' 1200px: a 1440px window leaves the Settings
-   area about 1185px, and the rail docks there, the cards' column narrowing
-   to about 554px at the threshold and 600px at 1185px
+   area 1152px with overlay scrollbars (1137px with a classic 15px one),
+   and the rail docks there, the cards' column narrowing to about 554px at
+   the threshold
    (`admin_design_rules_test` holds the one width).
 
    The grid (`__grid`) holds, in document order, the nav's wrapper (the

@@ -632,7 +632,9 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
 
     within("#profile-form") { press "Save changes" }
 
-    assert_selector "#profile-form .admin-save-bar", text: "No unsaved changes", wait: LIVE
+    # A footer inside its card says nothing at rest: a clean form is a disabled Save.
+    assert_selector "#profile-form button[type=submit][disabled]", text: "Save changes", wait: LIVE
+    assert_no_selector "#profile-form .admin-save-bar", text: /unsaved/i
     assert_no_selector "dialog#leave-dialog[open]"
     assert_equal [ "Olive", false, true ], users(:one).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
     assert_equal 1, Audit::Event.where(action: "user.updated", subject: users(:one)).count
@@ -647,7 +649,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     # (The typed password is given up first, or leaving would ask about it.)
     fill_in "New password", with: ""
     fill_in "Confirm new password", with: ""
-    assert_selector "#password-form .admin-save-bar", text: "No unsaved changes"
+    assert_no_selector "#password-form .admin-save-bar", text: /unsaved/i
     visit "/cs-studio"
     assert_selector "body[data-admin--notes--alert-sound-value=false][data-admin--notes--alert-desktop-value=true]"
   end

@@ -120,11 +120,13 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # Settings docks at 1140px of its own area (Design System v262, S13), so
-  # a 1440px laptop window, whose area is about 1185px, has the rail beside
-  # the cards rather than a card above them.
-  test "a 1440px window docks the rail, the cards' column taking what the nav, the gaps and the rail leave" do
-    at_window(1440) do
+  # Settings docks at 1140px of its own area (Design System v262, S13): a
+  # window of 1455px, whose area is about 1152px beside the sidebar and a
+  # classic scrollbar, has the rail beside the cards rather than above them.
+  # (A 1440px window's area is 1152px with overlay scrollbars, macOS's
+  # default, and 1137px with a classic 15px one, as here.)
+  test "an area of 1140px or more docks the rail, the cards' column taking what the nav, the gaps and the rail leave" do
+    at_window(1455) do
       visit_screen admin_settings_path
       boxes = layout
       assert_operator boxes["container"]["width"], :>=, 1140
@@ -306,7 +308,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     port = edge.("settings-mail_port")
     assert_equal "none", port[0]
     assert_equal danger, port[1]
-    assert_selector footer, text: "2 unsaved changes · Server, Port"
+    assert_selector footer, text: "2 unsaved changes · Host, Port"
 
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"
@@ -738,7 +740,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
         JS
         assert_not_empty heights
         heights.each { |height, line| assert_operator height, :<, line * 2, "at #{width}px Make default… is #{height}px tall on #{line}px lines" }
-        assert_equal page.evaluate_script("document.documentElement.clientWidth"), page.evaluate_script("document.documentElement.scrollWidth"), "at #{width}px the page does not scroll sideways"
+        assert_operator page.evaluate_script("document.documentElement.scrollWidth"), :<=, page.evaluate_script("document.documentElement.clientWidth"), "at #{width}px the page does not scroll sideways"
       end
     end
   end
@@ -791,7 +793,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
       assert docked?(boxes), boxes.inspect
       main_left = page.evaluate_script("document.querySelector('.admin-page').getBoundingClientRect().left")
       assert_in_delta main_left, boxes["nav"]["left"], 1, "the nav starts at the frame's left"
-      h1 = page.evaluate_script("document.querySelector('.admin-page__head h1').getBoundingClientRect()")
+      h1 = page.evaluate_script("(() => { const r = document.querySelector('.admin-page__head h1').getBoundingClientRect(); return { left: r.left, bottom: r.bottom } })()")
       assert_in_delta boxes["nav"]["left"], h1["left"], 1, "the h1 stands over the nav"
       assert_operator h1["bottom"], :<=, boxes["nav"]["top"] + 1
     end

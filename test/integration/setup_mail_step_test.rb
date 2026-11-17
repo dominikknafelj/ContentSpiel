@@ -46,7 +46,7 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     assert_select "dd a[href=?][aria-label='Edit Mail']", setup_step_path("mail"), text: "Edit"
   end
 
-  test "its fields come in order: Server, Port 587, Security STARTTLS / TLS, Username, Password, Sender name from the site's title, Sender address" do
+  test "its fields come in order: Host, Port 587, Security STARTTLS / TLS, Username, Password, Sender name from the site's title, Sender address" do
     patch setup_step_path("site"), params: { site_setting: { title: "Dana's Notes" } }
     get setup_step_path("mail")
 

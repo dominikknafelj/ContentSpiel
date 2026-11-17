@@ -108,7 +108,8 @@ class Admin::AccountSessionsSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog#leave-dialog[open]"
     assert_equal "Typed, Not Saved", find_field("Your name").value
     assert_selector "#profile-form .admin-save-bar", text: "1 unsaved change"
-    assert_selector "#profile-form [data-admin--saving--save-bar-target=dot]:not([hidden])", visible: :all
+    # A footer inside its card has no dot: its count and its live Save are the mark.
+    assert_selector "#profile-form button[type=submit]:not([disabled])", text: "Save changes"
     # The foot drawn again by the answer is locked from the start.
     within("#account-sessions-foot") { assert_selector "button[disabled]", text: "Sign out everywhere else…" }
     assert_not Session.exists?(@newer.id)
