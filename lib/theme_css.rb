@@ -205,45 +205,66 @@ module ThemeCss
   end
 
   # WHETHER THE BUILT STYLESHEET IS DRAWN INTO EACH PUBLIC PAGE, or linked
-  # (`Theme::Stylesheet` draws it; `theme_css:build` says which). Linked, it
-  # is the one request that holds back a public page's first paint: a round
-  # trip the visitor waits for after the HTML has arrived. Drawn in, it
-  # costs its bytes again on every page a visitor opens, where a linked one
-  # is fetched once and kept for a year under its digested address. So the
-  # size weighed is what crosses the wire, the file compressed (zlib's
-  # default level, gzip's; a proxy's Brotli is smaller still), never the
-  # raw file, which says little about that cost.
+  # (`Theme::Stylesheet` draws it; `theme_css:build` says which). The
+  # trade is the first view against every view after it:
+  # - linked, the stylesheet is the one request that holds back a public
+  #   page's first paint, a round trip the visitor waits for after the HTML
+  #   has arrived; after that it is kept for a year under its digested
+  #   address, and every later page costs only its HTML;
+  # - drawn in, the first paint waits for nothing but the HTML, but the
+  #   stylesheet cannot be kept apart from the page: every page a visitor
+  #   opens downloads it again.
+  # So only a stylesheet small enough that downloading it again is cheap is
+  # drawn in. The size weighed is what crosses the wire, the file
+  # gzip-compressed (`Zlib.gzip`, the default level; a proxy's Brotli is
+  # smaller still), never the raw file, which says little about that cost.
   #
-  # THE LIMIT IS 24 KiB COMPRESSED. A link costs a first view at least one
-  # round trip; drawn in, the stylesheet costs each later page its transfer
-  # time. On a slow mobile connection (Lighthouse's: 150 ms, 1.6 Mbit/s)
-  # one round trip moves about 30 KB, so under that size a later page pays
-  # less than the round trip the link costs the first one, with room left
-  # for the page's own HTML. The default theme's stylesheet is about 12 KB
-  # compressed (69 KB raw), and a theme that adds a few pages of styles of
-  # its own stays under the limit; one that brings a component library's
-  # worth is linked, as every theme was before. Decided from the built file
-  # alone (never the request, never the page), so the build's line and the
-  # running site agree.
-  INLINE_LIMIT = 24 * 1024
+  # THE LIMIT IS 14 KB GZIPPED (KB of 1,024 bytes): what fits, beside a page's HTML, in the
+  # first round trip of a new connection (TCP's initial window, ten
+  # segments of about 1.4 KB). Under it, drawing the stylesheet in takes the
+  # first view's extra round trip away and adds no round trip to any view
+  # (a later page grows by at most a window's worth of bytes); over it the
+  # first view gains less and every later view pays more, so it is linked
+  # and preloaded, as every theme was before. The default theme's
+  # stylesheet is 11.4 KB gzipped (67.3 KB raw) and is drawn in; a theme
+  # that adds a few pages of styles of its own to it (the guide's, 17.9 KB)
+  # is linked. Decided from the built file alone (never the request, never
+  # the page), so the build's line and the running site agree.
+  INLINE_LIMIT = 14 * 1024
 
-  def compressed_size(text) = Zlib::Deflate.deflate(text.b).bytesize
+  # The size the decision weighs: the built file gzipped, in bytes. Read
+  # once per digest by `Theme::Stylesheet#compressed_size`, which a screen
+  # may show (in KB of 1,024 bytes, `kilobytes`).
+  def compressed_size(text) = Zlib.gzip(text.b).bytesize
 
-  def inline?(text, limit: INLINE_LIMIT) = compressed_size(text) <= limit
+  # THE ONE DECISION, drawn in or linked, from how the site asks for its
+  # stylesheet to be taken and the stylesheet's gzipped size. The site asks
+  # one way today, `:automatic` (`Theme::Stylesheet.mode`): drawn in at or
+  # under the limit, linked over it. A stored choice is a further mode
+  # handed in here, and nothing else changes for it.
+  def inline_for?(mode, compressed_size, limit: INLINE_LIMIT)
+    case mode
+    when :automatic then compressed_size <= limit
+    else raise ArgumentError, "no such way to take the stylesheet: #{mode.inspect}"
+    end
+  end
 
   # The line `theme_css:build` prints after a build (not in the test
-  # environment), so a theme's author sees which way their site goes.
+  # environment), so a theme's author sees which way their site goes under
+  # `:automatic`.
   def inline_sentence(root:, limit: INLINE_LIMIT)
     path = Pathname(root).join(OUTPUT)
     return unless path.file?
 
     text = path.binread
-    sizes = "#{kilobytes(text.bytesize)} KB, #{kilobytes(compressed_size(text))} KB compressed"
-    way = inline?(text, limit: limit) ? "is drawn into each public page: it is at or under" : "is linked from each public page: it is over"
-    "[ContentSpiel] The public stylesheet (#{sizes}) #{way} #{limit / 1024} KiB compressed."
+    size = compressed_size(text)
+    sizes = "#{kilobytes(text.bytesize)} KB, #{kilobytes(size)} KB gzipped"
+    way = inline_for?(:automatic, size, limit: limit) ? "is drawn into each public page: it is at or under" : "is linked from each public page: it is over"
+    "[ContentSpiel] The public stylesheet (#{sizes}) #{way} #{limit / 1024} KB gzipped."
   end
 
-  def kilobytes(bytes) = format("%.1f", bytes / 1000.0)
+  # KB of 1,024 bytes, one decimal: "11.4".
+  def kilobytes(bytes) = format("%.1f", bytes / 1024.0)
 
   # For the watch (lib/tasks/theme_css.rake): a thread that keeps the stamp
   # true while a theme is written. Tailwind's watcher rebuilds the

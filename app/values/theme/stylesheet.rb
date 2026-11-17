@@ -43,12 +43,17 @@ class Theme
         return unless asset
 
         @mutex.synchronize do
-          @current = nil unless @current && @current.digest == asset.digest && @current.limit == limit
-          @current ||= new(asset, limit: limit)
+          @current = nil unless @current && @current.digest == asset.digest && @current.limit == limit && @current.mode == mode
+          @current ||= new(asset, limit: limit, mode: mode)
         end
       end
 
       def limit = @limit || ThemeCss::INLINE_LIMIT
+
+      # How the site asks for its stylesheet to be taken
+      # (`ThemeCss.inline_for?`): `:automatic`, by its size, and no other
+      # yet.
+      def mode = :automatic
 
       # FOR TESTS ONLY: another limit for the length of the block, as
       # `Theme.with` is another theme. Process-wide, like it.
@@ -61,15 +66,24 @@ class Theme
       end
     end
 
-    attr_reader :digest, :limit, :css
+    # `compressed_size` is the built file gzipped, in bytes, what the
+    # decision weighed (`ThemeCss.kilobytes` says it in KB).
+    attr_reader :digest, :limit, :mode, :compressed_size, :css
 
-    def initialize(asset, limit:)
+    def initialize(asset, limit:, mode: :automatic)
       @digest = asset.digest
       @limit = limit
+      @mode = mode
+      @compressed_size = ThemeCss.compressed_size(asset.content)
       css = asset.compiled_content.to_s.dup.force_encoding(Encoding::UTF_8)
-      @css = css if ThemeCss.inline?(asset.content, limit: limit) && css.valid_encoding? && !css.match?(RELATIVE_REFERENCE) && !css.match?(STYLE_END)
+      @css = css if ThemeCss.inline_for?(mode, compressed_size, limit: limit) && drawable?(css)
     end
 
     def inline? = !css.nil?
+
+    private
+
+    # Whatever the mode: a `<style>` would not change what the CSS does.
+    def drawable?(css) = css.valid_encoding? && !css.match?(RELATIVE_REFERENCE) && !css.match?(STYLE_END)
   end
 end

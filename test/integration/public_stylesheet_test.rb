@@ -22,7 +22,8 @@ class PublicStylesheetTest < ActionDispatch::IntegrationTest
   def stylesheet_of(css, digest:) = Theme::Stylesheet.new(FakeAsset.new(digest: digest, content: css, compiled_content: css), limit: ThemeCss::INLINE_LIMIT)
 
   test "a small stylesheet is drawn into the head as the CSS Propshaft serves, with no link and no preload header, on every kind of public page" do
-    assert ThemeCss.inline?(built.content), "the default theme's built stylesheet is under the limit"
+    assert ThemeCss.inline_for?(:automatic, ThemeCss.compressed_size(built.content)), "the default theme's built stylesheet is under the limit"
+    assert_equal ThemeCss.compressed_size(built.content), Theme::Stylesheet.current.compressed_size
 
     [ "/", "/about", "/no-such-page" ].each do |path|
       get path

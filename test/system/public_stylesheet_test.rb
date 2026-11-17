@@ -21,9 +21,12 @@ class PublicStylesheetTest < ApplicationSystemTestCase
 
   def window_marked? = page.evaluate_script("window.stylesheetTestMark === true")
 
+  # Capybara's own waits, which outlast a full load: a script waited on in
+  # the page (`await_js`) dies with the page a reload replaces.
   def visit_about
     find("header nav a", text: "About").click
-    await_js(%(location.pathname === "/about" && document.querySelector("main h1")?.textContent.includes("About")), message: "the About page is shown")
+    assert_current_path "/about"
+    assert_selector "main h1", text: "About"
   end
 
   test "a Turbo visit between two public pages keeps exactly one theme style element" do
@@ -37,7 +40,7 @@ class PublicStylesheetTest < ApplicationSystemTestCase
     assert_equal 1, theme_styles
 
     page.go_back
-    await_js(%(location.pathname === "/"), message: "back on the home page")
+    assert_current_path "/"
     assert_equal 1, theme_styles
     assert page.evaluate_script(%(getComputedStyle(document.body).fontFamily)).include?("Archivo"), "the drawn-in styles still apply"
   end
@@ -49,7 +52,11 @@ class PublicStylesheetTest < ApplicationSystemTestCase
 
     changed = Theme::Stylesheet.new(FakeAsset.new(digest: "dddddddd", content: ".changed-styles{color:red}", compiled_content: ".changed-styles{color:red}"), limit: ThemeCss::INLINE_LIMIT)
     with_singleton_override(Theme::Stylesheet, :current, -> { changed }) do
-      visit_about
+      find("header nav a", text: "About").click
+      # Turbo renders no page whose tracked elements differ: it loads it
+      # whole, so the changed style is in the head only after that load.
+      assert_selector "head style[data-turbo-track=reload]", text: ".changed-styles", visible: :all
+      assert_selector "main h1", text: "About"
       assert_not window_marked?, "the page was reloaded"
       assert_equal [ ".changed-styles{color:red}" ], page.evaluate_script(%([...document.head.querySelectorAll("style[data-turbo-track=reload]")].map((style) => style.textContent)))
     end
