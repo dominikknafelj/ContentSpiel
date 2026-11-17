@@ -4,8 +4,9 @@
 // SortableJS is fetched when a controller that drags connects, never with the
 // screen (`preload: false` in config/importmap.rb, and no static import
 // anywhere: `test/lib/admin_design_rules_test.rb`), and only through
-// `loadSortable`, which the block list, a groups field's rows, the page tree
-// and Settings' rows all call. Resolves to its default export; the module is
+// `loadSortable`, which the block list, a groups field's rows, a Gallery's
+// image rows, the page tree, Settings' rows and the Media screen's drag all
+// call. Resolves to its default export; the module is
 // cached, so a second call costs nothing.
 //
 // The caller's contract: a controller sets `data-sortable="pending"` on its

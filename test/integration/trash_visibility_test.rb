@@ -485,7 +485,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "p", text: /No results for/
   end
 
-  test "a trashed image is in no folder's listing or count, and comes back to its folder" do
+  test "a trashed image is in no folder's listing, count or images, and comes back to its folder" do
     folder = Media::Folder.create!(name: "Client A")
     [ @kept_asset, @gone_asset ].each { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
     place = Media::Place.parse(folder.id.to_s, tree: Media::FolderTree.load)
@@ -499,6 +499,9 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "#media-asset-#{@kept_asset.id}"
     assert_select "#media-asset-#{@gone_asset.id}", count: 0
     assert_select "#media-count-all", text: "1"
+    # The picker's "Add all … new images in this folder" (gallery spec §10.6).
+    get "/cs-studio/media_folders/#{folder.id}/images"
+    assert_equal({ "total" => 1, "ids" => [ @kept_asset.id ] }, JSON.parse(response.body).then { |json| { "total" => json["total"], "ids" => json["items"].map { |item| item["id"] } } })
 
     as(users(:one)) { assert Trash::Restore.call(@gone_asset.reload).ok? }
 
@@ -1239,6 +1242,23 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_nil asset.reload.trashed_at
     get "/banded"
     assert_select "section.content-section .content-section__column:nth-child(2) img", 1
+  end
+
+  # A gallery's list holds ids, so an image trashed around the services
+  # (its usage rows keep a live gallery's own images from the trash) is
+  # still named in it: the public page draws the kept ones and counts only
+  # them (`Blocks::GalleryComponent#items`).
+  test "a gallery whose list names a trashed image draws the kept ones and counts only them" do
+    page = create_page(title: "Shore")
+    third = create_media_asset
+    page.content_blocks.create!(block_type: "gallery", position: 0, settings: { "layout" => "carousel", "images" => [ @kept_asset.id, @gone_asset.id, third.id ] })
+    publish_changes(page) # the block was written around the services, after the page went live
+
+    get "/shore"
+    assert_response :success
+    assert_select ".content-block--gallery__slide", 2
+    assert_select ".content-block--gallery__slide[aria-label=?]", "2 of 2"
+    assert_select ".content-block--gallery__position", "1 of 2"
   end
 
   # Presence follows its record into the trash: a person

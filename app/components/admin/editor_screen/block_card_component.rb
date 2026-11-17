@@ -299,6 +299,38 @@ module Admin
       # Everything else in the schema, rendered one per line as before.
       def other_schema_fields = settings_row? ? schema_fields - settings_row_fields : schema_fields
 
+      # The other schema fields as the card's rows (StudioGallery D2): a
+      # `control: :segmented` select followed directly by another select
+      # share one row (the Gallery's Layout and Shape), every other field
+      # stands alone. The inputs answer it (`Fields::Base.opens_row?` and
+      # `fills_row?`), never the type's name, so a later type with that
+      # shape gets the row too.
+      def schema_field_rows
+        fields = other_schema_fields
+        rows = []
+        index = 0
+        while index < fields.size
+          pair = fields[index, 2]
+          rows << (pair.size == 2 && paired?(*pair) ? pair : [ fields[index] ])
+          index += rows.last.size
+        end
+        rows
+      end
+
+      def paired?(first, second) = Admin::Ui::FieldComponent.input_class_for(first).opens_row?(first) && Admin::Ui::FieldComponent.input_class_for(second).fills_row?(second)
+
+      # A schema field's chrome and input, handed the values it is drawn
+      # among (`values:`), for an input that reads a sibling: the Gallery's
+      # rows read the list of images they describe.
+      def field_component(field)
+        Admin::Ui::FieldComponent.new(
+          field: field, form_name: "block[settings]",
+          value: value_for(field), original: original_for(field), locale: locale,
+          errors: field_errors(field), id_prefix: error_prefix, placeholder: placeholder_for(field), importable: changeable?, values: settings_object,
+          **translation(field.name)
+        )
+      end
+
       # Where the row's Tag chip input asks for suggestions: the same
       # endpoint the post editor's tags use, open to `pages.edit` as well as
       # `posts.read`/`tags.manage` (`Admin::TagSuggestionsController`), so an

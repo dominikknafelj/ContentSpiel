@@ -91,14 +91,16 @@ class SeedsTest < ActiveSupport::TestCase
   # The showcase (db/seeds/showcase.rb) run on its own, on the suite's site
   # with its three languages: what each page holds, every page drawn once
   # published, and nothing written the second time.
-  test "the showcase draws every type at the top level and in every layout and band, every note kind, a long table, every list and a 404 link, and writes nothing the second time" do
+  test "the showcase draws every type at the top level (the Gallery as a carousel and a grid) and in every layout and band, every note kind, a long table, every list and a 404 link, and writes nothing the second time" do
     require Rails.root.join("db/seeds/showcase").to_s
     showcase = DevelopmentShowcase.call(root: root_page, image: create_media_asset)
     pages = Page.where(parent: showcase).index_by(&:slug)
     content = BlockTypes.all.reject { |definition| definition.capability?(:container) }.map(&:name).sort
     layouts = BlockTypes::Section::LAYOUTS.keys
 
-    assert_equal content, pages.fetch("every-block").content_blocks.where(section_id: nil).pluck(:block_type).sort
+    top = pages.fetch("every-block").content_blocks.where(section_id: nil)
+    assert_equal (content + [ "gallery" ]).sort, top.pluck(:block_type).sort, "every type, and the Gallery once more"
+    assert_equal %w[carousel grid], top.where(block_type: "gallery").order(:position).map { |gallery| gallery.settings["layout"] }
 
     BlockTypes::Section::BACKGROUNDS.each do |background|
       sections = pages.fetch("band-#{background}").content_blocks.where(block_type: "section", section_id: nil).to_a
@@ -141,6 +143,46 @@ class SeedsTest < ActiveSupport::TestCase
 
     assert_no_difference [ "Page.count", "ContentBlock.count", "Forms::Form.count" ] do
       DevelopmentShowcase.call(root: root_page, image: create_media_asset)
+    end
+  end
+
+  test "the showcase makes the images a sample asks for, and a second run makes none" do
+    require Rails.root.join("db/seeds/showcase").to_s
+    saved = BlockTypes.all.dup
+    begin
+      BlockTypes.register("test_pictures") do |t|
+        TestTypes.declare(t)
+        t.label "Pictures"
+        t.field :images, :media_list
+        t.field :texts, :media_texts, of: :images, translated: true
+        t.component TestQuoteComponent
+        t.sample images: 3, translations: { "en" => { texts: { "1" => { "caption" => "One" } } } }, shows: [ "content-block" ]
+      end
+
+      hero = create_media_asset
+      assert_difference "Media::Asset.count", 3 do
+        DevelopmentShowcase.call(root: root_page, image: hero)
+      end
+      images = Media::Asset.where("title LIKE 'Showcase image %'").order(:title)
+      assert_equal [ "Showcase image 1", "Showcase image 2", "Showcase image 3" ], images.pluck(:title)
+      block = ContentBlock.where(block_type: "test_pictures").first
+      assert_equal images.pluck(:id), block.settings["images"]
+      assert_equal [ images.first.id.to_s ], block.settings_object(locale: "en").texts.keys
+
+      assert_no_difference [ "Media::Asset.count", "Page.count", "ContentBlock.count" ] do
+        DevelopmentShowcase.call(root: root_page, image: hero)
+      end
+
+      # A showcase image in the trash is not handed to a sample again: a
+      # new one of its title is made.
+      first, second, third = images.to_a
+      second.update_columns(trashed_at: Time.current) # version: none (an image trashed around the services)
+      found = assert_difference("Media::Asset.count", 1) { DevelopmentShowcase.sample_images }
+      assert_equal [ first, third ], found.values_at(0, 2)
+      assert_not_equal second.id, found.second.id
+    ensure
+      BlockTypes.reset!
+      saved.each { |definition| BlockTypes.registry_put(definition) }
     end
   end
 

@@ -142,6 +142,36 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     CodeHighlight::ROLES.each { |role| assert_includes section, "`#{role}`" }
   end
 
+  # The Gallery block's own section: what its template is handed, its nine
+  # words and two patterns, and the markup the carousel script reads, each
+  # held to the code it describes (the script's targets and values read from
+  # its file, as the Code block's are), and its tokens named.
+  test "the Gallery block's tables name exactly the methods of its entry, its nine words and what the carousel script reads" do
+    section = section("The Gallery block")
+    cells = section.scan(/^\| `([^`]+)` \|/).flatten
+    targets, values = script_names("gallery_carousel_controller")
+    script = ContractLedger::SCRIPTS.fetch("gallery-carousel")
+    glossed = { "string" => "string(key)", "pattern" => "pattern(key)", "sizes" => "sizes(per_row:)" }
+    methods = ContractLedger::COMPONENTS.fetch("blocks/gallery_component").map { |name| glossed.fetch(name, name) }
+    words = Blocks::GalleryComponent::STRINGS.map { |key| "string(:#{key})" }
+    actions = %w[previous next show keydown]
+
+    assert_equal 9, Blocks::GalleryComponent::STRINGS.size
+    assert_equal %w[controls next pick position previous slide status track], targets.sort, "the script's targets, as this test reads them"
+    assert_equal %w[moved position], values.sort, "the script's values, as this test reads them"
+    assert_equal script[:targets].sort, targets.sort
+    actions.each { |action| assert Rails.root.join("app/javascript/controllers/gallery_carousel_controller.js").read.match?(/^  #{action}\(/), "the script has the action #{action}" }
+    markup = [ %(data-controller="gallery-carousel"), "data-gallery-carousel-index-param", "data-gallery-carousel-state" ] +
+      actions.map { |action| %(data-action="#{action == "keydown" ? "keydown->" : ""}gallery-carousel##{action}") } +
+      targets.map { |name| %(data-gallery-carousel-target="#{name}") } + values.map { |name| "data-gallery-carousel-#{name}-value" }
+
+    assert_equal (methods + words + markup).sort, cells.sort
+    Blocks::GalleryComponent::PATTERNS.each { |key| assert_includes section, "`pattern(:#{key})`" }
+    script[:states].each { |state| assert_includes section, "`#{state}`" }
+    type = BlockTypes.fetch(:gallery)
+    (type.themed_tokens + type.fixed_tokens).each { |token| assert_includes section, "--th-#{token}" }
+  end
+
   # The Form block's own section: what its template is handed, its six
   # words, what a field answers and the markup the send script reads, each
   # held to the code it describes (the script's targets and values read

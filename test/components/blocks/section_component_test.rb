@@ -40,4 +40,16 @@ class Blocks::SectionComponentTest < ActiveSupport::TestCase
     assert_equal %(<section class="content-section content-section--tinted content-section--content">), rendered_content[/<section[^>]*>/]
     assert_no_match(/style-/, rendered_content)
   end
+  test "column_width is the width a column is drawn at in the content column, less the gaps and a band's padding" do
+    width = ->(settings, column) { Blocks::SectionComponent.column_width(section_block(settings), column) }
+    assert_equal 736, width.({ "layout" => "one" }, 1)
+    assert_equal 352, width.({ "layout" => "two" }, 1)
+    assert_equal 328, width.({ "layout" => "two", "background" => "tinted" }, 2)
+    assert_equal 328, width.({ "layout" => "two", "background" => "strong" }, 1)
+    assert_equal 352, width.({ "layout" => "two", "background" => "strong", "width" => "full" }, 1), "a full-width band has no inline padding of its own"
+    assert_equal 160, width.({ "layout" => "four" }, 3), "the section measures 46rem, so four sit four across"
+    assert_equal 148, width.({ "layout" => "four", "background" => "tinted" }, 4)
+    assert_in_delta 704 * 2 / 3.0, width.({ "layout" => "one_two" }, 2)
+    assert_in_delta 704 / 3.0, width.({ "layout" => "one_two" }, 1)
+  end
 end

@@ -1,0 +1,78 @@
+<%# The Gallery block (gallery block spec §7). A grid is a list named by the gallery's label, each image a
+    figure: its frame (the picture) and its caption when there is one; the list says `role="list"`, since
+    Safari drops a list's role with its markers (`list-style: none`). A carousel of two or more images is
+    the APG's basic carousel with a slide picker: a section named by the label with the roledescription
+    carousel; first the controls, Previous and Next, each `aria-controls` the track; then the track, which
+    takes the focus and is named, so the arrow keys scroll it without a script; in it each slide a group
+    with the roledescription slide named "2 of 5", holding nothing focusable; then the foot, the picker (a
+    dot per image, only up to `BlockTypes::Gallery::PICKER_MAX`) and the position; last a polite status.
+    The controls, the foot, the picker and the status are `hidden` here: only `gallery-carousel` makes
+    them work, and it shows them. Its markup (the identifier, the targets `controls track slide previous
+    next position pick status`, the values `position` and `moved`, which are `pattern`'s sentences with
+    their `%{index}` and `%{count}` left in) is what a theme's own template keeps for the script to work
+    (docs/reference/theming.md, "The Gallery block"). A carousel of one image is its figure alone, with no
+    script. The class names are the default theme's own (gallery.css), not a promise; the track's id is
+    written from `block`. Everything printed goes through ERB's own escaping. %>
+<% look = [ "content-block content-block--gallery content-block--gallery--#{layout} content-block--gallery--ratio-#{ratio.tr(":", "-")}", ("content-block--gallery--fit" if fit) ].compact.join(" ") %>
+<% count = items.size %>
+<% if layout == "grid" %>
+  <div class="<%= look %>">
+    <ul class="content-block--gallery__grid" role="list" aria-label="<%= label %>">
+      <% items.each do |item| %>
+        <li class="content-block--gallery__item">
+          <figure>
+            <div class="content-block--gallery__frame"><%= render Media::PictureComponent.new(**item.picture) %></div>
+            <% if item.caption %><figcaption class="content-block--gallery__caption"><%= item.caption %></figcaption><% end %>
+          </figure>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+<% elsif count == 1 %>
+  <% item = items.first %>
+  <div class="<%= look %>">
+    <figure class="content-block--gallery__slide">
+      <div class="content-block--gallery__frame"><%= render Media::PictureComponent.new(**item.picture) %></div>
+      <% if item.caption %><figcaption class="content-block--gallery__caption"><%= item.caption %></figcaption><% end %>
+    </figure>
+  </div>
+<% else %>
+  <% track_id = "gallery-#{block.id}-track" %>
+  <%= tag.section class: look, aria: { roledescription: string(:carousel), label: label },
+        data: { controller: "gallery-carousel", gallery_carousel_position_value: pattern(:position), gallery_carousel_moved_value: pattern(:moved) } do %>
+    <div class="content-block--gallery__controls" data-gallery-carousel-target="controls" data-action="keydown->gallery-carousel#keydown" hidden>
+      <%= tag.button type: "button", class: "content-block--gallery__button content-block--gallery__button--previous", aria: { label: string(:previous), controls: track_id },
+            data: { gallery_carousel_target: "previous", action: "gallery-carousel#previous" } do %>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg>
+      <% end %>
+      <%= tag.button type: "button", class: "content-block--gallery__button content-block--gallery__button--next", aria: { label: string(:next), controls: track_id },
+            data: { gallery_carousel_target: "next", action: "gallery-carousel#next" } do %>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+      <% end %>
+    </div>
+    <%= tag.div class: "content-block--gallery__track", id: track_id, tabindex: 0, role: "group", aria: { label: string(:track) },
+          data: { gallery_carousel_target: "track", action: "keydown->gallery-carousel#keydown" } do %>
+      <% items.each do |item| %>
+        <%= tag.div class: "content-block--gallery__slide", role: "group", aria: { roledescription: string(:slide), label: string(:position, index: item.index, count: count) },
+              data: { gallery_carousel_target: "slide" } do %>
+          <figure>
+            <div class="content-block--gallery__frame"><%= render Media::PictureComponent.new(**item.picture) %></div>
+            <% if item.caption %><figcaption class="content-block--gallery__caption"><%= item.caption %></figcaption><% end %>
+          </figure>
+        <% end %>
+      <% end %>
+    <% end %>
+    <div class="content-block--gallery__foot" hidden>
+      <% if count <= BlockTypes::Gallery::PICKER_MAX %>
+        <div class="content-block--gallery__picks" hidden>
+          <% items.each do |item| %>
+            <%= tag.button type: "button", class: "content-block--gallery__pick", aria: { label: string(:show, index: item.index), current: ("true" if item.index == 1) },
+                  data: { gallery_carousel_target: "pick", action: "gallery-carousel#show", gallery_carousel_index_param: item.index } %>
+          <% end %>
+        </div>
+      <% end %>
+      <p class="content-block--gallery__position" data-gallery-carousel-target="position"><%= string(:position, index: 1, count: count) %></p>
+    </div>
+    <p class="content-block--gallery__status" aria-live="polite" data-gallery-carousel-target="status" hidden></p>
+  <% end %>
+<% end %>

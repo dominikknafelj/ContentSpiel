@@ -4,6 +4,7 @@ require "test_helper"
 # (`Media::Asset#shown_publicly?`), and once per generation.
 class Media::AssetVersionTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
+  include TestTypes
 
   def version = PublicSite::Version.current
 
@@ -78,6 +79,20 @@ class Media::AssetVersionTest < ActiveSupport::TestCase
 
     page.update_columns(published_at: nil) # version: none (a test)
     assert_not asset.shown_publicly?
+  end
+
+  test "an alt change on an image a live page's media list shows moves the content version" do
+    with_media_list_type do
+      asset = upload
+      page = create_page(title: "Gallery")
+      media_list_block(page, [ asset.id ])
+      publish_changes(page)
+      assert_equal %w[block_field published], Media::Usage.where(media_asset_id: asset.id).pluck(:role).sort
+
+      before = version
+      asset.update!(alt: { "en" => "A gallery picture" })
+      assert_equal before + 1, version
+    end
   end
 
   test "an image only a trashed page uses is not shown" do

@@ -48,7 +48,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     summary = "block-#{text.id}-tile-summary"
     face = page.find(".admin-block-tile__face")
     assert_equal "content_block_#{text.id}-type #{summary}-attention #{summary}-name #{summary}-status", face["aria-labelledby"]
-    assert_equal "#{summary}-text", face["aria-describedby"]
+    assert_equal "#{summary}-text #{summary}-badges", face["aria-describedby"], "the badges after the line describe it too, when there are any"
     assert_selector "#content_block_#{text.id}-type", exact_text: "Rich text"
     assert_selector "##{summary}-name.admin-block-tile__title", exact_text: "Opening hours"
     assert_selector "##{summary}-text", exact_text: "We open at nine."
@@ -61,6 +61,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_selector "##{summary} > ##{summary}-attention[role=img]"
     assert_selector "##{summary} > span##{summary}-name:last-child"
     assert_no_selector "##{summary}-text"
+    assert_no_selector "##{summary}-badges"
   end
 
   test "the tile shows the type's icon beside its name, and the face is named by the type" do

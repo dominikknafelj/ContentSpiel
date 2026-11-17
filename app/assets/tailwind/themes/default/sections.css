@@ -90,6 +90,9 @@
   /* A diagram's group (a subgraph, a composite state, a gantt section) is
      the sunken ground, which is this band: here it is a step darker. */
   --th-diagram-group: color-mix(in srgb, var(--th-ink) 6%, var(--th-band-tinted));
+  /* A gallery's dot at rest is --th-meta, computed on the page, where it is
+     the page's value: here it reads as dim, as the band's own text does. */
+  --th-gallery-pick: var(--th-dim);
 }
 /* Strong is the strongest step of its scheme -- the page inverted in light,
    a raised dark ground in dark -- with its own three text colours. `color` is
@@ -215,6 +218,13 @@
   --th-diagram-series-4: var(--th-diagram-dark-4);
   --th-diagram-series-5: var(--th-diagram-dark-5);
   --th-diagram-series-6: var(--th-diagram-dark-6);
+  /* A gallery on this band: the stage behind an image shown whole is the
+     band's text at 10% into the band, and the dots are the band's dim and
+     its text. A carousel's button is not re-valued: it sits on the image,
+     not on the band, so its ground, arrow and ring stay the page's. */
+  --th-gallery-stage: color-mix(in oklab, var(--th-on-band-strong) 10%, var(--th-band-strong));
+  --th-gallery-pick: var(--th-on-band-strong-dim);
+  --th-gallery-pick-current: var(--th-on-band-strong);
 }
 .content-section--strong .content-block--code { color-scheme: dark; }
 /* A form's native controls (the select's list, the checkbox, the radio)

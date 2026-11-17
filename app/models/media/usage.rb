@@ -11,10 +11,13 @@ class Media::Usage < ApplicationRecord
   # has to be spelled out explicitly.
   self.table_name = "media_usages"
 
-  # `published`: an image a current or pending published copy of the owner shows
-  # (`Media::UsageIndex.refresh_published`); the owner is the page or post,
-  # never a block, since a copy's block may no longer exist as a row.
-  ROLES = %w[hero block_image rich_text published].freeze
+  # `block_field`: an image a block's field names (a field type answering
+  # `FieldType#media_ids`, the Gallery's `:media_list`); the owner is the
+  # block, `locale` nil. `published`: an image a current or pending published
+  # copy of the owner shows (`Media::UsageIndex.refresh_published`); the
+  # owner is the page or post, never a block, since a copy's block may no
+  # longer exist as a row.
+  ROLES = %w[hero block_image block_field rich_text published].freeze
 
   belongs_to :media_asset, class_name: "Media::Asset"
 

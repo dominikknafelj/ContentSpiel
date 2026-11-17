@@ -12,8 +12,9 @@
 # `preload: "admin"` modulepreloads a module only on pages whose entry point
 # is `admin` (importmap-rails' per-entry-point preloading): CS Studio's own
 # controllers, the editor's modules and Tiptap/ProseMirror. SortableJS is
-# `preload: false`: the four controllers that drag (the block list, a groups
-# field's rows, the page tree and Settings' rows) load it when they connect,
+# `preload: false`: the controllers that drag (the block list, a groups
+# field's rows, a Gallery's image rows, the page tree, Settings' rows and the
+# Media screen's drag) load it when they connect,
 # all through `editor/drag`'s `loadSortable`, so a screen with nothing to drag
 # never fetches it.
 # A public page neither imports nor preloads any of them. They all stay in

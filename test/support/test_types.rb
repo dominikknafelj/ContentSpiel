@@ -61,6 +61,32 @@ module TestTypes
     t.sample shows: [ "content-block" ]
   end
 
+  # `with_media_list_type { … }`: `test_media_list`, a bare built-in-shaped
+  # block type with one `:media_list` field (`images`), which only a block
+  # type takes (`ContentModel::FieldTypes::BLOCK_ONLY`). The registry is
+  # put back as it was afterwards, so no other test sees the type.
+  def with_media_list_type
+    saved = BlockTypes.all.dup
+    BlockTypes.register("test_media_list") do |t|
+      TestTypes.declare(t)
+      t.label "Media list"
+      t.field :images, :media_list
+      t.component TestQuoteComponent
+    end
+    yield
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
+  end
+
+  # A `test_media_list` block on `owner`, written through `ContentBlocks::Save`
+  # (which takes the lock order's locks) with these images.
+  def media_list_block(owner, images)
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: owner), attributes: { block_type: "test_media_list", settings: { "images" => images } })
+    assert result.ok?, result.errors.to_sentence
+    result.record
+  end
+
   def with_test_types
     switched_on_before = SiteSetting.instance.content_types
     BlockTypes.register "test/quote" do |t|

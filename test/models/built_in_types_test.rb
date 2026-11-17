@@ -93,8 +93,8 @@ class BuiltInTypesTest < ActiveSupport::TestCase
   end
 
   test "an unregistered stored type is invalid on save" do
-    assert_not Post.new(content_type: "gallery", title: "X").valid?
-    block = root_page.content_blocks.build(block_type: "gallery", position: 0)
+    assert_not Post.new(content_type: "retired_widget", title: "X").valid?
+    block = root_page.content_blocks.build(block_type: "retired_widget", position: 0)
     assert_not block.valid?
     assert_includes block.errors[:block_type], "isn't a registered block type"
   end
@@ -102,9 +102,9 @@ class BuiltInTypesTest < ActiveSupport::TestCase
   test "an unregistered stored block type is skipped on render and sync" do
     page = create_page(title: "About")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
-    block.update_column(:block_type, "gallery")
+    block.update_column(:block_type, "retired_widget")
     post = create_post(title: "Hello")
-    post.update_column(:content_type, "gallery")
+    post.update_column(:content_type, "retired_widget")
 
     assert_nothing_raised { PublicSite::Paths.refresh(posts: [ post ]) }
     assert_nil post.reload.full_path("en")
@@ -141,8 +141,14 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert_equal "tinted", section.sample.settings.fetch("background")
   end
 
-  test "the seven types that preview declare one, and image, form, post list and section declare none" do
-    assert_equal %w[card code diagram note rich_text search table], BlockTypes.all.select(&:preview).map(&:name).reject { |name| name.include?("/") }.sort
+  # The initializer's lines are the picker's order: the Gallery stands
+  # beside the Image block.
+  test "gallery stands after image in the picker's order" do
+    assert_equal BlockTypes.built_in_names.index("image") + 1, BlockTypes.built_in_names.index("gallery")
+  end
+
+  test "the eight types that preview declare one, and image, form, post list and section declare none" do
+    assert_equal %w[card code diagram gallery note rich_text search table], BlockTypes.all.select(&:preview).map(&:name).reject { |name| name.include?("/") }.sort
     %w[image form post_list section].each { |name| assert_nil BlockTypes.fetch(name).preview, "#{name} keeps its summary line" }
   end
 

@@ -156,12 +156,17 @@
           <p class="-mt-2 text-sm text-meta">Shows the newest posts of this type.</p>
         <% end %>
 
-        <% other_schema_fields.each do |field| %>
-          <%= render Admin::Ui::FieldComponent.new(
-                field: field, form_name: "block[settings]",
-                value: value_for(field), original: original_for(field), locale: locale,
-                errors: field_errors(field), id_prefix: error_prefix, placeholder: placeholder_for(field), importable: changeable?, **translation(field.name)
-              ) %>
+        <% schema_field_rows.each do |row| %>
+          <% if row.size == 2 %>
+            <%# A segmented select and the select after it share a row, the second filling the rest; below about 420px
+                of the card they wrap onto two lines (`flex-wrap` and the second's least width, no size container). %>
+            <div class="admin-block-field-row flex flex-wrap items-end gap-x-4">
+              <div class="shrink-0"><%= render field_component(row.first) %></div>
+              <div class="min-w-56 flex-1"><%= render field_component(row.last) %></div>
+            </div>
+          <% else %>
+            <%= render field_component(row.first) %>
+          <% end %>
         <% end %>
 
         <%# Same-in-every-language fields: read-only on a translation tab (see `#schema_fields`). %>

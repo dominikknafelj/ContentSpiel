@@ -29,11 +29,14 @@ module ContentModel
   #   field of the definition is declared (`Definition#finish_fields!`, at
   #   registration), for an option that names a field declared after it
   #   (a Mermaid source's `drawing:`). Most types have none.
+  # - `media_ids`: `->(value) { [Integer] }`, the library images a stored
+  #   value refers to (`Definition#media_ids_in`, which the usage rows are
+  #   written from). Every type but `:media_list` answers none.
   #
   # It names no component: a type's input and its read-only display are its
   # `Admin::Fields::<Type>Field`, found by name, because the content model
   # sits below CS Studio (CLAUDE.md, Dependency order).
-  FieldType = Data.define(:name, :cast, :options, :validate, :translatable, :audit, :tracked, :finish) do
-    def initialize(tracked: true, finish: ->(_field, _fields) { }, **attributes) = super(tracked:, finish:, **attributes)
+  FieldType = Data.define(:name, :cast, :options, :validate, :translatable, :audit, :tracked, :finish, :media_ids) do
+    def initialize(tracked: true, finish: ->(_field, _fields) { }, media_ids: ->(_value) { [] }, **attributes) = super(tracked:, finish:, media_ids:, **attributes)
   end
 end

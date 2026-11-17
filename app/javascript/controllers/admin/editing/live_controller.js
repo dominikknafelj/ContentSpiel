@@ -40,8 +40,10 @@ import { clearMarks, fadeMark } from "editing/marks"
 //   dropped and asked for again: it was read before that write;
 // - the list is not fetched or drawn while a block is being dragged, is
 //   picked up by the keyboard or has a move that is not yet answered
-//   (`admin--editor--blocks:moving`, true while ANY of them is open): it is
-//   owed, and paid when the last one is over.
+//   (`admin--editor--blocks:moving`, true while ANY of them is open), nor
+//   while a Gallery's image row is dragged or picked up
+//   (`admin--editor--gallery:moving`, one per gallery): it is owed, and paid
+//   when the last one, of every element that said so, is over.
 //
 // A HIDDEN DOCUMENT FETCHES NOTHING; it owes the list and the record and pays
 // once when it is seen. Whenever the subscription is confirmed (the first time
@@ -105,7 +107,7 @@ export default class extends Controller {
     this.watchers = new Map()
     this.waitingForMoved = null
     this.running = false
-    this.moving = false
+    this.movers = new Set()
     this.busy = null
     this.kept = null
     const listener = Object.assign((signal) => this.heard(signal), {
@@ -120,10 +122,15 @@ export default class extends Controller {
     else if (this.stop.settled) this.say("answered")
 
     this.seen = () => { if (!document.hidden) this.pay() }
-    this.moved = (event) => { this.moving = event.detail.moving; if (!this.moving) this.pay() }
+    // Each element that says it is moving holds the list until it says it stopped.
+    this.moved = (event) => {
+      event.detail.moving ? this.movers.add(event.target) : this.movers.delete(event.target)
+      if (!this.moving) this.pay()
+    }
     this.asked_for = (event) => this.refresh(event.detail)
     document.addEventListener("visibilitychange", this.seen)
     this.element.addEventListener("admin--editor--blocks:moving", this.moved)
+    this.element.addEventListener("admin--editor--gallery:moving", this.moved)
     this.element.addEventListener("admin--editing--hold:refresh", this.asked_for)
   }
 
@@ -131,6 +138,7 @@ export default class extends Controller {
     this.stop?.()
     document.removeEventListener("visibilitychange", this.seen)
     this.element.removeEventListener("admin--editor--blocks:moving", this.moved)
+    this.element.removeEventListener("admin--editor--gallery:moving", this.moved)
     this.element.removeEventListener("admin--editing--hold:refresh", this.asked_for)
     this.timers.forEach(clearTimeout)
     clearMarks(this.element)
@@ -211,6 +219,14 @@ export default class extends Controller {
   owe(part, options = {}) {
     if (part === "blocks" && !this.hasBlocksUrlValue) part = "record"
     this.owed.set(part, this.merged(this.owed.get(part), { options }).options)
+  }
+
+  // Whether something holds the list. An element taken out of the page
+  // while it held it (a gallery removed with its block) holds nothing: it
+  // can no longer say it stopped, its event would not reach here.
+  get moving() {
+    for (const mover of this.movers) if (!mover.isConnected) this.movers.delete(mover)
+    return this.movers.size > 0
   }
 
   pay() {

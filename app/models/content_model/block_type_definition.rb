@@ -47,8 +47,8 @@ module ContentModel
     # `triangle_alert` are the Note block's kinds (note block plan, rulings
     # 11 and 12), which its blocks' cards and tiles draw through
     # `for_block:`; `table` is the Table block's, `diagram` the Diagram
-    # block's and `search` the Search block's.
-    ICONS = %w[pilcrow image code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list search].freeze
+    # block's, `search` the Search block's and `images` the Gallery block's.
+    ICONS = %w[pilcrow image images code_xml diagram posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list search].freeze
 
     # The hue families an icon may be drawn in: the chip behind a
     # type's icon takes the family's colour pair
@@ -107,9 +107,12 @@ module ContentModel
     # `caption` / `alt` columns), `body` (Markdown, written in the default
     # language), `image` (true: the test attaches a library image), `form`
     # (true: the test makes a visitor's form and names it in the block's
-    # `form_id`, the Form block's), `shows` (texts the public page holds for
+    # `form_id`, the Form block's), `images` (a count: the caller makes that
+    # many library images and `ContentModel::SampleBlock` writes their ids, in
+    # order, into the type's `:media_list` field, re-keying the sample's
+    # `:media_texts` from positions "1".."n" to those ids), `shows` (texts the public page holds for
     # the block).
-    Sample = Data.define(:settings, :translations, :body, :image, :form, :shows)
+    Sample = Data.define(:settings, :translations, :body, :image, :form, :images, :shows)
 
     def initialize(name)
       super
@@ -325,7 +328,7 @@ module ContentModel
       return @resolved_sample ||= resolved(@sample) if values.empty?
 
       unknown = values.keys - Sample.members
-      refuse "a sample holds settings, translations, body, image, form, shows; not #{unknown.join(", ")}" if unknown.any?
+      refuse "a sample holds settings, translations, body, image, form, images, shows; not #{unknown.join(", ")}" if unknown.any?
 
       shows = Array(values[:shows])
       refuse "a sample's `shows:` names at least one text the public page holds for it, none of them blank" if shows.empty? || !shows.all?(String) || shows.any? { |text| text.strip.empty? }
@@ -335,6 +338,8 @@ module ContentModel
       refuse "a sample's body is a Markdown String" unless values[:body].nil? || values[:body].is_a?(String)
       refuse "a sample's image is true or false" unless [ nil, true, false ].include?(values[:image])
       refuse "a sample's form is true or false" unless [ nil, true, false ].include?(values[:form])
+      images = values.fetch(:images, 0)
+      refuse "a sample's images is a count of library images, an Integer of 0 or more: #{images.inspect}" unless images.is_a?(Integer) && images >= 0
       translations = values[:translations] || {}
       refuse "a sample's translations are a Hash of locale => Hash of values" unless translations.is_a?(Hash) && translations.values.all?(Hash)
       translations = translations.transform_keys(&:to_s)
@@ -347,6 +352,7 @@ module ContentModel
         body: values[:body],
         image: values[:image] == true,
         form: values[:form] == true,
+        images: images,
         shows: shows.freeze
       )
     end

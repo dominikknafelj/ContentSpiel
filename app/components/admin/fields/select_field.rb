@@ -28,6 +28,12 @@ module Admin
       # A segmented control's legend is its label.
       def self.own_label?(field) = field.segmented?
 
+      # A segmented control and the select after it share a row on the block
+      # card (the Gallery's Layout and Shape, StudioGallery D2).
+      def self.opens_row?(field) = field.segmented?
+
+      def self.fills_row?(_field) = true
+
       def option_pairs
         options = field.options[:options]
         return options.map { |v, l| [ l, v ] } if options.is_a?(Hash)

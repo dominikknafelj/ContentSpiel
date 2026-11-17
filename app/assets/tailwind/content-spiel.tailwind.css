@@ -1746,6 +1746,24 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-tile:is([aria-current="true"], [aria-pressed="true"]), .admin-tile:has(> input:checked) { outline: 2px solid var(--cs-accent); outline-offset: 2px; box-shadow: var(--cs-shadow-1); }
 .admin-tile[data-locked], .admin-tile[data-locked]:has(> input:checked) { background: var(--cs-sunken); box-shadow: none; color: var(--cs-meta); }
 
+/* The picker choosing several (the card StudioGallery, D4;
+   `admin--media--select`, from the marks `Admin::Ui::MediaPickerComponent`
+   draws as templates), both marks at the thumbnail's top left. A chosen
+   tile's place in the order: a 22px accent pill with a 2px surface ring, so
+   it stands apart from the image under it. A tile already in the gallery
+   (`data-media-pick-present`): its thumbnail desaturated, never faded, and
+   the surface pill "In the gallery". A tile at the limit
+   (`data-media-pick-limit`, every other tile once the choice is full) is
+   drawn disabled with no pill: desaturated, its words meta, no lift under
+   the pointer (elevation 1, outweighing `.admin-tile:hover`) and the
+   not-allowed cursor; unchoosing a tile puts it back at rest. */
+.admin-media-pick-order { position: absolute; top: 6px; left: 6px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--cs-radius-pill); background: var(--cs-accent); color: var(--cs-on-accent); font-size: 12px; font-weight: 600; line-height: 1; box-shadow: 0 0 0 2px var(--cs-surface); pointer-events: none; }
+.admin-media-pick-in-gallery { position: absolute; top: 6px; left: 6px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: var(--cs-radius-pill); background: var(--cs-surface); color: var(--cs-dim); font-size: 11px; font-weight: 500; box-shadow: var(--cs-shadow-1); pointer-events: none; }
+.admin-tile:is([data-media-pick-present], [data-media-pick-limit]) img { filter: saturate(.35); }
+.admin-tile[data-media-pick-limit] { cursor: not-allowed; }
+.admin-tile[data-media-pick-limit]:hover { box-shadow: var(--cs-shadow-1); }
+.admin-tile[data-media-pick-limit] .text-ink { color: var(--cs-meta); }
+
 /* A table in its card that scrolls inside itself, so the page never scrolls
    sideways. `.admin-table-scroll` is Translations' matrix: the card is at
    most the window's height under the top bar, and its head row sticks to
@@ -1935,6 +1953,18 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 /* The placeholder is also the "chosen" element for the length of a mouse
    drag: it stays the dashed, empty slot, and the clone is what looks lifted. */
 .admin-drag-ghost.admin-drag-chosen { background: transparent; box-shadow: none; }
+
+/* A Gallery block's image row picked up by the keyboard
+   (`admin--editor--gallery`, StudioGallery D3): elevation 4 on the raised
+   tile's ground, with a 2px accent outline inside its edge, so nothing moves
+   or changes size. A row dragged by the pointer takes the drag's own looks
+   above (the dashed slot, the lifted clone). */
+.admin-gallery-row[data-picked] { background: var(--cs-tile-raised); box-shadow: var(--cs-shadow-4); outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-gallery-row[data-picked] .admin-gallery-row__handle { color: var(--cs-accent); }
+/* A row's Alt text whose library image has no alt either: the well's bottom
+   edge is the warn colour while the placeholder says so (the media panel's
+   `.admin-media-alt-warn`). */
+.admin-gallery-row__alt--warn:placeholder-shown { border-bottom-color: var(--cs-warn); }
 
 /* A view-only editor: the fieldset that disables a
    record's fields also marks them as plainly read-only -- sunken and dim,

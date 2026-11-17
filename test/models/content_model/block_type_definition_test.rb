@@ -40,6 +40,16 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_equal [ "A caption" ], d.sample.shows
   end
 
+  test "images: is a count, and anything else is refused with the type's name first" do
+    d = ContentModel::BlockTypeDefinition.new("shape")
+    assert_equal 0, d.tap { |t| t.sample shows: [ "x" ] }.sample.images
+    assert_equal 3, d.tap { |t| t.sample images: 3, shows: [ "x" ] }.sample.images
+    [ -1, 1.5, "2", true ].each do |bad|
+      error = assert_raises(ArgumentError, bad.inspect) { d.sample images: bad, shows: [ "x" ] }
+      assert_match(/\Ashape: .*images/, error.message)
+    end
+  end
+
   test "a translated value of a sample may be a callable, called once when the sample is first read and never at registration" do
     calls = 0
     d = ContentModel::BlockTypeDefinition.new("x")
@@ -57,7 +67,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_match(/without the --th- prefix/, assert_raises(ArgumentError) { definition.tokens fixed: %w[Shape_gap] }.message)
     assert_match(/identifier#method/, assert_raises(ArgumentError) { definition.read_only_actions "update" }.message)
     assert_match(/callable/, assert_raises(ArgumentError) { definition.summary "words" }.message)
-    assert_match(/settings, translations, body, image, form, shows/, assert_raises(ArgumentError) { definition.sample shows: [ "x" ], blocks: [] }.message)
+    assert_match(/settings, translations, body, image, form, images, shows/, assert_raises(ArgumentError) { definition.sample shows: [ "x" ], blocks: [] }.message)
     assert_match(/at least one text/, assert_raises(ArgumentError) { definition.sample settings: {} }.message)
     assert_match(/at least one text/, assert_raises(ArgumentError) { definition.sample shows: [] }.message)
     assert_match(/"en" at least/, assert_raises(ArgumentError) { definition.sample translations: { "de" => { caption: "x" } }, shows: [ "x" ] }.message)
@@ -309,7 +319,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
   end
 
   test "every built-in block type declares the family the design gives it" do
-    families = { "rich_text" => :text, "note" => :text, "image" => :media, "card" => :media, "code" => :code, "diagram" => :code, "table" => :code,
+    families = { "rich_text" => :text, "note" => :text, "image" => :media, "gallery" => :media, "card" => :media, "code" => :code, "diagram" => :code, "table" => :code,
                  "form" => :form, "search" => :form, "post_list" => :lists, "section" => :structure }
     assert_equal families, BlockTypes.all.to_h { |type| [ type.name, type.family ] }.slice(*BuiltInBlockTypes.names)
   end
@@ -321,7 +331,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     definition.icon :pilcrow
     assert_equal "pilcrow", definition.icon
     error = assert_raises(ArgumentError) { ContentModel::BlockTypeDefinition.new("x").icon "rocket" }
-    assert_match(/\Ax: icon is one of pilcrow, image, code_xml, diagram, posts, columns_2, info, lightbulb, circle_alert, triangle_alert/, error.message)
+    assert_match(/\Ax: icon is one of pilcrow, image, images, code_xml, diagram, posts, columns_2, info, lightbulb, circle_alert, triangle_alert/, error.message)
   end
 
   # Note block plan, ruling 12: the Note's icon in the picker is its type's

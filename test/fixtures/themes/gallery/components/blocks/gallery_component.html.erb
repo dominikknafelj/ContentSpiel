@@ -1,0 +1,64 @@
+<%# A theme's own Gallery block, written from what `Theme::Contract` gives the template
+    (`block`, `page`, `layout`, `ratio`, `fit`, `label`, `items`, `sizes`, `string`, `pattern`)
+    and from the markup the CMS's carousel script asks of any template
+    (docs/reference/theming.md, "The Gallery block"). Its elements and classes are its own
+    (`reel`, `shelf`). Every text is printed through ERB's own escaping and nothing is marked
+    safe. A grid is a list; a carousel of one image is its figure alone; a carousel of more
+    is the section with the track, the controls, the picks (twelve or fewer) and the position,
+    and what only the script makes work is `hidden`. %>
+<% look = [ "gallery-#{layout}", "gallery-ratio-#{ratio.tr(":", "-")}", ("gallery-fit" if fit) ].compact.join(" ") %>
+<% count = items.size %>
+<% if layout == "grid" %>
+  <div class="shelf <%= look %>" data-block="<%= block.id %>" data-page="<%= page.id %>">
+    <%= tag.ul class: "shelf__list", role: "list", aria: { label: label } do %>
+      <% items.each do |item| %>
+        <li class="shelf__item">
+          <figure>
+            <div class="shelf__frame"><%= render Media::PictureComponent.new(**item.picture) %></div>
+            <% if item.caption %><figcaption><%= item.caption %></figcaption><% end %>
+          </figure>
+        </li>
+      <% end %>
+    <% end %>
+  </div>
+<% elsif count == 1 %>
+  <% item = items.first %>
+  <figure class="reel reel--single <%= look %>" data-block="<%= block.id %>" data-page="<%= page.id %>">
+    <div class="reel__frame"><%= render Media::PictureComponent.new(**item.picture) %></div>
+    <% if item.caption %><figcaption><%= item.caption %></figcaption><% end %>
+  </figure>
+<% else %>
+  <% track_id = "gallery-#{block.id}-track" %>
+  <%= tag.section class: "reel #{look}", aria: { roledescription: string(:carousel), label: label },
+        data: { block: block.id, page: page.id, controller: "gallery-carousel",
+                gallery_carousel_position_value: pattern(:position), gallery_carousel_moved_value: pattern(:moved) } do %>
+    <div class="reel__controls" hidden data-gallery-carousel-target="controls" data-action="keydown->gallery-carousel#keydown">
+      <%= tag.button "‹", type: "button", class: "reel__button", aria: { label: string(:previous), controls: track_id },
+            data: { gallery_carousel_target: "previous", action: "gallery-carousel#previous" } %>
+      <%= tag.button "›", type: "button", class: "reel__button", aria: { label: string(:next), controls: track_id },
+            data: { gallery_carousel_target: "next", action: "gallery-carousel#next" } %>
+    </div>
+    <%= tag.div class: "reel__track", id: track_id, tabindex: 0, role: "group", aria: { label: string(:track) },
+          data: { gallery_carousel_target: "track", action: "keydown->gallery-carousel#keydown" } do %>
+      <% items.each do |item| %>
+        <%= tag.div class: "reel__slide", role: "group", aria: { roledescription: string(:slide), label: string(:position, index: item.index, count: count) },
+              data: { gallery_carousel_target: "slide" } do %>
+          <figure>
+            <div class="reel__frame"><%= render Media::PictureComponent.new(**item.picture) %></div>
+            <% if item.caption %><figcaption><%= item.caption %></figcaption><% end %>
+          </figure>
+        <% end %>
+      <% end %>
+    <% end %>
+    <div class="reel__foot" hidden>
+      <% if count <= BlockTypes::Gallery::PICKER_MAX %>
+        <% items.each do |item| %>
+          <%= tag.button type: "button", class: "reel__dot", aria: { label: string(:show, index: item.index), current: ("true" if item.index == 1) },
+                data: { gallery_carousel_target: "pick", action: "gallery-carousel#show", gallery_carousel_index_param: item.index } %>
+        <% end %>
+      <% end %>
+      <p class="reel__position" data-gallery-carousel-target="position"><%= string(:position, index: 1, count: count) %></p>
+    </div>
+    <p class="reel__status" aria-live="polite" hidden data-gallery-carousel-target="status"></p>
+  <% end %>
+<% end %>

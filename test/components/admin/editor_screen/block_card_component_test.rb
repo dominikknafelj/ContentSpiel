@@ -979,4 +979,28 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     render_for(users(:one), A, editable: false)
     assert_no_selector ".admin-mermaid-field__import, input[type=file], dialog[id$='-source-replace']", visible: :all
   end
+
+  # D2 (StudioGallery): a segmented select followed directly by a select
+  # share one row that wraps, judged from the fields and not the type: the
+  # Gallery's Layout and Shape. The Note's kind, followed by its title (no
+  # select), stands alone.
+  test "a segmented select followed by a select stand in one wrapping row" do
+    record = create_page(title: "Row test")
+    gallery = record.content_blocks.create!(block_type: "gallery", position: 0)
+
+    as_owner { render_card(gallery, page: record, editable: true) }
+
+    row = page.find(".admin-block-field-row")
+    assert_equal %w[flex flex-wrap items-end gap-x-4], row[:class].split - [ "admin-block-field-row" ]
+    first, second = row.all(:xpath, "./div")
+    assert first.has_css?("fieldset#block-#{gallery.id}-layout"), "Layout first"
+    assert second.has_css?("select[name='block[settings][ratio]']"), "Shape after it"
+    assert_includes second[:class].split, "flex-1", "Shape fills the rest"
+    assert_selector "[data-container], [class*='@container']", count: 0
+
+    note = record.content_blocks.create!(block_type: "note", position: 1)
+    as_owner { render_card(note, page: record, editable: true) }
+    assert_no_selector ".admin-block-field-row"
+    assert_selector "fieldset#block-#{note.id}-kind"
+  end
 end

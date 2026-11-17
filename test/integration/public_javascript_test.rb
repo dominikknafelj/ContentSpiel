@@ -81,8 +81,9 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_includes entry_point_script, %(import "admin")
   end
 
-  # SortableJS is imported with `import()` by the four controllers that drag
-  # (`editor/drag`'s `loadSortable`, the tree, Settings' language rows), and is
+  # SortableJS is imported with `import()` by the controllers that drag
+  # (`editor/drag`'s `loadSortable`: the blocks list, the tree, Settings' language rows,
+  # the Media screen's drag and the Gallery card's rows), and is
   # `preload: false`: a screen with nothing to drag never fetches it, though
   # the map still names it for the `import()` to resolve.
   test "a CS Studio screen with nothing to drag preloads no SortableJS, and the editor fetches it on demand" do
@@ -342,7 +343,8 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert modulepreloads.any? { |href| href.include?("controllers/search_suggest_controller") }, "the suggestions' controller is preloaded on a public page"
 
     index = Rails.root.join("app/javascript/controllers/index.js").read
-    assert_includes index, %(export const PUBLIC_ONLY = [ "controllers/search_suggest_controller" ])
+    assert_includes index, %("controllers/search_suggest_controller"), "PUBLIC_ONLY names it"
+    assert_match(/export const PUBLIC_ONLY = \[[^\]]*"controllers\/search_suggest_controller"/m, index)
 
     assert_includes index, %(&& !PUBLIC_ONLY.includes(path)), "the site's own registration, which every entry point runs, leaves it out"
     assert_includes Rails.root.join("app/javascript/site.js").read, %(|| PUBLIC_ONLY.includes(path)), "the site entry point registers it"
@@ -359,6 +361,40 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     end
     scripts = Dir[Rails.root.join("app/javascript/**/*.js")].reject { |file| file.end_with?("controllers/index.js", "search_suggest_controller.js") }
     assert_empty scripts.select { |file| File.read(file).include?("search_suggest") }, "no other script imports the suggestions' controller"
+  end
+
+  # Gallery block spec §7.5: the carousel's script is the site's own, at the
+  # top level like `search-suggest`, and in `PUBLIC_ONLY`: a visitor's page
+  # runs it, and no CS Studio screen, sign-in or setup imports it (CS
+  # Studio's preview draws the public layout, which does).
+  test "a public page with a carousel carries gallery-carousel and no admin script" do
+    page = create_page(title: "Walks")
+    assets = Array.new(2) { create_media_asset }
+    page.content_blocks.create!(block_type: :gallery, position: 0, settings: { "layout" => "carousel", "images" => assets.map(&:id) })
+    publish_changes(page)
+
+    get PublicSite::Urls.new.path_for(page, "en")
+    assert_response :success
+    assert_select "section.content-block--gallery[data-controller='gallery-carousel']"
+    assert modulepreloads.any? { |href| href.include?("controllers/gallery_carousel_controller") }, "the carousel's controller is preloaded on a public page"
+    ADMIN_ONLY.each do |name|
+      assert modulepreloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on a page with a carousel"
+    end
+
+    index = Rails.root.join("app/javascript/controllers/index.js").read
+    assert_match(/export const PUBLIC_ONLY = \[[^\]]*"controllers\/gallery_carousel_controller"/m, index, "PUBLIC_ONLY names it, so the site entry point alone registers it")
+
+    get admin_sign_in_path
+    assert_not_includes entry_point_script, "gallery_carousel"
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    [ "/cs-studio", "/cs-studio/pages/#{page.id}" ].each do |path|
+      get path
+      assert_response :success
+      assert_not_includes entry_point_script, "gallery_carousel"
+    end
+    scripts = Dir[Rails.root.join("app/javascript/**/*.js")].reject { |file| file.end_with?("controllers/index.js", "gallery_carousel_controller.js") }
+    assert_empty scripts.select { |file| File.read(file).include?("gallery_carousel") }, "no other script imports the carousel's controller"
   end
 
   test "a public page with a Note block needs no script: it carries no controller of its own and no admin script" do

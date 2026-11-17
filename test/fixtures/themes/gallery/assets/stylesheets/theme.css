@@ -1,0 +1,41 @@
+/* The eleventh theme's stylesheet: its own Gallery template's rules, and the
+   Gallery's six tokens declared again for both schemes. The carousel's track
+   is the scroll-snap row the reference asks for, with slides one to a view;
+   what the template wrote `hidden` stays hidden under its own display rules. */
+:root, [data-theme="light"] {
+  --th-gallery-stage: #efe6d6;
+  --th-gallery-control: #fffdf8;
+  --th-gallery-control-ink: #3a2a10;
+  --th-gallery-control-edge: #3a2a10;
+  --th-gallery-pick: #6b5a3a;
+  --th-gallery-pick-current: #3a2a10;
+}
+[data-theme="dark"] {
+  --th-gallery-stage: #241c10;
+  --th-gallery-control: #1c160c;
+  --th-gallery-control-ink: #f3e6cc;
+  --th-gallery-control-edge: #f3e6cc;
+  --th-gallery-pick: #b9a67d;
+  --th-gallery-pick-current: #f3e6cc;
+}
+.reel { position: relative; margin-block: 2rem; }
+.reel figure, .shelf figure { margin: 0; }
+.reel__track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
+.reel__track:focus-visible { outline: 2px solid var(--th-accent); outline-offset: 2px; }
+.reel__slide { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+.reel__frame, .shelf__frame { aspect-ratio: 3 / 2; overflow: hidden; background: var(--th-gallery-stage); }
+.gallery-ratio-1-1 .reel__frame, .gallery-ratio-1-1 .shelf__frame { aspect-ratio: 1 / 1; }
+.reel__frame img, .shelf__frame img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.gallery-fit .reel__frame img, .gallery-fit .shelf__frame img { object-fit: contain; }
+.reel__controls { display: flex; justify-content: space-between; }
+.reel__controls[hidden], .reel__foot[hidden], .reel__status[hidden] { display: none; }
+.reel__button { background: var(--th-gallery-control); color: var(--th-gallery-control-ink); box-shadow: 0 0 0 1px var(--th-gallery-control-edge); border: 0; border-radius: 50%; width: 44px; height: 44px; }
+.reel__button:disabled { color: var(--th-meta); box-shadow: 0 0 0 1px var(--th-line); }
+.reel__foot { display: flex; align-items: center; gap: 4px; }
+.reel__dot { width: 24px; height: 24px; border: 0; background: none; }
+.reel__dot::before { content: ""; display: block; margin: auto; width: 8px; height: 8px; border: 1.5px solid var(--th-gallery-pick); border-radius: 999px; box-sizing: border-box; }
+.reel__dot[aria-current="true"]::before { width: 20px; background: var(--th-gallery-pick-current); border-color: var(--th-gallery-pick-current); }
+.reel__position { margin: 0 0 0 auto; color: var(--th-meta); }
+.reel__status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.shelf__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--th-gallery-gap); list-style: none; margin: 0; padding: 0; }
+.shelf figcaption, .reel figcaption { color: var(--th-meta); }

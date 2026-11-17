@@ -17,6 +17,11 @@ module Admin
     # (`outside_form`). Only then does an input draw its import control
     # (`label_end`); it is false unless asked for, so no other caller draws
     # a control with nothing behind it.
+    # `values:` is the whole set of values the field is drawn among (the
+    # block's `ContentModel::FieldSet` for the language drawn), for an input
+    # that reads a sibling field: the Gallery's rows read the list of images
+    # they describe (`:media_texts`'s `of:`). Nil where a caller hands none
+    # (every caller but the block card); no other input reads it.
     class Base < Admin::AdminComponent
       # How a value of this type reads where it cannot be edited (a
       # translation tab's "Shared fields", `EditorScreen::SharedFieldsComponent`):
@@ -40,6 +45,14 @@ module Admin
       # its error slot alone, in a wrapper that takes no room in the form (no
       # box, no gap in its column) until the slot holds an error.
       def self.hidden?(_field) = false
+
+      # Whether the block card draws this field and the next one in one row
+      # that wraps (StudioGallery D2): the first opens it (`opens_row?`, a
+      # segmented select), the next fills the rest (`fills_row?`, a select).
+      # The input's answers, so the card asks no type by its name.
+      def self.opens_row?(_field) = false
+
+      def self.fills_row?(_field) = false
 
       # Data for the field's wrapper (`Ui::FieldComponent`'s `.admin-field`),
       # for an input whose script reaches beyond the input (the Mermaid
@@ -65,8 +78,9 @@ module Admin
       # forwarded here unchanged so `input_id` agrees with the wrapping
       # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a
       # caller supplied.
-      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil, placeholder: nil, importable: false)
+      def initialize(field:, form_name:, value:, original: nil, locale: nil, errors: [], id_prefix: nil, placeholder: nil, importable: false, values: nil)
         @field = field
+        @values = values
         @form_name = form_name
         @value = value
         @original = original
@@ -110,7 +124,7 @@ module Admin
         nil
       end
 
-      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :placeholder
+      attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :placeholder, :values
 
       def importable? = @importable
 

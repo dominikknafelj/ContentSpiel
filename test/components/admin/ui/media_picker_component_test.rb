@@ -88,4 +88,43 @@ class Admin::Ui::MediaPickerComponentTest < ViewComponent::TestCase
     assert_equal "Uploads go into %{name}", words.fetch("components.ui.media_picker.upload_into")
     assert_equal "Uploads go into no folder", words.fetch("components.ui.media_picker.upload_nowhere")
   end
+
+  # The card StudioGallery, D4: a multiple opening's words are the dialog's,
+  # for `admin--media--picker` and `admin--media--select` to say, and the two
+  # marks a tile takes (its order, "In the gallery") are drawn once, as
+  # templates the select script clones.
+  test "a multiple opening's words and a tile's two marks are on the dialog" do
+    as(users(:one)) { render_inline Admin::Ui::MediaPickerComponent.new }
+
+    words = JSON.parse(page.find("dialog", visible: :all)["data-messages"])
+    assert_equal "Choose an image", words.fetch("components.ui.media_picker.title")
+    assert_equal "Add images", words.fetch("components.ui.media_picker.title_multiple")
+    assert_equal "Use image", words.fetch("components.ui.media_picker.use")
+    assert_equal({ "zero" => "Add images", "one" => "Add 1 image", "other" => "Add %{count} images" }, words.fetch("components.ui.media_picker.add_count"))
+    assert_equal "%{count} selected · the gallery takes %{left} more", words.fetch("components.ui.media_picker.takes")
+    assert_equal "The gallery takes no more: %{max} images.", words.fetch("components.ui.media_picker.full")
+    assert_equal "No images selected · the gallery takes %{left} more", words.fetch("components.ui.media_picker.takes_none")
+    assert_equal ", chosen %{ordinal}", words.fetch("components.ui.media_picker.chosen")
+    assert_not words.key?("components.ui.media_picker.chosen_order"), "a chosen tile keeps its whole name: the order is appended"
+    assert_equal({ "one" => "%{count}st", "two" => "%{count}nd", "few" => "%{count}rd", "other" => "%{count}th" }, words.fetch("components.ui.media_picker.ordinal"))
+
+    assert_selector "h2[data-admin--media--picker-target=title]", text: "Choose an image", visible: :all
+    marks = rendered_content.scan(%r{<template data-admin--media--select-target="(\w+)">(.*?)</template>}m).to_h
+    assert_match(/class="admin-media-pick-order" aria-hidden="true" data-media-pick-order/, marks.fetch("orderMark"))
+    assert_match(/class="admin-media-pick-in-gallery" aria-hidden="true" data-media-pick-in-gallery>.*In the gallery/m, marks.fetch("inGalleryMark"))
+
+    # A tile at the limit is described by the footer's status line.
+    assert_selector "p#media-picker-choice[role=status][data-admin--media--select-target=status]", visible: :all
+    # The close drops the choice and the scripts' marks.
+    assert_includes page.find("dialog", visible: :all)["data-action"], "close->admin--media--select#reset"
+    assert_match(/chosen tile's name ends with its place in the order.*In the gallery.*aria-disabled/,
+      Admin::Ui::MediaPickerComponent.contract.accessibility)
+
+    limits = Admin::Ui::MediaPickerComponent.contract.limits
+    assert_includes limits, "It hands back one image, or several in the order chosen when the opener asks for several; there, in a folder's place, a whole folder's new images, oldest first, after the ones chosen."
+    # A folder's button, written by the script for each answer.
+    assert_equal({ "one" => "Add the 1 new image in this folder", "other" => "Add all %{count} new images in this folder" }, words.fetch("components.ui.media_picker.add_folder"))
+    assert_equal "Add the first %{count} of %{total} new images", words.fetch("components.ui.media_picker.add_folder_first")
+    assert_includes page.find("dialog", visible: :all)["data-action"], "admin--media--select:changed->admin--media--picker#choiceChanged"
+  end
 end

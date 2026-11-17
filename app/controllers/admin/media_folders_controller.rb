@@ -21,11 +21,17 @@ module Admin
   # another changed the library (`admin--media--live`, the card's D13): read
   # with the screen's own gate, `media.upload`, and the screen's words
   # (`folder`, `q`, `filter`; `picker` for the picker's places).
+  #
+  # `images` is a folder's own kept images as JSON, for the picker's "Add
+  # all … new images in this folder" (gallery spec §10.6): behind the
+  # picker's gate, `media.upload`, asked before the folder is looked up, so
+  # someone without it learns nothing of which ids exist; a folder the tree
+  # does not hold is then a 404.
   class MediaFoldersController < BaseController
     include MediaPlaces
 
-    before_action -> { require_permission("media.upload") }, only: :index
-    before_action -> { forbidden! unless can?("media.manage") }, except: :index
+    before_action -> { require_permission("media.upload") }, only: %i[index images]
+    before_action -> { forbidden! unless can?("media.manage") }, except: %i[index images]
     before_action :set_folder, only: %i[update destroy]
 
     # The services' sentence for a folder deleted meanwhile (`Media::SaveFolder`,
@@ -43,6 +49,21 @@ module Admin
 
       render Admin::MediaLibrary::FolderTreeComponent.new(tree: tree, counts: Media::FolderCounts.call, place: place, query: shown_query,
         open_set: TreeOpenSet::EMPTY, manage: false, mode: :picker, digest: place.digest(tree), gone: gone), layout: false
+    end
+
+    # `total` counts the folder's kept images with a file (never a
+    # subfolder's) whose ids `except` does not name; `items` are the oldest
+    # `limit` of them by id, upload order, each with the keys a picker tile
+    # hands back, in the admin language. `limit` and `except` never pass a gallery's size.
+    def images
+      place = Media::Place.parse(params[:id].to_s, tree: Media::FolderTree.load)
+      raise ActiveRecord::RecordNotFound unless place&.folder
+
+      # One scope for both, so "Add all N" never counts an image it would not
+      # add: one with no file is no picker tile and no gallery item.
+      scope = place.narrow(Media::Asset.kept.joins(:file_attachment)).where.not(id: excepted_ids)
+      items = scope.with_file.order(:id).limit(images_limit).map { |asset| picked_keys(asset) }
+      render json: { total: scope.count, items: items }
     end
 
     def create
@@ -126,6 +147,31 @@ module Admin
 
     def refused_in_move_dialog(folder, sentences, status)
       answer(Admin::Answers::MoveRefused.new(view: view_context).answer(choices: move_choices_for({ kind: :folder, folder: folder }, refusal: sentences), status: status))
+    end
+
+    # `limit` as a whole number up to a gallery's size; absent or anything
+    # else, the gallery's size.
+    def images_limit
+      limit = Integer(params[:limit].to_s, 10, exception: false)
+      limit ? limit.clamp(0, BlockTypes::Gallery::MAX_IMAGES) : BlockTypes::Gallery::MAX_IMAGES
+    end
+
+    # `except`, comma-separated ids: what is not a whole number is dropped,
+    # and no more than a gallery holds are read. Anything but a String
+    # (`except[]=1`) names none.
+    def excepted_ids
+      sent = params[:except]
+      return [] unless sent.is_a?(String)
+
+      sent.split(",").grep(/\A\d{1,18}\z/).map(&:to_i).uniq.first(BlockTypes::Gallery::MAX_IMAGES)
+    end
+
+    # What a picker tile hands back (`Admin::MediaLibrary::TileComponent#pick_payload`'s
+    # keys a gallery reads), the library's alt and caption in the admin
+    # language.
+    def picked_keys(asset)
+      { id: asset.id, url: asset.thumbnail_url, title: asset.title,
+        alt: asset.alt_text(override: nil, locale: admin_locale).to_s, caption: asset.caption_text(override: nil, locale: admin_locale).to_s }
     end
 
     def sent_name? = sent_folder.key?(:name)

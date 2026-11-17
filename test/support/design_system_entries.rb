@@ -16,10 +16,10 @@ module DesignSystemEntries
     ActionZone Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog EditorDiagramBlock EditorDiagramError EditorSearchBlock FieldFrame FoundationComponentContract FoundationContrast
     FoundationFocus FoundationIcons FoundationLayout FoundationMotion Gif GroupFields IconChip ImageField ImageViewer Mails MediaPicker Menu NoteMarker Notice
     PasswordField PatternDestructiveActions PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation PatternNotifications PatternSaving Person
-    PrefixInput PresenceMarker PublicDiagramBlock RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage
+    PrefixInput PresenceMarker PublicDiagramBlock RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteGallery SiteHeader SiteImage
     SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSearch SiteSearchMatches SiteSearchSuggest SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
     StudioBlockCard StudioCommandPalette StudioDashboardCards StudioDrawDiagrams StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms
-    StudioGroups StudioHeldStrip StudioHistory StudioListTable StudioMediaFolders StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioPostTypes StudioRail
+    StudioGallery StudioGroups StudioHeldStrip StudioHistory StudioListTable StudioMediaFolders StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPasskeySignIn StudioPasskeys StudioPostTypes StudioRail
     StudioSectionTile StudioSessions StudioSettings StudioShell StudioSignIn StudioSingleSignOn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations
     StudioTrash StudioTree StudioUsers StudioWizard TableGrid Tabs TextFields Toast Tooltip
   ].freeze

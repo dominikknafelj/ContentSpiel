@@ -25,6 +25,10 @@
 // locale tag `Intl` rejects falls back to `other`. (The server's own
 // pluralisation is Rails': `one`/`other` only without the `rails-i18n` gem, so
 // a `few` form the browser would pick is not one the server can render.)
+// An ordinal ("2nd") is asked with `{ count, ordinal: true }`: the category is
+// then `Intl.PluralRules`' ordinal type for that `@locale` (English `one` 1st,
+// `two` 2nd, `few` 3rd, `other` 4th, 11th to 13th `other`), and no `zero` form
+// applies. The server never picks one: Rails has no ordinal rules.
 // `%{name}` is replaced by `vars.name`; `count` is itself a variable.
 // `messages(element).locale()` answers the nearest holder's `@locale`.
 //
@@ -54,10 +58,11 @@ function holders(element) {
   return found
 }
 
-function category(locale, count) {
+function category(locale, count, type) {
+  const key = `${type} ${locale}`
   try {
-    if (!rules.has(locale)) rules.set(locale, new Intl.PluralRules(locale))
-    return rules.get(locale).select(count)
+    if (!rules.has(key)) rules.set(key, new Intl.PluralRules(locale, { type }))
+    return rules.get(key).select(count)
   } catch {
     return "other"
   }
@@ -82,7 +87,8 @@ export function messages(element) {
         if (!("count" in vars)) throw new Error(`i18n: "${key}" is a plural and needs a count`)
 
         const count = Number(vars.count)
-        const chosen = count === 0 && "zero" in value ? "zero" : category(all["@locale"] || "en", count)
+        const type = vars.ordinal === true ? "ordinal" : "cardinal"
+        const chosen = type === "cardinal" && count === 0 && "zero" in value ? "zero" : category(all["@locale"] || "en", count, type)
         value = value[chosen] ?? value.other
         if (value === undefined) throw new Error(`i18n: "${key}" has no "${chosen}" or "other" form`)
       }

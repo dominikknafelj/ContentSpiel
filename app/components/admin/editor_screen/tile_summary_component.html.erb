@@ -12,6 +12,7 @@
         <% end %>
         <span id="<%= name_id %>" class="truncate"><% parts.each do |text, look| %><%= look ? tag.span(text, class: look) : text %><% end %></span>
       </span>
+      <%= badges_row %>
       <% if picture_heading.present? || picture_text.present? %>
         <%# The two stand against each other: white space between them would be read with the description. %>
         <span id="<%= text_id %>" class="flex min-w-0 flex-col gap-0.5"><% if picture_heading.present? %><span class="admin-block-tile__text truncate text-sm text-dim"><%= picture_heading %></span><% end %><% if picture_text.present? %><span class="<%= preview_text_class %>"><%= picture_text %></span><% end %></span>
@@ -41,6 +42,7 @@
       <%# The type's line in place of a text (`Preview#line`); its parts stand against each other, as on the plain line. %>
       <span id="<%= text_id %>" class="admin-block-tile__line truncate text-xs text-meta"><% line_parts.each do |text, look| %><%= look ? tag.span(text, class: look) : text %><% end %></span>
     <% end %>
+    <%= badges_row %>
     <% if invalid %>
       <span id="<%= status_id %>" class="text-sm text-dim"><%= needs_fixing %></span>
     <% end %>
@@ -57,5 +59,6 @@
     <% end %>
     <%# The parts stand directly against each other: white space between them would be drawn. %>
     <span id="<%= name_id %>" class="truncate"><% parts.each do |text, look| %><%= look ? tag.span(text, class: look) : text %><% end %></span>
+    <%= badges_row %>
   </span>
 <% end %>

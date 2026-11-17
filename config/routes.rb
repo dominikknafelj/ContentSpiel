@@ -170,6 +170,9 @@ Rails.application.routes.draw do
       # The Folders column's writes and the move of images into a folder
       # (`Media::SaveFolder`, `DeleteFolder`, `MoveImages`).
       resources :media_folders, only: %i[create update destroy]
+      # A folder's own kept images as JSON, for the picker's "Add all … new
+      # images in this folder" (gallery spec §10.6).
+      get "media_folders/:id/images", to: "media_folders#images", as: :media_folder_images, constraints: { id: /\d+/ }
       post "media/move", to: "media_moves#create", as: :media_move
       # The Move to… dialog's list for images or a folder (its frame's answer).
       get "media/move/new", to: "media_moves#new", as: :new_media_move

@@ -1,0 +1,253 @@
+/* The Gallery block (gallery block spec §7.8, SiteGallery D6 and D7,
+   `Blocks::GalleryComponent`). Plain rules on tokens, not utilities: the
+   ratio and fit classes are built from the block's settings
+   (`content-block--gallery--ratio-4-3`), which no utility scan would find.
+   Every colour is a --th- token: the Gallery's own seven (tokens.css, a
+   band's in sections.css) and the site's --th-meta, --th-line and
+   --th-accent.
+
+   THE FRAME is every image's box, in both layouts: the block's width (a
+   grid cell's) at the set ratio, so it has its height before any image
+   arrives and nothing shifts. The image covers it, cropped at the centre,
+   or with "Show whole images" is drawn whole on the stage. */
+.content-block--gallery {
+  margin-block: 2.5rem;
+}
+.content-block--gallery figure {
+  margin: 0;
+}
+.content-block--gallery__frame {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border-radius: var(--th-radius);
+}
+.content-block--gallery__frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.content-block--gallery--ratio-4-3 :is(.content-block--gallery__frame, .content-block--gallery__controls) { aspect-ratio: 4 / 3; }
+.content-block--gallery--ratio-1-1 :is(.content-block--gallery__frame, .content-block--gallery__controls) { aspect-ratio: 1 / 1; }
+.content-block--gallery--ratio-16-9 :is(.content-block--gallery__frame, .content-block--gallery__controls) { aspect-ratio: 16 / 9; }
+.content-block--gallery--fit .content-block--gallery__frame {
+  background: var(--th-gallery-stage);
+}
+/* An image shown whole leaves the stage around it. Its ~24px preview is its
+   own `style` background, drawn `cover` (`Media::PictureComponent`): over
+   the whole frame it would show round the sharp image once it has arrived.
+   An inline style is beaten only by `!important`, so the preview is drawn
+   `contain` here, under the image and nowhere else: only an image that
+   carries that `style`, never the empty mark (`img[data-image-empty]`),
+   which images.css draws at its own size. */
+.content-block--gallery--fit .content-block--gallery__frame img {
+  object-fit: contain;
+}
+.content-block--gallery--fit .content-block--gallery__frame img[style] {
+  background-size: contain !important;
+}
+
+/* THE CAPTION, 8px under its frame, in the small size and the faint
+   colour, as the Image block's: --th-meta, which a tinted band reads as
+   --th-dim and a strong band as its own dim (sections.css). */
+.content-block--gallery__caption {
+  margin-top: 8px;
+  font-family: var(--th-font);
+  font-size: var(--th-t-small);
+  line-height: 1.5;
+  color: var(--th-meta);
+}
+
+/* THE GRID is a list of figures, the block a size container: one image a
+   row below 320px of the block's width, two from 320px, three from 640px
+   (`Blocks::GalleryComponent::GRID_COLUMNS`, which `sizes` divides the
+   widths by: a change here changes that constant). */
+.content-block--gallery--grid {
+  container-type: inline-size;
+}
+.content-block--gallery__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--th-gallery-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@container (min-width: 320px) {
+  .content-block--gallery__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (min-width: 640px) {
+  .content-block--gallery__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* THE CAROUSEL's track is a row of slides, each the block's whole width
+   with no peek, snapping into place. It works without the script: a person
+   scrolls it, swipes it, drags its scrollbar or moves it with the arrow
+   keys once it has the focus. With the script (`data-gallery-carousel-state`
+   on the block) the buttons and the dots say there is more, and the
+   scrollbar goes. It moves smoothly only for a person who has not asked
+   for reduced motion. */
+.content-block--gallery--carousel {
+  position: relative;
+}
+.content-block--gallery__track {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+.content-block--gallery[data-gallery-carousel-state] .content-block--gallery__track {
+  scrollbar-width: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .content-block--gallery__track { scroll-behavior: smooth; }
+}
+.content-block--gallery__track:focus-visible {
+  outline: 2px solid var(--th-accent);
+  outline-offset: 2px;
+}
+.content-block--gallery__track > .content-block--gallery__slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+/* PREVIOUS AND NEXT stand over the frame's sides, centred on its height
+   (never on the caption): the controls come first in the document and are
+   a box of the frame's ratio laid over the top of the block, which lets the
+   pointer through to the track but for the two buttons. Each is a 44px
+   disc 10px in from its side, in reading order (Previous at the inline
+   start, its chevron mirrored right to left). The ring is the edge, a 1px
+   `box-shadow` of --th-gallery-control-edge, and the menu's shadow under it
+   is depth only. At an end a button is disabled: its arrow --th-meta, its
+   ring --th-line and no shadow. */
+.content-block--gallery__controls {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  z-index: 1;
+  aspect-ratio: 3 / 2;
+  pointer-events: none;
+}
+.content-block--gallery__controls[hidden] {
+  display: none;
+}
+.content-block--gallery__button {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--th-radius-pill);
+  background: var(--th-gallery-control);
+  color: var(--th-gallery-control-ink);
+  box-shadow: 0 0 0 1px var(--th-gallery-control-edge), var(--th-shadow-menu);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.content-block--gallery__button--previous { inset-inline-start: 10px; }
+.content-block--gallery__button--next { inset-inline-end: 10px; }
+.content-block--gallery__button svg {
+  width: 20px;
+  height: 20px;
+}
+.content-block--gallery__button svg:dir(rtl) {
+  transform: scaleX(-1);
+}
+.content-block--gallery__button:disabled {
+  color: var(--th-meta);
+  box-shadow: 0 0 0 1px var(--th-line);
+  cursor: default;
+}
+.content-block--gallery__button:focus-visible {
+  outline: 2px solid var(--th-accent);
+  outline-offset: 2px;
+}
+
+/* THE FOOT, 10px under the caption: the dots centred and the position at
+   the inline end, in a 4.5em box aligned to the end, with an empty box of
+   the same width at the start so the dots stay centred. `display` below
+   would show it, so the `[hidden]` rules are the block's own and depend on
+   no reset. */
+.content-block--gallery__foot {
+  display: grid;
+  grid-template-columns: 4.5em minmax(0, 1fr) 4.5em;
+  align-items: center;
+  margin-top: 10px;
+  font-family: var(--th-font);
+  font-size: var(--th-t-small);
+}
+.content-block--gallery__foot::before {
+  content: "";
+  grid-column: 1;
+}
+.content-block--gallery__foot[hidden],
+.content-block--gallery__picks[hidden] {
+  display: none;
+}
+.content-block--gallery__picks {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.content-block--gallery__position {
+  grid-column: 3;
+  margin: 0;
+  text-align: end;
+  color: var(--th-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A DOT is a 24px target holding an 8px ring of 1.5px --th-gallery-pick;
+   the current one, `aria-current="true"`, is a 20x8 pill filled
+   --th-gallery-pick-current. */
+.content-block--gallery__pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.content-block--gallery__pick::before {
+  content: "";
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--th-gallery-pick);
+  border-radius: var(--th-radius-pill);
+}
+.content-block--gallery__pick[aria-current="true"]::before {
+  width: 20px;
+  border-color: var(--th-gallery-pick-current);
+  background: var(--th-gallery-pick-current);
+}
+.content-block--gallery__pick:focus-visible {
+  outline: 2px solid var(--th-accent);
+  outline-offset: 2px;
+}
+
+/* THE STATUS is heard, not seen: what a button or a key moved to. */
+.content-block--gallery__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

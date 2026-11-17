@@ -314,4 +314,67 @@ class Admin::MediaFoldersTest < ActionDispatch::IntegrationTest
     assert_not fetched_part.key?("data-media-place-gone")
     assert_equal Media::Place::NONE.digest(Media::FolderTree.load), fetched_part["data-media-place-digest"]
   end
+
+  # `GET /media_folders/:id/images` (gallery spec §10.6): what the picker's
+  # "Add all … new images in this folder" adds to a gallery.
+  def folder_images(folder_id, **params)
+    get "/cs-studio/media_folders/#{folder_id}/images", params: params
+    JSON.parse(response.body) if response.media_type == "application/json"
+  end
+
+  test "a folder's images come oldest first, kept only, never a subfolder's, less the ones named, up to the limit" do
+    folder = Media::Folder.create!(name: "Client A")
+    sub = Media::Folder.create!(name: "Stage", parent_id: folder.id)
+    first, second, third, fourth = Array.new(4) { create_media_asset.tap { |asset| asset.update_columns(folder_id: folder.id) } } # version: none (a test's own rows)
+    first.update!(title: "Harbour", alt: "Boats at dusk", caption: "The north pier")
+    create_media_asset.tap { |asset| asset.update_columns(folder_id: folder.id, trashed_at: Time.current) } # version: none (a test's own rows)
+    create_media_asset.tap { |asset| asset.update_columns(folder_id: sub.id) } # version: none (a test's own rows)
+    create_media_asset # in no folder
+    sign_in_as(users(:one))
+
+    answer = folder_images(folder.id, limit: "2", except: "#{second.id},x,-3,#{second.id}")
+    assert_response :ok
+    assert_equal 3, answer["total"]
+    assert_equal [ first.id, third.id ], answer["items"].map { |item| item["id"] }
+    assert_equal({ "id" => first.id, "url" => first.reload.thumbnail_url, "title" => "Harbour", "alt" => "Boats at dusk", "caption" => "The north pier" }, answer["items"].first)
+
+    # No limit, or one that is no whole number, is the gallery's own; a
+    # limit of none answers the count alone.
+    assert_equal [ first.id, second.id, third.id, fourth.id ], folder_images(folder.id)["items"].map { |item| item["id"] }
+    assert_equal 4, folder_images(folder.id, limit: "many")["items"].size
+    assert_equal({ "total" => 4, "items" => [] }, folder_images(folder.id, limit: "0"))
+    assert_equal [ first.id, second.id, third.id, fourth.id ], folder_images(folder.id, limit: "999", except: [ first.id ])["items"].map { |item| item["id"] },
+                 "an except that is no string is ignored"
+  end
+
+  # An image whose file is gone is no item, so it is not counted either:
+  # "Add all N" never names more images than it adds.
+  test "a folder's images count only the images with a file, as the items are" do
+    folder = Media::Folder.create!(name: "Client A")
+    with_file = create_media_asset.tap { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
+    without = create_media_asset.tap { |asset| asset.update_columns(folder_id: folder.id) } # version: none (a test's own rows)
+    without.file.attachment.delete
+    sign_in_as(users(:one))
+
+    answer = folder_images(folder.id)
+    assert_equal [ with_file.id ], answer["items"].map { |item| item["id"] }
+    assert_equal 1, answer["total"]
+  end
+
+  test "a folder's images need media.upload, asked before the folder is looked up, and an unknown folder is a 404" do
+    folder = Media::Folder.create!(name: "Client A")
+    unknown = Media::Folder.maximum(:id) + 1000
+
+    sign_in_as(users(:reader))
+    [ folder.id, unknown ].each do |id|
+      folder_images(id)
+      assert_response :forbidden
+    end
+
+    sign_in_as(uploader_without_manage)
+    assert_equal({ "total" => 0, "items" => [] }, folder_images(folder.id))
+    assert_response :ok
+    folder_images(unknown)
+    assert_response :not_found
+  end
 end

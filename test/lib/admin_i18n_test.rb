@@ -485,6 +485,13 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/fields/diagram_drawing_field.html.erb
     app/components/admin/fields/form_field.rb
     app/components/admin/fields/form_field.html.erb
+    app/components/admin/fields/media_list_field.rb
+    app/components/admin/fields/media_list_field.html.erb
+    app/components/admin/fields/media_texts_field.rb
+    app/components/admin/fields/media_texts_field.html.erb
+    app/components/admin/fields/media_text_row_component.rb
+    app/components/admin/fields/media_text_row_component.html.erb
+    app/javascript/controllers/admin/editor/gallery_controller.js
     app/javascript/controllers/admin/editor/code_limit_controller.js
     app/components/admin/notes_screen/body_component.rb
     app/components/admin/notes_screen/body_component.html.erb

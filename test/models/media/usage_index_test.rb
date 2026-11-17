@@ -6,6 +6,7 @@ require "test_helper"
 # that's the entire contract: `.refresh` recomputes, it never accumulates.
 class Media::UsageIndexTest < ViewComponent::TestCase
   include ContentHelper
+  include TestTypes
   def usage_tuples(scope = Media::Usage.all)
     scope.pluck(:media_asset_id, :owner_type, :owner_id, :role, :locale)
   end
@@ -234,6 +235,59 @@ class Media::UsageIndexTest < ViewComponent::TestCase
     end
 
     assert_equal [ [ asset.id, "Page", page.id, "hero", nil ] ], usage_tuples(Media::Usage.where(owner: page))
+  end
+
+  # A block's fields that name library images (`FieldType#media_ids`, through
+  # `Definition#media_ids_in`): one row each, owned by the block, as a block's
+  # own image is.
+  test "a block's media list gives one block_field row per existing image" do
+    with_media_list_type do
+      page = create_page(title: "Gallery page")
+      first, second = create_media_asset, create_media_asset
+      block = media_list_block(page, [ second.id, first.id ])
+
+      assert_equal [ [ first.id, "ContentBlock", block.id, "block_field", nil ], [ second.id, "ContentBlock", block.id, "block_field", nil ] ],
+        usage_tuples(Media::Usage.where(owner: block)).sort
+
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "images" => [ first.id ] } }).ok?
+      assert_equal [ [ first.id, "ContentBlock", block.id, "block_field", nil ] ], usage_tuples(Media::Usage.where(owner: block))
+    end
+  end
+
+  # No foreign key can point into jsonb: a stored id may name an image deleted
+  # around the services, and the refresh skips it as it skips a rich-text
+  # body's dead reference.
+  test "an id that names nothing gives no row and does not fail the refresh" do
+    with_media_list_type do
+      page = create_page(title: "Gallery page")
+      asset = create_media_asset
+      block = media_list_block(page, [ asset.id ])
+      missing = Media::Asset.maximum(:id) + 1
+      block.update_columns(settings: { "images" => [ missing, asset.id ] }) # version: none (a test writes a dead id around the services)
+
+      assert_nothing_raised { Media::UsageIndex.refresh(block) }
+      assert_equal [ [ asset.id, "ContentBlock", block.id, "block_field", nil ] ], usage_tuples(Media::Usage.where(owner: block))
+    end
+  end
+
+  test "an image only the published list still shows keeps a published row until the changes are published" do
+    with_media_list_type do
+      kept, dropped = create_media_asset, create_media_asset
+      page = Pages::Save.call(attributes: { parent: root_page, published: false }, translations: { "en" => { title: "Gallery" } }).record
+      block = media_list_block(page, [ kept.id, dropped.id ])
+      assert Pages::Save.call(page, attributes: { published: true }).ok?
+
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "images" => [ kept.id ] } }).ok?
+
+      assert_equal [ [ "Page", page.id, "published" ] ], dropped.usages.pluck(:owner_type, :owner_id, :role)
+      assert_not Trash::Move.call(dropped.reload).ok?, "an image the site still shows went to the trash"
+
+      publish_changes(page)
+
+      assert_not dropped.reload.used?
+      assert Trash::Move.call(dropped).ok?
+      assert_equal %w[block_field published], kept.usages.pluck(:role).sort
+    end
   end
 
   test "a rich-text block owned by a page gives a rich_text row owned by the block, not the page" do

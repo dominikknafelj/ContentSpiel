@@ -38,7 +38,9 @@ export function registerControllers(include) {
 
 // The site's own controllers that only the `site` entry point registers:
 // the Search block's suggestions while typing, which a CS Studio screen
-// never draws (its search fields are its own).
-export const PUBLIC_ONLY = [ "controllers/search_suggest_controller" ]
+// never draws (its search fields are its own), and the Gallery block's
+// carousel, which only a public page draws (CS Studio's preview draws one
+// through the public layout, which loads `site`).
+export const PUBLIC_ONLY = [ "controllers/search_suggest_controller", "controllers/gallery_carousel_controller" ]
 
 registerControllers((path) => !path.startsWith("controllers/admin/") && !path.startsWith("controllers/theme/") && !PUBLIC_ONLY.includes(path))

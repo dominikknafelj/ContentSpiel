@@ -41,7 +41,7 @@ module Admin
     class PanelComponent < Admin::AdminComponent
       # The roles a usage row names (`Media::Usage`), each a word of the
       # locale file's `roles`; a role outside it is named by itself.
-      ROLES = %w[hero block_image rich_text published].freeze
+      ROLES = %w[hero block_image block_field rich_text published].freeze
 
       # `tree:` is the folder tree the screen already read, which names the
       # image's folder; without it the panel reads it.
@@ -271,7 +271,7 @@ module Admin
           place = place_for(entry[:owner])
           next if place.nil? || place.trashed?
 
-          role = role_label(entry[:roles])
+          role = role_label(entry[:roles], entry[:owner])
           locales = entry[:locales].any? ? t(".used_on.locales", locales: entry[:locales].join(t(".used_on.names_separator"))) : ""
           kind = place.is_a?(Post) ? "post" : "page"
 
@@ -342,7 +342,17 @@ module Admin
       # `published` is already left out of a group that has another role and
       # out of the list when the same place has another group
       # (`Media::Asset#usages_summary`), so it is only ever named alone.
-      def role_label(roles) = roles.map { |role| ROLES.include?(role) ? t(".roles.#{role}") : role }.join(t(".used_on.names_separator"))
+      def role_label(roles, owner) = roles.map { |role| ROLES.include?(role) ? role_word(role, owner) : role }.join(t(".used_on.names_separator"))
+
+      # A `block_field` row's owner is the block, named by its type's label
+      # ("Gallery block"); a block whose type is no longer registered draws
+      # nothing and is named as a block.
+      def role_word(role, owner)
+        return t(".roles.#{role}") unless role == "block_field"
+
+        label = owner.is_a?(ContentBlock) ? owner.definition&.label : nil
+        label ? t(".roles.block_field", type: label) : t(".roles.block_field_unknown")
+      end
     end
   end
 end

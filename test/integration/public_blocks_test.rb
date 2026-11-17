@@ -167,8 +167,8 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
 
   test "an unregistered stored block type is skipped on render" do
     @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Hello there"))
-    gallery = @root.content_blocks.create!(block_type: :rich_text, position: 1, body: rich_doc("Gone"))
-    gallery.update_column(:block_type, "gallery")
+    retired = @root.content_blocks.create!(block_type: :rich_text, position: 1, body: rich_doc("Gone"))
+    retired.update_column(:block_type, "retired_widget")
 
     get "/"
 
@@ -437,7 +437,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   # can be drawn is an empty one.
   test "a block of an unregistered type in a column is skipped, and a section of nothing else renders nothing" do
     section = section_with_texts([ 1, "Still here" ], [ 2, "Gone" ])
-    @root.content_blocks.find_by!(section: section, section_column: 2).update_column(:block_type, "gallery")
+    @root.content_blocks.find_by!(section: section, section_column: 2).update_column(:block_type, "retired_widget")
     get "/"
 
     assert_response :success
@@ -445,7 +445,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "section.content-section .cs-prose", text: /Still here/
     assert_not_includes response.body, "Gone"
 
-    @root.content_blocks.find_by!(section: section, section_column: 1).update_column(:block_type, "gallery")
+    @root.content_blocks.find_by!(section: section, section_column: 1).update_column(:block_type, "retired_widget")
     get "/"
 
     assert_response :success
@@ -485,6 +485,25 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
 
     sizes = css_select("img[sizes]").map { |img| img["sizes"] }
     assert_equal [ Blocks::ImageComponent::SIZES, "(min-width: 768px) 245px, (min-width: 480px) 33vw, 100vw", "(min-width: 768px) 491px, (min-width: 480px) 67vw, 100vw" ], sizes
+  end
+
+  # A gallery's grid asks for one image's share of its block (gallery block
+  # spec §7.1): at the top level a third of the 736px content column less
+  # two gaps; in a column of an equal two-column section, drawn at 352px
+  # (736 less the 32px gap, halved), half of that less one gap, the widths
+  # relative to the viewport left whole. A carousel's image is its block's
+  # width, the column's own hint.
+  test "a gallery in a section's column asks for its column's share" do
+    asset = processed_asset
+    @root.content_blocks.create!(block_type: :gallery, position: 0, settings: { "layout" => "grid", "images" => [ asset.id ] })
+    two = @root.content_blocks.create!(block_type: :section, position: 1, settings: { "layout" => "two" })
+    @root.content_blocks.create!(block_type: :gallery, section: two, section_column: 2, position: 0, settings: { "layout" => "grid", "images" => [ asset.id ] })
+    @root.content_blocks.create!(block_type: :gallery, section: two, section_column: 1, position: 0, settings: { "layout" => "carousel", "images" => [ asset.id ] })
+    get "/"
+
+    sizes = css_select(".content-block--gallery img[sizes]").map { |img| img["sizes"] }
+    assert_equal [ "(min-width: 768px) 236px, 100vw", "(min-width: 768px) 368px, (min-width: 480px) 50vw, 100vw",
+                   "(min-width: 768px) 169px, (min-width: 480px) 50vw, 100vw" ], sizes
   end
 
   test "a page of sections costs no query per section or per block in one" do

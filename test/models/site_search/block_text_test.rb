@@ -107,4 +107,38 @@ class SiteSearch::BlockTextTest < ActiveSupport::TestCase
 
     assert_equal "Card heading Card words Card picture", field(document, "body").text
   end
+
+  # Spec §9: what the gallery draws in that language, from the copy; an id
+  # that names no image (written around the services) gives nothing, and
+  # the library image's own words and the label are not in it.
+  test "a gallery gives its captions and alt overrides of images that are there, in the language asked" do
+    first = create_media_asset.tap { |asset| asset.update!(alt: "Library alt words", caption: "Library caption words") }
+    second = create_media_asset
+    block = add_block("gallery", settings: { "images" => [ first.id, second.id ], "label" => "Gallery label words",
+                                             "texts" => { first.id.to_s => { "caption" => "First caption", "alt" => "First alt" },
+                                                          second.id.to_s => { "caption" => "Second caption" } } },
+                                 translations: { "de" => { settings: { "texts" => { second.id.to_s => { "caption" => "Zweite Unterschrift" } } } } })
+    gone = Media::Asset.maximum(:id) + 1
+    block.update_columns(settings: block.settings.merge("images" => [ gone, first.id, second.id ]),
+                         translated_settings: block.translated_settings.deep_merge("en" => { "texts" => { gone.to_s => { "caption" => "Gone caption" } } })) # version: none (a console write names an image that is not there)
+
+    assert_equal [ "First caption", "First alt", "Second caption" ], BlockTypes::Gallery.search_text(block.reload, locale: "en")
+    assert_equal [ "Zweite Unterschrift" ], BlockTypes::Gallery.search_text(block, locale: "de"), "German's own texts, not English's"
+    body = field(document, "body").text
+    assert_equal "First caption First alt Second caption", body
+    assert_equal "Zweite Unterschrift", field(document("de"), "body").text
+  end
+
+  # A gallery's usage rows keep its images from the trash, so a trashed one
+  # in its list was trashed around the services: the site skips it
+  # (`Blocks::GalleryComponent#items`), and its texts are not searched.
+  test "a gallery gives no texts of an image in the trash" do
+    kept, trashed = Array.new(2) { create_media_asset }
+    block = add_block("gallery", settings: { "images" => [ trashed.id, kept.id ],
+                                             "texts" => { trashed.id.to_s => { "caption" => "Trashed caption", "alt" => "Trashed alt" },
+                                                          kept.id.to_s => { "caption" => "Kept caption" } } })
+    trashed.update_columns(trashed_at: Time.current) # version: none (an image trashed around the services)
+
+    assert_equal [ "Kept caption" ], BlockTypes::Gallery.search_text(block.reload, locale: "en")
+  end
 end

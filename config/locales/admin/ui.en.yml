@@ -341,6 +341,37 @@ en:
           # or none (All media and Not in a folder).
           upload_into: "Uploads go into %{name}"
           upload_nowhere: "Uploads go into no folder"
+          # A multiple opening (the Gallery card's Add images): the title, the
+          # footer's primary and status, a tile already in the gallery, and
+          # what a chosen tile's whole name ends with, its place in the order
+          # picked by the script with `Intl.PluralRules`' ordinal type
+          # (`ordinal: true`).
+          title_multiple: "Add images"
+          add_count:
+            zero: "Add images"
+            one: "Add 1 image"
+            other: "Add %{count} images"
+          takes_none: "No images selected · the gallery takes %{left} more"
+          takes: "%{count} selected · the gallery takes %{left} more"
+          full: "The gallery takes no more: %{max} images."
+          in_gallery: "In the gallery"
+          chosen: ", chosen %{ordinal}"
+          ordinal:
+            one: "%{count}st"
+            two: "%{count}nd"
+            few: "%{count}rd"
+            other: "%{count}th"
+          # In a folder's place, the row above the grid of a multiple
+          # opening: the folder's own kept images, and its button, counting
+          # the folder's images not yet in the gallery nor chosen; past what
+          # the gallery takes, the oldest that fit.
+          folder_count:
+            one: "1 image"
+            other: "%{count} images"
+          add_folder:
+            one: "Add the 1 new image in this folder"
+            other: "Add all %{count} new images in this folder"
+          add_folder_first: "Add the first %{count} of %{total} new images"
 
         pagination:
           nav_label: "Pagination"
