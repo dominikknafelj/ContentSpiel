@@ -1820,6 +1820,14 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    cell's own shadow travels with the sticky head. */
 .admin-table-scroll thead th { position: sticky; top: 0; z-index: var(--cs-z-raised); background: var(--cs-surface); box-shadow: inset 0 -1px 0 var(--cs-line-strong); }
 .admin-table-scroll--x { overflow-x: auto; }
+/* Each of the three boxes is the containing block of what stands absolute
+   in its table. A box that scrolls clips only the boxes it contains: an
+   absolute box whose containing block is outside it (a head cell's
+   `sr-only` words, which stand at the cell's place, the cell being static)
+   is laid out against the window instead and widens the page by the
+   table's width on a phone. A popover lifted by `ui/float` is fixed, and a
+   relative box is no containing block of a fixed one. */
+:is(.admin-table-scroll, .admin-table-scroll--x, .admin-posts-scroll) { position: relative; }
 :is(.admin-table-scroll, .admin-table-scroll--x) :where(table:not(:has(.admin-row-link))) :is(th, td):first-child { position: sticky; left: 0; background: var(--cs-surface); }
 .admin-table-scroll tbody :is(th, td):first-child { z-index: var(--cs-z-raised); }
 .admin-table-scroll thead th:first-child { z-index: var(--cs-z-raised-top); }

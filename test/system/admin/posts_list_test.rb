@@ -289,6 +289,21 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # A head cell's `sr-only` words stand absolute; with the scroll box static
+  # they were laid out against the window and widened the page to the
+  # table's width.
+  test "at 390px the page does not scroll sideways, the table scrolls in its own box, and the bulk bar stays in view" do
+    at_window(390, height: 844) do
+      visit_screen admin_posts_path
+      assert_table_scrolls_in_its_box(".admin-posts-scroll")
+
+      tick(@first)
+      bar = find("[data-admin--posts--bulk-select-target=bar]", text: "1 selected")
+      assert_operator bar.evaluate_script("this.getBoundingClientRect().right"), :<=, page.evaluate_script("document.documentElement.clientWidth")
+      assert_table_scrolls_in_its_box(".admin-posts-scroll")
+    end
+  end
+
   test "at 1100px the filters stand above the list, under the search and the segments" do
     at_window(1100) do
       visit_screen admin_posts_path

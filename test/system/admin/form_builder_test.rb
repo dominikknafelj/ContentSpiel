@@ -109,6 +109,14 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
     assert_equal %w[f_name0001 f_mail0001 f_text0001], form.reload.fields.map(&:key), "nothing was written"
   end
 
+  test "at 390px the forms list does not scroll the page sideways, and its table scrolls in its own box" do
+    at_window(390, height: 844) do
+      visit_screen admin_forms_path
+      assert_selector ".admin-forms-table tbody tr", count: 2
+      assert_table_scrolls_in_its_box(".admin-table-scroll--x")
+    end
+  end
+
   test "a row's ⋯ menu on a list of one form opens whole over the page, and the table box does not scroll" do
     forms(:newsletter).update_columns(trashed_at: Time.current) # version: none (a test's row)
     visit_screen admin_forms_path
