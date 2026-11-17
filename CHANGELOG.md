@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.10.0 (2026-11-17)
+
 ### Added
 
 - Settings → Page speed, a tenth section, last in the nav (`settings.manage`): how visitors' browsers get the theme's stylesheet, "Automatic" (the default, as before: in the page while it is 14 KB or less compressed, otherwise a separate file), "Always in the page" or "Always a separate file", three choice tiles saved with the save bar ("Theme stylesheet") and recorded in `settings.updated`. A line above the tiles says the served stylesheet's compressed size and what Automatic does with it, and a line under them what a CDN's Early Hints do for a separate file. A change applies at a visitor's next page: the settings row is in the public ETag. ⌘K offers "Settings › Page speed". `ThemeCss::MODES` are the three, and `Theme::Stylesheet#inline?` takes the mode. The build's line ends with "(Settings › Page speed: Automatic)".
