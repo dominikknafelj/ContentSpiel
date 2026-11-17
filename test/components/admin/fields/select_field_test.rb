@@ -41,6 +41,14 @@ class Admin::Fields::SelectFieldTest < ViewComponent::TestCase
     assert_no_selector "option[value='']"
   end
 
+  test "a select with a default has no empty choice, and with nothing stored marks the default" do
+    field = Field.new(name: "ratio", type: :select, options: { options: { "3:2" => "3:2", "1:1" => "Square" }, default: "1:1" })
+    render_inline Admin::Fields::SelectField.new(field:, form_name: "block[settings]", value: nil, locale: "en")
+
+    assert_no_selector "option[value='']"
+    assert_selector "option[value='1:1'][selected]", text: "Square"
+  end
+
   # Note block spec, decision 7: a select may be drawn as a segmented control,
   # a group of radio buttons underneath, so it works from the keyboard and
   # without a script. The group is a fieldset named by its legend.

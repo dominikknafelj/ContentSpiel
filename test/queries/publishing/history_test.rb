@@ -66,11 +66,41 @@ class Publishing::HistoryTest < ActiveSupport::TestCase
     assert_not rows.first.was_scheduled
   end
 
-  test "a first copy with no publisher has none" do
+  test "a first copy with no publisher has none, and is the system's unless the migration kept it" do
     page = create_page(title: "About")
     Publishing::Version.of(page).update_all(created_by_id: nil) # version: none (a test) # changes: none (a test)
 
     assert_nil history(page).rows.last.publisher
+    assert_equal :system, history(page).rows.last.credit
+
+    Publishing::Version.of(page).update_all(kept_when_history_began: true) # version: none (a test) # changes: none (a test)
+    assert_equal :kept, history(page).rows.last.credit
+  end
+
+  test "a copy is credited to its publisher, or to a removed account once that account is deleted" do
+    page = create_page(title: "About")
+    leaver = User.create!(email_address: "leaver@example.com", name: "Lee Leaver", password: "a-long-password-1")
+    Publishing::Version.take!(page.reload, by: leaver) # version: none (a test takes a copy)
+
+    assert_equal [ :person, leaver ], history(page).rows.first.then { |row| [ row.credit, row.publisher ] }
+
+    assert Users::Destroy.call(leaver, actor: users(:one)).ok?
+    row = history(page).rows.first
+    assert_equal :removed, row.credit
+    assert_nil row.publisher
+    assert_equal leaver.id, row.version.created_by_id, "the id outlives the account"
+  end
+
+  test "a scheduled change keeps the person who scheduled it when its time comes" do
+    page = create_page(title: "About")
+    scheduler = users(:two)
+    Publishing::Version.take!(page.reload, live_at: 1.hour.from_now, by: scheduler) # version: none (a test takes a copy)
+
+    travel_to(2.hours.from_now) do
+      row = history(page).rows.first
+      assert_equal :on_site, row.state
+      assert_equal [ :person, scheduler ], [ row.credit, row.publisher ]
+    end
   end
 
   test "the list reads no content column" do

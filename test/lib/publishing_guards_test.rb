@@ -84,11 +84,13 @@ class PublishingGuardsTest < ActiveSupport::TestCase
     "20261011120000_create_published_versions" => "takes the first copy of every published and scheduled record, by logic frozen in the file",
     "20261011122000_add_settled_at_to_published_versions" => "marks the copies already shown as settled: bookkeeping, nothing a copy shows",
     "20261101100000_replace_page_type_with_page_settings" =>
-      "rewrites every page copy's page_type as its settings (current, pending and superseded): the one rewrite of a copy's content besides repoint_tag!"
+      "rewrites every page copy's page_type as its settings (current, pending and superseded): the one rewrite of a copy's content besides repoint_tag!",
+    "20261116140000_keep_version_publishers" =>
+      "marks the first copies the first migration took as kept when history began (and its down nullifies a removed account's id): bookkeeping, nothing a copy shows"
   }.freeze
   COPY_WRITES = /\b(?:UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+published_versions\b|\bMigrationVersion\b[^\n]*#{WRITES}|\bMigrationVersion\.create!?\(/i
 
-  test "a migration writes published_versions only where it is named: the first copies, their settling and the page settings rewrite" do
+  test "a migration writes published_versions only where it is named: the first copies, their settling, the page settings rewrite and the history's marks" do
     writing = Rails.root.glob("db/migrate/*.rb").select do |file|
       file.read.lines.any? { |line| !line.strip.start_with?("#") && line.match?(COPY_WRITES) }
     end.map { |file| file.basename(".rb").to_s }

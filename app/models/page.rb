@@ -14,6 +14,9 @@ class Page < ApplicationRecord
   # Post has no tree position and no equivalent rule).
   validate :slug_not_reserved_for_admin
 
+  # The addresses of the two health checks (`slug_not_reserved_for_admin`).
+  HEALTH_CHECK_SLUGS = %w[up ready].freeze
+
   # closure_tree 9.8: `has_closure_tree` builds the PageHierarchy model and the
   # parent/children/ancestors/descendants associations on top of the
   # `page_hierarchies` closure table.
@@ -317,14 +320,21 @@ class Page < ApplicationRecord
   # marks whichever locale's tab actually collides -- an editor translating
   # a page one language at a time only typed the reserved value into one of
   # them.
+  #
+  # `up` and `ready` are the two health checks' addresses (`config/routes.rb`:
+  # the proxy's boot check and an uptime monitor's), routed before every
+  # public page, so a top-level page by either slug could never be reached.
   def slug_not_reserved_for_admin
     return unless parent&.root?
 
     ::Locales.enabled.each do |locale|
       accessor = ::Mobility.normalize_locale_accessor(:slug, locale)
-      next unless public_send(accessor) == ContentSpiel::ADMIN_PATH
-
-      errors.add(accessor, "is reserved for the admin")
+      slug = public_send(accessor)
+      if slug == ContentSpiel::ADMIN_PATH
+        errors.add(accessor, "is reserved for the admin")
+      elsif HEALTH_CHECK_SLUGS.include?(slug)
+        errors.add(accessor, "is reserved for the site's health checks")
+      end
     end
   end
 

@@ -4,5 +4,5 @@
   <%= render Admin::Ui::SegmentedComponent.new(mode: :radios, name: input_name, label: field.label, legend: :visible, id: input_id,
         required: field.required?, segments:) %>
 <% else %>
-  <%= select_tag input_name, options_for_select(option_pairs, value), id: input_id, class: setup_select_class, include_blank: blank_choice, required: field.required? %>
+  <%= select_tag input_name, options_for_select(option_pairs, chosen), id: input_id, class: setup_select_class, include_blank: blank_choice, required: field.required? %>
 <% end %>

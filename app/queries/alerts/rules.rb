@@ -16,7 +16,7 @@ module Alerts
     DENIED = 20
     LIMITED = 1
 
-    FAILED_ACTIONS = %w[session.failed session.second_factor_failed session.confirmation_failed].freeze
+    FAILED_ACTIONS = Alerts::Alert::WINDOW_ACTIONS.fetch("sign_in_failures")
 
     def initialize(now: Time.current)
       @now = now
@@ -43,35 +43,38 @@ module Alerts
       return 0 if failed < FAILED_SIGN_INS
 
       locked = events("session.locked", start).sum(:occurrences)
-      upsert_window("sign_in_failures", start, failed_events, failed, "failed" => failed, "locked" => locked)
+      upsert_window("sign_in_failures", start, failed_events, "failed" => failed, "locked" => locked)
     end
 
     def access_denied_burst(start)
-      denied_events = events("access.denied", start)
+      denied_events = events(Alerts::Alert::WINDOW_ACTIONS.fetch("access_denied_burst"), start)
       denied = denied_events.sum(:occurrences)
       return 0 if denied < DENIED
 
       actors = denied_events.distinct.count(:user_id) + (denied_events.exists?(user_id: nil) ? 1 : 0)
-      upsert_window("access_denied_burst", start, denied_events, denied, "denied" => denied, "actors" => actors)
+      upsert_window("access_denied_burst", start, denied_events, "denied" => denied, "actors" => actors)
     end
 
     def request_limited(start)
-      limited_events = events("request.limited", start)
+      limited_events = events(Alerts::Alert::WINDOW_ACTIONS.fetch("request_limited"), start)
       limited = limited_events.count
       return 0 if limited < LIMITED
 
       limits = limited_events.pluck(:metadata).filter_map { |metadata| metadata["limit"] if metadata.is_a?(Hash) }.uniq.sort
-      upsert_window("request_limited", start, limited_events, limited, "limited" => limited, "limits" => limits)
+      upsert_window("request_limited", start, limited_events, "limited" => limited, "limits" => limits)
     end
 
     # One row per kind and window; `first_seen_at` and `mailed_at` stay as
     # they were, the rest follows the window's events as they are now.
-    def upsert_window(kind, start, window_events, occurrences, counts)
+    # `occurrences` counts how often the ALERT was raised, never the events
+    # inside it (the StudioAlerts card: "22 failed sign-ins in 15 minutes ·
+    # Seen once"): a window is one alert, however many scans update it.
+    def upsert_window(kind, start, window_events, counts)
       Alerts::Alert.upsert( # version: none (alerts are no part of a page)
-        { kind:, fingerprint: "#{kind}|#{start.iso8601}", occurrences:,
+        { kind:, fingerprint: "#{kind}|#{start.iso8601}", occurrences: 1,
           details: { "window_start" => start.iso8601 }.merge(counts),
           first_seen_at: window_events.minimum(:occurred_at), last_seen_at: window_events.maximum(:last_occurred_at) },
-        unique_by: :fingerprint, update_only: %i[occurrences details last_seen_at]
+        unique_by: :fingerprint, update_only: %i[details last_seen_at]
       )
       1
     end

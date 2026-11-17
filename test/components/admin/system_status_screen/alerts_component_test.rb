@@ -13,17 +13,23 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
 
   def error(**options) = alert(kind: "error", details: { "error_class" => "RuntimeError", "place" => "app/models/page.rb:120" }, **options)
 
-  def security(**options) = alert(kind: "sign_in_failures", details: { "failed" => 21, "locked" => 0 }, occurrences: 12, **options)
+  WINDOW_START = "2026-11-15T09:00:00Z".freeze
 
-  AUDIT = "/cs-studio/audit_events".freeze
+  def security(**options)
+    alert(kind: "sign_in_failures", details: { "window_start" => WINDOW_START, "failed" => 21, "locked" => 0 }, **options)
+  end
 
-  def card(alerts, mail_blocked_by: nil, settings_href: nil, audit_href: AUDIT)
+  # The audit log's address for a narrowing, as the screen hands it: the
+  # params themselves, readable in an assertion.
+  AUDIT = ->(narrowing) { "/cs-studio/audit_events?#{narrowing.to_query}" }
+
+  def card(alerts, mail_blocked_by: nil, settings_href: nil, audit_path: AUDIT)
     render_inline(Admin::SystemStatusScreen::AlertsComponent.new(alerts: alerts, mail_blocked_by: mail_blocked_by,
-      settings_href: settings_href, audit_href: audit_href))
+      settings_href: settings_href, audit_path: audit_path))
   end
 
   test "no alerts is one line, and no notice even when mail is not set up" do
-    card([], mail_blocked_by: :mail_not_ready)
+    card([], mail_blocked_by: :mail_not_set_up)
 
     assert_selector "h2", text: "Alerts"
     assert_text "The last 7 days, newest first. Not part of the checks."
@@ -32,7 +38,7 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
     assert_no_selector "[role=alert]"
   end
 
-  test "an error is a danger chip, its class and place in code, and Once · last time · Not mailed yet" do
+  test "an error is a danger chip, its class and place in code, and Seen once · last time · Not mailed yet" do
     travel_to Time.zone.local(2026, 11, 16, 15, 0) do
       card([ error(last_seen_at: Time.zone.local(2026, 11, 16, 14, 2)) ])
     end
@@ -40,8 +46,8 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
     assert_selector "li .admin-state-chip[data-state-tone=danger]", text: "Error"
     assert_selector "li code", text: "RuntimeError"
     assert_selector "li code", text: "app/models/page.rb:120"
-    assert_text "Once · last 14:02 today · Not mailed yet"
-    assert_no_link "Open audit log →"
+    assert_text "Seen once · last 14:02 today · Not mailed yet"
+    assert_no_link "Show in audit log →"
   end
 
   test "an error with no place is its class alone" do
@@ -50,22 +56,38 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
     assert_selector "li code", count: 1, text: "RuntimeError"
   end
 
-  test "a security alert is a warn chip, counts its times, says when it was mailed and links to the audit log" do
+  test "a security alert is a warn chip, seen once however many events it counts, says when it was mailed and links to its window's events" do
     travel_to Time.zone.local(2026, 11, 16, 15, 0) do
       card([ security(last_seen_at: Time.zone.local(2026, 11, 15, 9, 15), mailed_at: Time.zone.local(2026, 11, 16, 14, 2)) ])
     end
 
     assert_selector "li .admin-state-chip[data-state-tone=warn]", text: "Security"
     assert_text "21 failed sign-ins in 15 minutes"
-    assert_text "12 times · last 09:15 yesterday · Mailed 14:02"
-    assert_link "Open audit log →", href: AUDIT
+    assert_text "Seen once · last 09:15 yesterday · Mailed 14:02"
+    narrowing = { actions: %w[session.failed session.second_factor_failed session.confirmation_failed],
+                  after: WINDOW_START, before: "2026-11-15T09:15:00Z" }
+    assert_link "Show in audit log →", href: AUDIT.call(narrowing)
+  end
+
+  test "an error seen several times says how often; an owner change links to its one event" do
+    card([ error(occurrences: 12), alert(kind: "owner_changed", details: { "audit_event_id" => 812, "subject_label" => "Ana", "now_owner" => true }) ])
+
+    assert_text "Seen 12 times"
+    assert_link "Show in audit log →", count: 1, href: AUDIT.call(event_id: 812)
+  end
+
+  test "a security row with nothing to narrow to has no link: never the whole log" do
+    card([ alert(kind: "sign_in_failures", details: { "failed" => 21, "locked" => 0 }) ])
+
+    assert_text "21 failed sign-ins in 15 minutes"
+    assert_no_link "Show in audit log →"
   end
 
   test "a security row without an audit address has no link: the viewer may not open the audit log" do
-    card([ security ], audit_href: nil)
+    card([ security ], audit_path: nil)
 
     assert_text "21 failed sign-ins in 15 minutes"
-    assert_no_link "Open audit log →"
+    assert_no_link "Show in audit log →"
   end
 
   test "an older time is a date, with the year when it is another year" do
@@ -77,8 +99,8 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
     assert_text "last 30 Dec 2025, 08:00"
   end
 
-  test "mail not ready: the notice at the top, the link only with an address, and the row's own sentence" do
-    card([ error ], mail_blocked_by: :mail_not_ready, settings_href: "/cs-studio/settings#mail")
+  test "mail not set up: the notice at the top, the link only with an address, and the row's own sentence" do
+    card([ error ], mail_blocked_by: :mail_not_set_up, settings_href: "/cs-studio/settings#mail")
 
     assert_selector "[role=alert]", count: 0
     assert_text "Owners can't be mailed about these: outgoing mail is not set up."
@@ -86,11 +108,26 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
     assert_selector "li span.text-warn-ink", text: "Not mailed: outgoing mail is not set up"
   end
 
-  test "mail not ready without a settings link shows no link" do
-    card([ error ], mail_blocked_by: :mail_not_ready)
+  test "mail not set up without a settings link shows no link" do
+    card([ error ], mail_blocked_by: :mail_not_set_up)
 
     assert_text "Owners can't be mailed about these"
     assert_no_link "Open Mail settings →"
+  end
+
+  test "mail saved but not tested, or its last send failed: the notice and every row follow the mail's state, with the Mail settings link" do
+    {
+      mail_untested: [ "Alerts wait until outgoing mail works: it is saved but not tested.", "Not mailed: mail is not tested yet" ],
+      mail_failed: [ "Alerts wait until outgoing mail works: the last send failed.", "Not mailed: the last send failed" ]
+    }.each do |reason, (notice, row)|
+      card([ error, security ], mail_blocked_by: reason, settings_href: "/cs-studio/settings#mail")
+
+      assert_selector "[data-alerts-mail-notice=#{reason}]", count: 1, text: "#{notice} Open Mail settings →", normalize_ws: true
+      assert_link "Open Mail settings →", count: 1, href: "/cs-studio/settings#mail"
+      assert_selector "li span.text-warn-ink", count: 2, text: row
+      assert_no_text "Owners can't be mailed"
+      assert_no_text "Not mailed yet"
+    end
   end
 
   test "no site address: the notice says so and names PUBLIC_HOST, as an alert with no link, and the row says why" do
@@ -104,7 +141,7 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
   end
 
   test "mail not set up wins over no address: one notice, and every row says mail" do
-    card([ error, security ], mail_blocked_by: :mail_not_ready)
+    card([ error, security ], mail_blocked_by: :mail_not_set_up)
 
     assert_text "Owners can't be mailed about these: outgoing mail is not set up.", count: 1
     assert_no_text "the site has no address"

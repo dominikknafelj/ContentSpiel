@@ -51,6 +51,16 @@
 
 - Production's databases connect with `connect_timeout: 5`: an unreachable database fails in five seconds.
 
+### Fixed
+
+- History says who published a version in four ways: the person; "Published by a removed account" only when the publisher's account was deleted; "Published by the system" when nobody was behind it (the console, a seed, `bin/load`); and "Kept when history began" only for the copies the migration of 2026-10-11 made, where it once named every first version with no publisher, a seed's of yesterday included. A scheduled change keeps the person who scheduled it.
+- The restore dialog's sentence puts no possessive on the title, which broke for a title such as "Prices" and in other languages: "The working version of “Pricing” becomes version 5 as it went live on 3 Nov 2026."
+- An alert's count on System status and in the digest mail reads "Seen once" / "Seen 12 times" and counts how often the alert itself was raised (an error's reports), never the events inside one: a window of 22 failed sign-ins is one alert, seen once.
+- A security alert's link reads "Show in audit log →" and opens the audit log narrowed to that alert's events, never the whole log: an owner change's or a token's one event, a window alert's counted actions in its 15 minutes. The audit log takes the narrowing as `event_id`, or `actions[]` between the instants `after` and `before`, shown as a removable chip.
+- The Alerts card's notice follows the mail's state, each form ending with "Open Mail settings →" for someone who may manage settings: "Owners can't be mailed about these: outgoing mail is not set up.", "Alerts wait until outgoing mail works: it is saved but not tested." or "…the last send failed.", and each unmailed row says the same ("Not mailed: mail is not tested yet", "Not mailed: the last send failed"). Mail saved but untested once read "not set up". The digest now waits while the last send failed too, as it waits for mail that is not set up or not tested, and any of these wins over the missing site address: one notice at most.
+- A select field with a default (the Gallery's Shape) no longer offers an empty choice: a block that stores none shows the default chosen.
+- A top-level page can't take the slug `up` or `ready`, the two health checks' addresses, which are routed before every page: the slug "is reserved for the site's health checks".
+
 ### Breaking
 
 - A new top-level name, `Alerts` (`app/models/alerts.rb`): a gem whose hook owner is `alerts` is refused at boot. A gem with such an owner renames it.
@@ -60,6 +70,7 @@
 
 - `20261116120000_create_alerts`: the table `alerts` (one row per error or security alert: its kind, a unique fingerprint, the fixed details of its kind, how often it was seen, when first and last, and when it was last mailed). It writes no row.
 - `20261116130000_create_media_folders`: the table `media_folders` and `media_assets.folder_id`; every existing image starts in no folder.
+- `20261116140000_keep_version_publishers`: `published_versions.created_by_id` loses its foreign key, so a deleted account's id stays on the versions it published, and `published_versions.kept_when_history_began` marks the copies `20261011120000_create_published_versions` made (a first copy with no publisher taken before any copy a person published or any second copy). A version a deleted account published before this ran has lost its id and reads as the system's.
 
 ## 0.8.0 (2026-11-16)
 

@@ -16,7 +16,7 @@
     <p class="mt-0.5 text-small text-dim"><%= saved_line %></p>
   <% else %>
     <p class="mt-0.5 text-small text-dim"><%= time_line %></p>
-    <% if row.publisher %>
+    <% if person? %>
       <p class="mt-1 flex min-w-0 items-center gap-1.5 text-small text-dim">
         <%= render Admin::Ui::ActorAvatarComponent.new(user: row.publisher, viewer: Current.user, size: :sm) %>
         <span class="min-w-0 truncate"><%= publisher_name %></span>

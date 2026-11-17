@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_16_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_16_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -517,6 +517,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_130000) do
     t.bigint "created_by_id"
     t.datetime "created_at", null: false
     t.datetime "settled_at"
+    t.boolean "kept_when_history_began", default: false, null: false
     t.index ["live_at"], name: "index_published_versions_on_live_at"
     t.index ["live_at"], name: "index_published_versions_on_live_at_unsettled", where: "(settled_at IS NULL)"
     t.index ["record_type", "record_id", "live_at"], name: "index_published_versions_on_record_and_live_at"
@@ -722,7 +723,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_130000) do
   add_foreign_key "posts", "users", column: "author_id", on_delete: :nullify
   add_foreign_key "posts", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "presence_marks", "users", on_delete: :cascade
-  add_foreign_key "published_versions", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "recovery_codes", "users"
   add_foreign_key "search_entries", "published_versions", on_delete: :cascade
   add_foreign_key "sessions", "users"

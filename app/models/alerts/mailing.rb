@@ -5,7 +5,9 @@ module Alerts
   # and an alert seen again after its mail once that mail is
   # `Alert::REMIND_AFTER` old (`Alert.due`).
   #
-  # NOTHING IS MARKED THAT CANNOT GO. While mail is not ready, or no origin
+  # NOTHING IS MARKED THAT CANNOT GO. While outgoing mail is not working
+  # (`MailSettings#state`: not set up, saved but not tested, or its last
+  # send failed), or no origin
   # is known for the mail's link (`ApplicationMailer.link_url_options`, the
   # rule every mailed link follows), nothing is queued and no alert is
   # marked, so the alerts wait for the first run that can mail them and
@@ -31,17 +33,29 @@ module Alerts
   class Mailing
     NOT_READY = "[ContentSpiel] An alert digest was not sent: mail is not ready.".freeze
     NO_ADDRESS = "[ContentSpiel] An alert digest was not sent: no site address is known. Set PUBLIC_HOST.".freeze
-    SKIPPED_LINES = { mail_not_ready: NOT_READY, no_address: NO_ADDRESS }.freeze
+    # Why no digest goes, by the mail's state (`MailSettings::STATES`):
+    # every state but `:working`.
+    MAIL_STATES = { not_set_up: :mail_not_set_up, untested: :mail_untested, failed: :mail_failed }.freeze
+    SKIPPED_LINES = MAIL_STATES.values.index_with(NOT_READY).merge(no_address: NO_ADDRESS).freeze
     # How often a skipped digest's line is logged.
     SKIPPED_LOGGED_EVERY = 1.hour
 
-    # Why no digest can go now: nil when one can, `:mail_not_ready` while
-    # outgoing mail is not ready, `:no_address` while no origin is known for
-    # the mail's link (asked as a job asks, with no request). Mail not ready
-    # wins when both are missing: it is the first thing to fix. `deliver`
-    # and System status both ask it, so the card says what the digest does.
+    # Why no digest can go now: nil when one can; while outgoing mail is not
+    # working, its state's reason (`MAIL_STATES`: `:mail_not_set_up`,
+    # `:mail_untested`, `:mail_failed`, read from `MailSettings#state`, the
+    # one source of mail's state); else `:no_address` while no origin is
+    # known for the mail's link (asked as a job asks, with no request). Any
+    # mail state but working wins over the missing address: it is the first
+    # thing to fix. `deliver` and System status both ask it, so the card says
+    # what the digest does.
+    #
+    # A send that failed holds the digest too (the StudioAlerts card: "Alerts
+    # wait until outgoing mail works"): the next mail that goes out, a test
+    # mail from Settings among them, makes mail working again and the
+    # alerts that waited go at the next run.
     def self.blocked_by
-      return :mail_not_ready unless MailSettings.current.ready?
+      blocked = MAIL_STATES[MailSettings.current.state]
+      return blocked if blocked
 
       :no_address if DigestMailer.link_url_options.empty?
     end

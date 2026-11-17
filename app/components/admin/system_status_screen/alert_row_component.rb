@@ -4,9 +4,16 @@ module Admin
     # grid: the kind as a state chip (an error is danger, a security finding
     # warn), the sentence, then the facts joined by " · ": how often, when it
     # was last seen and its mail state (why it was not mailed when no digest
-    # can go, `Alerts::Mailing.blocked_by`). A security row ends with the
-    # link to the audit log, where the finding came from, when it is handed
-    # one (the viewer holds `audit.view`).
+    # can go, `Alerts::Mailing.blocked_by`). How often counts the alert's
+    # own raisings ("Seen once", "Seen 12 times"), never the events inside
+    # one: a window alert is raised once, an error once per report.
+    #
+    # A security row ends with "Show in audit log →", the log narrowed to
+    # the alert's own events (`Alerts::Alert#audit_filter`: the one event of
+    # an owner change or a token, the counted actions in a window alert's
+    # span), never the whole log, when it is handed `audit_path` (the viewer
+    # holds `audit.view`), a callable that turns those params into the
+    # address.
     #
     # The sentence is `Alerts::Alert#sentence`, the data the model hands up,
     # worded here with this card's keys (the digest mail words the same data
@@ -16,16 +23,26 @@ module Admin
     # "today", of the day before "yesterday", any other a date.
     class AlertRowComponent < Admin::AdminComponent
       LINK_CLASS = Admin::Ui::SystemCheckRowComponent::LINK_CLASS
+      # An unmailed row's mail state, by why no digest goes (`Alerts::Mailing.blocked_by`).
+      NOT_MAILED = { mail_not_set_up: ".no_mail", mail_untested: ".no_mail_untested", mail_failed: ".no_mail_failed", no_address: ".no_address" }.freeze
 
-      def initialize(alert:, mail_blocked_by:, audit_href:)
+      def initialize(alert:, mail_blocked_by:, audit_path:)
         @alert = alert
         @mail_blocked_by = mail_blocked_by
-        @audit_href = audit_href
+        @audit_path = audit_path
       end
 
       private
 
-      attr_reader :alert, :audit_href
+      attr_reader :alert
+
+      # Nil for a row with nothing to narrow to: no link to the whole log.
+      def audit_href
+        return unless alert.security? && @audit_path
+
+        narrowing = alert.audit_filter
+        @audit_path.call(narrowing) if narrowing
+      end
 
       def security? = alert.security?
 
@@ -49,7 +66,7 @@ module Admin
         t(".sentences.#{sentence.key}", **sentence.values)
       end
 
-      def how_often = t(".occurrences", count: alert.occurrences)
+      def how_often = t(".count", count: alert.occurrences)
 
       def last_seen
         time = alert.last_seen_at.in_time_zone
@@ -63,11 +80,7 @@ module Admin
       def mail_state
         return t(".mailed", time: mailed_time) if alert.mailed_at
 
-        case @mail_blocked_by
-        when :mail_not_ready then t(".not_mailed_no_mail")
-        when :no_address then t(".no_address")
-        else t(".not_mailed_yet")
-        end
+        t(NOT_MAILED.fetch(@mail_blocked_by, ".not_mailed"))
       end
 
       def mail_unavailable? = alert.mailed_at.nil? && !@mail_blocked_by.nil?

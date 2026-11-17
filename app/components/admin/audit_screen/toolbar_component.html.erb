@@ -28,6 +28,16 @@
     </div>
   <% end %>
 
+  <% if filter.narrowed? %>
+    <% narrowing_fields.each do |name, value| %>
+      <%= hidden_field_tag name, value, id: nil %>
+    <% end %>
+    <span class="<%= chip_class %>" data-narrowing-chip>
+      <span class="min-w-0 truncate"><%= narrowing_label %></span>
+      <%= link_to narrowing_clear_path, aria: { label: t(".remove_narrowing") }, class: remove_class, data: { turbo_frame: "content", turbo_action: "replace" } do %><span aria-hidden="true">×</span><% end %>
+    </span>
+  <% end %>
+
   <div>
     <%= label_tag :channel, t(".channel"), class: "sr-only" %>
     <%= select_tag :channel, options_for_select(channel_options, filter.channel), include_blank: t(".all_channels"), class: setup_select_class %>

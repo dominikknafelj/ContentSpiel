@@ -50,4 +50,26 @@ class Admin::AuditScreen::ToolbarComponentTest < ViewComponent::TestCase
     assert_no_selector "select#subject_type"
     assert_selector "[data-subject-chip] a[href*='channel=admin']"
   end
+
+  test "an alert's narrowing is a removable chip that keeps its values, and its × keeps the other filters" do
+    Time.use_zone("Europe/Berlin") do
+      toolbar(actions: %w[session.failed session.confirmation_failed], after: "2026-11-16T13:00:00Z", before: "2026-11-16T13:15:00Z", channel: "admin")
+    end
+
+    assert_selector "[data-narrowing-chip]", text: "16 Nov, 14:00 to 14:15 · 2 actions"
+    assert_selector "input[type=hidden][name='actions[]'][value='session.failed']", visible: :all
+    assert_selector "input[type=hidden][name='actions[]'][value='session.confirmation_failed']", visible: :all
+    assert_selector "input[type=hidden][name=after][value='2026-11-16T13:00:00Z']", visible: :all
+    link = page.find("[data-narrowing-chip] a")
+    assert_includes link[:href], "channel=admin"
+    assert_no_match(/actions|after|before/, link[:href])
+  end
+
+  test "one event is a chip of its own" do
+    toolbar(event_id: "812")
+
+    assert_selector "[data-narrowing-chip]", text: "Event #812"
+    assert_selector "input[type=hidden][name=event_id][value='812']", visible: :all
+    assert_link "Clear"
+  end
 end

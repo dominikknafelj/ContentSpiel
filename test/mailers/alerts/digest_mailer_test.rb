@@ -38,9 +38,9 @@ class Alerts::DigestMailerTest < ActionMailer::TestCase
       assert_includes body, "2 alerts on Test Site since the last mail:"
       assert_includes body, "Error: NoMethodError in app/models/page.rb:120"
       # 12:47 UTC is 13:47 in Berlin, in November.
-      assert_includes body, "12 times · last 16 Nov 2026, 13:47"
+      assert_includes body, "Seen 12 times · last 16 Nov 2026, 13:47"
       assert_includes body, "Security: Ana Example was made an owner"
-      assert_includes body, "Once · last 16 Nov 2026, 12:47"
+      assert_includes body, "Seen once · last 16 Nov 2026, 12:47"
       assert_includes body, "You get this mail as an owner of Test Site. At most one mail every 10 minutes."
       assert_includes body, "Sent by Test Site via Content Spiel"
       assert body.index("NoMethodError") < body.index("Ana Example"), "newest first"

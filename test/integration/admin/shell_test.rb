@@ -72,6 +72,18 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
     assert page.errors.full_messages.any? { |message| message.include?("reserved for the admin") }
   end
 
+  test "a root child page can't take a health check's address as its slug, a deeper page can" do
+    %w[up ready].each do |slug|
+      page = Page.new(parent: root_page, title: "Health", slug: slug)
+      assert_not page.valid?, slug
+      assert page.errors.full_messages.any? { |message| message.include?("reserved for the site's health checks") }, slug
+    end
+
+    deeper = Page.new(parent: Page.new(parent: root_page, title: "About", slug: "about"), title: "Ready", slug: "ready")
+    deeper.valid?
+    assert_not deeper.errors.full_messages.any? { |message| message.include?("reserved") }
+  end
+
   test "an unknown locale param falls back to the default" do
     sign_in_as(users(:one))
     get "/cs-studio", params: { locale: "xx" }

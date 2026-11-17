@@ -1,8 +1,11 @@
 module Audit
   # The audit log's filters, read from request params (design pass round 3,
   # Task 15): User, Action, Type, Channel, a Date preset (Today / 7 / 30 / 90
-  # days / Custom with From and To) and the subject a record's "Activity" link
-  # names. Every value is validated here and reaches SQL only as a bound
+  # days / Custom with From and To), the subject a record's "Activity" link
+  # names, and the narrowing an alert's "Show in audit log" link names
+  # (System status, the StudioAlerts card): one event (`event_id`), or some
+  # actions (`actions`, a list) between two instants (`after` inclusive,
+  # `before` exclusive, ISO 8601), the span a window alert was counted over. Every value is validated here and reaches SQL only as a bound
   # parameter; anything that isn't a valid value is dropped -- "all" -- never
   # an error (a typo, a stale link, a probing request).
   #
@@ -21,6 +24,8 @@ module Audit
     RANGES = %w[today 7 30 90 custom].freeze
     CHANNELS = %w[admin mcp other].freeze
     MAX_ACTION_LENGTH = 100
+    # More actions than an alert names is a probe, not a link.
+    MAX_ACTIONS = 10
 
     # The subject types any cataloged event can carry, keyed by the polymorphic
     # `subject_type` string actually stored on the row (`AccessControl::Group`'s
@@ -47,7 +52,7 @@ module Audit
     # Years outside this are a typo or a probe, not a date anyone filters by.
     YEARS = (1970..2200)
 
-    attr_reader :user_id, :event_action, :subject_type, :subject_id, :channel, :range
+    attr_reader :user_id, :event_action, :subject_type, :subject_id, :channel, :range, :event_id, :actions, :after, :before
 
     def initialize(params, today: Time.zone.today)
       @today = today
@@ -64,6 +69,13 @@ module Audit
       from, to = to, from if from && to && from > to
       @from = from
       @to = to
+      @event_id = integer(params[:event_id])
+      @actions = action_list(params[:actions])
+      after = instant(params[:after])
+      before = instant(params[:before])
+      after, before = before, after if after && before && after > before
+      @after = after
+      @before = before
     end
 
     def custom? = range == "custom"
@@ -75,6 +87,9 @@ module Audit
 
     def subject? = subject_id.present?
 
+    # One event, or some actions between two instants: an alert's link.
+    def narrowed? = event_id.present? || actions.present? || after.present? || before.present?
+
     def active? = to_params.any?
 
     # The normalised values, as query params, for every link that must keep the
@@ -82,8 +97,9 @@ module Audit
     def to_params
       {
         "user_id" => user_id, "event_action" => event_action, "subject_type" => subject_type, "subject_id" => subject_id,
-        "channel" => channel, "range" => range, "from" => from&.iso8601, "to" => to&.iso8601
-      }.compact.transform_values(&:to_s)
+        "channel" => channel, "range" => range, "from" => from&.iso8601, "to" => to&.iso8601,
+        "event_id" => event_id, "after" => after&.utc&.iso8601, "before" => before&.utc&.iso8601
+      }.compact.transform_values(&:to_s).merge(actions ? { "actions" => actions } : {})
     end
 
     def scope(base = Event.all)
@@ -93,6 +109,10 @@ module Audit
       scope = scope.where(subject_type: stored_subject_types) if subject_type
       scope = scope.where(subject_id:) if subject_id
       scope = channel_scope(scope)
+      scope = scope.where(id: event_id) if event_id
+      scope = scope.where(action: actions) if actions
+      scope = scope.where(last_occurred_at: after..) if after
+      scope = scope.where(last_occurred_at: ...before) if before
       lower, upper = bounds
       scope = scope.where(last_occurred_at: lower..) if lower
       scope = scope.where(last_occurred_at: ..upper) if upper
@@ -131,6 +151,25 @@ module Audit
     def integer(value)
       string = value.to_s
       string.match?(/\A\d{1,18}\z/) ? string.to_i : nil
+    end
+
+    # A list of action strings, each as long as an action may be, at most
+    # MAX_ACTIONS; nil for anything else (a string, a hash, an empty list).
+    def action_list(value)
+      return unless value.is_a?(Array)
+
+      list = value.filter_map { |action| action.to_s.presence&.first(MAX_ACTION_LENGTH) if action.is_a?(String) }.uniq
+      list.first(MAX_ACTIONS).presence
+    end
+
+    # `Time.iso8601` raises on anything that isn't a full ISO 8601 instant.
+    def instant(value)
+      return if value.blank? || !value.is_a?(String)
+
+      parsed = Time.iso8601(value)
+      YEARS.cover?(parsed.year) ? parsed.in_time_zone : nil
+    rescue ArgumentError
+      nil
     end
 
     # `Date.iso8601` raises on anything that isn't a real `YYYY-MM-DD`.

@@ -14,6 +14,11 @@ module Admin
     # (`Admin::Ui::ChipInputComponent::CHIP_CLASS`), and its × is a link: removing
     # the filter is a navigation.
     #
+    # An alert's "Show in audit log" link narrows to one event or to some
+    # actions between two instants (`Audit::Filter#narrowed?`): one more such
+    # chip, "Event #<id>" or "16 Nov, 14:00 to 14:15 · 3 actions", its values
+    # riding along as hidden fields, its × the same filters without them.
+    #
     # The User options are bounded (`MAX_USERS`, the controller's list, plus the
     # chosen one); the Action options are the catalogue of
     # `Audit::Sentence::ACTIONS` grouped by what they are about, plus an "Other"
@@ -89,6 +94,33 @@ module Admin
 
       # The chip's own "×": the same filters, without the subject.
       def subject_clear_path = helpers.admin_audit_events_path(**filter.to_params.except("subject_type", "subject_id"), **@url_options)
+
+      NARROWING = %w[event_id actions after before].freeze
+
+      # The narrowing's values as hidden fields: `[name, value]`, a list's
+      # each under `actions[]`.
+      def narrowing_fields
+        filter.to_params.slice(*NARROWING).flat_map { |name, value| value.is_a?(Array) ? value.map { |each| [ "#{name}[]", each ] } : [ [ name, value ] ] }
+      end
+
+      def narrowing_label
+        return t(".event", id: filter.event_id) if filter.event_id
+
+        span = t(".between", from: moment(filter.after), to: moment(filter.before, after: filter.after))
+        filter.actions ? t(".with_actions", span: span, count: filter.actions.size) : span
+      end
+
+      def narrowing_clear_path = helpers.admin_audit_events_path(**filter.to_params.except(*NARROWING), **@url_options)
+
+      private
+
+      # An open end is "…"; a second end on the first's day is its time alone.
+      def moment(time, after: nil)
+        return "…" unless time
+
+        same_day = after && after.to_date == time.to_date
+        I18n.l(time, format: same_day ? :"admin.time" : :"admin.short_datetime")
+      end
     end
   end
 end

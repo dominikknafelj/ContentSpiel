@@ -46,6 +46,13 @@ module Alerts
     WINDOW_KINDS = %w[sign_in_failures access_denied_burst request_limited].freeze
     # The value a kind's plural wording counts by.
     COUNTED_BY = { "access_denied_burst" => :actors, "request_limited" => :limited }.freeze
+    # The audit log's actions a window kind is counted from (`Alerts::Rules`),
+    # and what its "Show in audit log" link narrows to.
+    WINDOW_ACTIONS = {
+      "sign_in_failures" => %w[session.failed session.second_factor_failed session.confirmation_failed].freeze,
+      "access_denied_burst" => %w[access.denied].freeze,
+      "request_limited" => %w[request.limited].freeze
+    }.freeze
 
     validates :kind, inclusion: { in: KINDS }
 
@@ -75,6 +82,21 @@ module Alerts
 
     def security? = SECURITY_KINDS.include?(kind)
 
+    # THE AUDIT LOG'S FILTER FOR THIS ALERT'S EVENTS, as the params
+    # `Audit::Filter` reads (the StudioAlerts card: "Show in audit log →"
+    # opens the log narrowed to the alert, never the whole log): an owner
+    # change's or a token's one event, a window kind's actions in the window
+    # it was counted over (`after` inclusive, `before` exclusive, the span
+    # `Alerts::Rules` counts). Nil for an error, which the log does not hold,
+    # and for a row that names neither (nothing to narrow to). Data: the
+    # route is the component's.
+    def audit_filter
+      return { event_id: details["audit_event_id"] } if details["audit_event_id"]
+
+      start = window_start or return
+      { actions: WINDOW_ACTIONS.fetch(kind), after: start.utc.iso8601, before: (start + WINDOW).utc.iso8601 }
+    end
+
     def sentence
       values = VALUE_KEYS.fetch(kind).index_with { |key| details[key] }.symbolize_keys
       values[:limits] = Array(values[:limits]).join(", ") if kind == "request_limited"
@@ -85,6 +107,14 @@ module Alerts
     end
 
     private
+
+    def window_start
+      return unless WINDOW_ACTIONS.key?(kind) && details["window_start"].is_a?(String)
+
+      Time.iso8601(details["window_start"])
+    rescue ArgumentError
+      nil
+    end
 
     def sentence_key(values)
       case kind

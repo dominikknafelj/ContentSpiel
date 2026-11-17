@@ -115,14 +115,28 @@ class Alerts::MailingTest < ActiveSupport::TestCase
     end
   end
 
-  test "blocked_by: nothing while mail is ready and an address is known, else why, mail not ready first" do
+  test "blocked_by: nothing while mail works and an address is known, else why, any mail state but working first" do
     with_mail_state(:working) do
       with_site_address(SITE) { assert_nil Alerts::Mailing.blocked_by }
       with_site_address(nil) { assert_equal :no_address, Alerts::Mailing.blocked_by }
     end
-    with_mail_state(:not_set_up) do
-      with_site_address(SITE) { assert_equal :mail_not_ready, Alerts::Mailing.blocked_by }
-      with_site_address(nil) { assert_equal :mail_not_ready, Alerts::Mailing.blocked_by }
+    { not_set_up: :mail_not_set_up, untested: :mail_untested, failed: :mail_failed }.each do |state, reason|
+      with_mail_state(state) do
+        with_site_address(SITE) { assert_equal reason, Alerts::Mailing.blocked_by, state }
+        with_site_address(nil) { assert_equal reason, Alerts::Mailing.blocked_by, "#{state} wins over the missing address" }
+      end
+    end
+  end
+
+  test "with the last send failed the alerts wait, unmarked, and go once mail works again" do
+    with_site_address(SITE) do
+      alert = make
+      with_mail_state(:failed) do
+        capture_log { assert_no_enqueued_emails { assert_equal 0, deliver } }
+        assert_nil alert.reload.mailed_at
+      end
+      with_mail_state(:working) { assert_operator deliver, :>, 0 }
+      assert_not_nil alert.reload.mailed_at
     end
   end
 

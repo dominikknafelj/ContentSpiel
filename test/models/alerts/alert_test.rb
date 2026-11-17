@@ -102,4 +102,18 @@ class Alerts::AlertTest < ActiveSupport::TestCase
       assert_equal key, make(kind: kind, **details).sentence.key, details.inspect
     end
   end
+
+  test "the audit log's filter: an event alert's one event, a window alert's actions in its span, nothing for an error" do
+    assert_equal({ event_id: 812 }, make(kind: "owner_changed", audit_event_id: 812, subject_label: "Ana").audit_filter)
+    assert_equal({ event_id: 9 }, make(kind: "token_issued", audit_event_id: 9, token_name: "deploy").audit_filter)
+    assert_equal({ actions: %w[session.failed session.second_factor_failed session.confirmation_failed],
+                   after: "2026-11-16T12:00:00Z", before: "2026-11-16T12:15:00Z" },
+      make(kind: "sign_in_failures", window_start: "2026-11-16T12:00:00Z", failed: 22).audit_filter)
+    assert_equal %w[access.denied], make(kind: "access_denied_burst", window_start: "2026-11-16T12:00:00Z").audit_filter[:actions]
+    assert_equal %w[request.limited], make(kind: "request_limited", window_start: "2026-11-16T12:00:00Z").audit_filter[:actions]
+
+    assert_nil make(kind: "error", error_class: "RuntimeError").audit_filter
+    assert_nil make(kind: "sign_in_failures", failed: 22).audit_filter, "no window, no link: never the whole log"
+    assert_nil make(kind: "sign_in_failures", window_start: "soon").audit_filter
+  end
 end
