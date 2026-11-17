@@ -49,7 +49,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
 
   # Everything a visitor's page names to fetch, held to an allow-list: the
   # `site` entry point and what it preloads, the theme's one stylesheet and
-  # the icons. Nothing of CS Studio's or of sign-in's, setup's, an
+  # the icons (`/icon.*`, and `/apple-touch-icon.png`, `SiteIconsController`). Nothing of CS Studio's or of sign-in's, setup's, an
   # invitation's or the password reset's: not their entry points, not their
   # controllers, not `i18n/` (the strings `password_field` fetched when the
   # site's registration still imported it), not the product stylesheet
@@ -517,7 +517,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
   # an icon (the CMS's at the root, or a theme's from its assets).
   def allowed_public_resource?(name)
     %w[site @hotwired/turbo-rails turbo.min stimulus.min controllers/index controllers/application theme].include?(name) ||
-      site_set.include?(name) || theme_controller_assets.include?(name) || name.match?(%r{\A/icon\.(png|svg)\z}) ||
+      site_set.include?(name) || theme_controller_assets.include?(name) || name.match?(%r{\A/(icon\.(png|svg)|apple-touch-icon\.png)\z}) ||
       name.match?(/\A[\w-]+\z/) && !top_level_controllers.include?("controllers/#{name}") && Rails.root.glob("test/fixtures/themes/plain/assets/images/#{name}.*").any?
   end
 

@@ -507,7 +507,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     get "/about"
 
     assert_select "head link[rel=icon][href='/icon.png']"
-    assert_select "head link[rel='apple-touch-icon'][href='/icon.png']"
+    assert_select "head link[rel='apple-touch-icon'][href='/apple-touch-icon.png']"
     assert_select "head meta[name='application-name'][content='ContentSpiel']"
     assert_select "head meta[name='theme-color']", count: 0
   end

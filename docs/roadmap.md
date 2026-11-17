@@ -161,6 +161,7 @@ Library images are served in Active Storage proxy mode with long-lived headers (
 | One span in `ApplicationService` (service, actor type, channel, outcome, audit event id) so every write is traced; attributes on the public request (resolver result, language, cache hit or miss); rescued exceptions reported through `Rails.error` | Must | O1, O2 |
 | Guards against the performance problems returning: N+1 detection raising in tests, and query-count assertions on a public page render and a page save | Should | O5 |
 | Structured logs tied to traces; a jobs dashboard and failed-job counts on System status; browser errors reported to the server; a cache hit rate; `/up` that checks the database | Should | O3, O4, O6, O7, O8 |
+| Server vitals: memory and CPU made visible, OpenTelemetry host and process metrics sent to the configured exporter, and a memory row on System status | Should | Owner, 2026-11-17 |
 
 ### Hosting and the dry run (2026-10-11)
 
@@ -438,6 +439,8 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | Item | Priority | Ref |
 |---|---|---|
 | Public read path: no `posts` scan on a 404, batched URL and internal-link lookups, a cap on unlimited listings | Should | S11, S14, S15 |
+| Public page caching, for a site with or without a CDN, in four steps: first, the public ETag reaches visitors (the live guide behind Cloudflare and Thruster sends none: find out where it is dropped); second, a shared-cache header policy for published pages (a short `s-maxage` with `stale-while-revalidate`, honoured by Thruster or a CDN, as a setting); third, a whole-page cache inside Rails keyed by the ETag key `PagesController` already computes; fourth, an optional CDN purge on publish behind a hook (Cloudflare first). Open checks: the Form block's hidden values on a cached page, scheduled publications that fall within the lifetime, and the headers of the sitemap, `robots.txt` and the preview | Should | Owner, 2026-11-17 |
+| The page editor's GET (`/cs-studio/pages/:id`) is the slowest route in production (P50 about 270 ms, P95 about 760 ms on the guide): profile it | Should | Owner, 2026-11-17 |
 | Admin frame requests render a minimal layout; the tree loads only visible, kept pages | Should | S10 |
 | MCP `list_posts` paginated, without rendering bodies | Should | S12 |
 | Lazy-load Tiptap instead of evaluating it on every admin page (done for d3-force, which only the Mind graph's layout worker loads now; Tiptap's is still open) | Should | S13 |

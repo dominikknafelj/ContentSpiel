@@ -248,6 +248,14 @@ class Theme
     choice(:icons, name)&.file
   end
 
+  # The file a browser asks for by a fixed address (`SiteIconsController`:
+  # `/favicon.ico`, `/apple-touch-icon.png`), when the theme brings one under
+  # that name in its assets/images; nil otherwise, and the CMS's own answers.
+  def site_icon(name)
+    file = path&.join("assets/images", name)
+    file if file&.file?
+  end
+
   # The folder's base name, for a log line and System status.
   def name = path ? path.basename.to_s : "default"
 
