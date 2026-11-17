@@ -60,11 +60,13 @@
 - The Alerts card's notice follows the mail's state, each form ending with "Open Mail settings →" for someone who may manage settings: "Owners can't be mailed about these: outgoing mail is not set up.", "Alerts wait until outgoing mail works: it is saved but not tested." or "…the last send failed.", and each unmailed row says the same ("Not mailed: mail is not tested yet", "Not mailed: the last send failed"). Mail saved but untested once read "not set up". The digest now waits while the last send failed too, as it waits for mail that is not set up or not tested, and any of these wins over the missing site address: one notice at most.
 - A select field with a default (the Gallery's Shape) no longer offers an empty choice: a block that stores none shows the default chosen.
 - A top-level page can't take the slug `up` or `ready`, the two health checks' addresses, which are routed before every page: the slug "is reserved for the site's health checks".
+- `/favicon.ico`, `/apple-touch-icon.png` and `/apple-touch-icon-precomposed.png` (iOS and iPadOS ask both touch icons by default) answer with an icon instead of the site's 404 page: a theme's `assets/images/favicon.ico` or `assets/images/apple-touch-icon.png` (180x180) when it brings one, else the CMS's. They never reach the page router and set no cookie. The public head links `/apple-touch-icon.png`, and CS Studio's layouts link the CMS's icons and a touch icon.
 
 ### Breaking
 
 - A new top-level name, `Alerts` (`app/models/alerts.rb`): a gem whose hook owner is `alerts` is refused at boot. A gem with such an owner renames it.
 - A new top-level name, `ReadinessController` (`app/controllers/readiness_controller.rb`): a gem whose hook owner is `readiness_controller` is refused at boot. A gem with such an owner renames it.
+- A new top-level name, `SiteIconsController` (`app/controllers/site_icons_controller.rb`): a gem whose hook owner is `site_icons_controller` is refused at boot. A gem with such an owner renames it.
 
 ### Migrations
 

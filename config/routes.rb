@@ -608,6 +608,15 @@ Rails.application.routes.draw do
   # same reason as `/up`, and named in `HostSettings::HEALTH_CHECK`.
   get "ready" => "readiness#show", as: :readiness_check
 
+  # The icons a browser asks for by a fixed address whatever the page links
+  # (iOS and iPadOS ask both touch icons by default): the theme's file of
+  # that name, else the CMS's (`SiteIconsController`). Before the public
+  # catch-all, so a page by any of these names is never what answers, and
+  # outside both host constraints, as a browser asks them on either host.
+  get "favicon.ico" => "site_icons#favicon", format: false, as: :site_favicon
+  get "apple-touch-icon.png" => "site_icons#touch", format: false, as: :site_touch_icon
+  get "apple-touch-icon-precomposed.png" => "site_icons#touch", format: false, as: :site_touch_icon_precomposed
+
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker

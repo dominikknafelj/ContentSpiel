@@ -8,6 +8,7 @@
     <%# turbo-rails' consumer reads the socket's address here and otherwise asks /cable. %>
     <%= action_cable_meta_tag %>
     <%= render "shared/theme_head" %>
+    <%= render "shared/studio_icons" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%# The wizard loads the `application` entry point. The one step that
         shows a token, `mcp_token_created`, asks for `admin` instead
