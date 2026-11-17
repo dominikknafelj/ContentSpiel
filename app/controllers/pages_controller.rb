@@ -45,6 +45,8 @@ class PagesController < PublicController
   # can't match and so the one where nothing has loaded the row yet.
   prepend_before_action :read_content_version_first
 
+  after_action :keep_late_code_out_of_shared_caches
+
   def show
     result = PublicSite::Resolver.new(scope: :published, urls: public_urls).call(locale: effective_locale, path: requested_path)
 
@@ -71,11 +73,14 @@ class PagesController < PublicController
 
       # `stale?` answers a matching `If-None-Match` with a bare 304 itself --
       # `render :show` below only ever runs for a genuinely stale request.
-      # `expires_in ... public: true` plus `stale?(public: true)` together
-      # are what turn the response's `Cache-Control` into
+      # `cache_for_visitors` plus `stale?(public: true)` together are what
+      # turn the response's `Cache-Control` into
       # `public, max-age=0, must-revalidate`: a CDN or browser may cache it,
       # but must always revalidate against the ETag rather than serving a
-      # stale copy for up to `max-age` seconds.
+      # stale copy for up to `max-age` seconds. With
+      # PUBLIC_SHARED_CACHE_SECONDS above 0 a shared cache may keep it that
+      # long (`PublicSite::SharedCache`); a browser still revalidates. Set
+      # before `stale?`, so a 304 carries the same header.
       #
       # The ETag is everything the response is built from that Rails' own
       # template digest (of `pages/show` alone) doesn't cover:
@@ -112,7 +117,7 @@ class PagesController < PublicController
       # different content version (the newest `live_at` in force). The images
       # and their variants are loaded only past `stale?`, for a response that
       # is actually rendered.
-      expires_in 0, public: true, must_revalidate: true
+      cache_for_visitors
       keys = light ? [ etag_key_of(result.record) ] : [ @page, @post ].map { |record| etag_key_of(record) } # public: rows (the ETag names the copy's id, not content)
       if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Theme.current.fingerprint, Time.current.year, Forms::Encryption.available?, *origin_etag_key, *stale_stylesheet_etag_key ], public: true)
         assign_record(result.record) if light # public: rows (assign_record reads the copy through as_published)
@@ -127,6 +132,30 @@ class PagesController < PublicController
   end
 
   private
+
+  # Only the `:found` answer of `show` calls this: a search, a 404 and a
+  # redirect never do, and keep the header Rails or
+  # `answer_search_privately` gives them.
+  def cache_for_visitors
+    if PublicSite::SharedCache.on?
+      # Both as extras, which Rails writes in this order after `public`
+      # (its own `stale_while_revalidate:` would come before `s-maxage`).
+      expires_in 0, public: true, "s-maxage": PublicSite::SharedCache.seconds,
+        "stale-while-revalidate": PublicSite::SharedCache::STALE_WHILE_REVALIDATE
+    else
+      expires_in 0, public: true, must_revalidate: true
+    end
+  end
+
+  # A page drawn with a Code block left plain because the request's budget
+  # was spent loses its ETag (`PublicPageRendering#forget_late_code`), since
+  # the next request draws it coloured; a shared cache must not keep it
+  # either, so it says what it says with the variable unset.
+  def keep_late_code_out_of_shared_caches
+    return unless CodeHighlight.late? && response.cache_control[:extras]&.any? { |extra| extra.start_with?("s-maxage=") }
+
+    response.cache_control.replace(max_age: 0, public: true, must_revalidate: true)
+  end
 
   def as_published(record) = Publishing.published(record)
 

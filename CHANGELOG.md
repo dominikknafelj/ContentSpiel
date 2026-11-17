@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- A shared cache in front of the site (a CDN, Varnish, nginx) may keep published public pages for a time the host chooses: `PUBLIC_SHARED_CACHE_SECONDS=60` makes a published page or post say `Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=86400`, in standard HTTP only, so a published change shows within that time plus the cache's own. Browsers still ask again on every visit, and the ETag and its 304 are as before. A search's results, the preview, CS Studio, a 404, a redirect and an error never take it. Unset or `0`, nothing changes; a value that is not a whole number of 0 or more stops the boot. Cloudflare needs a Cache Rule to cache HTML at all (`docs/reference/hosting.md`, "Behind a shared cache").
+
 ### Changed
 
 - A public page reads its texts' and tables' renders from the cache in one batched read, where each Rich text, Note and Table block was a round trip of its own, and a block of a published page is named in the cache by its copy and its id, so no document is walked for its key on every view (the guide's largest page, 117 blocks: about 100 ms down to about 70 ms locally). Every cached render is drawn once again after the upgrade.

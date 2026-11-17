@@ -23,7 +23,7 @@ require "fileutils"
 # without a secret; the secret check has its tests in `host_settings_test.rb`
 # and is not booted for here.
 #
-# Each boot is about three seconds, so there are ten and no more: an https
+# Each boot is about three seconds, so there are thirteen and no more: an https
 # address, none, and a value that is no address; and for the theme, a
 # folder, a path that is none, a folder with a file the contract does
 # not name (`Theme::Check`, run by `Theme.load` in `to_prepare`: the one
@@ -32,7 +32,9 @@ require "fileutils"
 # raises (the one proof that a registration raises at boot and names its
 # place, block types spec, decision 11); and single sign-on's two: a
 # required provider that is not there, which stops the boot, and a half-set
-# one, which only says which variable is missing.
+# one, which only says which variable is missing; and a shared cache's
+# seconds that are no number, which stop the boot (the one proof that the
+# value is checked when the application starts).
 class ProductionBootTest < ActiveSupport::TestCase
   SCRIPT = <<~'RUBY'.freeze
     config = Rails.application.config
@@ -199,6 +201,14 @@ class ProductionBootTest < ActiveSupport::TestCase
     assert_includes printed.lines(chomp: true), "[ContentSpiel] Single sign-on is off: SSO_CLIENT_SECRET is not set."
   end
 
+  test "production with a PUBLIC_SHARED_CACHE_SECONDS that is no whole number does not start, and names the variable" do
+    printed, status = boot_production("PUBLIC_HOST" => "https://docs.example.org", "PUBLIC_SHARED_CACHE_SECONDS" => "1m")
+
+    assert_not status.success?
+    assert_includes printed, "PUBLIC_SHARED_CACHE_SECONDS must be a whole number of seconds, 0 or more (such as 60), or unset."
+    assert_no_match(/^hosts:/, printed)
+  end
+
   private
     BOOT_SECONDS = 90
 
@@ -211,7 +221,8 @@ class ProductionBootTest < ActiveSupport::TestCase
         "PUBLIC_HOST" => nil, "ADMIN_HOST" => nil, "TRUSTED_PROXIES" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
         "SECRET_KEY_BASE" => nil, "RAILS_MASTER_KEY" => nil, "DATABASE_URL" => nil, "ADMIN_PATH" => nil,
         "OTEL_EXPORTER_OTLP_ENDPOINT" => nil, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" => nil, "OTEL_CONSOLE" => nil,
-        "SSO_ISSUER" => nil, "SSO_CLIENT_ID" => nil, "SSO_CLIENT_SECRET" => nil, "SSO_NAME" => nil, "SSO_REQUIRED" => nil
+        "SSO_ISSUER" => nil, "SSO_CLIENT_ID" => nil, "SSO_CLIENT_SECRET" => nil, "SSO_NAME" => nil, "SSO_REQUIRED" => nil,
+        "PUBLIC_SHARED_CACHE_SECONDS" => nil
       }.merge(variables)
 
       Bundler.with_original_env do
