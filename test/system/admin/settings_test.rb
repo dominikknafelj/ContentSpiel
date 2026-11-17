@@ -144,7 +144,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
       visit_screen admin_settings_path
       # A press on the heading puts the sequential focus starting point there.
       find(".admin-settings-layout h1").click
-      stops = Array.new(14) do
+      stops = Array.new(15) do
         page.send_keys(:tab)
         page.evaluate_script(<<~JS)
           (() => {
@@ -157,7 +157,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
           })()
         JS
       end
-      assert_equal [ *%w[#site #languages #post_types #publishing #forms #ai #mail #sign_in #images],
+      assert_equal [ *%w[#site #languages #post_types #publishing #forms #ai #mail #sign_in #images #page_speed],
                      *%w[settings-glance-languages settings-glance-ai settings-glance-mail settings-glance-images], "site card" ], stops
     end
   end
@@ -373,16 +373,16 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
   end
 
   test "at the end of a page that scrolls the last section is current, though its heading is not above the 40% line" do
-    # A window tall enough that the last card's (Images') heading is still below the 40% line at the page's end:
+    # A window tall enough that the last card's (Page speed's) heading is still below the 40% line at the page's end:
     # only the nav's at-end rule can make it current.
     page.current_window.resize_to(1400, 2400)
     visit admin_settings_path
     await_admin_controllers
     page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
 
-    assert page.evaluate_script("document.getElementById('images').getBoundingClientRect().top > window.innerHeight * 0.4"), "the premise: the Images heading is below the 40% line at the end"
+    assert page.evaluate_script("document.getElementById('page_speed').getBoundingClientRect().top > window.innerHeight * 0.4"), "the premise: the Page speed heading is below the 40% line at the end"
     assert page.evaluate_script("document.documentElement.scrollHeight > window.innerHeight"), "the premise: the page scrolls"
-    assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "Images", count: 1
+    assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "Page speed", count: 1
   ensure
     page.current_window.resize_to(1400, 1400)
   end
