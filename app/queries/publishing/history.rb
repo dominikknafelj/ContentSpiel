@@ -13,14 +13,14 @@ module Publishing
   # copies are `:earlier`.
   class History
     PER_PAGE = 50
-    COLUMNS = %w[id record_type record_id number live_at created_at created_by_id].freeze
+    COLUMNS = %w[id record_type record_id number live_at created_at created_by_id kept_when_history_began].freeze
 
     # `at`: when the copy goes or went live for a visitor (`shown_at`).
-    # `publisher` is nil for a copy kept when history began, and for one
-    # whose publisher's account was removed since (`created_by` nullified).
-    # `was_scheduled`: the copy went live later than it was taken: a
-    # scheduled change, or a scheduled record's copy in force.
-    Row = Data.define(:version, :number, :at, :publisher, :state, :was_scheduled)
+    # `publisher` is the person who published it, nil but for `:person`.
+    # `credit` is who the row names (`credit_of`): `:person`, `:removed`,
+    # `:system` or `:kept`. `was_scheduled`: the copy went live later than it
+    # was taken: a scheduled change, or a scheduled record's copy in force.
+    Row = Data.define(:version, :number, :at, :publisher, :credit, :state, :was_scheduled)
     # `changes`: the mark is set. `saved_at`: when the rows were last saved.
     Working = Data.define(:changes, :saved_at)
 
@@ -42,7 +42,7 @@ module Publishing
 
         copies.select(*COLUMNS).includes(:created_by).order(number: :desc).limit(PER_PAGE).offset(pagination.offset).map do |version|
           Row.new(version: version, number: version.number, at: shown_at(version), publisher: version.created_by,
-            state: state_of(version), was_scheduled: was_scheduled?(version))
+            credit: credit_of(version), state: state_of(version), was_scheduled: was_scheduled?(version))
         end
       end
     end
@@ -77,7 +77,27 @@ module Publishing
     # The copy before `number`, or nil for the first.
     def previous(number) = copies.where(arel_table[:number].lt(number)).order(number: :desc).first
 
+    # WHO A COPY IS CREDITED TO (the StudioHistory card, "A version row"):
+    # `:person` when its publisher's account exists; `:removed` when an id
+    # was recorded and its user is gone (the id outlives the account:
+    # `KeepVersionPublishers`); `:kept` for a copy the migration made of what
+    # was live when history began (`kept_when_history_began`, and nothing
+    # else: a later copy with no publisher is never that, whatever its date);
+    # `:system` for any other copy nobody was behind (the console, a seed,
+    # `bin/load`). A scheduled change is credited to whoever scheduled it,
+    # since the copy is taken when it is scheduled (`Version.take!`, `by:`),
+    # and comes into force with no write when its time passes.
+    def self.credit_of(version)
+      return :person if version.created_by
+      return :removed if version.created_by_id
+      return :kept if version.kept_when_history_began
+
+      :system
+    end
+
     private
+
+    def credit_of(version) = self.class.credit_of(version)
 
     def copies = Version.of(record)
 

@@ -42,16 +42,33 @@ class Admin::HistoryScreen::VersionRowComponentTest < ViewComponent::TestCase
     assert_selector "a[aria-current=true]", text: "Version 1"
   end
 
-  test "a first copy with no publisher was kept when history began; a later one's publisher was removed" do
-    Publishing::Version.take!(@pricing.reload, by: @me) # version: none (a test takes a copy)
+  test "a copy with nobody behind it is the system's, whatever its number; only the migration's copy was kept when history began" do
+    Publishing::Version.take!(@pricing.reload) # version: none (a test takes a copy)
     Publishing::Version.of(@pricing).update_all(created_by_id: nil) # version: none (a test) # changes: none (a test)
 
     draw(row: row_for(1), href: "/v")
-    assert_text "Kept when history began"
+    assert_selector "p.text-meta", text: "Published by the system"
+    assert_no_text "Kept when history began"
+    assert_no_selector "li > p:last-child [aria-hidden=true]" # no avatar
+
+    Publishing::Version.of(@pricing).where(number: 1).update_all(kept_when_history_began: true) # version: none (a test) # changes: none (a test)
+    draw(row: row_for(1), href: "/v")
+    assert_selector "p.text-meta", text: "Kept when history began"
 
     draw(row: row_for(2), href: "/v")
-    assert_text "Published by a removed account"
+    assert_text "Published by the system"
     assert_no_text "Kept when history began"
+  end
+
+  test "a copy whose publisher's account was deleted reads a removed account, with no avatar" do
+    leaver = User.create!(email_address: "leaver@example.com", name: "Lee Leaver", password: "a-long-password-1")
+    Publishing::Version.take!(@pricing.reload, by: leaver) # version: none (a test takes a copy)
+    leaver.delete
+
+    draw(row: row_for(2), href: "/v")
+    assert_selector "p.text-meta", text: "Published by a removed account"
+    assert_no_text "Lee Leaver"
+    assert_no_selector "li > p:last-child [aria-hidden=true]" # no avatar
   end
 
   test "a scheduled record's copy goes live at the record's time, and once that has passed was scheduled" do

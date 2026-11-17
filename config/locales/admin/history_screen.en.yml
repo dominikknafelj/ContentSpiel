@@ -28,9 +28,12 @@ en:
           goes_live: "Goes live %{time}"
           # A copy that was a scheduled change: "Went live 8 Nov 2026, 16:40 · was scheduled".
           with_scheduled: "%{line} · was scheduled"
+          # Only a copy the migration made of what was live when history began.
           kept_when_began: "Kept when history began"
-          # A later copy whose publisher's account was removed since.
-          removed_publisher: "Published by a removed account"
+          # A copy with nobody behind it: the console, a seed, `bin/load`.
+          by_system: "Published by the system"
+          # A copy whose publisher's account was deleted since.
+          by_removed: "Published by a removed account"
         # `Admin::HistoryScreen::VersionsComponent`, the rail, and below its
         # threshold the disclosure whose summary names the chosen version.
         versions:

@@ -51,6 +51,10 @@
 
 - Production's databases connect with `connect_timeout: 5`: an unreachable database fails in five seconds.
 
+### Fixed
+
+- History says who published a version in four ways: the person; "Published by a removed account" only when the publisher's account was deleted; "Published by the system" when nobody was behind it (the console, a seed, `bin/load`); and "Kept when history began" only for the copies the migration of 2026-10-11 made, where it once named every first version with no publisher, a seed's of yesterday included. A scheduled change keeps the person who scheduled it.
+
 ### Breaking
 
 - A new top-level name, `Alerts` (`app/models/alerts.rb`): a gem whose hook owner is `alerts` is refused at boot. A gem with such an owner renames it.
@@ -60,6 +64,7 @@
 
 - `20261116120000_create_alerts`: the table `alerts` (one row per error or security alert: its kind, a unique fingerprint, the fixed details of its kind, how often it was seen, when first and last, and when it was last mailed). It writes no row.
 - `20261116130000_create_media_folders`: the table `media_folders` and `media_assets.folder_id`; every existing image starts in no folder.
+- `20261116140000_keep_version_publishers`: `published_versions.created_by_id` loses its foreign key, so a deleted account's id stays on the versions it published, and `published_versions.kept_when_history_began` marks the copies `20261011120000_create_published_versions` made (a first copy with no publisher taken before any copy a person published or any second copy). A version a deleted account published before this ran has lost its id and reads as the system's.
 
 ## 0.8.0 (2026-11-16)
 

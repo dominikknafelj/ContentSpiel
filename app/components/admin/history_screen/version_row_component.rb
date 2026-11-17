@@ -3,8 +3,9 @@ module Admin
     # One row of the History screen's versions (the StudioHistory card, "A
     # version row"), from a `Publishing::History::Row`: "Version 7" with its
     # chip, when it went or goes live (and that it was a scheduled change),
-    # and who published it, or that it was kept when history began, or that
-    # its publisher's account was removed. Its name
+    # and who published it: a person, with their avatar; "Published by a
+    # removed account"; "Published by the system"; or "Kept when history
+    # began" (`Publishing::History.credit_of` decides which). Its name
     # is the row's one link (`.admin-row-link`, stretched over the row), to
     # the comparison of that version; the chosen row's link is
     # `aria-current="true"`, which the stylesheet draws as the selection
@@ -20,6 +21,8 @@ module Admin
     # working version is what each one is compared with.
     class VersionRowComponent < Admin::AdminComponent
       CHIPS = { on_site: "live", scheduled: "scheduled" }.freeze
+      # A row with no person to name: its credit as words, drawn `cs-meta`.
+      CREDITS = { removed: ".by_removed", system: ".by_system", kept: ".kept_when_began" }.freeze
 
       def initialize(row: nil, working: nil, href: nil, current: false)
         raise ArgumentError, "a version row draws a version or the working version" unless row.nil? ^ working.nil?
@@ -54,10 +57,9 @@ module Admin
 
       def publisher_name = row.publisher.name_or_email
 
-      # No publisher: the first copy was kept by the migration that began
-      # the history, with nobody to name; any other copy's publisher is an
-      # account removed since (`created_by_id` nullified).
-      def no_publisher_line = t(row.number == 1 ? ".kept_when_began" : ".removed_publisher")
+      def person? = row.credit == :person
+
+      def no_publisher_line = t(CREDITS.fetch(row.credit))
 
       def saved_line
         saved = local(working.saved_at)
