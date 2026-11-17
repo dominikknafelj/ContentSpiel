@@ -24,7 +24,7 @@ class Alerts::CheckJobTest < ActiveJob::TestCase
 
     with_mail_state(:working) do
       with_site_address(SITE) do
-        assert_enqueued_emails(User.owners.count) { Alerts::CheckJob.perform_now }
+        assert_emails(User.owners.count) { Alerts::CheckJob.perform_now }
       end
     end
 
@@ -44,7 +44,7 @@ class Alerts::CheckJobTest < ActiveJob::TestCase
         with_singleton_override(Alerts::Rules, :new, ->(**) { failing }) do
           log = capture_log do
             assert_error_reported(RuntimeError) do
-              assert_enqueued_emails(User.owners.count) { Alerts::CheckJob.perform_now }
+              assert_emails(User.owners.count) { Alerts::CheckJob.perform_now }
             end
           end
 

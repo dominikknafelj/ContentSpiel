@@ -1,6 +1,7 @@
 module Alerts
   # Every minute (`config/recurring.yml`): the scan of the audit log
-  # (`Alerts::Rules`), then the owners' digest (`Alerts::Mailing`), then the
+  # (`Alerts::Rules`), then the owners' digest (`Alerts::Mailing`, which sends
+  # it here and tries a failed send again on its own schedule), then the
   # prune of alerts past their keeping (`Alert.expired`).
   #
   # Each step rescues its own failure, so a scan that fails does not keep

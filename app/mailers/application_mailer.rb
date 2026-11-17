@@ -17,7 +17,9 @@
 #
 # The test mail is the one sent at once, because its answer is the point:
 # `ApplicationMailer.deliver_now_and_record(SomeMailer.test(...))` answers
-# nil when it was sent, or the `MailFailure`.
+# nil when it was sent, or the `MailFailure`. The alert digest is sent at
+# once too, from its own job, because it marks its alerts mailed only once
+# a mail went out (`sent_now?`, `Alerts::Mailing`).
 #
 # WITH WHAT. `mail` is where the settings are read, so in the job they are
 # the settings at delivery time:
@@ -76,6 +78,27 @@ class ApplicationMailer < ActionMailer::Base
     raise unless MailFailure.delivery?(error)
 
     record_failed(error)
+  end
+
+  # Delivers now, from inside a job of its own, and records the outcome as
+  # the test mail's path does; answers whether a mail went out. For a job
+  # whose own state follows the send (`Alerts::Mailing`, which marks its
+  # alerts mailed only then): false when the mailer built nothing, when the
+  # settings are not complete (no `perform_deliveries`), and when the
+  # delivery failed, which is recorded at once, a connection failure too
+  # (the caller tries again on its own schedule). An error raised before the
+  # delivery is a bug and is raised on.
+  def self.sent_now?(delivery, fingerprint:)
+    message = delivery.deliver_now
+    return false unless message.is_a?(Mail::Message) && message.perform_deliveries
+
+    record_sent(message, fingerprint: fingerprint)
+    true
+  rescue StandardError => error
+    raise unless MailFailure.delivery?(error)
+
+    record_failed(error)
+    false
   end
 
   # Delivers now, from inside a job of its own, and records the outcome as

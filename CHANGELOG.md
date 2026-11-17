@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- The alert digest no longer waits for another mail to succeed after a failed send: it is sent from the alert check itself and retries on its own, 10 minutes after the failure, then 30, then every hour (never longer while alerts wait), and an alert is marked mailed only by a send that went out. A successful digest makes mail working again, as any mail does. While mail is not set up, or saved but not tested, alerts still wait.
+
+### Migrations
+
+- `20261117120000_add_digest_retry_to_alerts`: `alerts.digest_failures` (how many sends of the alert's digest failed in a row, 0 for every existing row) and `alerts.digest_failed_at` (when the last one did), which say when the digest tries again. It writes no row.
+
 ## 0.9.0 (2026-11-16)
 
 ### Added

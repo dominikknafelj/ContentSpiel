@@ -1,8 +1,8 @@
 module Alerts
-  # The owners' digest of alerts (`Alerts::Mailing` queues it): a line per
+  # The owners' digest of alerts (`Alerts::Mailing` sends it, from the check job): a line per
   # alert, newest first, up to LISTED and then how many more, and one button
   # to System status. Handed the owner and the alerts' ids; the alerts are
-  # read here, in the job, so one deleted since (pruned, or its row gone) is
+  # read here, at the send, so one deleted since (pruned, or its row gone) is
   # skipped, and with none left no mail is built.
   #
   # An alert's line is drawn from `Alert#sentence`, the data the model
@@ -11,7 +11,7 @@ module Alerts
   # security alert names what the audit log's rule saw, never an address or
   # a typed email. Its link follows `ApplicationMailer#link_origin`, the
   # rule every mailed link follows; the digest asks the same rule before it
-  # queues, so a mail that finds no origin here is one whose address went
+  # sends, so a mail that finds no origin here is one whose address went
   # away in between, and one line says so, naming nobody.
   class DigestMailer < ApplicationMailer
     LISTED = 20

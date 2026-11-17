@@ -1,7 +1,8 @@
 require "test_helper"
 
-# The digest: which alerts are mailed, to whom, how often, and that nothing
-# is marked while no mail can go.
+# The digest: which alerts are mailed, to whom, how often, that nothing is
+# marked while no mail can go or by a send that failed, and the retries
+# after a failed send.
 class Alerts::MailingTest < ActiveSupport::TestCase
   include ActionMailer::TestHelper
   include ActiveJob::TestHelper
@@ -13,6 +14,7 @@ class Alerts::MailingTest < ActiveSupport::TestCase
   setup do
     Alerts::Alert.delete_all
     travel_to NOW
+    ActionMailer::Base.deliveries.clear
     @owners = [ users(:one), users(:reader).tap { it.update_columns(owner: true) } ]
   end
 
@@ -23,7 +25,13 @@ class Alerts::MailingTest < ActiveSupport::TestCase
 
   def deliver(now: Time.current) = Alerts::Mailing.new(now: now).deliver
 
-  def queued = { fingerprint: MailSettings.current.fingerprint }
+  def sent_to = ActionMailer::Base.deliveries.flat_map(&:to)
+
+  # The mail settings point at a port on this machine nobody listens on: a
+  # send is refused at once, a failure of the delivery.
+  def refused = { mail_server: SmtpStub::HOST, mail_port: SmtpStub.closed_port }
+
+  def tried_at(alert) = alert.reload.digest_failed_at
 
   test "two due alerts and two owners: one mail each, and both alerts are marked mailed now" do
     with_mail_state(:working) do
@@ -32,11 +40,8 @@ class Alerts::MailingTest < ActiveSupport::TestCase
         newer = make(seen: NOW - 1.minute)
         ids = [ newer.id, older.id ]
 
-        assert_enqueued_email_with Alerts::DigestMailer, :digest, params: queued, args: [ @owners.first, ids ] do
-          assert_enqueued_email_with Alerts::DigestMailer, :digest, params: queued, args: [ @owners.last, ids ] do
-            assert_equal 2, deliver
-          end
-        end
+        assert_emails(2) { assert_equal 2, deliver }
+        assert_equal @owners.map(&:email_address).sort, sent_to.sort
         assert_equal [ NOW ], [ older, newer ].map { it.reload.mailed_at }.uniq
       end
     end
@@ -50,10 +55,10 @@ class Alerts::MailingTest < ActiveSupport::TestCase
 
         travel 9.minutes
         make
-        assert_no_enqueued_emails { assert_equal 0, deliver }
+        assert_no_emails { assert_equal 0, deliver }
 
         travel 1.minute
-        assert_enqueued_emails(2) { assert_equal 2, deliver }
+        assert_emails(2) { assert_equal 2, deliver }
       end
     end
   end
@@ -63,10 +68,10 @@ class Alerts::MailingTest < ActiveSupport::TestCase
       with_site_address(SITE) do
         alert = make(seen: NOW - 70.minutes, mailed: NOW - 59.minutes)
         alert.update_columns(last_seen_at: NOW - 1.minute)
-        assert_no_enqueued_emails { assert_equal 0, deliver }
+        assert_no_emails { assert_equal 0, deliver }
 
         travel 2.minutes
-        assert_enqueued_emails(2) { assert_equal 2, deliver }
+        assert_emails(2) { assert_equal 2, deliver }
         assert_equal Time.current, alert.reload.mailed_at
       end
     end
@@ -76,7 +81,7 @@ class Alerts::MailingTest < ActiveSupport::TestCase
     with_mail_state(:working) do
       with_site_address(SITE) do
         make(seen: NOW - 3.hours, mailed: NOW - 2.hours)
-        assert_no_enqueued_emails { assert_equal 0, deliver }
+        assert_no_emails { assert_equal 0, deliver }
       end
     end
   end
@@ -86,9 +91,9 @@ class Alerts::MailingTest < ActiveSupport::TestCase
       with_site_address(SITE) do
         alert = make
         log = capture_log do
-          assert_no_enqueued_emails { assert_equal 0, deliver }
+          assert_no_emails { assert_equal 0, deliver }
           travel 30.minutes
-          assert_no_enqueued_emails { assert_equal 0, deliver }
+          assert_no_emails { assert_equal 0, deliver }
         end
 
         assert_nil alert.reload.mailed_at
@@ -106,7 +111,7 @@ class Alerts::MailingTest < ActiveSupport::TestCase
       with_site_address(nil) do
         alert = make
         log = capture_log do
-          assert_no_enqueued_emails { assert_equal 0, deliver }
+          assert_no_emails { assert_equal 0, deliver }
         end
 
         assert_nil alert.reload.mailed_at
@@ -128,15 +133,96 @@ class Alerts::MailingTest < ActiveSupport::TestCase
     end
   end
 
-  test "with the last send failed the alerts wait, unmarked, and go once mail works again" do
+  test "a failed send marks nothing, records the try, and the next waits ten minutes, then thirty, then an hour, never longer" do
     with_site_address(SITE) do
-      alert = make
-      with_mail_state(:failed) do
-        capture_log { assert_no_enqueued_emails { assert_equal 0, deliver } }
-        assert_nil alert.reload.mailed_at
+      with_mail_state(:failed, **refused) do
+        alert = make
+        log = capture_log { assert_no_emails { assert_equal 0, deliver } }
+
+        assert_nil alert.reload.mailed_at, "a send that failed marks nothing"
+        assert_equal [ 1, NOW ], [ alert.digest_failures, alert.digest_failed_at ]
+        assert_equal NOW, SiteSetting.instance.reload.mail_failed_at, "the failure is the site's mail state, as any mail's"
+        ours = log.lines.map(&:strip).grep(/ContentSpiel/)
+        assert_equal [ format(Alerts::Mailing::RETRYING, 10) ], ours, "one line of its own, naming nobody"
+
+        [ [ 10, 2 ], [ 30, 3 ], [ 60, 4 ], [ 60, 5 ] ].each do |minutes, failures|
+          travel (minutes - 1).minutes
+          last = tried_at(alert)
+          capture_log { assert_equal 0, deliver }
+          assert_equal last, tried_at(alert), "no try #{minutes - 1} minutes after a failure, with #{failures - 1} failed"
+
+          travel 1.minute
+          capture_log { assert_equal 0, deliver }
+          assert_equal [ failures, Time.current ], [ alert.reload.digest_failures, alert.digest_failed_at ],
+            "tried again #{minutes} minutes after the failure"
+          assert_nil alert.mailed_at
+        end
       end
-      with_mail_state(:working) { assert_operator deliver, :>, 0 }
-      assert_not_nil alert.reload.mailed_at
+    end
+  end
+
+  test "a success after failed sends marks the alerts mailed, makes mail working and starts the backoff again" do
+    with_site_address(SITE) do
+      with_mail_state(:failed) do
+        alert = make
+        alert.update_columns(digest_failures: 3, digest_failed_at: NOW - 30.minutes)
+        assert_no_emails { assert_equal 0, deliver }
+
+        travel 30.minutes
+        assert_emails(2) { assert_equal 2, deliver }
+        assert_equal [ Time.current, 0, nil ], [ alert.reload.mailed_at, alert.digest_failures, alert.digest_failed_at ]
+        assert_equal :working, MailSettings.current.state, "a digest that went out clears the failure, as any mail does"
+      end
+    end
+  end
+
+  test "a digest that failed goes at once when another mail made mail working again" do
+    with_site_address(SITE) do
+      with_mail_state(:working) do
+        alert = make
+        alert.update_columns(digest_failures: 1, digest_failed_at: NOW - 1.minute)
+        assert_emails(2) { assert_equal 2, deliver }
+        assert_equal [ NOW, 0 ], [ alert.reload.mailed_at, alert.digest_failures ]
+      end
+    end
+  end
+
+  test "a failed reminder keeps the earlier mail's time, so it is neither lost nor marked twice" do
+    with_site_address(SITE) do
+      with_mail_state(:failed, **refused) do
+        reminded = make(seen: NOW - 3.hours, mailed: NOW - 2.hours)
+        reminded.update_columns(last_seen_at: NOW - 1.minute)
+        fresh = make
+        capture_log { assert_equal 0, deliver }
+
+        assert_equal NOW - 2.hours, reminded.reload.mailed_at
+        assert_nil fresh.reload.mailed_at
+        assert_equal [ 1, 1 ], [ reminded.digest_failures, fresh.digest_failures ]
+        assert_equal 2, Alerts::Alert.due(NOW).count, "both are still due"
+      end
+    end
+  end
+
+  test "a send that raises before the delivery gives the alerts back and raises" do
+    with_site_address(SITE) do
+      with_mail_state(:working) do
+        alert = make
+        with_singleton_override(Alerts::DigestMailer, :digest, ->(*) { raise NoMethodError, "a bug" }) do
+          assert_raises(NoMethodError) { deliver }
+        end
+        assert_nil alert.reload.mailed_at
+        assert_equal 1, alert.digest_failures
+      end
+    end
+  end
+
+  test "with mail saved but not tested the alerts wait, unmarked and untried" do
+    with_site_address(SITE) do
+      with_mail_state(:untested) do
+        alert = make
+        capture_log { assert_no_emails { assert_equal 0, deliver } }
+        assert_equal [ nil, 0, nil ], [ alert.reload.mailed_at, alert.digest_failures, alert.digest_failed_at ]
+      end
     end
   end
 
@@ -151,7 +237,7 @@ class Alerts::MailingTest < ActiveSupport::TestCase
     with_mail_state(:working) do
       with_site_address(SITE) do
         alert = make
-        assert_no_enqueued_emails { assert_equal 0, deliver }
+        assert_no_emails { assert_equal 0, deliver }
         assert_nil alert.reload.mailed_at
       end
     end
@@ -178,7 +264,8 @@ class Alerts::MailingTest < ActiveSupport::TestCase
           pending
         end
 
-        assert_enqueued_emails(@owners.size) { assert_equal 0, first.deliver }
+        assert_emails(@owners.size) { assert_equal 0, first.deliver }
+        assert_equal @owners.map(&:email_address).sort, sent_to.sort
       end
     end
   end
