@@ -27,6 +27,7 @@
 ### Fixed
 
 - The page a theme's header search box points at (`search_page`) is found from a flag each published copy carries, `holds_search`, instead of reading the blocks of every copy ever published, a scan that grew with every publish (about 44 ms on every page of a site republished many times). A Search block in an older copy only no longer counts, as before.
+- On a phone the Posts list and the Forms list no longer scroll the whole page sideways: their tables scroll in their own box, as the other lists' do. A head cell's words for screen readers stood outside the table's scroll box (which was static) and widened the page to the table's width; every table scroll box (`.admin-table-scroll`, `.admin-table-scroll--x`, `.admin-posts-scroll`) is now `position: relative`.
 
 ### Migrations
 

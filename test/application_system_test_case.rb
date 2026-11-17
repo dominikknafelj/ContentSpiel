@@ -148,6 +148,21 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     page.current_window.resize_to(*original)
   end
 
+  # The page does not scroll sideways while the table's own box (`box`, one
+  # of the table scroll boxes) does: the document is no wider than its
+  # viewport, and the box is narrower than the table it holds.
+  def assert_table_scrolls_in_its_box(box)
+    widths = page.evaluate_script(<<~JS)
+      (() => {
+        const box = document.querySelector(#{box.to_json})
+        return { page: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth,
+          box: box.clientWidth, table: box.scrollWidth }
+      })()
+    JS
+    assert_operator widths["page"], :<=, widths["viewport"], "the page scrolls sideways: #{widths.inspect}"
+    assert_operator widths["table"], :>, widths["box"], "the table does not scroll in its box: #{widths.inspect}"
+  end
+
   # Follows a link into the `#content` frame and waits until Turbo has finished
   # with it. Such a link (a media tile, a trash tab, a list row, the users
   # list's "New user") renders the frame and is then promoted to a page visit
