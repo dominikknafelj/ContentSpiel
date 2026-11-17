@@ -1,6 +1,6 @@
 // CS Studio's import-map entry point (final fix wave, D; the admin layout
-// imports this instead of `application`). Everything the public site loads
-// -- Turbo, the site's own controllers -- via `application`, plus CS
+// imports this instead of `application`). Everything sign-in loads --
+// Turbo, the site's own controllers -- via `application`, plus CS
 // Studio's own controllers (`controllers/admin/*`, identifiers `admin--*`).
 // Those, the editor's modules (`rich_text/*`) and Tiptap/ProseMirror are
 // `preload: "admin"` in config/importmap.rb: modulepreloaded here, and
