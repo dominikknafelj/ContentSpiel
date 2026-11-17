@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.9.0 (2026-11-16)
+
 ### Added
 
 - Two field types for a block type's schema, `:media_list` (library image ids, in order; `max:` refuses more, never cuts) and `:media_texts` (a caption and an alt for each image of a `media_list` named by `of:`, in each language), both a built-in block type's own, and `ContentModel::Definition#media_ids_in` answering the images a block's values refer to.
@@ -46,9 +48,6 @@
 - `ChangesOverviewComponent` moved from `Admin::EditorScreen` to `Admin::Ui`, and takes `detail:`: `:names`, the dialogs' overview as before, or `:diffs`, each field's and block's words in one language, for the History screen.
 - "Discard changes…" no longer fails on an image deleted or moved to the trash since the copy was published: it leaves the image empty and says so ("An image was deleted or moved to the trash since this was published: it is left empty, as unpublished changes"), and the mark stays. A discard refused because it would bring back a changed image without `media.upload` is now recorded as `access.denied`.
 - "Publish now" on a scheduled record reads "Publish now…" and opens a dialog instead of publishing at once; a draft's "Publish" still publishes at once.
-
-### Changed
-
 - Production's databases connect with `connect_timeout: 5`: an unreachable database fails in five seconds.
 
 ### Breaking
