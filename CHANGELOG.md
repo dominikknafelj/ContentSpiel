@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.9.0 (2026-11-16)
+
 ### Added
 
 - Two field types for a block type's schema, `:media_list` (library image ids, in order; `max:` refuses more, never cuts) and `:media_texts` (a caption and an alt for each image of a `media_list` named by `of:`, in each language), both a built-in block type's own, and `ContentModel::Definition#media_ids_in` answering the images a block's values refer to.
@@ -46,9 +48,6 @@
 - `ChangesOverviewComponent` moved from `Admin::EditorScreen` to `Admin::Ui`, and takes `detail:`: `:names`, the dialogs' overview as before, or `:diffs`, each field's and block's words in one language, for the History screen.
 - "Discard changes…" no longer fails on an image deleted or moved to the trash since the copy was published: it leaves the image empty and says so ("An image was deleted or moved to the trash since this was published: it is left empty, as unpublished changes"), and the mark stays. A discard refused because it would bring back a changed image without `media.upload` is now recorded as `access.denied`.
 - "Publish now" on a scheduled record reads "Publish now…" and opens a dialog instead of publishing at once; a draft's "Publish" still publishes at once.
-
-### Changed
-
 - Production's databases connect with `connect_timeout: 5`: an unreachable database fails in five seconds.
 - A public page loads none of CS Studio's, sign-in's or setup's scripts: the `site` entry point no longer imports `application` and registers only the site's own controllers a public page draws (`SITE` in `controllers/index.js`: `theme`, `code-copy`, `form-send`, `search-suggest`, `gallery-carousel`) and a theme's, and `config/importmap.rb` pins the top-level controllers one by one so a visitor's page preloads only those. `bot_check`, `file_drop`, `invitation_token`, `mail_port`, `passkey_sign_in`, `password_field`, `reset_token`, `application.js` and `i18n/messages` are neither preloaded nor fetched there any more; sign-in, the password reset, an invitation, setup and CS Studio load them as before. A new controller file at the top of `app/javascript/controllers` needs a restart in development.
 
