@@ -23,13 +23,15 @@ class BackendPathsTest < ActiveSupport::TestCase
   VIEW_COMPONENTS = "ViewComponent's preview routes, drawn in development and test only, never in production".freeze
   HEALTH_CHECK = "the health check, asked by the proxy, and the readiness check, asked by a monitor".freeze
   SYSTEM_TEST_ENTRYPOINT = "Rails' own entrypoint of the browser tests, drawn in the test environment only".freeze
+  SITE_ICONS = "the icons a browser asks by a fixed address on whatever host it shows (`SiteIconsController`): a file, no record and no cookie".freeze
 
   # The reasons whose routes answer on every host, ADMIN_HOST or not: the
   # proxy asks `/up` on either name, both hosts embed Active Storage's files,
-  # the setup redirect gates CS Studio on the admin host too, and the test
+  # the setup redirect gates CS Studio on the admin host too, a browser asks
+  # the fixed icon addresses on either host, and the test
   # routes are never drawn in production. Every other route outside the prefix
   # is the site's and carries `HostRouteConstraint::Site`.
-  HOST_FREE = [ SETUP_PENDING, HEALTH_CHECK, ACTIVE_STORAGE_READ, ACTIVE_STORAGE_WRITE, VIEW_COMPONENTS, SYSTEM_TEST_ENTRYPOINT ].freeze
+  HOST_FREE = [ SETUP_PENDING, HEALTH_CHECK, ACTIVE_STORAGE_READ, ACTIVE_STORAGE_WRITE, VIEW_COMPONENTS, SYSTEM_TEST_ENTRYPOINT, SITE_ICONS ].freeze
 
   # Keys are `"VERB spec"`, as `key` writes them.
   PUBLIC = {
@@ -42,6 +44,9 @@ class BackendPathsTest < ActiveSupport::TestCase
     "POST /search/suggestions" => "a visitor's suggestions while typing in a search field",
     "GET /up(.:format)" => HEALTH_CHECK,
     "GET /ready(.:format)" => HEALTH_CHECK,
+    "GET /favicon.ico" => SITE_ICONS,
+    "GET /apple-touch-icon.png" => SITE_ICONS,
+    "GET /apple-touch-icon-precomposed.png" => SITE_ICONS,
     "GET /rails/active_storage/blobs/redirect/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,
     "GET /rails/active_storage/blobs/proxy/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,
     "GET /rails/active_storage/blobs/:signed_id/*filename(.:format)" => ACTIVE_STORAGE_READ,
