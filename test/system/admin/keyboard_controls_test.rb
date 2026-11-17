@@ -205,7 +205,8 @@ class Admin::KeyboardControlsSystemTest < ApplicationSystemTestCase
       page.send_keys(:enter)
     end
     assert_eventually(message: "the name was never saved") { users(:one).reload.name == "Saved by keyboard" }
-    assert_selector "#profile-form .admin-save-bar", text: /No unsaved changes/i
+    assert_selector "#profile-form .admin-save-bar button[type=submit][disabled]", text: "Save changes"
+    assert_no_selector "#profile-form .admin-save-bar", text: /unsaved/i
   end
 
   test "an error summary takes the focus when it is drawn, Tab reaches its link, and Enter there moves the focus to the field" do

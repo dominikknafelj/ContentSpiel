@@ -640,7 +640,10 @@ en:
         mail_fields:
           server_group: "Server"
           sender_group: "Sender"
-          server: "Server"
+          # The host's name, inside the Server group (which is not said twice).
+          server: "Host"
+          # The meta line over the login's fields, Settings' and the wizard's.
+          login_heading: "Login (if your provider needs one)"
           server_placeholder: "smtp.example.com"
           port: "Port"
           security: "Security"

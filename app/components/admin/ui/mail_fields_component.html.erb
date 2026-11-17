@@ -36,7 +36,13 @@
       <%= helpers.render "admin/shared/field_errors", id: "#{input_id(:mail_security)}-errors", messages: field_errors(:mail_security) %>
     <% end %>
 
-    <%= login %>
+    <% if login? %>
+      <%# The login's meta line, then the screen's own fields for it. %>
+      <div class="flex flex-col gap-1">
+        <p class="text-label text-meta" data-mail-login-heading><%= t(".login_heading") %></p>
+        <%= login %>
+      </div>
+    <% end %>
   <% end %>
 
   <%= tag.div role: "group", aria: { labelledby: group_id(:sender) }, class: GROUP_CLASS do %>

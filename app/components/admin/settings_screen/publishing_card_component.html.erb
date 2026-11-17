@@ -1,6 +1,6 @@
 <%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(SettingsSections.find("publishing"), self), id: "settings-publishing-card") do %>
   <div class="admin-column p-4" data-field-name="trash_retention_days" <%= tag.attributes(data: { save_bar_changed: values.saved_change("trash_retention_days") }) %>>
-    <div class="flex flex-wrap items-center gap-2 text-ink">
+    <div class="flex flex-wrap items-center gap-2 text-sm text-ink">
       <label for="<%= field_id %>"><%= t(".keep_label") %></label>
       <%= number_field_tag "site_setting[trash_retention_days]", values.trash_retention_days, id: field_id, min: 0, step: 1,
             class: "#{setup_input_class} !mt-0 !w-18", aria: { describedby: "#{field_id}-help" } %>

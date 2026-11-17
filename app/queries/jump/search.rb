@@ -56,7 +56,7 @@ module Jump
       "site" => "Settings › Site",
       "languages" => "Settings › Languages",
       "post_types" => "Settings › Post types",
-      "publishing" => "Settings › Publishing",
+      "publishing" => "Settings › Trash",
       "forms" => "Settings › Forms",
       "ai" => "Settings › AI translation",
       "mail" => "Settings › Mail",

@@ -555,10 +555,11 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     # The current password alone is not a change (a password manager fills it
     # in on load): only what would be saved counts.
     fill_in "Current password", with: "whatever"
-    assert_selector "#password-form .admin-save-bar", text: "No unsaved changes"
+    # A footer inside its card says nothing at rest (Design System v262).
+    assert_no_selector "#password-form .admin-save-bar", text: /unsaved/i
     fill_in "New password", with: "a-new-long-password"
 
-    # One under each form, never covering each other.
+    # One inside each form's card, never covering each other.
     rects = page.evaluate_script("Array.from(document.querySelectorAll('.admin-save-bar')).map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.bottom] })")
     first, second = rects.sort_by(&:first)
     assert_operator first.last, :<=, second.first + 1
@@ -608,9 +609,10 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_selector "#account-identity span[title='Kept Both']"
     assert_equal "a-new-long-password", find_field("New password").value
     assert_equal "password", find_field("Current password").value
-    # The name form took what it saved as its baseline: clean, Save disabled,
-    # and typing the old value back is a change again.
-    assert_selector "#profile-form .admin-save-bar", text: "No unsaved changes"
+    # The name form took what it saved as its baseline: clean (a contained
+    # footer says nothing then), Save disabled, and typing the old value back
+    # is a change again.
+    assert_no_selector "#profile-form .admin-save-bar", text: /unsaved/i
     assert_selector "#profile-form button[type=submit][disabled]", text: /\ASave changes\z/
     assert_selector "#password-form .admin-save-bar", text: "1 unsaved change"
     fill_in "Your name", with: "Kept Both, again"
@@ -704,11 +706,11 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_selector bar, text: "1 unsaved change · Provider"
     fill_in "settings-mail_server", with: "smtp.named.test"
     fill_in "settings-mail_port", with: "2525"
-    assert_selector bar, text: "3 unsaved changes · Provider, Server, Port"
+    assert_selector bar, text: "3 unsaved changes · Provider, Host, Port"
     fill_in "settings-mail_sender_name", with: "Named Sender"
     fill_in "settings-mail_sender_address", with: "named@example.org"
 
-    assert_selector bar, text: "5 unsaved changes · Provider, Server, Port and 2 more"
+    assert_selector bar, text: "5 unsaved changes · Provider, Host, Port and 2 more"
     assert_selector "#{bar} strong", text: /\A5 unsaved changes\z/
     assert_selector "#{bar} [data-admin--saving--save-bar-target=dot]:not([hidden])", visible: :all
   end
@@ -748,6 +750,6 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{server}[data-save-bar-changed]"
     assert_equal "none", shadow.call
     assert_selector ".admin-save-bar", text: /Security/
-    assert_no_selector ".admin-save-bar", text: /Server/
+    assert_no_selector ".admin-save-bar", text: /Host/
   end
 end

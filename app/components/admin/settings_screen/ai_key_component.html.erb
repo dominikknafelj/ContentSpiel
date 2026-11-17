@@ -1,4 +1,4 @@
-<div id="<%= ID %>" class="admin-column">
+<div id="<%= ID %>" class="admin-column" data-ai-key-set="<%= key_set? %>">
   <label for="settings-ai_api_key" class="<%= setup_label_class %>"><%= t(".label") %></label>
 
   <div class="mt-1 flex flex-wrap items-center gap-2" data-admin--settings--ai-target="chip" <%= "hidden" if editing? %>>
@@ -18,7 +18,7 @@
           aria: { describedby: ("settings-ai-key-errors" if error.present?), invalid: (true if error.present?) },
           class: "#{setup_input_class} !mt-0 min-w-0 flex-1",
           data: LOCK.merge("admin--settings--ai-target": "input", action: "keydown.esc->admin--settings--ai#cancel input->admin--settings--ai#holdKey") %>
-    <%= render Admin::Ui::ButtonComponent.new(label: t(".save"), variant: :secondary, type: "submit", form: KEY_FORM, data: LOCK) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".save"), variant: :secondary, size: :small, type: "submit", form: KEY_FORM, data: LOCK) %>
     <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, data: { action: "admin--settings--ai#cancel" }) %>
   </div>
 

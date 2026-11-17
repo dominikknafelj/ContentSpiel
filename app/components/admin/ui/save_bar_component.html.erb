@@ -21,7 +21,11 @@
   <% else %>
     <span data-admin--saving--save-bar-target="dot" aria-hidden="true" class="size-2 shrink-0 rounded-full bg-accent" hidden></span>
   <% end %>
-  <span data-admin--saving--save-bar-target="count" aria-live="polite" class="<%= line_class %> text-dim"></span>
+  <%# A contained footer's line says nothing at rest (`data-save-bar-quiet`)
+      but keeps its height, so the footer does not move when a change is
+      counted: "No unsaved changes" is the floating bar's, which is always on
+      screen and has to say why its Save is off. %>
+  <%= tag.span data: { "admin--saving--save-bar-target": "count", save_bar_quiet: (true if contained?) }, aria: { live: "polite" }, class: count_class %>
   <%# Shown while another form on the screen has to be saved first
       (`save_bar_form_data(after:)`); the controller writes the sentence. %>
   <span data-admin--saving--save-bar-target="blocked" role="status" class="<%= line_class %> text-dim" hidden></span>

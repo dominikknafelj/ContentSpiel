@@ -101,6 +101,12 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     assert_equal %w[not-disabled:not-aria-disabled:hover:shadow-3], Admin::Ui::ButtonComponent.classes(:primary).split.grep(/hover:shadow/), "the primary rises to shadow 3"
   end
 
+  test "a label never wraps, at either size: the row wraps around the button instead" do
+    Admin::Ui::ButtonComponent::VARIANT_CLASSES.each_key do |variant|
+      %i[regular small].each { |size| assert_includes Admin::Ui::ButtonComponent.classes(variant, size: size).split, "whitespace-nowrap", "#{variant} #{size}" }
+    end
+  end
+
   test "a hover fades its fill and its lift over 120ms on --cs-ease" do
     %w[transition-[background-color,box-shadow] duration-120 ease-(--cs-ease)].each { |name| assert_includes Admin::Ui::ButtonComponent::COMMON_CLASS.split, name }
     assert_not_includes Admin::Ui::ButtonComponent::COMMON_CLASS.split, "transition-colors"

@@ -42,12 +42,12 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     assert_select "#settings-language-order[name='site_setting[language_order]'][value='en,de,es'][data-save-bar-track]"
     assert_select "#language-de input[type=hidden][name='site_setting[languages][][code]'][value='de']"
     assert_select "#language-de select[name='site_setting[languages][][fallback]'] option[selected][value='en']"
-    assert_select "#language-de select option", 3 # None (default), English, Español
-    assert_select "#language-de select option[value='']", text: "None (default)"
+    assert_select "#language-de select option", 3 # English, the default; English; Español
+    assert_select "#language-de select option[value='']", text: "English, the default"
     assert_select "#language-de select option[value='de']", count: 0
 
-    # The default's select is disabled and reads "None (default)"; it can't be turned off.
-    assert_select "#language-en select[disabled] option[selected][value='']", text: "None (default)"
+    # The default's select is disabled and reads "English, the default"; it can't be turned off.
+    assert_select "#language-en select[disabled] option[selected][value='']", text: "English, the default"
     # The default's row has only the inert spacer copy of the button (it keeps the columns in line).
     assert_select "#language-en button:not([disabled])", text: "Turn off…", count: 0
     assert_select "#language-en button[data-admin--ui--dialog-id-param^='language-off-dialog']", count: 0
@@ -61,7 +61,7 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     # trigger with no name on the others -- nothing the form could submit.
     assert_select "#settings-languages-card input[type=radio]", count: 0
     assert_select "#language-en [data-default-tag]", text: "Default"
-    assert_select "#settings-languages-card button[type=button]:not([name])", text: "Make default…", count: 2
+    assert_select "#settings-languages-card button[type=button]:not([name]):not([disabled])", text: "Make default…", count: 2
     assert_select "#language-de button[data-admin--ui--dialog-id-param='language-default-dialog-de'][aria-label='Make Deutsch the default language']"
     assert_select "form#settings-form form", count: 0
     assert_select "form#language-default-form", count: 0

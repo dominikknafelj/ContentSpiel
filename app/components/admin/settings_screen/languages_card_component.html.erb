@@ -33,43 +33,45 @@
             default's select is disabled and so not posted). %>
         <%= hidden_field_tag "site_setting[languages][][code]", code, id: nil %>
 
-        <div class="min-w-[9rem] flex-1">
+        <%# Three groups, and the row wraps between them, never inside one:
+            the language (its name, its path and, on the default, the
+            "Default" badge), then its fallback, then its actions. A
+            button's label never wraps (`ButtonComponent`). %>
+        <div class="flex min-w-[9rem] flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
           <span class="font-semibold text-ink"><%= name(code) %></span>
-          <span class="ml-1.5 text-small text-meta"><%= path(code) %></span>
-        </div>
-
-        <%# The default: a tag on the row that is it, a button on every other
-            (an instant action behind its dialog, not a field). They share a
-            column width so the rows line up. %>
-        <div class="flex w-28 justify-start">
+          <span class="text-small text-meta"><%= path(code) %></span>
           <% if default?(code) %>
-            <%= render Admin::Ui::BadgeComponent.new(label: t(".default"), data: { default_tag: true }) %>
-          <% else %>
-            <%= render Admin::Ui::ButtonComponent.new(label: t(".make_default"), variant: :secondary, size: :small, aria: { label: t(".make_default_label", language: name(code)) },
-                  data: dialog_trigger(self.class.default_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>
+            <%= render Admin::Ui::BadgeComponent.new(label: t(".default"), class: "ml-1", data: { default_tag: true }) %>
           <% end %>
         </div>
 
         <%= tag.div class: "inline-flex items-center gap-2 text-sm text-ink",
               data: { field_name: "languages.#{code}.fallback", save_bar_name: fallback_name(code), save_bar_changed: values.saved_change("languages.#{code}.fallback") } do %>
-          <label for="language-<%= code %>-fallback"><%= t(".falls_back_to") %><span class="sr-only"> <%= t(".falls_back_for", language: name(code)) %></span></label>
+          <label for="language-<%= code %>-fallback" class="whitespace-nowrap"><%= t(".falls_back_to") %><span class="sr-only"> <%= t(".falls_back_for", language: name(code)) %></span></label>
           <%= select_tag "site_setting[languages][][fallback]", options_for_select(fallback_options(code), (default?(code) ? "" : row[:fallback])),
                 id: "language-#{code}-fallback", disabled: default?(code), class: "#{setup_select_class} !mt-0 !w-auto",
                 data: { save_bar_key: "languages.#{code}.fallback" } %>
         <% end %>
 
-        <%# The default can't be turned off. Its row keeps the button's place
-            with the button itself, unseen and inert, in the same variant,
-            rather than a guessed width: a spacer that is a few pixels off
-            shifts the default's tag and select out of line with the rows below. %>
-        <% if default?(code) %>
-          <span class="invisible" aria-hidden="true" data-turn-off-spacer>
-            <%= render Admin::Ui::ButtonComponent.new(label: t(".turn_off"), variant: :danger_text, size: :small, disabled: true, tabindex: -1) %>
-          </span>
-        <% else %>
-          <%= render Admin::Ui::ButtonComponent.new(label: t(".turn_off"), variant: :danger_text, size: :small, aria: { label: t(".turn_off_label", language: name(code)) },
-                data: dialog_trigger(self.class.off_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>
-        <% end %>
+        <%# The actions: Make default… (an instant action behind its dialog,
+            not a field) and Turn off…. The default can be neither made
+            default nor turned off: its row keeps the buttons' place with the
+            buttons themselves, unseen and inert, in the same variants,
+            rather than a guessed width, so its select stays in line with
+            the rows below. %>
+        <div class="flex shrink-0 items-center gap-2">
+          <% if default?(code) %>
+            <span class="invisible flex items-center gap-2" aria-hidden="true" data-turn-off-spacer>
+              <%= render Admin::Ui::ButtonComponent.new(label: t(".make_default"), variant: :secondary, size: :small, disabled: true, tabindex: -1) %>
+              <%= render Admin::Ui::ButtonComponent.new(label: t(".turn_off"), variant: :danger_text, size: :small, disabled: true, tabindex: -1) %>
+            </span>
+          <% else %>
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".make_default"), variant: :secondary, size: :small, aria: { label: t(".make_default_label", language: name(code)) },
+                  data: dialog_trigger(self.class.default_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".turn_off"), variant: :danger_text, size: :small, aria: { label: t(".turn_off_label", language: name(code)) },
+                  data: dialog_trigger(self.class.off_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>
+          <% end %>
+        </div>
       </li>
     <% end %>
   </ul>
@@ -81,7 +83,7 @@
       <label for="language-add-code" class="text-sm text-ink"><%= t(".add_label") %></label>
       <%= select_tag "code", options_for_select(addable_options), id: "language-add-code", form: ADD_FORM,
             class: "#{setup_select_class} !mt-0 !w-auto", data: { "admin--saving--pending-lock-target": "control" } %>
-      <%= render Admin::Ui::ButtonComponent.new(label: t(".add"), variant: :secondary, type: "submit", form: ADD_FORM,
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".add"), variant: :secondary, size: :small, type: "submit", form: ADD_FORM,
             data: { "admin--saving--pending-lock-target": "control" }) %>
     </div>
   <% else %>

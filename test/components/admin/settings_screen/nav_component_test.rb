@@ -6,7 +6,7 @@ class Admin::SettingsScreen::NavComponentTest < ViewComponent::TestCase
 
     assert_selector "nav[aria-label='Settings sections'] a", count: 9
     assert_equal %w[#site #languages #post_types #publishing #forms #ai #mail #sign_in #images], page.all("a").map { |a| a[:href] }
-    assert_equal [ "Site", "Languages", "Post types", "Publishing", "Forms", "AI translation", "Mail", "Sign-in", "Images" ], page.all("a").map(&:text)
+    assert_equal [ "Site", "Languages", "Post types", "Trash", "Forms", "AI translation", "Mail", "Sign-in", "Images" ], page.all("a").map(&:text)
   end
 
   # Same-page links: a `_top` link would be a Turbo visit, which the save

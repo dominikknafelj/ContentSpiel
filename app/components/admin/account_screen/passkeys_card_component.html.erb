@@ -33,14 +33,21 @@
       <% end %>
     </ul>
   <% end %>
-  <div class="flex flex-wrap items-center justify-between gap-3 rounded-b-card border-t border-line px-4 py-3" data-passkeys-foot>
+  <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3" data-passkeys-foot>
     <p class="text-small text-dim"><%= passkeys.any? ? t(".count", count: passkeys.size) : t(".none") %></p>
     <% if addable? %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".add"), variant: :secondary, size: :small, type: "button",
             data: { action: "admin--passkeys--register#add", "admin--passkeys--register-target": "add" }) %>
+    <% else %>
+      <%# Why there is no "Add a passkey…": a browser makes a passkey only for
+          the site's own name, never an IP address. %>
+      <p class="basis-full text-small text-meta" data-passkeys-not-addable><%= t(".not_addable") %></p>
     <% end %>
   </div>
   <% if addable? %>
     <%= render Admin::AccountScreen::PasskeyDialogComponent.new(kind: :add, url_options: url_options) %>
   <% end %>
+  <%# The recovery codes, the card's second section, drawn only while the
+      person holds a passkey. %>
+  <%= render recovery if recovery %>
 <% end %>

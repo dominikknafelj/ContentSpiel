@@ -135,7 +135,7 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
 
   test "Settings destinations anchor into the settings screen" do
     sign_in_as users(:one)
-    get admin_jump_path(q: "publishing")
-    assert_select "[role=option] a[href$='/settings#publishing']", text: /Settings › Publishing/
+    get admin_jump_path(q: "trash")
+    assert_select "[role=option] a[href$='/settings#publishing']", text: /Settings › Trash/
   end
 end

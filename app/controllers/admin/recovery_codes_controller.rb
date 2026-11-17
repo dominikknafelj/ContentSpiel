@@ -1,6 +1,6 @@
 module Admin
   # Generate… and Regenerate… on Your account's Recovery codes card
-  # (`Admin::AccountScreen::RecoveryCardComponent`): a new set of the
+  # (`Admin::AccountScreen::RecoverySectionComponent`): a new set of the
   # signed-in person's own codes (`SignIn::RecoveryCodes::Generate`, which deletes
   # every code they held), behind Confirm it's you. A person with no passkey
   # is refused with a toast: the card offers neither button to them.
@@ -21,7 +21,7 @@ module Admin
       end
 
       render turbo_stream: [
-        turbo_stream.replace(AccountScreen::RecoveryCardComponent::ID, AccountScreen::RecoveryCardComponent.for(Current.user, url_options: admin_url_options)),
+        turbo_stream.replace(AccountScreen::RecoverySectionComponent::ID, AccountScreen::RecoverySectionComponent.for(Current.user, url_options: admin_url_options)),
         *AccountRecoveryCodes.streams(turbo_stream, result.record)
       ]
     end

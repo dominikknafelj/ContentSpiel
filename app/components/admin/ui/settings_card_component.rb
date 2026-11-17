@@ -18,7 +18,10 @@ module Admin
     # language tabs, the Mail state); `head_note`, under the intro (the
     # Languages card's pending hint); `heading_mark`, the heading's next
     # sibling on its row (the Languages card's changed order), outside it so
-    # the section's name stays its word.
+    # the section's name stays its word. On a card narrower than 560px the
+    # head's end takes a row of its own under the heading and the intro
+    # (the head is a container, `content-spiel.tailwind.css`), so a chip or
+    # the language tabs never stand over the heading.
     class SettingsCardComponent < Admin::AdminComponent
       include Admin::Ui::Contract
 
@@ -30,7 +33,8 @@ module Admin
         interface: %i[heading_id heading icon family intro],
         limits: [
           "It says nothing of its own: the heading and the intro are the caller's, already read.",
-          "An id in html is the section's; a class is appended."
+          "An id in html is the section's; a class is appended.",
+          "Below 560px of the card the head_end leaves the heading's row for a row of its own under the heading and the intro, and scrolls sideways when it still does not fit."
         ],
         states: %i[rest intro head_end head_note heading_mark],
         keys: [],

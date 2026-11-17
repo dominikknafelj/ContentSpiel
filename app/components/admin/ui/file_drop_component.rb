@@ -14,7 +14,10 @@ module Admin
     # form). Same reason as `password_field_controller.js`.
     #
     # `label:` is the input's accessible name (aria-label), e.g. "Upload images";
-    # without it the visible "Choose file" label names it.
+    # without it the visible "Choose file" label names it. `size:` is the
+    # Choose file button's (`ButtonComponent.classes`): `:small` where the
+    # zone stands among a card's instant actions (Settings' logo), regular
+    # where it is the screen's way in (the media library, the wizard).
     #
     # Whoever owns the upload (the media library's `admin--media--upload`) listens
     # to the input's own `change`; this component never uploads anything.
@@ -26,12 +29,12 @@ module Admin
         motion: :reduced,
         content_edges: %i[none short long],
         widths: :from_container,
-        interface: %i[name id accept multiple hint label],
+        interface: %i[name id accept multiple hint label size],
         limits: [
           "It never uploads: whoever owns the upload listens to the input's change.",
           "Its words (Drop an image here or, Choose file) are English in the template, not keys."
         ],
-        states: %i[rest with_hint hover focus],
+        states: %i[rest with_hint small hover focus],
         script_states: {
           chosen: [ "test/system/setup_wizard_test.rb", "a fresh install goes from the token to a live homepage" ]
         },
@@ -41,19 +44,20 @@ module Admin
         keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a file drop's input is a Tab stop, and its Choose file rings while the keyboard is on it" ]
       )
 
-      def initialize(name:, id:, accept: Media::Asset::ALLOWED_CONTENT_TYPES.join(","), multiple: false, hint: nil, label: nil, **input_html)
+      def initialize(name:, id:, accept: Media::Asset::ALLOWED_CONTENT_TYPES.join(","), multiple: false, hint: nil, label: nil, size: :regular, **input_html)
         @name = name
         @id = id
         @accept = accept
         @multiple = multiple
         @hint = hint
         @label = label
+        @size = size
         @input_html = input_html
       end
 
       private
 
-      attr_reader :name, :id, :accept, :multiple, :hint, :label, :input_html
+      attr_reader :name, :id, :accept, :multiple, :hint, :label, :size, :input_html
 
       def input_attrs
         {

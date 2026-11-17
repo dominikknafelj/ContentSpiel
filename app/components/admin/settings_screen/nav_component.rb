@@ -9,6 +9,12 @@ module Admin
     # history entry (`admin--saving--save-bar` moves the focus by hand), so following
     # one never asks "Leave without saving?".
     #
+    # Below 640px the links give way to a select labelled "Section", above
+    # the first card (and the rail, which follows the nav in the document):
+    # choosing a section jumps to its card, the same same-page jump the
+    # links make (`admin--settings--nav#choose`), so it never asks "Leave
+    # without saving?" either.
+    #
     # The link of the section in view carries `aria-current="true"`, set by
     # `admin--settings--nav` (the server marks none: which section is in view
     # is the scroll's); the stylesheet draws it from that attribute. The links

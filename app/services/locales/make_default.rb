@@ -54,7 +54,7 @@ module Locales
         site.default_locale = @code
         # The new default has nothing to fall back to: the default IS the last
         # resort of every chain (`Locales.fallback_chain`), and the card shows its
-        # select as a disabled "None (default)", so no screen could clear fallbacks
+        # select as a disabled "<default>, the default", so no screen could clear fallbacks
         # it was stored with while the chain would still apply them. Cleared here,
         # in the same save (and so in the event's field changes). Nobody else's
         # fallbacks change, and the OLD default keeps whatever it had: it is an

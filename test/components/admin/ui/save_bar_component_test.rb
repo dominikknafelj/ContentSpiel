@@ -60,4 +60,15 @@ class Admin::Ui::SaveBarComponentTest < ViewComponent::TestCase
     assert_selector ".admin-save-bar [data-admin--saving--save-bar-target=count][aria-live=polite].text-small", visible: :all
     assert_selector ".admin-save-bar [data-admin--saving--save-bar-target=blocked].text-small", visible: :all
   end
+
+  # Design System v262: a footer inside its card says nothing at rest, and
+  # keeps the line's height; the floating bar keeps "No unsaved changes".
+  test "a contained bar's count line is quiet at rest and keeps its height; the floating one's is not" do
+    render_inline(Admin::Ui::SaveBarComponent.new(form_id: "f", cancel_url: "/x", contained: true))
+    assert_selector "[data-admin--saving--save-bar-target=count][data-save-bar-quiet].min-h-\\[1lh\\]", visible: :all
+
+    render_inline(Admin::Ui::SaveBarComponent.new(form_id: "f", cancel_url: "/x"))
+    assert_selector "[data-admin--saving--save-bar-target=count]", visible: :all
+    assert_no_selector "[data-save-bar-quiet]", visible: :all
+  end
 end

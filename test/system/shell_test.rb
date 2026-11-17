@@ -115,7 +115,7 @@ class ShellTest < ApplicationSystemTestCase
 
   # The sidebar's entry reads "Your account",
   # and the person's name block above it is a link to the same screen, whose
-  # cards are Profile, Notes, Password, Passkeys, Recovery codes and Sessions. A name saved there is drawn again
+  # cards are Profile, Password, Passkeys and Sessions. A name saved there is drawn again
   # in the block (a stream), which is still the link.
   test "the sidebar's name block and its Your account entry both lead to the account screen" do
     sign_in_via_form users(:one)
@@ -123,8 +123,8 @@ class ShellTest < ApplicationSystemTestCase
 
     within("#sidebar .admin-account") { click_link "Your account" }
     assert_selector "h1", text: "Your account"
-    assert_equal [ "Profile", "Notes", "Password", "Passkeys", "Recovery codes", "Sessions" ], all("turbo-frame#content section h2").map(&:text)
-    assert_selector "#password-form section .admin-settings-card__head > p", text: "You'll stay signed in here. Other sessions are signed out."
+    assert_equal [ "Profile", "Password", "Passkeys", "Sessions" ], all("turbo-frame#content section h2").map(&:text)
+    assert_selector "#password-form section .admin-settings-card__head > p", text: "Changing it keeps you signed in here and signs you out everywhere else."
     assert_title "Your account"
 
     visit admin_tags_path

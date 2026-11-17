@@ -66,9 +66,11 @@ module Admin
 
       def order_value = rows.map { |row| row[:code] }.join(",")
 
-      # "None (default)" first, then every OTHER enabled language.
+      # The default first ("English, the default", in its own language as the
+      # rows name it: no fallback of the row's own is the default), then
+      # every OTHER enabled language.
       def fallback_options(code)
-        [ [ t(".no_fallback"), "" ] ] + (rows.map { |row| row[:code] } - [ code ]).map { |other| [ name(other), other ] }
+        [ [ t(".no_fallback", language: name(site_setting.default_locale.to_s)), "" ] ] + (rows.map { |row| row[:code] } - [ code ]).map { |other| [ name(other), other ] }
       end
 
       def addable_options

@@ -45,7 +45,7 @@
         <% end %>
         <div class="min-w-0 flex-1">
           <%= render Admin::Ui::FileDropComponent.new(name: "site_setting[logo]", id: "settings-logo", accept: "image/*", label: t(".logo_file"),
-                hint: t(".logo_hint")) %>
+                hint: t(".logo_hint"), size: :small) %>
           <% if logo.attached? %>
             <label class="mt-2 inline-flex items-center gap-2 text-sm text-meta">
               <%= render Admin::Ui::CheckboxComponent.new(name: "site_setting[remove_logo]", value: "1", id: "settings-remove_logo", checked: values.remove_logo?) %>

@@ -95,8 +95,10 @@ module Admin
       # the caller shows the reason in words and joins it by `aria-describedby`. The fill
       # and the lift change over 120ms on `--cs-ease`, and at once under
       # reduced motion, where the primary's press does not move either (it is
-      # told by its shadow going).
-      COMMON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-button border font-semibold " \
+      # told by its shadow going). A label never wraps (`whitespace-nowrap`):
+      # where a row has no room, the row wraps between its groups and the
+      # label stays whole.
+      COMMON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-button border font-semibold whitespace-nowrap " \
                      "transition-[background-color,box-shadow] duration-120 ease-(--cs-ease) motion-reduce:transition-none " \
                      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " \
                      "disabled:cursor-not-allowed disabled:not-aria-busy:border-transparent disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta " \

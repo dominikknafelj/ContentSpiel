@@ -83,10 +83,10 @@ class Admin::SettingsScreen::AiKeyComponentTest < ViewComponent::TestCase
     assert_selector "input[aria-invalid=true]"
   end
 
-  test "Save key and Replace are secondary and Remove… danger text: the save bar is the screen's one primary" do
+  test "Save key and Replace are small secondaries and Remove… danger text: the save bar is the screen's one primary" do
     render_key(site: site_with_key(nil))
 
-    assert drawn_as?(page.find("button", text: "Save key", visible: :all), :secondary), "Save key is a secondary"
+    assert drawn_as?(page.find("button", text: "Save key", visible: :all), :secondary, size: :small), "Save key is a small secondary"
     assert drawn_as?(page.find("button", text: "Replace"), :secondary, size: :small)
     assert drawn_as?(page.find("button", text: "Remove…"), :danger_text, size: :small)
     assert drawn_as?(page.find("button", text: "Cancel", visible: :all), :tertiary)

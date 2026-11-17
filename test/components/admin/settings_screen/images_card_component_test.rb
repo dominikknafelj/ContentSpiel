@@ -18,7 +18,7 @@ class Admin::SettingsScreen::ImagesCardComponentTest < ViewComponent::TestCase
     assert_selector "input[type=number][name='site_setting[image_quality_avif]'][value='50']"
     assert_selector "input[type=text][name='site_setting[image_widths]'][value='480, 960, 1600, 2400']"
     assert_selector "input[type=number][name='site_setting[image_max_upload_mb]'][min='1'][max='50'][value='10']"
-    assert_selector "[data-images-avif-note]", text: "Smaller files, slower to make; very old browsers show no image. Animated images are always made in WebP, at the WebP quality."
+    assert_selector "[data-images-avif-note]", text: "AVIF: smaller files, slower to make; very old browsers show no image. Animated images are still made in WebP, at the WebP quality."
   end
 
   test "AVIF is disabled with its reason where the server cannot write it" do

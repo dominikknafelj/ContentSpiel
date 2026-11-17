@@ -10,7 +10,8 @@ module Admin
     #   Port.
     # - The login, in the fields' `login` slot, is `MailLoginComponent`:
     #   instant forms, written once.
-    # - The state (`MailStateComponent`) stands at the head's end.
+    # - The state (`MailStateComponent`): its chip alone at the head's end,
+    #   and what it means as the head's note, under the intro.
     # - "Send test mail" is the foot (`MailTestResultComponent`).
     #
     # With every field from the host the card says so once, and only the test

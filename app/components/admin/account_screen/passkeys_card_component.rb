@@ -17,8 +17,12 @@ module Admin
     #   server asks for it), then the Name dialog, whose Continue opens the
     #   browser's prompt at once.
     # - `addable: false` (no relying party: a site reached at an IP address,
-    #   where no passkey endpoint answers) draws no Add and no Name dialog;
-    #   the passkeys the person holds are still listed, renamed and removed.
+    #   where no passkey endpoint answers) draws no Add and no Name dialog,
+    #   and the foot says why, under the count; the passkeys the person
+    #   holds are still listed, renamed and removed.
+    # - THE RECOVERY CODES are the card's second section
+    #   (`RecoverySectionComponent`, `recovery:`), under a line, drawn only
+    #   while the person holds a passkey: they are a backup for one.
     # - After a sign-in with a recovery code (`recovery_left`, how many are
     #   left) the card opens on a warn notice.
     #
@@ -28,25 +32,27 @@ module Admin
       ID = "account-passkeys".freeze
       HEADING_ID = "passkeys".freeze
 
-      # The card for `user` as stored: their passkeys, oldest first, and
-      # whether the policy covers them.
+      # The card for `user` as stored: their passkeys, oldest first, whether
+      # the policy covers them, and their recovery codes.
       def self.for(user, addable:, recovery_left: nil, url_options: {}, autofocus: nil)
         new(passkeys: user.passkeys.order(:created_at, :id).to_a, covered: SignIn::Passkeys::Policy.current.covers?(user), addable: addable,
-          recovery_left: recovery_left, url_options: url_options, autofocus: autofocus)
+          recovery_left: recovery_left, url_options: url_options, autofocus: autofocus,
+          recovery: RecoverySectionComponent.for(user, url_options: url_options))
       end
 
-      def initialize(passkeys:, covered:, addable: true, recovery_left: nil, url_options: {}, autofocus: nil)
+      def initialize(passkeys:, covered:, addable: true, recovery_left: nil, url_options: {}, autofocus: nil, recovery: nil)
         @passkeys = passkeys
         @covered = covered
         @addable = addable
         @recovery_left = recovery_left
         @url_options = url_options
         @autofocus = autofocus
+        @recovery = recovery
       end
 
       private
 
-      attr_reader :passkeys, :url_options, :recovery_left
+      attr_reader :passkeys, :url_options, :recovery_left, :recovery
 
       # The only passkey left, of a person the policy holds to one.
       def required? = @covered && last?

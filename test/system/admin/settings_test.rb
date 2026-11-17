@@ -109,14 +109,30 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     at_window(1279) do
       visit_screen admin_settings_path
       boxes = layout
-      assert_operator boxes["container"]["width"], :>=, 1200
+      assert_operator boxes["container"]["width"], :>=, 1140
       assert docked?(boxes), boxes.inspect
     end
     at_window(1280) do
       visit_screen admin_settings_path
       boxes = layout
-      assert_operator boxes["container"]["width"], :<, 1200
+      assert_operator boxes["container"]["width"], :<, 1140
       assert_not docked?(boxes), boxes.inspect
+    end
+  end
+
+  # Settings docks at 1140px of its own area (Design System v262, S13): a
+  # window of 1455px, whose area is about 1152px beside the sidebar and a
+  # classic scrollbar, has the rail beside the cards rather than above them.
+  # (A 1440px window's area is 1152px with overlay scrollbars, macOS's
+  # default, and 1137px with a classic 15px one, as here.)
+  test "an area of 1140px or more docks the rail, the cards' column taking what the nav, the gaps and the rail leave" do
+    at_window(1455) do
+      visit_screen admin_settings_path
+      boxes = layout
+      assert_operator boxes["container"]["width"], :>=, 1140
+      assert docked?(boxes), boxes.inspect
+      assert_in_delta boxes["container"]["width"] - 586, boxes["cards"]["width"], 1, boxes.inspect
+      assert_operator boxes["cards"]["width"], :>=, 554, "the column keeps at least what 1140px leaves it"
     end
   end
 
@@ -292,7 +308,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     port = edge.("settings-mail_port")
     assert_equal "none", port[0]
     assert_equal danger, port[1]
-    assert_selector footer, text: "2 unsaved changes · Server, Port"
+    assert_selector footer, text: "2 unsaved changes · Host, Port"
 
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"
@@ -351,7 +367,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_not_equal look[1], other
 
     page.execute_script("document.getElementById('publishing').scrollIntoView({ block: 'start' })")
-    assert_selector "#{nav} a[aria-current=true]", text: "Publishing", count: 1
+    assert_selector "#{nav} a[aria-current=true]", text: "Trash", count: 1
   ensure
     page.current_window.resize_to(1400, 1400)
   end
@@ -697,9 +713,9 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector footer, text: /\b1 unsaved change\b/i
   end
 
-  # The default's row has no Turn off button; an unseen copy holds its place,
-  # so the tag and the fallback select start where the other rows' do.
-  test "the language rows line up: the default's tag and select start where the other rows' button and select do" do
+  # The default's row has no Make default… or Turn off…; unseen copies hold
+  # their place, so the fallback selects start where the other rows' do.
+  test "the language rows line up: the selects and the actions start where the other rows' do" do
     visit admin_settings_path(anchor: "languages")
     await_admin_controllers
 
@@ -707,8 +723,79 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_operator lefts.size, :>=, 2
     assert_operator lefts.max - lefts.min, :<, 1, "the fallback selects start at #{lefts.inspect}"
 
-    tag = page.evaluate_script("document.querySelector('#settings-languages-card [data-default-tag]').getBoundingClientRect().left")
-    button = page.evaluate_script("Array.from(document.querySelectorAll('#settings-languages-card button')).find((b) => b.textContent.trim() === 'Make default…').getBoundingClientRect().left")
-    assert_in_delta button, tag, 1
+    actions = page.evaluate_script("Array.from(document.querySelectorAll('#settings-languages-card li > div:last-child')).map((group) => group.getBoundingClientRect().left)")
+    assert_operator actions.max - actions.min, :<, 1, "the actions start at #{actions.inspect}"
+  end
+
+  # Design System v262, S3: a button's label never wraps; the row wraps
+  # between its groups instead.
+  test "Make default… stays on one line, at a phone's width too" do
+    [ 1440, 390 ].each do |width|
+      at_window(width, height: 844) do
+        visit_screen admin_settings_path(anchor: "languages")
+        heights = page.evaluate_script(<<~JS)
+          Array.from(document.querySelectorAll("#settings-languages-card button:not([disabled])"))
+            .filter((button) => button.textContent.trim() === "Make default…")
+            .map((button) => [button.getBoundingClientRect().height, parseFloat(getComputedStyle(button).lineHeight)])
+        JS
+        assert_not_empty heights
+        heights.each { |height, line| assert_operator height, :<, line * 2, "at #{width}px Make default… is #{height}px tall on #{line}px lines" }
+        assert_operator page.evaluate_script("document.documentElement.scrollWidth"), :<=, page.evaluate_script("document.documentElement.clientWidth"), "at #{width}px the page does not scroll sideways"
+      end
+    end
+  end
+
+  # Design System v262, S1 and S2: on a narrow card the head's end takes a
+  # row of its own under the heading and the intro.
+  test "on a phone the Mail chip and the Site card's language tabs stand under their headings, never over them" do
+    at_window(390, height: 844) do
+      visit_screen admin_settings_path
+      boxes = page.evaluate_script(<<~JS)
+        (() => {
+          const box = (selector) => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right } }
+          return {
+            mail_heading: box("#settings-mail-card h2"), mail_intro: box("#settings-mail-card .admin-settings-card__head > p"), mail_chip: box("#settings-mail-state"),
+            site_heading: box("#settings-site-card h2"), site_tabs: box("#settings-site-card .admin-settings-card__end"), site_card: box("#settings-site-card")
+          }
+        })()
+      JS
+      assert_operator boxes["mail_chip"]["top"], :>=, boxes["mail_intro"]["bottom"] - 1, boxes.inspect
+      assert_operator boxes["site_tabs"]["top"], :>=, boxes["site_heading"]["bottom"] - 1, boxes.inspect
+      assert_operator boxes["site_tabs"]["right"], :<=, boxes["site_card"]["right"] + 1, "the tabs scroll inside the card rather than out of it"
+    end
+  end
+
+  # Design System v262, S14: below 640px a select stands for the nav's links.
+  test "on a phone the nav is a Section select above the first card, and choosing a section jumps to its card without asking" do
+    at_window(390, height: 844) do
+      visit_screen admin_settings_path
+      assert_no_selector "nav[aria-label='Settings sections'] a"
+      assert_selector "label[for=settings-section-select]", text: "Section"
+      fill_in "Title", with: "Typed, not saved", match: :first
+      select "Mail", from: "Section"
+      assert_eventually(message: "the Mail heading never reached the view") do
+        page.evaluate_script("(() => { const r = document.getElementById('mail').getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight })()")
+      end
+      assert_equal "mail", page.evaluate_script("document.activeElement.id")
+      assert_no_selector "dialog[open]", text: "Leave without saving?"
+      select_box = page.evaluate_script("document.getElementById('settings-section-select').getBoundingClientRect().top")
+      glance = page.evaluate_script("document.querySelector('.admin-settings-glance').getBoundingClientRect().top")
+      assert_operator select_box, :<, glance, "the glance follows the select"
+    end
+  end
+
+  # The page frame (Design System 1794894016-5ccc): Settings stands from the
+  # frame's left edge, the h1 over the nav, and is never centred.
+  test "past the content max Settings stays at the left, the spare width on the right" do
+    at_window(2400) do
+      visit_screen admin_settings_path
+      boxes = layout
+      assert docked?(boxes), boxes.inspect
+      main_left = page.evaluate_script("document.querySelector('.admin-page').getBoundingClientRect().left")
+      assert_in_delta main_left, boxes["nav"]["left"], 1, "the nav starts at the frame's left"
+      h1 = page.evaluate_script("(() => { const r = document.querySelector('.admin-page__head h1').getBoundingClientRect(); return { left: r.left, bottom: r.bottom } })()")
+      assert_in_delta boxes["nav"]["left"], h1["left"], 1, "the h1 stands over the nav"
+      assert_operator h1["bottom"], :<=, boxes["nav"]["top"] + 1
+    end
   end
 end

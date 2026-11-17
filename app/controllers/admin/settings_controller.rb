@@ -164,9 +164,15 @@ module Admin
       [
         turbo_stream.replace(Admin::SettingsScreen::MailTestResultComponent::ID,
           Admin::SettingsScreen::MailTestResultComponent.new(address: Current.user.email_address, **result)),
-        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: MailSettings.current)),
+        *mail_state_streams(MailSettings.current),
         glance_row_stream("mail")
       ]
+    end
+
+    # The Mail card's state, its chip and its note, as `settings` has them.
+    def mail_state_streams(settings)
+      [ turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: settings)),
+        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::NOTE_ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: settings, part: :note)) ]
     end
 
     # `[attributes, translations]` for `Settings::Save` from the permitted

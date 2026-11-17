@@ -9,7 +9,7 @@ class Admin::SettingsScreen::PublishingCardComponentTest < ViewComponent::TestCa
   test "a sentence around a narrow number input, with the help under it" do
     render_card
 
-    assert_selector "h2#publishing", text: "Publishing"
+    assert_selector "h2#publishing", text: "Trash"
     assert_selector "section[aria-labelledby=publishing]"
     assert_text "Keep trashed items for"
     assert_text "days after an item is trashed."

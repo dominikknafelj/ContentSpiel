@@ -8,7 +8,7 @@ class SettingsSectionsTest < ActiveSupport::TestCase
       [ "site", "settings.manage", :structure, :pages, false ],
       [ "languages", "languages.manage", :text, :translations, false ],
       [ "post_types", "settings.manage", :lists, :posts, false ],
-      [ "publishing", "settings.manage", :lists, :file_text, false ],
+      [ "publishing", "settings.manage", :code, :trash, false ],
       [ "forms", "settings.manage", :form, :clipboard_list, false ],
       [ "ai", "settings.manage", :code, :assistant, false ],
       [ "mail", "settings.manage", :media, :at_sign, false ],

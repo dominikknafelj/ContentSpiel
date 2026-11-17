@@ -46,12 +46,12 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     assert_select "dd a[href=?][aria-label='Edit Mail']", setup_step_path("mail"), text: "Edit"
   end
 
-  test "its fields come in order: Server, Port 587, Security STARTTLS / TLS, Username, Password, Sender name from the site's title, Sender address" do
+  test "its fields come in order: Host, Port 587, Security STARTTLS / TLS, Username, Password, Sender name from the site's title, Sender address" do
     patch setup_step_path("site"), params: { site_setting: { title: "Dana's Notes" } }
     get setup_step_path("mail")
 
     labels = css_select("form label, form legend").map { |node| node.text.strip }.reject(&:blank?)
-    assert_equal [ "Server", "Port", "Security", "STARTTLS", "TLS", "Username", "Password", "Sender name", "Sender address" ], labels
+    assert_equal [ "Host", "Port", "Security", "STARTTLS", "TLS", "Username", "Password", "Sender name", "Sender address" ], labels
     assert_select "input[name='site_setting[mail_server]'][placeholder='smtp.example.com']"
     assert_select "input[name='site_setting[mail_port]'][value='587'][data-mail-port-target=port]"
     assert_select "input[type=radio][name='site_setting[mail_security]']", 2

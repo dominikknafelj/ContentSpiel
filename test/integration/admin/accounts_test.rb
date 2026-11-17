@@ -82,29 +82,30 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/account"
 
-    # The page is "Your account"; its cards are
-    # Profile, Notes, Password, Passkeys, Recovery codes and Sessions, in that
-    # order; and the promise about sessions stands directly under the
-    # Password card's title.
+    # The page is "Your account"; its cards are Profile, Password, Passkeys
+    # and Sessions, in that order (Design System v262: Notes is Profile's
+    # second section, Recovery codes Passkeys'); and the promise about
+    # sessions stands directly under the Password card's title.
     assert_select "title", text: "Your account"
     assert_select "h1", text: "Your account", count: 1
-    assert_equal [ "Profile", "Notes", "Password", "Passkeys", "Recovery codes", "Sessions" ],
+    assert_equal [ "Profile", "Password", "Passkeys", "Sessions" ],
       css_select("turbo-frame#content section .admin-settings-card__head h2").map { |heading| heading.text.strip }
-    # Passkeys, Recovery codes and Sessions stand in neither form: nothing in
-    # them is a change either save bar counts.
+    # Passkeys (with its recovery codes) and Sessions stand in neither form:
+    # nothing in them is a change either save bar counts.
     assert_select "form section#account-passkeys, form section#account-recovery, form section#account-sessions", count: 0
-    assert_select "form#password-form + div > section#account-passkeys + section#account-recovery"
-    assert_select "form#profile-form section", count: 2
+    assert_select "form#password-form + div > section#account-passkeys"
+    assert_select "form#profile-form > section.admin-settings-card", count: 1
     assert_select "form#password-form section[aria-labelledby=account-password]" do
-      assert_select ".admin-settings-card__head:has(h2#account-password) > p", text: "You'll stay signed in here. Other sessions are signed out."
+      assert_select ".admin-settings-card__head:has(h2#account-password) > p", text: "Changing it keeps you signed in here and signs you out everywhere else."
       assert_select "input[type=password]", count: 3
     end
-    # The Password card's footer is the card's own and sits inside it, under
-    # a line; the first form's stays under its two cards.
+    # Each footer is its card's own and sits inside it, at its foot, under a
+    # line; nothing floats on Your account.
     assert_select "form#password-form section[aria-labelledby=account-password] > .admin-save-bar.admin-save-bar--contained.border-t:last-child button[type=submit]", text: "Change password"
     assert_select "form#password-form section ~ .admin-save-bar", count: 0
-    assert_select "form#profile-form > section ~ .admin-save-bar.sticky:not(.admin-save-bar--contained) button[type=submit]", text: "Save changes"
-    assert_select "form#profile-form section .admin-save-bar", count: 0
+    assert_select "form#profile-form section[aria-labelledby=account-profile] > .admin-save-bar.admin-save-bar--contained.border-t:last-child button[type=submit]", text: "Save changes"
+    assert_select "form#profile-form > section ~ .admin-save-bar", count: 0
+    assert_select ".admin-save-bar--floating, .admin-save-bar.sticky", count: 0
     assert_select "h1 + p", count: 0
     assert_select "#password-form .admin-save-bar a[href='/cs-studio/password/new']", text: "Forgot your current password?"
     assert_select "#profile-form .admin-save-bar a", text: "Forgot your current password?", count: 0
@@ -289,14 +290,21 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/account"
 
     assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--saving--save-bar']" do
-      # "Your account", then two cards of one width, Profile and Notes, and
-      # one footer under both, whose button is "Save changes".
-      assert_select "section.admin-settings-card", count: 2
+      # "Your account", then one card, Profile: the email read only, the
+      # name with its help, then the notes section under a line, and the
+      # card's own footer at its foot, whose button is "Save changes".
+      assert_select "section.admin-settings-card", count: 1
       assert_select "section[aria-labelledby=account-profile] h2#account-profile", text: "Profile"
+      assert_select "section[aria-labelledby=account-profile] dl dt", text: "Email"
+      assert_select "section[aria-labelledby=account-profile] dl dd[data-account-email]", text: users(:reader).email_address
+      assert_select "section[aria-labelledby=account-profile] dl dd.text-small.text-meta", text: "Someone who manages users can change it."
+      assert_select "section[aria-labelledby=account-profile] input[name=email_address], section[aria-labelledby=account-profile] input[type=email]", count: 0
       assert_select "section[aria-labelledby=account-profile] label[for=name]", text: "Your name"
-      assert_select "section[aria-labelledby=account-profile] input[name=name]"
-      assert_select "section[aria-labelledby=account-notes] h2#account-notes", text: "Notes"
-      assert_select "section ~ [data-admin--saving--save-bar-target=bar] button[type=submit]", text: "Save changes"
+      assert_select "section[aria-labelledby=account-profile] input[name=name][aria-describedby=name-help]"
+      assert_select "#name-help", text: "Shown with your notes and edits. Left empty, the start of your email address is shown."
+      assert_select "section[aria-labelledby=account-profile] section.border-t[aria-labelledby=account-notes] h3#account-notes.text-label.text-meta", text: "When someone mentions you in a note"
+      assert_select "section[aria-labelledby=account-notes] p", text: /in this browser when someone mentions/, count: 0
+      assert_select "section[aria-labelledby=account-profile] > [data-admin--saving--save-bar-target=bar]:last-child button[type=submit]", text: "Save changes"
       assert_select "input[type=checkbox][name=notes_sound][role=switch][checked]"
       assert_select "input[type=checkbox][name=notes_desktop][role=switch]:not([checked])"
       assert_select "label", text: "Play a sound when I'm mentioned"
@@ -412,29 +420,27 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "form#profile-form[action='/cs-studio/account/profile']"
   end
 
-  test "the six cards are card frames, the password card anchored at #password and the sessions card at #sessions" do
+  test "the four cards are card frames, the password card anchored at #password and the sessions card at #sessions" do
     sign_in_as(users(:reader))
 
     get "/cs-studio/account"
 
-    assert_select "turbo-frame#content .max-w-\\[560px\\] > h1", text: "Your account"
+    # The page frame's form body, Settings' column, 760px (`--cs-form-max`):
+    # the head row across the frame, the cards in the body.
+    assert_select "turbo-frame#content .admin-page.admin-page--form > .admin-page__head > h1", text: "Your account"
+    assert_select "turbo-frame#content .admin-page--form > .admin-page__body > form#profile-form"
     cards = css_select("turbo-frame#content section.admin-settings-card")
-    assert_equal %w[account-profile account-notes account-password passkeys recovery-codes sessions], cards.map { |card| card["aria-labelledby"] }
+    assert_equal %w[account-profile account-password passkeys sessions], cards.map { |card| card["aria-labelledby"] }
     # Profile and Notes are the person's, in the people pair; Password is neutral, its own key.
     assert_select "section.admin-settings-card[aria-labelledby=account-profile] .admin-settings-card__head" do
       assert_select "span.bg-ic-people-bg[aria-hidden=true] svg path[d^='M19 21v-2']"
       assert_select "h2#account-profile", text: "Profile"
       assert_select "p", count: 0
     end
-    assert_select "section.admin-settings-card[aria-labelledby=account-notes] .admin-settings-card__head" do
-      assert_select "span.bg-ic-people-bg[aria-hidden=true] svg path[d^='M21 15a2 2']"
-      assert_select "h2#account-notes", text: "Notes"
-      assert_select "p.text-small", text: "What happens in this browser when someone mentions you in a note."
-    end
     assert_select "section#password.admin-settings-card.scroll-mt-6[aria-labelledby=account-password]" do
       assert_select ".admin-settings-card__head span.bg-sunken[aria-hidden=true] svg path[d^='M2.586 17.414']"
       assert_select ".admin-settings-card__head h2#account-password", text: "Password"
-      assert_select ".admin-settings-card__head p.text-small", text: "You'll stay signed in here. Other sessions are signed out."
+      assert_select ".admin-settings-card__head p.text-small", text: "Changing it keeps you signed in here and signs you out everywhere else."
     end
     # Sessions is neutral, its own monitor and phone; its heading is the anchor its answers come back to.
     assert_select "section#account-sessions.admin-settings-card.scroll-mt-6.mt-8[aria-labelledby=sessions]" do
@@ -553,7 +559,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
       assert_select "#password-form"
       assert_select "section#account-passkeys"
-      assert_select "section#account-recovery"
+      assert_select "section#account-passkeys"
       assert_select "section#password h2", text: "Password"
     end
   end

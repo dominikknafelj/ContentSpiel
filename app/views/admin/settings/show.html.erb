@@ -2,7 +2,7 @@
     the "At a glance" rail (`Admin::SettingsScreen::GlanceComponent`) and one
     card per section (`SettingsSections`, each drawn in
     `Admin::Ui::SettingsCardComponent`) in a column of `--cs-form-max` at
-    most. The three stand in that order in the document at every width, so
+    most, in the page frame (`.admin-page--wide`). The three stand in that order in the document at every width, so
     the focus goes nav, rail, cards; only the stylesheet places them
     (`.admin-settings-layout`, docked by the Settings area's own width).
 
@@ -56,10 +56,15 @@
      "image_quality_webp" => "settings-image_quality_webp", "image_quality_avif" => "settings-image_quality_avif",
      "image_widths" => "settings-image_widths", "content_types" => Admin::SettingsScreen::PostTypesCardComponent.first_switch_id, "image_max_upload_mb" => "settings-image_max_upload_mb" } %>
 
-<div class="admin-settings-layout">
-  <div class="admin-settings-layout__grid">
+<%# The page frame, wide: the head row (the `h1`, over the nav, at the
+    frame's left), then the layout from the frame's left edge, spare width
+    on the right, never centred. %>
+<div class="admin-page admin-page--wide admin-settings-layout">
+  <div class="admin-page__head">
+    <h1 class="text-h1 text-ink"><%= t(".heading") %></h1>
+  </div>
+  <div class="admin-page__body admin-settings-layout__grid">
     <div class="admin-settings-layout__nav lg:sticky lg:top-[calc(var(--admin-top-offset)+1.75rem)]">
-      <h1 class="mb-3.5 text-h1 text-ink"><%= t(".heading") %></h1>
       <%= render Admin::SettingsScreen::NavComponent.new(sections: sections) %>
     </div>
 
