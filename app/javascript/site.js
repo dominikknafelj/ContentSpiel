@@ -1,16 +1,19 @@
-// The public site's entry point (theming spec §4, "Scripts"): `application`
-// (Turbo and the site's own controllers) plus the theme's controllers, which
-// config/importmap.rb pins under controllers/theme/, and the site's own that
-// a visitor's page alone runs (`PUBLIC_ONLY`: the Search block's
-// suggestions). Only the public layout
-// loads it (layouts/application.html.erb), as only CS Studio's layout loads
-// `admin`: a theme's script is never imported on a CS Studio screen, on
-// sign-in or in setup, because `controllers/index.js` registers neither
-// CS Studio's controllers nor a theme's by itself.
-import "application"
-import { registerControllers, PUBLIC_ONLY } from "controllers"
+// The public site's entry point (theming spec §4, "Scripts"): Turbo, the
+// site's own controllers a public page draws (`SITE` in controllers/index.js:
+// the light/dark switch, the Code block's copy, the Form block's send, the
+// Search block's suggestions and the Gallery block's carousel) and the
+// theme's controllers, which config/importmap.rb pins under
+// controllers/theme/. It does not import `application`, whose registration
+// would fetch the sign-in, password, invitation and setup controllers on
+// every visitor's page; config/importmap.rb preloads `SITE` alone for it.
+// Only the public layout loads it (layouts/application.html.erb), as only
+// CS Studio's layout loads `admin`: a theme's script is never imported on a
+// CS Studio screen, on sign-in or in setup, because `application` registers
+// neither CS Studio's controllers nor a theme's.
+import "@hotwired/turbo-rails"
+import { registerControllers, SITE } from "controllers"
 
-registerControllers((path) => path.startsWith("controllers/theme/") || PUBLIC_ONLY.includes(path))
+registerControllers((path) => path.startsWith("controllers/theme/") || SITE.includes(path))
 
 // A LINK TO AN ANCHOR OF THE PAGE IS THE BROWSER'S, NOT A TURBO VISIT. Turbo 8 (turbo-rails 2.0.23) draws such a link
 // again from the server: `findLinkFromClickTarget` skips a link whose
