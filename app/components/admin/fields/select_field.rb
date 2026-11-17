@@ -41,9 +41,20 @@ module Admin
         Array(options).map { |v| [ v.to_s, v ] }
       end
 
-      # The empty choice of a select that is not required: unnamed, unless
-      # the field says what it means (`blank: "Plain text"`).
-      def blank_choice = field.required? ? false : (field.options[:blank] || true)
+      # The empty choice of a select that is not required and has no
+      # default: unnamed, unless the field says what it means (`blank: "Plain
+      # text"`). A field with a default has no empty choice: a block that
+      # stores none is drawn with the default (the Gallery's Shape), so an
+      # empty row would offer a choice that means the first one.
+      def blank_choice
+        return false if field.required? || field.options.key?(:default)
+
+        field.options[:blank] || true
+      end
+
+      # The option marked selected: the stored value, or the default when the
+      # block stores none.
+      def chosen = value.presence || field.options[:default]
 
       # The choices as the shared segmented control's radios.
       def segments = option_pairs.map { |label, option| { label:, value: option, id: "#{input_id}-#{option}", current: value.to_s == option.to_s } }
