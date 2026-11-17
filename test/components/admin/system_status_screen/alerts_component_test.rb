@@ -29,7 +29,7 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
   end
 
   test "no alerts is one line, and no notice even when mail is not set up" do
-    card([], mail_blocked_by: :mail_not_ready)
+    card([], mail_blocked_by: :mail_not_set_up)
 
     assert_selector "h2", text: "Alerts"
     assert_text "The last 7 days, newest first. Not part of the checks."
@@ -99,8 +99,8 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
     assert_text "last 30 Dec 2025, 08:00"
   end
 
-  test "mail not ready: the notice at the top, the link only with an address, and the row's own sentence" do
-    card([ error ], mail_blocked_by: :mail_not_ready, settings_href: "/cs-studio/settings#mail")
+  test "mail not set up: the notice at the top, the link only with an address, and the row's own sentence" do
+    card([ error ], mail_blocked_by: :mail_not_set_up, settings_href: "/cs-studio/settings#mail")
 
     assert_selector "[role=alert]", count: 0
     assert_text "Owners can't be mailed about these: outgoing mail is not set up."
@@ -108,11 +108,26 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
     assert_selector "li span.text-warn-ink", text: "Not mailed: outgoing mail is not set up"
   end
 
-  test "mail not ready without a settings link shows no link" do
-    card([ error ], mail_blocked_by: :mail_not_ready)
+  test "mail not set up without a settings link shows no link" do
+    card([ error ], mail_blocked_by: :mail_not_set_up)
 
     assert_text "Owners can't be mailed about these"
     assert_no_link "Open Mail settings →"
+  end
+
+  test "mail saved but not tested, or its last send failed: the notice and every row follow the mail's state, with the Mail settings link" do
+    {
+      mail_untested: [ "Alerts wait until outgoing mail works: it is saved but not tested.", "Not mailed: mail is not tested yet" ],
+      mail_failed: [ "Alerts wait until outgoing mail works: the last send failed.", "Not mailed: the last send failed" ]
+    }.each do |reason, (notice, row)|
+      card([ error, security ], mail_blocked_by: reason, settings_href: "/cs-studio/settings#mail")
+
+      assert_selector "[data-alerts-mail-notice=#{reason}]", count: 1, text: "#{notice} Open Mail settings →", normalize_ws: true
+      assert_link "Open Mail settings →", count: 1, href: "/cs-studio/settings#mail"
+      assert_selector "li span.text-warn-ink", count: 2, text: row
+      assert_no_text "Owners can't be mailed"
+      assert_no_text "Not mailed yet"
+    end
   end
 
   test "no site address: the notice says so and names PUBLIC_HOST, as an alert with no link, and the row says why" do
@@ -126,7 +141,7 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
   end
 
   test "mail not set up wins over no address: one notice, and every row says mail" do
-    card([ error, security ], mail_blocked_by: :mail_not_ready)
+    card([ error, security ], mail_blocked_by: :mail_not_set_up)
 
     assert_text "Owners can't be mailed about these: outgoing mail is not set up.", count: 1
     assert_no_text "the site has no address"

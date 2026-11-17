@@ -376,4 +376,18 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     assert_select "#system-alerts [role=alert]", text: /the site has no address for the mail to link to\. Set PUBLIC_HOST/
     assert_select "#system-alerts li", text: /Not mailed: the site has no address/
   end
+
+  test "mail's last send failed and no site address: the Alerts card says the mail first, once, with the Mail settings link" do
+    sign_in_as(users(:one))
+
+    with_mail_state(:failed) do
+      with_site_address(nil) do
+        get "/cs-studio/system_status"
+      end
+    end
+
+    assert_select "#system-alerts [data-alerts-mail-notice]", count: 1, text: /Alerts wait until outgoing mail works: the last send failed\.\s*Open Mail settings →/
+    assert_select "#system-alerts", text: /the site has no address/, count: 0
+    assert_select "#system-alerts li", text: /Not mailed: the last send failed/
+  end
 end

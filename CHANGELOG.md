@@ -57,6 +57,7 @@
 - The restore dialog's sentence puts no possessive on the title, which broke for a title such as "Prices" and in other languages: "The working version of “Pricing” becomes version 5 as it went live on 3 Nov 2026."
 - An alert's count on System status and in the digest mail reads "Seen once" / "Seen 12 times" and counts how often the alert itself was raised (an error's reports), never the events inside one: a window of 22 failed sign-ins is one alert, seen once.
 - A security alert's link reads "Show in audit log →" and opens the audit log narrowed to that alert's events, never the whole log: an owner change's or a token's one event, a window alert's counted actions in its 15 minutes. The audit log takes the narrowing as `event_id`, or `actions[]` between the instants `after` and `before`, shown as a removable chip.
+- The Alerts card's notice follows the mail's state, each form ending with "Open Mail settings →" for someone who may manage settings: "Owners can't be mailed about these: outgoing mail is not set up.", "Alerts wait until outgoing mail works: it is saved but not tested." or "…the last send failed.", and each unmailed row says the same ("Not mailed: mail is not tested yet", "Not mailed: the last send failed"). Mail saved but untested once read "not set up". The digest now waits while the last send failed too, as it waits for mail that is not set up or not tested, and any of these wins over the missing site address: one notice at most.
 
 ### Breaking
 

@@ -5,12 +5,12 @@
     <% if alerts.empty? %>
       <p class="px-4 py-4 text-sm text-dim"><%= t(".none") %></p>
     <% else %>
-      <% if mail_blocked_by == :mail_not_ready %>
+      <% if mail_notice %>
         <div class="px-4 pt-4">
-          <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil) do %>
-            <%= t(".mail_not_ready") %>
+          <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, data: { alerts_mail_notice: mail_blocked_by }) do %>
+            <%= mail_notice %>
             <% if settings_href.present? %>
-              <%= link_to t(".open_mail_settings"), settings_href, class: "font-medium text-warn-ink underline hover:no-underline" %>
+              <%= link_to t(".open_mail"), settings_href, class: "font-medium text-warn-ink underline hover:no-underline" %>
             <% end %>
           <% end %>
         </div>

@@ -11,8 +11,11 @@ en:
           title: "Alerts"
           line: "The last 7 days, newest first. Not part of the checks."
           none: "No alerts in the last 7 days."
-          mail_not_ready: "Owners can't be mailed about these: outgoing mail is not set up."
-          open_mail_settings: "Open Mail settings →"
+          # The notice while outgoing mail is not working, by its state.
+          mail_off: "Owners can't be mailed about these: outgoing mail is not set up."
+          mail_untested: "Alerts wait until outgoing mail works: it is saved but not tested."
+          mail_failed: "Alerts wait until outgoing mail works: the last send failed."
+          open_mail: "Open Mail settings →"
           address_off: "Owners can't be mailed about these: the site has no address for the mail to link to. Set PUBLIC_HOST to the site's address."
         # `Admin::SystemStatusScreen::AlertRowComponent`, one alert.
         alert_row:
@@ -29,8 +32,10 @@ en:
           last_yesterday: "last %{time} yesterday"
           last_on: "last %{time}"
           mailed: "Mailed %{time}"
-          not_mailed_yet: "Not mailed yet"
-          not_mailed_no_mail: "Not mailed: outgoing mail is not set up"
+          not_mailed: "Not mailed yet"
+          no_mail: "Not mailed: outgoing mail is not set up"
+          no_mail_untested: "Not mailed: mail is not tested yet"
+          no_mail_failed: "Not mailed: the last send failed"
           no_address: "Not mailed: the site has no address"
           # The log narrowed to the alert's own events, never the whole log.
           audit: "Show in audit log →"
