@@ -16,22 +16,23 @@ module Admin
     # fix is the host's and the sentence names the variable. Mail not ready
     # wins when both are missing, so the card shows one notice at most.
     #
-    # A security row links to the audit log only when the screen hands
-    # `audit_href` (a holder of `audit.view`).
+    # A security row links to the audit log, narrowed to its own events,
+    # only when the screen hands `audit_path` (a holder of `audit.view`): a
+    # callable from the narrowing's params to the log's address.
     #
     # One screen draws this card, so it lives in the screen's folder and
     # takes no shared-component contract.
     class AlertsComponent < Admin::AdminComponent
-      def initialize(alerts:, mail_blocked_by:, settings_href: nil, audit_href: nil)
+      def initialize(alerts:, mail_blocked_by:, settings_href: nil, audit_path: nil)
         @alerts = alerts.to_a
         @mail_blocked_by = mail_blocked_by
         @settings_href = settings_href
-        @audit_href = audit_href
+        @audit_path = audit_path
       end
 
       private
 
-      attr_reader :alerts, :mail_blocked_by, :settings_href, :audit_href
+      attr_reader :alerts, :mail_blocked_by, :settings_href, :audit_path
     end
   end
 end

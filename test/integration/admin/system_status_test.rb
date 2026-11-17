@@ -352,16 +352,16 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     assert_select "#system-checks #system-alerts", count: 0
   end
 
-  test "a security alert links to the audit log only for a holder of audit.view" do
+  test "a security alert links to the audit log narrowed to its event, only for a holder of audit.view" do
     sign_in_as(users(:one))
     get "/cs-studio/system_status"
-    assert_select "#system-alerts li[data-alert-kind=owner_changed] a[href=?]", "/cs-studio/audit_events", text: "Open audit log →"
+    assert_select "#system-alerts li[data-alert-kind=owner_changed] a[href=?]", "/cs-studio/audit_events?event_id=1", text: "Show in audit log →"
 
     access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})
     sign_in_as(users(:reader))
     get "/cs-studio/system_status"
     assert_select "#system-alerts li[data-alert-kind=owner_changed]", text: /Ana was made an owner by Ben/
-    assert_select "#system-alerts a", text: "Open audit log →", count: 0
+    assert_select "#system-alerts a", text: "Show in audit log →", count: 0
   end
 
   test "mail working and no site address: the Alerts card says the owners can't be mailed and why" do

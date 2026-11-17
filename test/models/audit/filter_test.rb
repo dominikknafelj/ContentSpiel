@@ -79,4 +79,34 @@ class Audit::FilterTest < ActiveSupport::TestCase
 
     assert_equal [ legacy.id, current.id ].sort, filter(subject_type: "Media::Asset", subject_id: "7").scope.ids.sort
   end
+
+  test "an alert's narrowing: one event, or some actions in a span that includes its start and not its end" do
+    start = Time.utc(2026, 11, 16, 12, 0)
+    inside = event(start, action: "session.failed")
+    last_minute = event(start + 14.minutes, action: "session.second_factor_failed")
+    other_action = event(start + 1.minute, action: "session.created")
+    at_the_end = event(start + 15.minutes, action: "session.failed")
+    before = event(start - 1.second, action: "session.failed")
+    ids = [ inside, last_minute, other_action, at_the_end, before ].map(&:id)
+
+    f = filter(actions: %w[session.failed session.second_factor_failed], after: "2026-11-16T12:00:00Z", before: "2026-11-16T12:15:00Z")
+    assert f.narrowed?
+    assert_equal [ inside.id, last_minute.id ].sort, f.scope.where(id: ids).ids.sort
+    assert_equal({ "actions" => %w[session.failed session.second_factor_failed], "after" => "2026-11-16T12:00:00Z", "before" => "2026-11-16T12:15:00Z" }, f.to_params)
+
+    one = filter(event_id: inside.id.to_s)
+    assert_equal [ inside.id ], one.scope.ids
+    assert_equal({ "event_id" => inside.id.to_s }, one.to_params)
+  end
+
+  test "a narrowing's junk is dropped, never an error" do
+    f = filter(event_id: "1; DROP", actions: "session.failed", after: "yesterday", before: "2026-13-40T99:00:00Z")
+    assert_not f.narrowed?
+    assert_empty f.to_params
+
+    assert_nil filter(actions: [ "", 5 ]).actions
+    assert_equal 10, filter(actions: (1..20).map { |n| "x.#{n}" }).actions.size
+    reversed = filter(after: "2026-11-16T12:15:00Z", before: "2026-11-16T12:00:00Z")
+    assert_operator reversed.after, :<, reversed.before
+  end
 end

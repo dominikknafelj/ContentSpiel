@@ -20,9 +20,11 @@ en:
           security: "Security"
           # Between an error's class and its place, both drawn as code.
           in: "in"
-          occurrences:
-            one: "Once"
-            other: "%{count} times"
+          # How often the alert itself was raised, never the events inside
+          # one: a window alert once, an error once per report.
+          count:
+            one: "Seen once"
+            other: "Seen %{count} times"
           last_today: "last %{time} today"
           last_yesterday: "last %{time} yesterday"
           last_on: "last %{time}"
@@ -30,7 +32,8 @@ en:
           not_mailed_yet: "Not mailed yet"
           not_mailed_no_mail: "Not mailed: outgoing mail is not set up"
           no_address: "Not mailed: the site has no address"
-          open_audit_log: "Open audit log →"
+          # The log narrowed to the alert's own events, never the whole log.
+          audit: "Show in audit log →"
           sentences:
             sign_in_failures: "%{failed} failed sign-ins in %{minutes} minutes"
             owner_made: "%{subject_label} was made an owner"

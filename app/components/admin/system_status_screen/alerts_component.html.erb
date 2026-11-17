@@ -23,7 +23,7 @@
       <% end %>
       <ul class="divide-y divide-line px-4">
         <% alerts.each do |alert| %>
-          <%= render Admin::SystemStatusScreen::AlertRowComponent.new(alert: alert, mail_blocked_by: mail_blocked_by, audit_href: audit_href) %>
+          <%= render Admin::SystemStatusScreen::AlertRowComponent.new(alert: alert, mail_blocked_by: mail_blocked_by, audit_path: audit_path) %>
         <% end %>
       </ul>
     <% end %>

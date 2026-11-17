@@ -30,7 +30,7 @@ class Alerts::RulesTest < ActiveSupport::TestCase
     event("session.locked")
     assert_equal 1, apply
     found = alert("sign_in_failures")
-    assert_equal 20, found.occurrences
+    assert_equal 1, found.occurrences, "one alert of 20 events: Seen once"
     assert_equal({ "window_start" => WINDOW_START.iso8601, "failed" => 20, "locked" => 1 }, found.details)
     assert_equal "sign_in_failures|#{WINDOW_START.iso8601}", found.fingerprint
   end
@@ -47,7 +47,7 @@ class Alerts::RulesTest < ActiveSupport::TestCase
 
     assert_equal 1, Alerts::Alert.where(kind: "sign_in_failures").count
     again = alert("sign_in_failures")
-    assert_equal 23, again.occurrences
+    assert_equal 1, again.occurrences, "the same alert, not raised again"
     assert_equal 23, again.details["failed"]
     assert_equal first.first_seen_at, again.first_seen_at
     assert_equal NOW, again.mailed_at
@@ -68,7 +68,7 @@ class Alerts::RulesTest < ActiveSupport::TestCase
     event("access.denied", occurrences: 1, user_id: users(:two).id)
     assert_equal 1, apply
     found = alert("access_denied_burst")
-    assert_equal 20, found.occurrences
+    assert_equal 1, found.occurrences
     assert_equal({ "window_start" => WINDOW_START.iso8601, "denied" => 20, "actors" => 2 }, found.details)
   end
 

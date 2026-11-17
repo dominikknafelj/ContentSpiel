@@ -112,8 +112,8 @@ en:
             one: "A limit on requests was reached once in %{minutes} minutes: %{limits}"
             other: "Limits on requests were reached %{count} times in %{minutes} minutes: %{limits}"
         facts:
-          one: "Once · last %{time}"
-          other: "%{count} times · last %{time}"
+          one: "Seen once · last %{time}"
+          other: "Seen %{count} times · last %{time}"
         more: "and %{count} more"
         button: "Open System status"
         outro: "You get this mail as an owner of %{site}. At most one mail every %{minutes} minutes."

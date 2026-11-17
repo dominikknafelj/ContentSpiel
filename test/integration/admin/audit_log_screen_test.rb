@@ -235,6 +235,26 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "an alert's link lists only its events: one event, or the counted actions in the alert's window" do
+    start = Time.utc(2026, 11, 16, 12, 0)
+    failed = event(start + 2.minutes, action: "session.failed", subject_label: "Window failure")
+    event(start + 20.minutes, action: "session.failed", subject_label: "Later failure")
+    event(start + 3.minutes, action: "session.created", subject_label: "A sign-in")
+    owner = event(start, action: "user.owner_changed", subject_label: "Ana")
+    window = Alerts::Alert.new(kind: "sign_in_failures", details: { "window_start" => start.iso8601 }).audit_filter
+
+    get "/cs-studio/audit_events", params: window
+    assert_response :success
+    assert_select "li[id^=audit_event_]", count: 1
+    assert_select "##{dom_id(failed)}"
+    assert_select "[data-narrowing-chip]", text: /13:00 to 13:15 · 3 actions/
+
+    get "/cs-studio/audit_events", params: { event_id: owner.id }
+    assert_select "li[id^=audit_event_]", count: 1
+    assert_select "##{dom_id(owner)}"
+    assert_select "[data-narrowing-chip]", text: /Event ##{owner.id}/
+  end
+
   test "an empty result with filters names them; Clear filters resets" do
     get "/cs-studio/audit_events", params: { event_action: "nothing.like.this" }
 

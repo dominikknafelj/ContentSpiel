@@ -58,6 +58,14 @@ en:
           # `type` is the record's kind in lower case.
           subject: "About this %{type} #%{id}"
           remove_subject: "Remove the %{type} filter"
+          # An alert's link on System status: one event, or some actions
+          # between two moments ("16 Nov, 14:00 to 14:15 · 3 actions").
+          event: "Event #%{id}"
+          between: "%{from} to %{to}"
+          with_actions:
+            one: "%{span} · 1 action"
+            other: "%{span} · %{count} actions"
+          remove_narrowing: "Remove the alert's filter"
         day_list:
           today: "Today"
           yesterday: "Yesterday"

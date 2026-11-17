@@ -13,8 +13,8 @@
     <p class="text-small text-dim">
       <%= how_often %> · <%= last_seen %> · <span class="<%= mail_unavailable? ? "text-warn-ink" : "text-meta" %>"><%= mail_state %></span>
     </p>
-    <% if security? && audit_href %>
-      <p class="mt-2"><%= link_to t(".open_audit_log"), audit_href, class: LINK_CLASS %></p>
+    <% if (href = audit_href) %>
+      <p class="mt-2"><%= link_to t(".audit"), href, class: LINK_CLASS %></p>
     <% end %>
   </div>
 </li>

@@ -55,6 +55,8 @@
 
 - History says who published a version in four ways: the person; "Published by a removed account" only when the publisher's account was deleted; "Published by the system" when nobody was behind it (the console, a seed, `bin/load`); and "Kept when history began" only for the copies the migration of 2026-10-11 made, where it once named every first version with no publisher, a seed's of yesterday included. A scheduled change keeps the person who scheduled it.
 - The restore dialog's sentence puts no possessive on the title, which broke for a title such as "Prices" and in other languages: "The working version of “Pricing” becomes version 5 as it went live on 3 Nov 2026."
+- An alert's count on System status and in the digest mail reads "Seen once" / "Seen 12 times" and counts how often the alert itself was raised (an error's reports), never the events inside one: a window of 22 failed sign-ins is one alert, seen once.
+- A security alert's link reads "Show in audit log →" and opens the audit log narrowed to that alert's events, never the whole log: an owner change's or a token's one event, a window alert's counted actions in its 15 minutes. The audit log takes the narrowing as `event_id`, or `actions[]` between the instants `after` and `before`, shown as a removable chip.
 
 ### Breaking
 
