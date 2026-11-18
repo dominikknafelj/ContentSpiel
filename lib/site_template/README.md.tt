@@ -152,7 +152,7 @@ Object lock keeps an object from being deleted for a set time, even with the key
 
 Then turn the accessory on in `config/deploy.yml`, at the end of `accessories:`:
 
-1. Take `# ` out of every line between `# The backup accessory` and `# End of the backup accessory` (not the two marks themselves), so `backup:` stands under `db:` at the same depth.
+1. Take `# ` out of every line between `# The backup accessory` and `# End of the backup accessory` (not the two marks themselves), so `backup:` stands under `db:` at the same depth. In most editors: select the lines between the two marks and toggle the line comment (often Cmd-/ or Ctrl-/), which takes out `# ` and leaves the indentation.
 2. In `BACKUP_REPOSITORY`, replace `<endpoint>` with the endpoint without `https://` and `<bucket>` with the bucket's name: `s3:https://fsn1.your-objectstorage.com/my-bucket/<%= name %>`. The last part is the folder in the bucket, so one bucket can hold several sites.
 3. Set `AWS_DEFAULT_REGION` as your provider's paragraph says. To run at another hour than 03:00 UTC, uncomment `BACKUP_HOUR` and set it (0 to 23, UTC).
 
@@ -180,7 +180,9 @@ contentspiel upgrade
 
 This shows what changed in the CMS between this site's version and the newest release, breaking changes first, checks `theme/` against the new version, and only when the check passes, writes the new version into `.contentspiel-version`. If it lists problems, fix them in `theme/` and run it again; the version is not changed until the theme passes.
 
-Then make a backup, commit `.contentspiel-version`, deploy, and move the backup accessory to the new version:
+Then make a backup, commit `.contentspiel-version` and deploy. How you make the backup depends on step 4.4.
+
+If you did step 4.4 (the backup accessory is on), back up with the accessory, and after the deploy move the accessory to the new version:
 
 ```sh
 kamal accessory exec backup --reuse "bin/backup run"
@@ -191,10 +193,12 @@ kamal accessory reboot backup
 
 The backup runs on the version the site ran until now, which is right: it copies the database as that version left it. `kamal accessory reboot backup` starts the accessory on the version `.contentspiel-version` now names; a deploy does not move it.
 
-Without the backup accessory (step 4.4), make the backup with this instead, and leave out the reboot. It writes every database to the file `backup.sql` on this machine; keep it like a secret, it holds every page and every account:
+If you did not do step 4.4, make the backup with `pg_dumpall` instead, and there is no accessory to reboot. It writes every database to the file `backup.sql` on this machine; keep it like a secret, it holds every page and every account:
 
 ```sh
 kamal accessory exec db --reuse --raw "pg_dumpall -U postgres" > backup.sql
+git commit -am "ContentSpiel $(cat .contentspiel-version)"
+kamal deploy
 ```
 
 To go back, write the old version into `.contentspiel-version` and deploy again. That is safe only for a release with no migration: the release notes say which ones have one.
