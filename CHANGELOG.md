@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- A file the site serves whose name carries no digest is kept by browsers and caches for an hour, not a year: `/icon.svg`, `/icon.png`, `/icons/*`, `/robots.txt`, the sitemap, `/diagram-renderer.js` and the error pages, and the site's icons (`/favicon.ico`, `/apple-touch-icon.png`, the CMS's and a theme's, which were kept a day) now say `Cache-Control: max-age=3600, public, stale-while-revalidate=86400`; a digested asset (`/assets/<name>-<digest>.<ext>`) keeps its year and is marked `immutable`. Production used to say a year for every file in `public/`, so when 0.10.0 replaced CS Studio's icon a CDN and the browsers kept Rails' red circle. A site behind a CDN purges `/icon.svg`, `/icon.png` and `/icons/*` there once (`docs/reference/hosting.md`, "Files served as they are").
+
 ## 0.10.1 (2026-11-17)
 
 ### Changed

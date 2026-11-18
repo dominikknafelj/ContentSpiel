@@ -45,8 +45,10 @@ require_relative "../lib/telemetry"
 require_relative "../lib/telemetry/path_scrubber"
 require_relative "../lib/telemetry/work_sampler"
 
-# And these two because the middleware stack below names them while the
-# application is configured.
+# And these three because the middleware stack below names them while the
+# application is configured (and config/environments/ reads the public file
+# server's headers from the first).
+require_relative "../lib/content_spiel/public_file_cache"
 require_relative "../lib/content_spiel/diagram_font_cors"
 require_relative "../lib/content_spiel/suggest_gate"
 
@@ -74,6 +76,13 @@ module ContentSpiel
     # stands after it: production's precompiled files and development's
     # served ones answer with the header alike.
     config.middleware.insert_before ActionDispatch::Static, ContentSpiel::DiagramFontCors, prefix: config.assets.prefix
+
+    # A file in `public/` is kept by a cache for an hour, a digested asset
+    # for a year (lib/content_spiel/public_file_cache.rb): `ActionDispatch::Static`
+    # says the hour for every file, and this gives a digested asset's answer
+    # the year back. Before `ActionDispatch::Static`, so it also wraps
+    # `Propshaft::Server`, as the CORS header above does.
+    config.middleware.insert_before ActionDispatch::Static, ContentSpiel::PublicFileCache, prefix: config.assets.prefix
 
     # The suggestions' body (`POST /search/suggestions`) is capped and parsed
     # before Rails parses it, so a body too large or malformed is refused
