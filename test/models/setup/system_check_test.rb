@@ -764,7 +764,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     row = result("Backups", run_check(backup_status: :none))
 
     assert_equal :warning, row.status
-    assert_equal "No backups are configured. The backups reference says how to set them up.", row.message
+    assert_equal "No backup has run on this site. The backups reference says how to set them up.", row.message
     assert_equal Setup::SystemCheck::BACKUPS_DOCS, row.docs
   end
 
@@ -772,7 +772,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     row = result("Backups", run_check(backup_status: ContentSpiel::Backup::Status.unreadable))
 
     assert_equal :warning, row.status
-    assert_equal "The backup status file can't be read.", row.message
+    assert_equal "The backup status file can't be read, so the state of the backups is unknown.", row.message
   end
 
   test "Backups: 26 hours or older warns with the age" do
@@ -781,8 +781,8 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       at50 = result("Backups", run_check(backup_status: backup_status(last_ok_at: 50.hours.ago)))
 
       assert_equal :warning, at26.status
-      assert_equal "The newest good backup is from 26 hours ago.", at26.message
-      assert_equal "The newest good backup is from 2 days ago.", at50.message
+      assert_equal "The last good backup was 26 hours ago.", at26.message
+      assert_equal "The last good backup was 2 days ago.", at50.message
     end
   end
 
@@ -798,7 +798,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       stale = result("Backups", run_check(backup_status: backup_status(outcome: "failed", error: "wrong_password", last_ok_at: 30.hours.ago)))
 
       assert_equal "The last backup failed: the repository's password is wrong.", fresh.message
-      assert_equal "The last backup failed: the repository's password is wrong. The newest good backup is from 30 hours ago.", stale.message
+      assert_equal "The last backup failed: the repository's password is wrong. The last good backup was 30 hours ago.", stale.message
     end
   end
 
@@ -815,7 +815,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     travel_to Time.utc(2026, 11, 18, 12) do
       row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago, cms_version: "0.0.1")))
 
-      assert_equal "The backup runs ContentSpiel 0.0.1, the site #{ContentSpiel::VERSION}.", row.message
+      assert_equal "The backup accessory runs ContentSpiel 0.0.1 and the site #{ContentSpiel::VERSION}. Reboot it to move it to the site\'s version:", row.message
       assert_equal "kamal accessory reboot backup", row.command
     end
   end
@@ -831,7 +831,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       behind = ContentSpiel::Backup::RunningVersion.new(cms_version: "0.0.2", started_at: 10.minutes.ago)
       row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago), running_version: behind))
 
-      assert_equal "The backup runs ContentSpiel 0.0.2, the site #{ContentSpiel::VERSION}.", row.message
+      assert_equal "The backup accessory runs ContentSpiel 0.0.2 and the site #{ContentSpiel::VERSION}. Reboot it to move it to the site\'s version:", row.message
       assert_equal "kamal accessory reboot backup", row.command
     end
   end
@@ -840,7 +840,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     travel_to Time.utc(2026, 11, 18, 12) do
       row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago, cms_version: "0.0.1"), running_version: :none))
 
-      assert_equal "The backup runs ContentSpiel 0.0.1, the site #{ContentSpiel::VERSION}.", row.message
+      assert_equal "The backup accessory runs ContentSpiel 0.0.1 and the site #{ContentSpiel::VERSION}. Reboot it to move it to the site\'s version:", row.message
     end
   end
 

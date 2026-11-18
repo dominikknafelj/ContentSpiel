@@ -72,13 +72,13 @@ en:
       backups:
         label: "Backups"
         ok: "Last backup %{age}, %{size}."
-        not_configured: "No backups are configured. The backups reference says how to set them up."
-        unreadable: "The backup status file can't be read."
+        not_configured: "No backup has run on this site. The backups reference says how to set them up."
+        unreadable: "The backup status file can't be read, so the state of the backups is unknown."
         failed: "The last backup failed: %{reason}."
-        stale: "The newest good backup is from %{age}."
+        stale: "The last good backup was %{age}."
         never: "No backup has succeeded yet."
         check_failed: "The monthly check of the backups failed: %{reason}."
-        version: "The backup runs ContentSpiel %{backup}, the site %{site}."
+        version: "The backup accessory runs ContentSpiel %{backup} and the site %{site}. Reboot it to move it to the site's version:"
         age:
           recent: "less than an hour ago"
           hours:

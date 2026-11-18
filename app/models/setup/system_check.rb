@@ -63,7 +63,7 @@ module Setup
     # day plus slack for a slow run.
     FRESH_BACKUP = 26.hours
 
-    # Where the "No backups are configured" warning sends the reader, at the
+    # Where the "No backup has run on this site" warning sends the reader, at the
     # tag of the running version.
     BACKUPS_DOCS = "https://github.com/dominikknafelj/ContentSpiel/blob/v#{ContentSpiel::VERSION}/docs/reference/backups.md".freeze
 
