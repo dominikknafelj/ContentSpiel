@@ -101,7 +101,7 @@ The bucket's key should be allowed to write and read but not delete objects olde
 
 ### System status
 
-A "Backups" row (`Setup::SystemCheck`), on System status and in the Dashboard's attention list as the other checks are:
+A "Backups" row (`Setup::SystemCheck`), on System status as the other checks are (the Dashboard lists no checks; the alert reaches owners):
 
 Two states only, the ones every check has (decided by Claude, 2026-11-17; no new `:error` state, so no new look; the wording goes to the Design System for its card):
 
@@ -112,7 +112,7 @@ Two states only, the ones every check has (decided by Claude, 2026-11-17; no new
 
 ### The site template
 
-- `config/deploy.yml.tt`: a `backup` accessory, commented out with its placeholders filled by the README's step, using the site's own image (`image: <the site's image>`, `cmd: bin/backup schedule`), the files volume, the database's network name and the env above.
+- `config/deploy.yml.tt`: a `backup` accessory, commented out with its placeholders filled by the README's step, using the CMS image at the site's pinned version (`image: <cms_image>:<version from .contentspiel-version>`, `cmd: bin/backup schedule`; see "Which image the accessory runs"), the files volume, the database's network name and the env above.
 - `.kamal/secrets.example`: the three secrets with how to make each (`openssl rand -base64 32` for the restic password, "keep it in your password manager; losing it loses every backup").
 - README: a "Backups" step after the first deploy: create the bucket and its key at one of the three providers (one short paragraph each, links), fill the variables, `kamal accessory boot backup`, `kamal accessory exec backup "bin/backup init"`, `... "bin/backup run"`, and what System status should then say.
 - **Existing sites** (decided by Claude): `contentspiel upgrade` to the release that ships this prints the accessory's block and the three secrets to paste when `deploy.yml` has no `backup` accessory, and the CHANGELOG names it; it never edits `deploy.yml` itself.
@@ -149,7 +149,7 @@ Add under Media a row: **Library files in an S3-compatible bucket** (Should): Ac
 ## Tests
 
 - The command, against a local S3-compatible server is not available in CI without a download: the builder uses restic's `local:` repository in tests (same code path but the backend) and a test database, covering run, retention, the status file on success and on each failure class, and that no secret reaches stdout, stderr or the status file.
-- The status file's reader and the System status row's three states and their words (`Setup::SystemCheck` tests).
+- The status file's reader and the System status row's two states and their words (`Setup::SystemCheck` tests).
 - `public_site:after_restore`: the version after it is above any value the counter held, and the caches are empty.
 - The image: `restic version` and `pg_dump --version` (major ≥ the template's Postgres) in the image test.
 - The site template: the generated `deploy.yml` with the accessory uncommented passes `kamal config` validation shape tests the template already has, and the README's commands match the command's subcommands.
