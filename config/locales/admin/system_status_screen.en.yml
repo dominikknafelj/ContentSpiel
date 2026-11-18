@@ -21,6 +21,7 @@ en:
         alert_row:
           error: "Error"
           security: "Security"
+          backups: "Backups"
           # Between an error's class and its place, both drawn as code.
           in: "in"
           # How often the alert itself was raised, never the events inside
@@ -53,3 +54,6 @@ en:
             request_limited:
               one: "A limit on requests was reached once in %{minutes} minutes: %{limits}"
               other: "Limits on requests were reached %{count} times in %{minutes} minutes: %{limits}"
+            backup_stale: "No good backup for %{hours} hours"
+            backup_never: "No backup has succeeded in the %{hours} hours since backups were set up"
+            backup_check_failed: "The monthly check of the backups failed"

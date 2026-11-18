@@ -38,6 +38,16 @@ class Admin::SystemStatusScreen::AlertsComponentTest < ViewComponent::TestCase
     assert_no_selector "[role=alert]"
   end
 
+  test "a backup alert is drawn with the Backups chip and its sentence, with no audit link" do
+    card([ alert(kind: "backup_stale", details: { "reason" => "stale", "hours" => 51 }),
+           alert(kind: "backup_stale", details: { "reason" => "check_failed", "hours" => nil }) ])
+
+    assert_selector "li .admin-state-chip[data-state-tone=warn]", text: "Backups", count: 2
+    assert_text "No good backup for 51 hours"
+    assert_text "The monthly check of the backups failed"
+    assert_no_link "Show in audit log →"
+  end
+
   test "an error is a danger chip, its class and place in code, and Seen once · last time · Not mailed yet" do
     travel_to Time.zone.local(2026, 11, 16, 15, 0) do
       card([ error(last_seen_at: Time.zone.local(2026, 11, 16, 14, 2)) ])
