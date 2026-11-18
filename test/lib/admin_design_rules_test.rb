@@ -1255,7 +1255,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/grid-template-columns:\s*170px minmax\(0, var\(--cs-form-max\)\);/, window.first)
     assert_match(/grid-template-areas:\s*"nav glance" "nav cards";/, window.first, "the nav spans both rows; the rail stands above the cards")
 
-    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-settings \(min-width: 1140px\)\s*\{/)
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-settings \(min-width: 1120px\)\s*\{/)
     assert_equal 1, docked.size, "one block docks Settings' rail"
     docked_grid = docked.first[/\.admin-settings-layout__grid\s*\{([^}]*)\}/, 1]
     assert docked_grid, "the docked block lays out the grid"
@@ -1645,7 +1645,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ editor.first ], css.scan(/@container admin-list \(min-width: ([^)]+)\)/).flatten, "the lists' container asks the threshold alone"
     # Settings docks at a width of its own (Design System v262, S13): a
     # 1440px window leaves its area about 1185px, which docks the rail.
-    assert_equal [ "1140px" ], css.scan(/@container admin-settings \(min-width: ([^)]+)\)/).flatten, "the Settings area's container asks its own threshold alone"
+    assert_equal [ "1120px" ], css.scan(/@container admin-settings \(min-width: ([^)]+)\)/).flatten, "the Settings area's container asks its own threshold alone"
     # The media library asks the threshold and 760px, where its rail stands
     # beside the grid as a card.
     assert_equal [ "1200px", "760px" ].sort, css.scan(/@container admin-media \(min-width: ([^)]+)\)/).flatten.sort

@@ -1294,11 +1294,11 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    (`Admin::SettingsScreen::GlanceComponent`). `.admin-settings-layout` is
    the container, so the rail docks by the room the Settings area has,
    never the window's (the sidebar takes room the window does not show).
-   It docks at 1140px, Settings' own threshold, under the editors', the
-   dashboard's and the lists' 1200px: a 1440px window leaves the Settings
-   area 1152px with overlay scrollbars (1137px with a classic 15px one),
-   and the rail docks there, the cards' column narrowing to about 554px at
-   the threshold
+   It docks at 1120px (70rem; Design System 1794976883-7360), Settings' own
+   threshold, under the editors', the dashboard's and the lists' 1200px: a
+   1440px window leaves the Settings area 1152px with overlay scrollbars
+   and 1137px with a classic 15px one, and the rail docks at both, the
+   cards' column narrowing to 534px at the threshold
    (`admin_design_rules_test` holds the one width).
 
    The grid (`__grid`) holds, in document order, the nav's wrapper (the
@@ -1319,7 +1319,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
      with `--cs-sp-4` above it, scrolling inside itself when it is taller
      than the window. The rail's track is `minmax(var(--cs-rail-width),
      1fr)` with the rail at its end: the grid grows the cards' column to
-     its 760px before the rail's track grows past 360px, so between 1140px
+     its 760px before the rail's track grows past 360px, so between 1120px
      and 1346px of area (170 + 28 + 760 + 28 + 360) the column narrows as
      it always did, the least gap before the rail `--cs-rail-gap`, and past
      it the spare room opens BETWEEN the column and the rail, never after
@@ -1334,7 +1334,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 @media (min-width: 1024px) {
   .admin-settings-layout__grid { grid-template-columns: 170px minmax(0, var(--cs-form-max)); grid-template-areas: "nav glance" "nav cards"; }
 }
-@container admin-settings (min-width: 1140px) {
+@container admin-settings (min-width: 1120px) {
   .admin-settings-layout__grid { grid-template-columns: 170px minmax(0, var(--cs-form-max)) minmax(var(--cs-rail-width), 1fr); grid-template-areas: "nav cards glance"; max-width: var(--admin-frame-max); }
   .admin-settings-glance { justify-self: end; width: var(--cs-rail-width); max-width: none; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail);
     position: sticky; top: calc(var(--admin-top-offset) + var(--cs-sp-4)); max-height: calc(100dvh - var(--admin-top-offset) - 2 * var(--cs-sp-4)); overflow-y: auto; overscroll-behavior: contain; }
