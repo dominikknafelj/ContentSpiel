@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Environment
+
+- The backup accessory's variables, on the accessory only (the web container gets none of them; `docs/reference/backups.md`, `docs/reference/hosting.md`, "Every variable the code reads"): `BACKUP_REPOSITORY` (restic's repository, `s3:https://<endpoint>/<bucket>/<folder>`; unset, backups are not configured and `bin/backup run` says so and exits 0), `BACKUP_SITE` (the snapshots' host and tag, the service's name in the template; default `contentspiel`), `BACKUP_HOUR` (0 to 23 UTC, default 3), `RESTIC_PASSWORD` (a secret, the repository's encryption password: **losing it loses every backup**), `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (a secret; the bucket's key pair), `AWS_DEFAULT_REGION` (where the provider asks for one, `auto` for Cloudflare R2) and `PGUSER` (the role `pg_dump` connects as, default `postgres`), with `PGHOST` and `POSTGRES_PASSWORD`, which the template's database accessory already has.
+
+### Added
+
+- Backups (#175): `bin/backup`, a command in the image (`run`, `schedule`, `list`, `restore`, `init`), dumps the primary database with `pg_dump --format=custom` and sends it with the files volume to an S3-compatible bucket (Hetzner Object Storage, Cloudflare R2, Amazon S3 and any other) with restic, encrypted, deduplicated and kept as 7 daily, 4 weekly and 6 monthly snapshots, with one twelfth of the data read back each month (`restic check`). A run writes `storage/backup/status.json` (no secret, no destination, a failure as one of five fixed reasons) and prints no tool's message. Recovery targets: 24 hours of changes at most, 2 hours to restore (`docs/reference/backups.md`).
+- A new site's `config/deploy.yml` carries the backup accessory, commented: the CMS image at the site's pin running `bin/backup schedule` once a day at `BACKUP_HOUR`, with the files volume and one CPU, its tools under `nice` and `ionice`. Its README has a new step 4.4, Backups (the bucket and its key at each of the three providers, the three secrets, `init` and the first `run`), and its `.kamal/secrets.example` the three secrets, commented.
+- System status's Backups row: the newest good backup's age and size while it is younger than 26 hours, else a warning that says why (none configured, with a link to the reference; the last run failed and its reason; how old the newest good backup is; the monthly check failed; the backup runs another CMS version than the site, with `kamal accessory reboot backup` to copy).
+- The alert `backup_stale` (a "Backups" chip on System status's Alerts card and in the owners' digest, with no audit-log link): the newest good backup is 48 hours old, none succeeded in the 48 hours since the first run, or the monthly check failed. One alert a UTC day while it lasts; a single failed run alerts nothing.
+- `bin/rails public_site:after_restore`, the restore runbook's step after the data is back: the content version jumped past every value it held before the backup was taken (the clock in microseconds), any stray version row removed, and the cache emptied; it says to purge a CDN in front.
+- A new site's `docs/restore-drills/TEMPLATE.md`, the record of the quarterly restore drill (the snapshot, the duration against the two hours, six checks).
+
+### Changed
+
+- `contentspiel upgrade`: a site whose `config/deploy.yml` has no backup accessory is shown the accessory's block and its three secrets to paste after the next steps (it never edits `deploy.yml` or `.kamal/secrets`); a site with the accessory makes the backup before the deploy with `kamal accessory exec backup --reuse "bin/backup run"` and is told to move the accessory to the new version afterwards with `kamal accessory reboot backup`. A site without it keeps the `pg_dumpall` command.
+- The image carries restic and `postgresql-client-17` (it had Debian's `postgresql-client`), so its `pg_dump` is never older than the template's Postgres 17.
+
 ## 0.10.1 (2026-11-17)
 
 ### Changed
