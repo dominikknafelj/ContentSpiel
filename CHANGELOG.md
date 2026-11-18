@@ -21,6 +21,10 @@
 - `contentspiel upgrade`: a site whose `config/deploy.yml` has no backup accessory is shown the accessory's block and its three secrets to paste after the next steps (it never edits `deploy.yml` or `.kamal/secrets`); a site with the accessory makes the backup before the deploy with `kamal accessory exec backup --reuse "bin/backup run"` and is told to move the accessory to the new version afterwards with `kamal accessory reboot backup`. A site without it keeps the `pg_dumpall` command.
 - The image carries restic and `postgresql-client-17` (it had Debian's `postgresql-client`), so its `pg_dump` is never older than the template's Postgres 17.
 
+### Fixed
+
+- A file the site serves whose name carries no digest is kept by browsers and caches for an hour, not a year: `/icon.svg`, `/icon.png`, `/icons/*`, `/robots.txt`, the sitemap, `/diagram-renderer.js` and the error pages, and the site's icons (`/favicon.ico`, `/apple-touch-icon.png`, the CMS's and a theme's, which were kept a day) now say `Cache-Control: max-age=3600, public, stale-while-revalidate=86400`; a digested asset (`/assets/<name>-<digest>.<ext>`) keeps its year and is marked `immutable`. Production used to say a year for every file in `public/`, so when 0.10.0 replaced CS Studio's icon a CDN and the browsers kept Rails' red circle. A site behind a CDN purges `/icon.svg`, `/icon.png` and `/icons/*` there once (`docs/reference/hosting.md`, "Files served as they are").
+
 ## 0.10.1 (2026-11-17)
 
 ### Changed
