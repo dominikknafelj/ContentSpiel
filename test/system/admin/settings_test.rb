@@ -109,30 +109,47 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     at_window(1279) do
       visit_screen admin_settings_path
       boxes = layout
-      assert_operator boxes["container"]["width"], :>=, 1140
+      assert_operator boxes["container"]["width"], :>=, 1120
       assert docked?(boxes), boxes.inspect
     end
     at_window(1280) do
       visit_screen admin_settings_path
       boxes = layout
-      assert_operator boxes["container"]["width"], :<, 1140
+      assert_operator boxes["container"]["width"], :<, 1120
       assert_not docked?(boxes), boxes.inspect
     end
   end
 
-  # Settings docks at 1140px of its own area (Design System v262, S13): a
-  # window of 1455px, whose area is about 1152px beside the sidebar and a
+  # Settings docks at 1120px of its own area (Design System 1794976883-7360):
+  # a window of 1455px, whose area is about 1152px beside the sidebar and a
   # classic scrollbar, has the rail beside the cards rather than above them.
   # (A 1440px window's area is 1152px with overlay scrollbars, macOS's
-  # default, and 1137px with a classic 15px one, as here.)
-  test "an area of 1140px or more docks the rail, the cards' column taking what the nav, the gaps and the rail leave" do
+  # default, and 1137px with a classic 15px one: it docks at both, below.)
+  test "an area of 1120px or more docks the rail, the cards' column taking what the nav, the gaps and the rail leave" do
     at_window(1455) do
       visit_screen admin_settings_path
       boxes = layout
-      assert_operator boxes["container"]["width"], :>=, 1140
+      assert_operator boxes["container"]["width"], :>=, 1120
       assert docked?(boxes), boxes.inspect
       assert_in_delta boxes["container"]["width"] - 586, boxes["cards"]["width"], 1, boxes.inspect
-      assert_operator boxes["cards"]["width"], :>=, 554, "the column keeps at least what 1140px leaves it"
+      assert_operator boxes["cards"]["width"], :>=, 534, "the column keeps at least what 1120px leaves it"
+    end
+  end
+
+  # A 1440px window docks At a glance with a classic scrollbar too: the frame
+  # is 1137px (x 264 to 1401), past the 1120px threshold, and the rail stands
+  # at its right end, x 1041 to 1401 (less the scrollbar's gutter where there
+  # is none: the frame's right end is measured, not assumed).
+  test "a 1440px window docks At a glance at the frame's right end" do
+    at_window(1440) do
+      visit_screen admin_settings_path
+      boxes = layout
+      assert docked?(boxes), boxes.inspect
+      frame = page.evaluate_script("(() => { const r = document.querySelector('.admin-page').getBoundingClientRect(); return [ r.left, r.right ] })()")
+      assert_in_delta 264, frame[0], 1, "the frame starts after the sidebar and <main>'s padding"
+      assert_in_delta frame[1], boxes["rail"]["right"], 1, "the rail ends at the frame's right end"
+      assert_in_delta frame[1] - 360, boxes["rail"]["left"], 1, "and is the rail's 360px"
+      assert_in_delta boxes["cards"]["right"] + 28, boxes["rail"]["left"], 1, "the cards' column narrows, the rail's gap before the rail"
     end
   end
 
@@ -809,8 +826,10 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
   end
 
   # The page frame (Design System 1794894016-5ccc): Settings stands from the
-  # frame's left edge, the h1 over the nav, and is never centred.
-  test "past the content max Settings stays at the left, the spare width on the right" do
+  # frame's left edge, the h1 over the nav, and is never centred. The rail
+  # stands at the frame's right end, as every docked rail does (Design System
+  # 1794973507-1201): the spare room opens between the cards and the rail.
+  test "past the content max Settings stays at the left, the rail at the frame's right end" do
     at_window(2400) do
       visit_screen admin_settings_path
       boxes = layout
@@ -820,6 +839,12 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
       h1 = page.evaluate_script("(() => { const r = document.querySelector('.admin-page__head h1').getBoundingClientRect(); return { left: r.left, bottom: r.bottom } })()")
       assert_in_delta boxes["nav"]["left"], h1["left"], 1, "the h1 stands over the nav"
       assert_operator h1["bottom"], :<=, boxes["nav"]["top"] + 1
+      assert_in_delta 760, boxes["cards"]["width"], 1, "the cards keep the form column's width"
+      frame_right = page.evaluate_script("document.querySelector('.admin-page').getBoundingClientRect().right")
+      sidebar = page.evaluate_script("document.getElementById('sidebar').getBoundingClientRect().right")
+      assert_in_delta sidebar + 24 + 1680, frame_right, 1, "the frame ends at its right end"
+      assert_in_delta frame_right, boxes["rail"]["right"], 1, "the rail stands at the frame's right end"
+      assert_operator boxes["rail"]["left"] - boxes["cards"]["right"], :>, 28, "the spare room stands between the cards and the rail"
     end
   end
 end
