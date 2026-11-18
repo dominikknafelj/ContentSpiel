@@ -8,6 +8,7 @@ class BackupImageTest < ActiveSupport::TestCase
     client = install[/postgresql-client-(\d+)/, 1]
     assert client, "the Dockerfile names postgresql-client without its major version"
     template = Rails.root.join("lib/site_template/config/deploy.yml.tt").read[/image: postgres:(\d+)/, 1]
+    assert template, "lib/site_template/config/deploy.yml.tt names no image: postgres:NN"
     assert_operator client.to_i, :>=, template.to_i
   end
 end

@@ -820,6 +820,30 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     end
   end
 
+  test "Backups: the accessory's own version wins over the status's, so a reboot clears the warning before the next run" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      rebooted = ContentSpiel::Backup::RunningVersion.new(cms_version: ContentSpiel::VERSION, started_at: 10.minutes.ago)
+      row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago, cms_version: "0.0.1"), running_version: rebooted))
+
+      assert_predicate row, :ok?
+      assert_nil row.command
+
+      behind = ContentSpiel::Backup::RunningVersion.new(cms_version: "0.0.2", started_at: 10.minutes.ago)
+      row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago), running_version: behind))
+
+      assert_equal "The backup runs ContentSpiel 0.0.2, the site #{ContentSpiel::VERSION}.", row.message
+      assert_equal "kamal accessory reboot backup", row.command
+    end
+  end
+
+  test "Backups: without the accessory's file (none, or unreadable) the status's version is compared" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago, cms_version: "0.0.1"), running_version: :none))
+
+      assert_equal "The backup runs ContentSpiel 0.0.1, the site #{ContentSpiel::VERSION}.", row.message
+    end
+  end
+
   test "Backups: no message names the snapshot or the repository" do
     travel_to Time.utc(2026, 11, 18, 12) do
       status = backup_status(outcome: "failed", error: "destination_unreachable", last_ok_at: 60.hours.ago, snapshot: "deadbeef1234", last_check_outcome: "failed", check_error: "other", cms_version: "0.0.1")

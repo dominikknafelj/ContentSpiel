@@ -3,6 +3,7 @@ require "fileutils"
 require_relative "version"
 require_relative "backup/failure"
 require_relative "backup/status"
+require_relative "backup/running_version"
 require_relative "backup/runner"
 
 module ContentSpiel
@@ -14,18 +15,27 @@ module ContentSpiel
   #   <root>/storage (the status folder excluded), restic forget with
   #   RETENTION, and once a month (the first run of a month, or the run after
   #   a failed check) restic check of one twelfth of the data, the month's.
-  #   Then the status file, ok or failed, which is the one thing it writes in
-  #   the files volume. A run whose snapshot was taken and whose forget then
-  #   failed is failed, but records that snapshot as the newest good backup.
+  #   Then the status file, ok or failed, which with RunningVersion's file
+  #   beside it is all it writes in the files volume. A run whose snapshot
+  #   was taken and whose forget then failed is failed, but records that
+  #   snapshot as the newest good backup. One run at a time: a run holds a
+  #   lock on DUMP_DIR + LOCK_SUFFIX (on the container's own disk), and a
+  #   run that finds it held says so and ends with 1, writing no status, so a
+  #   person's `kamal accessory exec backup --reuse "bin/backup run"` and the
+  #   schedule's never share the dump or the status.
   # - schedule: run once a day at BACKUP_HOUR, the accessory's long-running
-  #   command. It sleeps until the hour, runs, and sleeps until the next day's:
+  #   command. Configured, it first writes its version (RunningVersion), which
+  #   System status compares with the site's. It sleeps until the hour, runs,
+  #   and sleeps until the next day's:
   #   a failed run is not retried, so a broken destination fails once a day,
   #   never in a loop. Unconfigured, it says so once a day and runs nothing.
   #   stop! (bin/backup traps TERM and INT with it: as the container's PID 1,
   #   Ruby would otherwise ignore TERM and Kamal's stop would wait and kill)
   #   wakes a sleep, which ends the schedule with 0, or sends TERM to the
   #   running tool, which ends the run as failed ("other") and the schedule
-  #   with 143.
+  #   with 143. A status file that cannot be written (a full disk) raises out
+  #   of the schedule; the accessory's restart policy (Kamal's default,
+  #   unless-stopped) starts it again, sleeping until the next day's hour.
   # - list: restic's snapshots. init: a new repository. restore: a snapshot's
   #   dump and files into an empty folder, as database.dump and files/; it
   #   touches no database and no live volume.
@@ -52,6 +62,9 @@ module ContentSpiel
     DATABASE = "content_spiel_production"
     DUMP_DIR = "/tmp/content_spiel_backup"
     DUMP_FILE = "database.dump"
+    # The run lock's file, beside the dump folder and never in it (restic
+    # backs that folder up) nor in the files volume.
+    LOCK_SUFFIX = ".lock"
     RETENTION = %w[--keep-daily 7 --keep-weekly 4 --keep-monthly 6].freeze
     CHECK_PARTS = 12
     NICE = %w[nice -n 19 ionice -c 3 -t].freeze
@@ -154,6 +167,7 @@ module ContentSpiel
     # stop! came during a run, or 1 for a BACKUP_HOUR that is not an hour.
     def schedule(runs: Float::INFINITY)
       hour = backup_hour or return 1
+      write_running_version if @repository
       done = 0
       last_run = nil
       until @stopping || done >= runs
@@ -191,6 +205,13 @@ module ContentSpiel
         return 0
       end
 
+      with_run_lock { locked_run }
+    end
+
+    private
+
+    # The run's own steps, under the run lock.
+    def locked_run
       started = @clock.call
       previous = Status.read(Status.path(@root))
       previous = nil if previous&.unreadable?
@@ -214,7 +235,27 @@ module ContentSpiel
       0
     end
 
-    private
+    # A non-blocking flock on the lock file, released when the block ends
+    # (the file stays: removing it would let a waiting run lock a file no
+    # longer at the path). Held by another run: one line on err and 1.
+    def with_run_lock
+      File.open("#{@dump_dir}#{LOCK_SUFFIX}", File::RDWR | File::CREAT, 0o600) do |lock|
+        unless lock.flock(File::LOCK_EX | File::LOCK_NB)
+          @err.puts("[backup] another backup is already running")
+          return 1
+        end
+        yield
+      end
+    end
+
+    # The version marker is a hint for System status, so a write that fails
+    # is named by its class and the schedule goes on: System status then
+    # compares the status file's version.
+    def write_running_version
+      RunningVersion.new(cms_version: ContentSpiel::VERSION, started_at: @clock.call).write(RunningVersion.path(@root))
+    rescue SystemCallError => error
+      @err.puts("[backup] could not write the accessory's version: #{error.class}")
+    end
 
     def present(value) = value.to_s.strip.empty? ? nil : value
 

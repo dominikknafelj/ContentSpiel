@@ -57,18 +57,21 @@ module ContentSpiel
       private_class_method :typed?
 
       # mkdir -p, a temp file beside the file, a rename: whole or absent.
-      def write(path)
+      # RunningVersion writes its file the same way.
+      def self.write_json(path, hash)
         path = Pathname(path)
         FileUtils.mkdir_p(path.dirname)
         temp = Pathname("#{path}.tmp#{Process.pid}")
         begin
-          temp.write(JSON.pretty_generate(to_json_hash))
+          temp.write(JSON.pretty_generate(hash))
           temp.chmod(0o644)
           File.rename(temp, path)
         ensure
           FileUtils.rm_f(temp)
         end
       end
+
+      def write(path) = self.class.write_json(path, to_json_hash)
 
       def ok? = outcome == "ok"
       def unreadable? = outcome == "unreadable"

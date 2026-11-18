@@ -6,6 +6,7 @@ require_relative "../../support/fake_backup_runner"
 class ContentSpiel::BackupTest < ActiveSupport::TestCase
   Backup = ContentSpiel::Backup
   Status = Backup::Status
+  RunningVersion = Backup::RunningVersion
   Runner = Backup::Runner
   Outcome = Runner::Outcome
 
@@ -32,6 +33,7 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
   teardown do
     FileUtils.remove_entry(@root)
     FileUtils.remove_entry(@dump_dir) if @dump_dir.exist?
+    FileUtils.rm_f("#{@dump_dir}.lock")
   end
 
   def backup(env: @env, clock: -> { NOW }, runner: @runner, sleeper: ->(_) { flunk "nothing sleeps here" })
@@ -80,6 +82,7 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert_equal "content_spiel_production", Backup::DATABASE
     assert_equal "/tmp/content_spiel_backup", Backup::DUMP_DIR
     assert_equal "database.dump", Backup::DUMP_FILE
+    assert_equal ".lock", Backup::LOCK_SUFFIX
     assert_equal %w[--keep-daily 7 --keep-weekly 4 --keep-monthly 6], Backup::RETENTION
     assert_equal 12, Backup::CHECK_PARTS
   end
@@ -345,6 +348,28 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert changed.all? { |path| path == "backup" || path.start_with?("backup/") }, changed.inspect
   end
 
+  test "a run while another holds the run lock says so, exits 1, starts no tool and writes no status" do
+    lock = File.open("#{@dump_dir}.lock", File::RDWR | File::CREAT)
+    assert lock.flock(File::LOCK_EX | File::LOCK_NB)
+
+    assert_equal 1, backup.call([ "run" ])
+    assert_equal "[backup] another backup is already running\n", @err.string
+    assert_empty @runner.calls
+    assert_nil status
+
+    lock.close
+    assert_equal 0, backup.call([ "run" ])
+    assert_equal "ok", status.outcome
+  end
+
+  test "the run lock is released after a run, a failed one too" do
+    failing = FakeBackupRunner.new("pg_dump" => Outcome.new(exit_status: 1, stdout: "", stderr: "could not connect"))
+    assert_equal 1, backup(runner: failing).call([ "run" ])
+    File.open("#{@dump_dir}.lock", File::RDWR) do |lock|
+      assert lock.flock(File::LOCK_EX | File::LOCK_NB), "the lock is still held after the run"
+    end
+  end
+
   test "restore refuses a target that is not empty, and lays out database.dump and files/" do
     target = Pathname(Dir.mktmpdir).join("restore")
     target.mkpath
@@ -476,6 +501,34 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert_equal [ 3_630 ], sleeps
   end
 
+  test "schedule writes the accessory's version when it starts, before it sleeps, and nothing secret" do
+    clock, sleeper, = fake_time(Time.utc(2026, 11, 18, 2, 59, 30))
+    seen = nil
+    watching = lambda do |seconds|
+      seen ||= RunningVersion.read(RunningVersion.path(@root))
+      sleeper.call(seconds)
+    end
+    assert_equal 0, backup(clock: clock, sleeper: watching).schedule(runs: 1)
+
+    assert_equal ContentSpiel::VERSION, seen.cms_version
+    assert_equal Time.utc(2026, 11, 18, 2, 59, 30), seen.started_at
+    text = RunningVersion.path(@root).read
+    assert_equal %w[cms_version started_at], JSON.parse(text).keys.sort
+    HIDDEN.each { |value| refute_includes text, value }
+    refute_includes text, SITE
+    assert_equal "100644", format("%o", RunningVersion.path(@root).stat.mode)
+    assert_empty Dir.glob("#{RunningVersion.path(@root)}.tmp*")
+  end
+
+  test "a schedule that cannot write the accessory's version says so by its class and goes on" do
+    @root.join("storage", "backup").mkpath
+    RunningVersion.path(@root).mkpath # a folder where the file goes: the rename fails
+    clock, sleeper, = fake_time(Time.utc(2026, 11, 18, 2, 59, 30))
+    assert_equal 0, backup(clock: clock, sleeper: sleeper).schedule(runs: 1)
+    assert_match(/\A\[backup\] could not write the accessory's version: Errno::\w+\n\z/, @err.string)
+    assert_equal "ok", status.outcome
+  end
+
   test "a wall clock set back after a run does not give a second run that day" do
     times = [ Time.utc(2026, 11, 18, 2, 0) ]
     sleeps = []
@@ -507,6 +560,7 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert_equal [ 86_400 ], sleeps
     assert_empty @runner.calls
     assert_nil status
+    assert_not RunningVersion.path(@root).exist?
   end
 
   test "stop! while sleeping ends the schedule with 0; during a run it interrupts the tool and records the run as failed" do

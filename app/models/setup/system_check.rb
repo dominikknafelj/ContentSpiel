@@ -151,7 +151,9 @@ module Setup
     # `backup_status` is the backup accessory's status file
     # (`ContentSpiel::Backup::Status.read`), read when the row is drawn like
     # `search`; a test passes any value that is not a `Status` (`:none`) for
-    # "no file".
+    # "no file". `running_version` is the accessory's own version file
+    # (`ContentSpiel::Backup::RunningVersion.read`), read the same way; any
+    # value that is not one (`:none`) is "no readable file".
     #
     # `theme` is the theme that draws the site (`Theme.current`), handed in so
     # a test can say it. `stylesheet_probe` answers whether the public
@@ -169,7 +171,7 @@ module Setup
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil, remote_ip: nil, cf_connecting_ip: nil,
       mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false,
       sso_provider: SignIn::Sso::Provider.current, sso_required: SignIn::Sso.required?,
-      search: nil, backup_status: nil)
+      search: nil, backup_status: nil, running_version: nil)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -183,6 +185,7 @@ module Setup
       @sso_required = sso_required
       @search = search
       @backup_status = backup_status
+      @running_version = running_version
       @address = address
       @admin_address = admin_address
       @request_ssl = request_ssl
@@ -523,7 +526,9 @@ module Setup
       # joined by a space: the last run failed, the newest good backup is
       # older than FRESH_BACKUP (a day plus slack for a slow run) or there is
       # none, the monthly check failed, the accessory runs another version
-      # than the site. None is OK with the newest good backup's age and size.
+      # than the site (the version the accessory wrote when it started, or,
+      # without that file, the one that made the last run). None is OK with
+      # the newest good backup's age and size.
       # A failed run whose backup step succeeded carries a fresh good backup,
       # so "failed" without "stale" is normal. The row names neither a
       # snapshot nor the destination.
@@ -542,8 +547,10 @@ module Setup
         elsif age >= FRESH_BACKUP then sentences << t.call(:stale, age: backup_age(age))
         end
         sentences << t.call(:check_failed, reason: reason.call(status.check_error)) if status.check_failed?
-        other_version = status.cms_version.present? && status.cms_version != ContentSpiel::VERSION
-        sentences << t.call(:version, backup: status.cms_version, site: ContentSpiel::VERSION) if other_version
+        running = @running_version || ContentSpiel::Backup::RunningVersion.read(ContentSpiel::Backup::RunningVersion.path(Rails.root))
+        version = running.is_a?(ContentSpiel::Backup::RunningVersion) ? running.cms_version : status.cms_version
+        other_version = version.present? && version != ContentSpiel::VERSION
+        sentences << t.call(:version, backup: version, site: ContentSpiel::VERSION) if other_version
         if sentences.empty?
           return ok(label, t.call(:ok, age: backup_age(age), size: ActiveSupport::NumberHelper.number_to_human_size(status.total_bytes)))
         end
