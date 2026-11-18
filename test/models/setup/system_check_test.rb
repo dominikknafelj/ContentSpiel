@@ -6,7 +6,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "reports every check, in order" do
     labels = run_check.map(&:label)
 
-    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Search", "Mail", "Forms" ], labels
+    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Search", "Backups", "Mail", "Forms" ], labels
   end
 
   test "the search row while the index is built is a warning with the progress and no command" do
@@ -114,7 +114,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "in production with the request's facts, HTTPS comes second" do
     labels = run_check(production: true, request_ssl: true).map(&:label)
 
-    assert_equal [ "Site address", "Single sign-on", "HTTPS", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Search", "Mail", "Forms" ], labels
+    assert_equal [ "Site address", "Single sign-on", "HTTPS", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Search", "Backups", "Mail", "Forms" ], labels
   end
 
   test "a configured site address is named by its origin" do
@@ -580,7 +580,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     results = nil
     logged = capture_log { results = run_check(image_progress: failing) }
 
-    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Background jobs", "Search", "Mail", "Forms" ], results.map(&:label)
+    assert_equal [ "Site address", "Single sign-on", "Theme", "File storage", "Image processing", "Background jobs", "Search", "Backups", "Mail", "Forms" ], results.map(&:label)
     assert_includes logged, "ActiveRecord::StatementInvalid"
     assert_not_includes logged, "PG::QueryCanceled"
   end
@@ -749,6 +749,86 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_equal "Not set up. The hosting reference lists its variables.", check.message
   end
 
+  # Backups
+
+  test "Backups: a good backup under 26 hours is ok with its age and size" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 5.hours.ago, database_bytes: 100 * 1024 * 1024, files_bytes: 330 * 1024 * 1024)))
+
+      assert_predicate row, :ok?
+      assert_equal "Last backup 5 hours ago, 430 MB.", row.message
+    end
+  end
+
+  test "Backups: no status file warns that none are configured, with the reference's link" do
+    row = result("Backups", run_check(backup_status: :none))
+
+    assert_equal :warning, row.status
+    assert_equal "No backups are configured. The backups reference says how to set them up.", row.message
+    assert_equal Setup::SystemCheck::BACKUPS_DOCS, row.docs
+  end
+
+  test "Backups: an unreadable status file is a warning that says so" do
+    row = result("Backups", run_check(backup_status: ContentSpiel::Backup::Status.unreadable))
+
+    assert_equal :warning, row.status
+    assert_equal "The backup status file can't be read.", row.message
+  end
+
+  test "Backups: 26 hours or older warns with the age" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      at26 = result("Backups", run_check(backup_status: backup_status(last_ok_at: 26.hours.ago)))
+      at50 = result("Backups", run_check(backup_status: backup_status(last_ok_at: 50.hours.ago)))
+
+      assert_equal :warning, at26.status
+      assert_equal "The newest good backup is from 26 hours ago.", at26.message
+      assert_equal "The newest good backup is from 2 days ago.", at50.message
+    end
+  end
+
+  test "Backups: no good backup yet says so" do
+    row = result("Backups", run_check(backup_status: backup_status(last_ok_at: nil)))
+
+    assert_equal "No backup has succeeded yet.", row.message
+  end
+
+  test "Backups: a failed run warns with its reason, and a stale one says both" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      fresh = result("Backups", run_check(backup_status: backup_status(outcome: "failed", error: "wrong_password", last_ok_at: 2.hours.ago)))
+      stale = result("Backups", run_check(backup_status: backup_status(outcome: "failed", error: "wrong_password", last_ok_at: 30.hours.ago)))
+
+      assert_equal "The last backup failed: the repository's password is wrong.", fresh.message
+      assert_equal "The last backup failed: the repository's password is wrong. The newest good backup is from 30 hours ago.", stale.message
+    end
+  end
+
+  test "Backups: a failed monthly check warns with its reason even when the backup is fresh" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago, last_check_outcome: "failed", check_error: "other")))
+
+      assert_equal :warning, row.status
+      assert_equal "The monthly check of the backups failed: an unexpected error; the backup accessory's log says more.", row.message
+    end
+  end
+
+  test "Backups: another CMS version warns and offers the reboot command" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago, cms_version: "0.0.1")))
+
+      assert_equal "The backup runs ContentSpiel 0.0.1, the site #{ContentSpiel::VERSION}.", row.message
+      assert_equal "kamal accessory reboot backup", row.command
+    end
+  end
+
+  test "Backups: no message names the snapshot or the repository" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      status = backup_status(outcome: "failed", error: "destination_unreachable", last_ok_at: 60.hours.ago, snapshot: "deadbeef1234", last_check_outcome: "failed", check_error: "other", cms_version: "0.0.1")
+      row = result("Backups", run_check(backup_status: status))
+
+      assert_no_match(/deadbeef|repo:|s3:/, row.message)
+    end
+  end
+
   private
     def failed_submission(form)
       submission = Forms::Submission.create!(form: form, locale: "en", answers: [])
@@ -765,6 +845,12 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       io.string
     ensure
       Rails.logger = previous
+    end
+
+    def backup_status(**overrides)
+      ContentSpiel::Backup::Status.new(**{ finished_at: Time.current, outcome: "ok", snapshot: "abc123", database_bytes: 1, files_bytes: 1,
+        duration_seconds: 5, first_run_at: 90.days.ago, last_ok_at: Time.current, last_check_at: nil, last_check_outcome: nil,
+        check_error: nil, error: nil, cms_version: ContentSpiel::VERSION }.merge(overrides))
     end
 
     def search_status(**overrides)

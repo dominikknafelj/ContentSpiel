@@ -59,6 +59,18 @@ module Setup
     # builds the index in the foreground. A fixed string.
     SEARCH_REINDEX_COMMAND = "bin/rails search:reindex".freeze
 
+    # How old the newest good backup may be before the Backups row warns: a
+    # day plus slack for a slow run.
+    FRESH_BACKUP = 26.hours
+
+    # Where the "No backups are configured" warning sends the reader, at the
+    # tag of the running version.
+    BACKUPS_DOCS = "https://github.com/dominikknafelj/ContentSpiel/blob/v#{ContentSpiel::VERSION}/docs/reference/backups.md".freeze
+
+    # What the Backups row offers to copy when the accessory runs another
+    # version than the site: restarting it picks up the site's image.
+    BACKUP_REBOOT_COMMAND = "kamal accessory reboot backup".freeze
+
     # The longest sentence of a search backend's own that its row shows.
     DETAIL_LENGTH = 200
 
@@ -136,6 +148,11 @@ module Setup
     # can say them; read when the row is drawn (`run`), never at construction,
     # since reading asks the backend.
     #
+    # `backup_status` is the backup accessory's status file
+    # (`ContentSpiel::Backup::Status.read`), read when the row is drawn like
+    # `search`; a test passes any value that is not a `Status` (`:none`) for
+    # "no file".
+    #
     # `theme` is the theme that draws the site (`Theme.current`), handed in so
     # a test can say it. `stylesheet_probe` answers whether the public
     # stylesheet was built for that theme: by default, whether the build's
@@ -152,7 +169,7 @@ module Setup
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil, remote_ip: nil, cf_connecting_ip: nil,
       mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false,
       sso_provider: SignIn::Sso::Provider.current, sso_required: SignIn::Sso.required?,
-      search: nil)
+      search: nil, backup_status: nil)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -165,6 +182,7 @@ module Setup
       @sso_provider = sso_provider
       @sso_required = sso_required
       @search = search
+      @backup_status = backup_status
       @address = address
       @admin_address = admin_address
       @request_ssl = request_ssl
@@ -188,7 +206,7 @@ module Setup
     end
 
     def run
-      [ site_address, admin_address, single_sign_on, https, visitor_address, theme, storage, image_processing, images, background_jobs, search, mail, forms ].compact
+      [ site_address, admin_address, single_sign_on, https, visitor_address, theme, storage, image_processing, images, background_jobs, search, backups, mail, forms ].compact
     end
 
     private
@@ -496,6 +514,50 @@ module Setup
             end
           Result.new(label:, status: :ok, message:, note:)
         end
+      end
+
+      # Backups, from the status file the backup accessory writes. No file is
+      # "not configured": the web container cannot tell a site without the
+      # accessory from one whose accessory never ran. An unreadable file is a
+      # warning of its own. Otherwise the warnings that apply, in order and
+      # joined by a space: the last run failed, the newest good backup is
+      # older than FRESH_BACKUP (a day plus slack for a slow run) or there is
+      # none, the monthly check failed, the accessory runs another version
+      # than the site. None is OK with the newest good backup's age and size.
+      # A failed run whose backup step succeeded carries a fresh good backup,
+      # so "failed" without "stale" is normal. The row names neither a
+      # snapshot nor the destination.
+      def backups
+        t = ->(key, **values) { I18n.t("admin.system_status.backups.#{key}", **values) }
+        label = t.call(:label)
+        status = @backup_status || ContentSpiel::Backup::Status.read(ContentSpiel::Backup::Status.path(Rails.root))
+        return Result.new(label:, status: :warning, message: t.call(:not_configured), docs: BACKUPS_DOCS) unless status.is_a?(ContentSpiel::Backup::Status)
+        return Result.new(label:, status: :warning, message: t.call(:unreadable)) if status.unreadable?
+
+        reason = ->(code) { t.call("reasons.#{ContentSpiel::Backup::Failure::REASONS.include?(code) ? code : :other}") }
+        age = status.good_backup_age(Time.current)
+        sentences = []
+        sentences << t.call(:failed, reason: reason.call(status.error)) unless status.ok?
+        if age.nil? then sentences << t.call(:never)
+        elsif age >= FRESH_BACKUP then sentences << t.call(:stale, age: backup_age(age))
+        end
+        sentences << t.call(:check_failed, reason: reason.call(status.check_error)) if status.check_failed?
+        other_version = status.cms_version.present? && status.cms_version != ContentSpiel::VERSION
+        sentences << t.call(:version, backup: status.cms_version, site: ContentSpiel::VERSION) if other_version
+        if sentences.empty?
+          return ok(label, t.call(:ok, age: backup_age(age), size: ActiveSupport::NumberHelper.number_to_human_size(status.total_bytes)))
+        end
+
+        Result.new(label:, status: :warning, message: sentences.join(" "), command: (BACKUP_REBOOT_COMMAND if other_version))
+      end
+
+      # "less than an hour ago", whole hours under 48, whole days beyond.
+      def backup_age(seconds)
+        hours = (seconds / 1.hour).floor
+        return I18n.t("admin.system_status.backups.age.recent") if hours < 1
+        return I18n.t("admin.system_status.backups.age.hours", count: hours) if hours < 48
+
+        I18n.t("admin.system_status.backups.age.days", count: hours / 24)
       end
 
       # A backend's own sentence is shown as one line: its first, no longer

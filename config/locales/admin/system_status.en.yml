@@ -66,6 +66,33 @@ en:
         problem_detail: "%{backend} reports a problem: %{detail}"
         limited: "Search in %{languages} finds the text a page contains, with no stemming and no correction."
         tags_only: "Suggestions while typing offer tags only: %{label} offers no title suggestions."
+      # The "Backups" row (`Setup::SystemCheck#backups`, `ContentSpiel::Backup::Status`): `ok` with
+      # the newest good backup's `age` (the `age` keys) and size; otherwise the warnings that apply,
+      # joined by a space. `reasons` are the fixed failure reasons (`ContentSpiel::Backup::Failure::REASONS`).
+      backups:
+        label: "Backups"
+        ok: "Last backup %{age}, %{size}."
+        not_configured: "No backups are configured. The backups reference says how to set them up."
+        unreadable: "The backup status file can't be read."
+        failed: "The last backup failed: %{reason}."
+        stale: "The newest good backup is from %{age}."
+        never: "No backup has succeeded yet."
+        check_failed: "The monthly check of the backups failed: %{reason}."
+        version: "The backup runs ContentSpiel %{backup}, the site %{site}."
+        age:
+          recent: "less than an hour ago"
+          hours:
+            one: "1 hour ago"
+            other: "%{count} hours ago"
+          days:
+            one: "1 day ago"
+            other: "%{count} days ago"
+        reasons:
+          destination_unreachable: "the backup destination could not be reached, or holds no repository yet"
+          wrong_password: "the repository's password is wrong"
+          database_unreachable: "the database could not be reached"
+          disk_full: "the server's disk is full"
+          other: "an unexpected error; the backup accessory's log says more"
       # The "Visitor address" row (`Setup::SystemCheck#visitor_address`):
       # OK with no Cloudflare header, OK when the header is the address the
       # request is counted by, and the warning when it is not.
