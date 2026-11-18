@@ -569,9 +569,10 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
   # Folded, the tree's track is the 44px strip and `<main>` keeps its 24px
   # padding: the editor area starts 68px right of the sidebar, whatever width
   # was chosen before the fold, and no band is left between them. At a width
-  # where the rail docks below the content max the composition starts there
-  # too; one past the content max, the composition starts there as well and
-  # stops at the content max, the spare width on its right (the page frame:
+  # where the rail docks below the frame's cap the composition starts there
+  # too; one past it, the composition starts there as well and ends at the
+  # frame's right end (the sidebar's edge, 24px and 1680px: the strip stands
+  # inside the frame's width), the spare width on its right (the page frame:
   # nothing in CS Studio is centred).
   test "folded, the editor and its composition start 68px right of the sidebar at 1600px and at 2600px" do
     open_editor
@@ -589,8 +590,8 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
         [ "#editor-grid", ".admin-rail__main", ".admin-content-blocks" ].each do |part|
           assert_in_delta sidebar + 68, box(part)[0], 1, "at #{width}px #{part} starts 68px right of the sidebar"
         end
-        if area[2] - area[0] >= 1680
-          assert_in_delta 1680, grid[2] - grid[0], 1, "at #{width}px the composition stops at the content max"
+        if area[2] - area[0] >= 1680 - 44
+          assert_in_delta sidebar + 24 + 1680, grid[2], 1, "at #{width}px the composition ends at the frame's right end"
           assert_operator area[2] - grid[2], :>, 100, "at #{width}px the spare width stays on the right"
         end
       end

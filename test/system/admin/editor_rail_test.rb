@@ -2,15 +2,18 @@ require "application_system_test_case"
 
 # The editors' rail (`admin/pages/show` and `Admin::EditorScreen::PostFormComponent`,
 # `.admin-rail-grid`, `admin--ui--rail`): where the editor area has 1200px, the
-# page settings stand in a 360px rail 28px right of a blocks column that takes
-# the rest, up to 1680px for the whole (`--cs-content-max`, at the left past it), with
+# page settings stand in a 360px rail at the area's right end, the blocks
+# column 760px at its left (Design System 1794973507-1201, "The rail's place
+# and the editor's column") and the spare room between them, the whole up to
+# `--admin-frame-max`, so the rail stands at the frame's right end on every
+# screen, with
 # a Page and a Section tab, and a post's settings in the same rail beside its
 # title, address and body, under the one heading Post; below that the page
 # settings stand above the blocks and a post's settings below its main
 # column, at 760px, as one column. The editor area is the container, so a
 # folded tree docks the rail at a window that would not otherwise. Each rule that overrides a base rule
-# while docked (the grown column over 760px, the forced-open settings over a
-# folded `<details>`) is measured at both widths here.
+# while docked (the forced-open settings over a folded `<details>`) is
+# measured at both widths here, and the blocks column's 760px at both.
 class Admin::EditorRailSystemTest < ApplicationSystemTestCase
   WIDE = 1900
   NARROW = 1400
@@ -46,7 +49,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
   PAGE_TAB = "#editor-grid-tab-page".freeze
   SECTION_TAB = "#editor-grid-tab-section".freeze
 
-  test "at a wide window the rail stands right of a blocks column that takes the rest, left-aligned, 28px apart" do
+  test "at a wide window the blocks column is 760px at the left, the rail at the area's right end, the spare room between them" do
     at_window(WIDE) do
       visit_editor(@page)
       assert_docked
@@ -55,23 +58,23 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       blocks = box(".admin-content-blocks")
       rail = box("#editor-grid-panel-page")
       assert_in_delta area[0], blocks[0], 1, "the blocks column starts at the content's left edge"
-      assert_in_delta blocks[2] + 28, rail[0], 1, "the rail stands 28px right of the blocks"
+      assert_in_delta 760, blocks[2] - blocks[0], 1, "the blocks column is the form column"
       assert_in_delta 360, rail[2] - rail[0], 1
       assert_operator area[2] - area[0], :<, 1680, "the window leaves the editor less than the content max"
-      assert_in_delta area[2], rail[2], 1, "the blocks column takes what the rail leaves"
+      assert_in_delta area[2], rail[2], 1, "the rail stands at the area's right end"
+      assert_operator rail[0] - blocks[2], :>, 28, "the spare room stands between the blocks and the rail"
       assert_in_delta blocks[1], box(".admin-rail__tabs")[1], 1, "the rail's tabs and the blocks start at one height"
       # Page and Section, then the registered Notes tab (`editor.rail.tabs`).
       assert_equal %w[editor-grid-tab-page editor-grid-tab-section editor-grid-tab-notes], all("#editor-grid [role=tablist] [role=tab]").map { |tab| tab[:id] }
     end
   end
 
-  # The figures of the one rule for spare width. The page editor with the
-  # tree folded: the
-  # editor area is the window less the sidebar (240), the strip (44), the
-  # scrollbar's gutter and `<main>`'s padding (48), so a window of 1600px of
-  # content is 1600 + 347 wide. Running text keeps its measure (72ch, about
-  # 650px in Archivo at 16px), the Code field the code measure (100ch), and
-  # an image field and a table take the column.
+  # The page editor with the tree folded: the editor area is the window less
+  # the sidebar (240), the strip (44), the scrollbar's gutter and `<main>`'s
+  # padding (48), so a window of 1600px of content is 1600 + 332 wide and
+  # some. The blocks column is 760px however wide the area is, and every
+  # field fills its card: the card's content box is the card less its 12px
+  # padding either side.
   def content_window(content) = content + 240 + 44 + 48 + page.evaluate_script("Math.round(window.innerWidth - document.documentElement.getBoundingClientRect().width)")
 
   def wide_blocks
@@ -85,7 +88,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
 
   def in_block(block, selector) = "[data-block-id='#{block.id}'] #{selector}"
 
-  test "at a 1600px content width the blocks column is 1212px, a rich-text box about 650px and a table the column's width" do
+  test "at a 1600px content width the blocks column is 760px, every field fills its card, and the spare room stands before the rail" do
     wide_blocks
     visit_editor(@page)
     fold_tree
@@ -95,29 +98,29 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
 
       area = box("#editing")
       assert_in_delta 1600, area[2] - area[0], 1
-      assert_in_delta 1212, width_of(".admin-content-blocks"), 1
-      assert_in_delta box(".admin-content-blocks")[2] + 28, box("#editor-grid-panel-page")[0], 1
+      assert_in_delta 760, width_of(".admin-content-blocks"), 1
+      assert_in_delta area[2], box("#editor-grid-panel-page")[2], 1, "the rail stands at the area's right end"
+      assert_in_delta 1600 - 760 - 360, box("#editor-grid-panel-page")[0] - box(".admin-content-blocks")[2], 1, "the spare room stands between the blocks and the rail"
       assert_in_delta 360, width_of("#editor-grid-panel-page"), 1
 
       card = box("[data-block-id='#{@text.id}']")
-      assert_in_delta 1212, card[2] - card[0], 1, "a block card takes the column"
-      text = width_of(in_block(@text, ".admin-rich-text-box"))
-      assert_in_delta 650, text, 30, "a rich-text box keeps the text measure"
-      assert_in_delta text, width_of(in_block(@text, ".admin-column > p")), 1, "its label takes the same cap"
-      code = width_of(in_block(@code, ".admin-code-input"))
-      assert_operator code, :>, text + 200, "the Code field is wider than running text"
-      assert_operator code, :<, 1000, "and keeps the code measure"
+      assert_in_delta 760, card[2] - card[0], 1, "a block card takes the column"
       inner = card[2] - card[0] - 24
-      assert_in_delta inner, width_of(in_block(@table, ".admin-rich-text-box")), 2, "a table takes the column"
-      assert_in_delta inner, width_of(in_block(@image, "[data-controller~='admin--media--field']")), 2, "an image field takes the column"
+      assert_in_delta inner, width_of(in_block(@text, ".admin-rich-text-box")), 2, "a rich-text box fills its card"
+      assert_in_delta inner, width_of(in_block(@text, ".admin-column > p")), 2, "its label too"
+      assert_in_delta inner, width_of(in_block(@code, ".admin-code-input")), 2, "the Code field fills its card"
+      assert_in_delta inner, width_of(in_block(@table, ".admin-rich-text-box")), 2, "a table's box fills its card"
+      assert_in_delta inner, width_of(in_block(@image, "[data-controller~='admin--media--field']")), 2, "an image field fills its card"
       section = box(".admin-section-card")
-      assert_in_delta 1212, section[2] - section[0], 1, "a section's frame takes the column"
+      assert_in_delta 760, section[2] - section[0], 1, "a section's frame takes the column"
     end
   end
 
-  # The page frame's rule holds for the editors too: past the content max
+  # Past the frame's cap the editor stops where every screen's frame stops:
+  # the tree's track (here the 44px strip) stands inside the frame's width,
+  # so the frame ends at the sidebar's edge, `<main>`'s 24px and 1680px, and
   # the spare width stays on the right, never centred.
-  test "at a 2400px content width the editor stops at the content max, at the left" do
+  test "at a 2400px content width the editor ends at the frame's right end, at the left" do
     wide_blocks
     visit_editor(@page)
     fold_tree
@@ -127,8 +130,10 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
 
       area = box("#editing")
       grid = box("#editor-grid")
+      sidebar = box("#sidebar")[2]
       assert_in_delta 2400, area[2] - area[0], 1
-      assert_in_delta 1680, grid[2] - grid[0], 1, "the composition stops at the content max"
+      assert_in_delta sidebar + 24 + 1680, grid[2], 1, "the composition ends at the frame's right end"
+      assert_in_delta 1680 - 44, grid[2] - grid[0], 1, "the frame's width is the content max less the strip"
       assert_in_delta area[0], grid[0], 1, "the composition starts at the area's left edge"
       assert_operator area[2] - grid[2], :>, 600, "the spare width stays on the right"
       # The header's row stands in the header's padding, 4px in from the
@@ -137,10 +142,30 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_in_delta grid[0] + 4, row[0], 1, "the header row starts with the composition"
       assert_in_delta grid[2] + 4, row[2], 1, "and stops with it, so Publish stands over the rail's right edge"
       assert_operator box(".admin-editor-header")[2] - box(".admin-editor-header")[0], :>, 2400, "the header's own line keeps the window's width"
-      assert_in_delta 1292, width_of(".admin-content-blocks"), 1
+      assert_in_delta 760, width_of(".admin-content-blocks"), 1
       assert_in_delta grid[2], box("#editor-grid-panel-page")[2], 1, "the rail ends the composition"
-      assert_in_delta 650, width_of(in_block(@text, ".admin-rich-text-box")), 30, "running text keeps its measure"
-      assert_in_delta 1292 - 24, width_of(in_block(@table, ".admin-rich-text-box")), 2, "a table takes the column"
+      assert_in_delta 736, width_of(in_block(@text, ".admin-rich-text-box")), 2, "running text fills its card"
+      assert_in_delta 736, width_of(in_block(@table, ".admin-rich-text-box")), 2, "a table's box fills its card"
+    end
+  end
+
+  # The regression of #293: the frame's rules moved into `@layer
+  # components`, and the docked grid's own rule let the blocks column grow
+  # past the form column (cards about 1037px at a 2000px window, their
+  # fields about 660px). At 2000px with the tree shown the card is 760px
+  # and its rich-text field fills it.
+  test "a block card and its rich text field are the same width, at most 760px" do
+    wide_blocks
+    at_window(2000) do
+      visit_editor(@page)
+      assert_docked
+
+      card = box("[data-block-id='#{@text.id}']")
+      assert_in_delta 760, card[2] - card[0], 1, "the card is the form column"
+      field = box(in_block(@text, ".admin-rich-text-box"))
+      assert_in_delta card[0] + 12, field[0], 1, "the field starts at the card's padding"
+      assert_in_delta card[2] - 12, field[2], 1, "and ends at it: no empty band on the right"
+      assert_in_delta card[2] - card[0] - 24, width_of(in_block(@text, "[role=toolbar]")), 2, "its toolbar too"
     end
   end
 
@@ -342,15 +367,65 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
 
       find("button[aria-label='Hide page tree']").click
       assert_docked
-      # The room left of a 360px rail.
-      assert_operator width_of(".admin-content-blocks"), :>, 760
+      assert_in_delta 760, width_of(".admin-content-blocks"), 1, "docked, the blocks column keeps the form column's width"
       assert_in_delta box("#editing")[2], box("#editor-grid-panel-page")[2], 1, "the rail ends at the editor's right edge"
       assert_in_delta 360, width_of("#editor-grid-panel-page"), 1
-      assert_in_delta box(".admin-content-blocks")[2] + 28, box("#editor-grid-panel-page")[0], 1
+      assert_operator box("#editor-grid-panel-page")[0] - box(".admin-content-blocks")[2], :>=, 28 - 1, "at least the rail's gap between them"
 
       find("button[aria-label='Show page tree']").click
       assert_docked(false)
       assert_in_delta 760, width_of(".admin-content-blocks"), 1
+    end
+  end
+
+  # THE RAIL'S PLACE (Design System 1794973507-1201): the frame ends at one x
+  # on every screen, the page tree's track (its column or its 44px strip)
+  # inside its width, and every docked rail stands at that end. Each screen
+  # is `[frame, rail]`: the frame is the page frame, or the editor's grid.
+  # A rail is docked when it is the rail's 360px; undocked it is a card or a
+  # row of the page. The page editor has the tree, shown or folded; the
+  # Dashboard, Posts and Settings have none.
+  RAIL_PLACES = {
+    "Dashboard" => [ ".admin-page", ".admin-dashboard__rail" ],
+    "Posts" => [ ".admin-page", ".admin-list-rail__rail" ],
+    "the page editor" => [ "#editor-grid", "#editor-grid-panel-page" ],
+    "Settings" => [ ".admin-page", ".admin-settings-glance" ]
+  }.freeze
+
+  def rail_places
+    RAIL_PLACES.to_h do |screen, (frame, rail)|
+      case screen
+      when "Dashboard" then visit_screen(admin_root_path)
+      when "Posts" then visit_screen(admin_posts_path)
+      when "Settings" then visit_screen(admin_settings_path)
+      else visit_editor(@page)
+      end
+      [ screen, { frame: box(frame), rail: box(rail) } ]
+    end
+  end
+
+  test "the rail's left edge is the same x on the Dashboard, Posts, a page's editor and Settings" do
+    [ 1440, 2000 ].each do |width|
+      [ false, true ].each do |folded|
+        visit_editor(@page)
+        page.execute_script(folded ? "window.localStorage.setItem('cs-tree-folded', '1')" : "window.localStorage.removeItem('cs-tree-folded')")
+        at_window(width) do
+          places = rail_places
+          state = "at #{width}px with the tree #{folded ? "folded" : "shown"}"
+          sidebar = box("#sidebar")[2]
+          right = [ places.values.first[:frame][2], sidebar + 24 + 1680 ].min
+          places.each do |screen, place|
+            assert_in_delta right, place[:frame][2], 1, "#{state}, #{screen}'s frame ends at the one right end"
+            next unless (place[:rail][2] - place[:rail][0] - 360).abs < 1
+
+            assert_in_delta right, place[:rail][2], 1, "#{state}, #{screen}'s docked rail stands at the frame's right end"
+          end
+          next unless width == 2000
+
+          lefts = places.transform_values { |place| place[:rail][0].round }
+          assert_equal [ (sidebar + 24 + 1680 - 360).round ], lefts.values.uniq, "#{state}, every rail docks at one x: #{lefts.inspect}"
+        end
+      end
     end
   end
 
@@ -663,9 +738,10 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       main = box(POST_MAIN)
       rail = box(POST_PANEL)
       assert_in_delta area[0], main[0], 1, "the main column starts at the content's left edge"
-      assert_in_delta main[2] + 28, rail[0], 1, "the rail stands 28px right of the main column"
+      assert_in_delta 760, main[2] - main[0], 1, "the main column is the form column"
+      assert_operator rail[0] - main[2], :>=, 28 - 1, "the spare room stands between the main column and the rail"
       assert_in_delta 360, rail[2] - rail[0], 1
-      assert_in_delta area[2], rail[2], 1, "the main column takes what the rail leaves"
+      assert_in_delta area[2], rail[2], 1, "the rail stands at the area's right end"
       assert_in_delta main[1], box(".admin-rail__tabs")[1], 1, "the rail's tabs and the main column start at one height"
 
       listen_to_post_form

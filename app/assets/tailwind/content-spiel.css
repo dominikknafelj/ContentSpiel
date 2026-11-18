@@ -281,19 +281,20 @@
   --cs-checker-a: #ffffff;
   --cs-checker-b: #e7e9ef;
   /* A docked composition (the editors' blocks column, the dashboard's main
-     column, a list, each with a rail beside it): the rail, the space
-     between, and the widest the whole may grow, one group whose main column
-     takes what the rail leaves, from the content's left edge and never
-     centred: past the cap the spare width stays on the right. Read by `.admin-rail-grid`,
-     `.admin-dashboard__grid` and `.admin-list-rail__grid` in
-     content-spiel.tailwind.css; CS Studio's alone. */
+     column, a list, Settings' column, each with a rail beside it): the
+     rail, the least space between, and the widest a screen's frame may be.
+     The cap is read through `--admin-frame-max` (content-spiel.tailwind.css),
+     which takes the page tree's track off it on a screen with a tree, so
+     the frame, and the docked rail at its right end, end at one x on every
+     screen; from the content's left edge and never centred. CS Studio's
+     alone. */
   --cs-rail-width: 360px;
   --cs-rail-gap: 28px;
   --cs-content-max: 1680px;
-  /* Inside the editors' grown blocks column, the widest a field of running
-     text draws (its label, well, help and error lines), and the Code field's,
-     whose lines are read whole. Wide blocks (an image, a table, a section's
-     lanes, a group's rows) take the column. */
+  /* The widest running text draws in a box wider than the form column (a
+     screen's lead line, a document's preview), and code's, whose lines are
+     read whole. Never a field in an editor's block card: there the 760px
+     column is the line length and every field fills its card. */
   --cs-text-measure: 72ch;
   --cs-code-measure: 100ch;
   /* A tree's row (`.admin-tree` in content-spiel.tailwind.css): its least

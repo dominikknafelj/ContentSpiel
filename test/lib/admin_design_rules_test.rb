@@ -1018,7 +1018,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal 1, docked.size, "one block docks the rail"
     grid = docked.first[/\.admin-rail-grid\s*\{([^}]*)\}/, 1]
     assert grid, "the docked grid is .admin-rail-grid"
-    assert_grows_to_content_max(grid)
+    assert_stops_at_frame_max_on_the_left(grid, ".admin-rail-grid")
     assert_match(/--admin-rail-docked:\s*1;/, grid, "the controller reads the docked state from the property the query sets")
     ground = docked.first[/\.admin-rail-grid::before\s*\{([^}]*)\}/, 1]
     assert ground, "the rail's ground is the grid's ::before"
@@ -1030,7 +1030,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     %w[admin-rail__tabs admin-rail__panel admin-rail__main].each do |item|
       assert_no_match(/\.admin-rail-grid[^{,]*>\s*\.#{item}/, docked.first, "#{item} is matched anywhere in the grid, not only as a child")
     end
-    assert_match(/\.admin-rail-grid \.admin-form-column\s*\{\s*max-width:\s*none;\s*\}/, docked.first, "the blocks column takes its track whole")
+    assert_no_match(/\.admin-form-column[^{]*\{[^}]*max-width/, docked.first, "docked, the blocks column keeps the form column's cap")
     assert_match(/\.admin-rail-grid\s*\{[^}]*--admin-rail-docked:\s*0;[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/, css, "one column below the threshold")
 
     medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
@@ -1163,7 +1163,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal 1, docked.size, "one block docks the dashboard's rail"
     grid = docked.first[/\.admin-dashboard__grid\s*\{([^}]*)\}/, 1]
     assert grid, "the docked block lays out .admin-dashboard__grid"
-    assert_grows_to_content_max(grid)
+    assert_grows_to_frame_max(grid)
     tiles = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard-main \(min-width: 64rem\)\s*\{/)
     assert_equal 1, tiles.size, "the draft tiles take a fourth column from 64rem of the main column"
     assert_match(/\.admin-draft-tiles\s*\{\s*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);\s*\}/, tiles.first)
@@ -1194,7 +1194,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal 1, docked.size, "one block docks the lists' rail"
     grid = docked.first[/\.admin-list-rail__grid\s*\{([^}]*)\}/, 1]
     assert grid, "the docked block lays out .admin-list-rail__grid"
-    assert_grows_to_content_max(grid)
+    assert_grows_to_frame_max(grid)
     assert_match(/grid-template-rows:\s*auto 1fr;/, grid, "a rail taller than the bar grows the list's row, never the bar's")
     rail = docked.first[/\.admin-list-rail__rail\s*\{([^}]*)\}/, 1]
     assert rail, "the docked block grounds .admin-list-rail__rail"
@@ -1259,14 +1259,20 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal 1, docked.size, "one block docks Settings' rail"
     docked_grid = docked.first[/\.admin-settings-layout__grid\s*\{([^}]*)\}/, 1]
     assert docked_grid, "the docked block lays out the grid"
-    assert_match(/grid-template-columns:\s*170px minmax\(0, var\(--cs-form-max\)\) var\(--cs-rail-width\);/, docked_grid, "the cards' column narrows as the area does; the rail keeps its width")
+    # The rail's place (Design System 1794973507-1201): the cards' column
+    # grows to 760px before the rail's track grows past 360px, and the rail
+    # stands at its track's end, the frame's right end, so the spare room
+    # opens between the column and the rail.
+    assert_match(/grid-template-columns:\s*170px minmax\(0, var\(--cs-form-max\)\) minmax\(var\(--cs-rail-width\), 1fr\);/, docked_grid, "the cards' column narrows as the area does; the rail's track keeps its width at least")
     assert_match(/grid-template-areas:\s*"nav cards glance";/, docked_grid)
-    assert_no_match(/justify-content/, docked_grid, "spare width below the max falls right of the rail")
+    assert_no_match(/justify-content/, docked_grid, "the nav and the cards stand at the frame's left")
     # The page frame (Design System 1794894016-5ccc): Settings stands from
     # the frame's left edge and is never centred, past the max included.
-    assert_no_match(/margin-inline|max-width/, docked_grid, "the frame stops the layout at the content max; nothing centres it")
+    assert_no_match(/margin/, docked_grid, "nothing centres it")
+    assert_match(/max-width:\s*var\(--admin-frame-max\);/, docked_grid, "the docked grid stops at the frame's right end")
     rail = docked.first[/\.admin-settings-glance\s*\{([^}]*)\}/, 1]
     assert rail, "the docked block grounds the rail"
+    assert_match(/justify-self:\s*end;\s*width:\s*var\(--cs-rail-width\);/, rail, "the rail is the rail's width, at its track's end")
     [ 'background:\s*var\(--cs-rail\)', 'box-shadow:\s*var\(--cs-shadow-2\)', 'border-radius:\s*var\(--cs-radius-rail\)', 'position:\s*sticky',
       'top:\s*calc\(var\(--admin-top-offset\) \+ var\(--cs-sp-4\)\)', 'max-height:\s*calc\(100dvh - var\(--admin-top-offset\) - 2 \* var\(--cs-sp-4\)\)',
       'overflow-y:\s*auto' ].each do |declaration|
@@ -1337,21 +1343,23 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-tag-usage\s*\{[^}]*height:\s*4px;[^}]*background:\s*var\(--cs-paper\);/, tailwind)
   end
 
-  # The one rule for spare width: a docked composition is a
-  # main column that takes what the rail leaves and the rail at its right,
-  # the whole stopping at `--cs-content-max` and never centred (the page
-  # frame, Design System 1794894016-5ccc: past the cap the spare width
-  # stays on the right); no `justify-content` of its own, so the grid's
-  # tracks start at its own left edge.
-  def assert_grows_to_content_max(grid)
+  # The one rule for spare width: a wide docked composition (the
+  # dashboard, a list, the media library) is a main column that takes what
+  # the rail leaves and the rail at its right, the whole stopping at
+  # `--admin-frame-max` and never centred (the page frame, Design System
+  # 1794894016-5ccc: past the cap the spare width stays on the right; the
+  # rail's place, 1794973507-1201: so the rail stands at the frame's right
+  # end); no `justify-content` of its own, so the grid's tracks start at its
+  # own left edge.
+  def assert_grows_to_frame_max(grid)
     assert_match(/grid-template-columns:\s*minmax\(0, 1fr\) var\(--cs-rail-width\);/, grid, "the main column takes what the rail leaves")
     assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid)
-    assert_stops_at_content_max_on_the_left(grid)
+    assert_stops_at_frame_max_on_the_left(grid)
     assert_no_match(/justify-content/, grid, "the tracks start at the composition's own left edge")
   end
 
-  def assert_stops_at_content_max_on_the_left(rule, what = "the composition")
-    assert_match(/max-width:\s*var\(--cs-content-max\);/, rule, "#{what} grows to the content max and no further")
+  def assert_stops_at_frame_max_on_the_left(rule, what = "the composition")
+    assert_match(/max-width:\s*var\(--admin-frame-max\);/, rule, "#{what} grows to the frame's cap and no further")
     assert_no_match(/margin/, rule, "#{what} is never centred")
   end
 
@@ -1359,15 +1367,53 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # page frame"): one frame, at the left, up to the content max; a head row
   # across it; two body widths. In `@layer components`, so a screen's
   # utility wins over it.
+  # THE FRAME'S RIGHT END (Design System 1794973507-1201): every screen's
+  # frame, its head row, the editor's header row and every docked grid stop
+  # at `--admin-frame-max`, which takes the page tree's track off
+  # `--cs-content-max` on a screen with a tree, so the frame and the docked
+  # rail at its end stand at one x on every screen. `--cs-content-max` is
+  # read by the frame's own property and nowhere else: a docked grid that
+  # read it directly would end one tree's width further right on Pages.
+  # The tree's track it subtracts is the held width, which has no
+  # percentage in it (a custom property is substituted where it is used, so
+  # the room's `100%` would mean another box's width in a `max-width`).
+  FRAME_MAX_READERS = [
+    ".admin-page", ".admin-page__head", ".admin-rail-grid", ".admin-dashboard__grid", ".admin-list-rail__grid",
+    ".admin-media-library__grid", ".admin-settings-layout__grid",
+    ".admin-editor-header:has(~ .admin-editor-area [data-rail-docked]) > *,\n.admin-editor-area:has([data-rail-docked]) .admin-editor-header > *"
+  ].freeze
+
+  test "the docked grids read --admin-frame-max, never --cs-content-max directly" do
+    css = self.class.stylesheet_without_comments("content-spiel.tailwind.css")
+    readers = css.scan(/([^{}]*)\{([^{}]*var\(--cs-content-max\)[^{}]*)\}/).map { |selector, body| [ selector.strip, body.strip ] }
+    assert_equal [ [ ":root", "--admin-frame-max: var(--cs-content-max);" ],
+                   [ ".admin-shell--tree", "--admin-frame-max: calc(var(--cs-content-max) - var(--admin-tree-held));" ] ], readers,
+      "--cs-content-max is read by --admin-frame-max alone"
+    tree_rule = self.class.css_blocks("content-spiel.tailwind.css", /@media \(min-width: 1024px\)\s*\{/).find { |body| body.include?("--admin-frame-max") }
+    assert_match(/\A\s*\.admin-shell--tree\s*\{[^}]*\}\s*\z/, tree_rule.to_s, "the tree's track comes off from 1024px, where the tree is a column")
+    held = css[/--admin-tree-held:\s*([^;]+);/, 1]
+    assert_equal "clamp(13.75rem, var(--admin-tree-width, 17rem), 30rem)", held, "the held width is the choice between its limits"
+    assert_no_match(/%|--admin-tree-room/, held, "the held width has no percentage, so it means the same where the frame reads it")
+    assert_match(/:root\[data-tree-folded\]\s*\{[^}]*--admin-tree-held:\s*var\(--admin-tree-strip\);/, css, "folded, the strip is the track the frame loses")
+
+    FRAME_MAX_READERS.each do |selector|
+      rule = css[/(?:\A|[{};])\s*#{Regexp.escape(selector)}\s*\{([^}]*max-width:\s*var\(--admin-frame-max\)[^}]*)\}/, 1]
+      assert rule, "#{selector.lines.first.strip} stops at --admin-frame-max"
+    end
+    assert_no_match(/max-w-\(--cs-content-max\)|max-w-\[1680px\]/, Dir[Rails.root.join("app/{views,components}/admin/**/*.erb")].map { |path| File.read(path) }.join,
+      "no view caps a frame by the content max itself")
+  end
+
   test "the page frame stops at the content max at the left, its head spans it, and its form body is --cs-form-max" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     layer = self.class.css_blocks("content-spiel.tailwind.css", /@layer components\s*\{/)
     assert_equal 1, layer.size, "the frame's rules stand in one components layer"
     frame = layer.first[/(?:\A|[{}])\s*\.admin-page\s*\{([^}]*)\}/, 1]
     assert frame, "the frame's own rule"
-    assert_match(/max-width:\s*var\(--cs-content-max\);/, frame)
+    assert_match(/max-width:\s*var\(--admin-frame-max\);/, frame)
     assert_no_match(/margin/, frame, "the frame is never centred")
     head = layer.first[/\.admin-page__head\s*\{([^}]*)\}/, 1]
+    assert_match(/max-width:\s*var\(--admin-frame-max\);/, head, "the head row stops where the frame does")
     assert_match(/justify-content:\s*space-between;/, head, "the action stands at the frame's right end")
     assert_match(/flex-wrap:\s*wrap;/, head)
     assert_match(/\.admin-page--form > \.admin-page__body\s*\{\s*max-width:\s*var\(--cs-form-max\);\s*\}/, layer.first)
@@ -1410,11 +1456,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty offenders, "a fixed width: pick the frame's wide or form body instead"
   end
 
-  # Nothing is centred past the content max, the docked compositions and
-  # the editor's header row included: each stops at `--cs-content-max`
+  # Nothing is centred past the frame's cap, the docked compositions and
+  # the editor's header row included: each stops at `--admin-frame-max`
   # from the left, the spare width on the right. Nothing in the stylesheet
   # carries an auto inline margin.
-  test "no docked composition or head row is centred past --cs-content-max" do
+  test "no docked composition or head row is centred past the frame's cap" do
     { "admin-editor" => [ ".admin-rail-grid" ],
       "admin-dashboard" => [ ".admin-dashboard__grid" ],
       "admin-list" => [ ".admin-list-rail__grid" ],
@@ -1423,7 +1469,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       selectors.each do |selector|
         rule = docked[/(?:\A|[};])\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/, 1]
         assert rule, "#{container}'s docked block lays out #{selector}"
-        assert_stops_at_content_max_on_the_left(rule, selector)
+        assert_stops_at_frame_max_on_the_left(rule, selector)
       end
     end
 
@@ -1432,49 +1478,66 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     header = css[/\.admin-editor-header:has\(~ \.admin-editor-area \[data-rail-docked\]\) > \*,\s*\.admin-editor-area:has\(\[data-rail-docked\]\) \.admin-editor-header > \*\s*\{([^}]*)\}/, 1]
     assert header, "the page's header (the editor area's sibling) and the post's (inside it) are held to the docked grid"
-    assert_stops_at_content_max_on_the_left(header, "the editor's header row")
+    assert_stops_at_frame_max_on_the_left(header, "the editor's header row")
     assert_empty css.scan(/margin-inline:\s*auto|margin:\s*0 auto/), "nothing in CS Studio is centred"
   end
 
-  test "every docked composition grows to --cs-content-max from the rail's tokens, at the one threshold" do
-    { "admin-editor" => /\.admin-rail-grid\s*\{([^}]*)\}/,
-      "admin-dashboard" => /\.admin-dashboard__grid\s*\{([^}]*)\}/,
+  test "every wide docked composition grows to --admin-frame-max from the rail's tokens, at the one threshold" do
+    { "admin-dashboard" => /\.admin-dashboard__grid\s*\{([^}]*)\}/,
       "admin-list" => /\.admin-list-rail__grid\s*\{([^}]*)\}/,
       "admin-media" => /\.admin-media-library__grid\s*\{([^}]*)\}/ }.each do |container, rule|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/)
       assert_equal 1, docked.size, "one block docks #{container}"
       grid = docked.first[rule, 1]
       assert grid, "#{container}'s docked grid"
-      assert_grows_to_content_max(grid)
+      assert_grows_to_frame_max(grid)
     end
   end
 
-  # Inside the editor's grown blocks column a field of running text keeps a
-  # measure and a wide block takes the column. The measure is on the field's
-  # wrapper, so its label, help and error lines share it.
-  test "a field of running text in the editor is capped at --cs-text-measure, the Code field at --cs-code-measure, and no wide block carries a measure" do
-    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-editor \(min-width: 1200px\)\s*\{/).first
-    field = '\.admin-rail-grid \.admin-rail__main :is\(\.admin-column, \.admin-field\)'
-    assert_match(/#{field}\s*\{\s*max-width:\s*var\(--cs-text-measure\);\s*\}/, docked, "a field of running text keeps the text measure")
-    assert_match(/#{field}:has\(\.admin-code-input\)\s*\{\s*max-width:\s*var\(--cs-code-measure\);\s*\}/, docked, "the Code field keeps the code measure")
-    wide = docked[/#{field}:is\(([^{]*)\)\s*\{\s*max-width:\s*none;\s*\}/, 1]
-    assert wide, "the wide fields take the column"
-    [ '[data-controller~="admin--media--field"]', ".admin-rich-text-table", ".admin-groups-field" ].each { |hook| assert_includes wide, hook }
-    assert_includes Admin::Fields::CodeField.instance_method(:input_class).source_location.then { |file, _| File.read(file) }, "admin-code-input"
+  # The editors' blocks column is the form column docked too (Design System
+  # 1794973507-1201): 760px from the left (1144px on a translation tab), the
+  # rail at the grid's right end and the spare room between, the gap the
+  # least of it. The regression of #293: a docked rule that took the form
+  # column's cap off (`max-width: none`) let the blocks grow to about 1037px
+  # at a 2000px window, while the measure kept their fields at about 660px.
+  test "docked, the editors' blocks column keeps the form column's width and the rail stands at the grid's end" do
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-editor \(min-width: 1200px\)\s*\{/)
+    assert_equal 1, docked.size, "one block docks the editors' rail"
+    grid = docked.first[/(?:\A|[};])\s*\.admin-rail-grid\s*\{([^}]*)\}/, 1]
+    assert grid, "the docked block lays out .admin-rail-grid"
+    assert_match(/grid-template-columns:\s*minmax\(0, var\(--cs-form-max\)\) var\(--cs-rail-width\);/, grid, "the blocks column is at most the form column")
+    assert_match(/justify-content:\s*space-between;/, grid, "the spare room stands between the blocks and the rail")
+    assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid, "the rail's gap is the least of it")
+    assert_stops_at_frame_max_on_the_left(grid, ".admin-rail-grid")
+    assert_match(/\.admin-rail-grid:has\(\.admin-form-column--pair\)\s*\{\s*grid-template-columns:\s*minmax\(0, var\(--cs-form-max-pair\)\) var\(--cs-rail-width\);\s*\}/, docked.first,
+      "a translation tab's column is at most the pair's width")
 
-    # The measure is the fields' alone: no wide part of the editor names it.
-    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    users = css.scan(/([^{}]*)\{[^}]*var\(--cs-(?:text|code)-measure\)[^}]*\}/).flatten.map(&:strip)
-    pair_half = ".admin-rail-grid .admin-rail__main .admin-translation-pair > *"
-    assert_equal 3, users.size, "the two measures are read by the two field rules and a pair's half alone: #{users.inspect}"
-    assert_includes users, pair_half, "a translation pair's halves keep the text measure"
-    (users - [ pair_half ]).each { |selector| assert_match(/\A#{field}/, selector) }
-    assert_match(/#{field}:has\(> \.admin-translation-pair\)\s*\{\s*max-width:\s*none;\s*\}/, docked, "a field holding a pair takes the column, its halves keep the measure")
-    %w[admin-block-card admin-section-card admin-section-lanes admin-rich-text-table admin-groups-field].each do |wide_part|
-      assert_no_match(/\.#{wide_part}[^{]*\{[^}]*-measure/, css, "#{wide_part} carries no measure")
+    # The form column's cap is a plain rule, outside every `@layer`, and no
+    # rule anywhere takes it off or widens the blocks column: a layered rule
+    # loses to it, and a docked one cannot undo it.
+    css = self.class.stylesheet_without_comments("content-spiel.tailwind.css")
+    caps = css.scan(/([^{}]*)\{([^{}]*max-width[^{}]*)\}/).select { |selector, _| selector.match?(/\.admin-(?:form-column|content-blocks|rail__main)\b/) }
+    assert_equal [ [ ".admin-form-column", "max-width: var(--cs-form-max);" ], [ ".admin-form-column--pair", "max-width: var(--cs-form-max-pair);" ] ],
+      caps.map { |selector, body| [ selector.strip, body.strip ] }, "the blocks column's width is the form column's two rules alone"
+    self.class.css_blocks("content-spiel.tailwind.css", /@layer [\w-]+\s*\{/).each do |layer|
+      assert_no_match(/\.admin-form-column/, layer, "the form column's cap stands outside every layer, so nothing layered outweighs it")
     end
-    # Nothing under the editor's grid caps a block card or a section frame by width.
-    assert_no_match(/\.(?:admin-block-card|admin-section-card|admin-section-lanes)[^{]*\{[^}]*max-width/, css, "a wide block takes the column")
+  end
+
+  # EVERY FIELD FILLS ITS CARD (Design System 1794973507-1201, StudioBlockCard):
+  # the 760px column is the line length, so a field in a block card (its
+  # wrapper `.admin-column`) carries no cap of its own, and no rule of the
+  # stylesheet holds a field to the text or code measure; those two stay for
+  # running text in a box wider than the form column (a screen's lead line).
+  test "every field fills its block card, and no field in the editor carries a measure" do
+    css = self.class.stylesheet_without_comments("content-spiel.tailwind.css")
+    assert_match(/(?:\A|\})\s*\.admin-block-card \.admin-column\s*\{\s*max-width:\s*none;\s*\}/, css, "a field in a block card takes the card's width")
+    assert_no_match(/var\(--cs-(?:text|code)-measure\)/, css, "no stylesheet rule holds a field to a measure")
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-editor \(min-width: 1200px\)\s*\{/).first
+    assert_no_match(/\.admin-(?:column|field)\b[^{]*\{[^}]*max-width/, docked, "docked, no field is capped")
+    fields = Dir[Rails.root.join("app/components/admin/{fields,columns}/**/*.{erb,rb}")]
+    assert_operator fields.size, :>, 10, "the field components were found"
+    assert_empty fields.select { |path| File.read(path).match?(/max-w-\(--cs-(?:text|code)-measure\)/) }, "a field component carries a measure"
   end
 
   # THE POST FORM HOLDS NO SIZE CONTAINER. Docked, `form#post-form` is

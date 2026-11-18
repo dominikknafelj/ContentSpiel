@@ -809,8 +809,10 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
   end
 
   # The page frame (Design System 1794894016-5ccc): Settings stands from the
-  # frame's left edge, the h1 over the nav, and is never centred.
-  test "past the content max Settings stays at the left, the spare width on the right" do
+  # frame's left edge, the h1 over the nav, and is never centred. The rail
+  # stands at the frame's right end, as every docked rail does (Design System
+  # 1794973507-1201): the spare room opens between the cards and the rail.
+  test "past the content max Settings stays at the left, the rail at the frame's right end" do
     at_window(2400) do
       visit_screen admin_settings_path
       boxes = layout
@@ -820,6 +822,12 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
       h1 = page.evaluate_script("(() => { const r = document.querySelector('.admin-page__head h1').getBoundingClientRect(); return { left: r.left, bottom: r.bottom } })()")
       assert_in_delta boxes["nav"]["left"], h1["left"], 1, "the h1 stands over the nav"
       assert_operator h1["bottom"], :<=, boxes["nav"]["top"] + 1
+      assert_in_delta 760, boxes["cards"]["width"], 1, "the cards keep the form column's width"
+      frame_right = page.evaluate_script("document.querySelector('.admin-page').getBoundingClientRect().right")
+      sidebar = page.evaluate_script("document.getElementById('sidebar').getBoundingClientRect().right")
+      assert_in_delta sidebar + 24 + 1680, frame_right, 1, "the frame ends at its right end"
+      assert_in_delta frame_right, boxes["rail"]["right"], 1, "the rail stands at the frame's right end"
+      assert_operator boxes["rail"]["left"] - boxes["cards"]["right"], :>, 28, "the spare room stands between the cards and the rail"
     end
   end
 end

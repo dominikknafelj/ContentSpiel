@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- Every docked right rail stands at one place, the frame's right end, on every screen (Design System 1794973507-1201, FoundationLayout "The rail's place and the editor's column"): the Dashboard's, the Posts list's and the Tags screen's, the page and post editors', Settings' At a glance and the Media screen's image panel, with the page tree shown, folded or absent (at a 2000px window the rail's left edge is x 1584 on all of them; the page editor's was 1601 and Settings' 1250). The page tree's column now stands inside the frame's width: `--admin-frame-max`, `--cs-content-max` less the tree's track on a screen with a tree from 1024px, caps the page frame, its heading row, the editor's header row and every docked grid, so the frame's left edge follows the tree and its right end does not. Settings keeps its nav and its 760px column at the frame's left, and past 1346px of its area the spare room opens between the column and the rail instead of after the rail. `--admin-tree-held` (the chosen tree width between its limits) is new beside `--admin-tree-column`.
+
+### Fixed
+
+- The page and post editors' blocks column is 760px again with the rail docked (1144px on a translation tab), from the frame's left, the spare room between it and the rail: since #293 it grew with the window (block cards about 1037px at a 2000px window) while their fields stayed at the 72ch measure, about 660px, leaving an empty band on each card's right. Every field fills its card now (the rich-text box with its toolbar, a caption, the Code field, a table's box, an image field); no field in a block card carries `--cs-text-measure` or `--cs-code-measure`, and a table wider than its card scrolls in its own box as before.
+
 ## 0.10.0 (2026-11-17)
 
 ### Added
