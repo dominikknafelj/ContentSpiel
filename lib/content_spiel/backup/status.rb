@@ -66,7 +66,7 @@ module ContentSpiel
           temp.chmod(0o644)
           File.rename(temp, path)
         ensure
-          temp.delete if temp.exist?
+          FileUtils.rm_f(temp)
         end
       end
 
