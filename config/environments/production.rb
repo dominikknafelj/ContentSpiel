@@ -15,8 +15,11 @@ Rails.application.configure do
   # Turn on fragment caching in view templates.
   config.action_controller.perform_caching = true
 
-  # Cache assets for far-future expiry since they are all digest stamped.
-  config.public_file_server.headers = { "cache-control" => "public, max-age=#{1.year.to_i}" }
+  # A file in public/ is kept by a cache for an hour, and a digested asset
+  # for a year: `ContentSpiel::PublicFileCache` gives the year back to a
+  # name that carries its digest. A year for every file kept a changed
+  # /icon.svg in browsers and a CDN (lib/content_spiel/public_file_cache.rb).
+  config.public_file_server.headers = ContentSpiel::PublicFileCache.headers
 
   # Enable serving of images, stylesheets, and JavaScripts from an asset server.
   # config.asset_host = "http://assets.example.com"

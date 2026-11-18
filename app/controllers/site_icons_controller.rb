@@ -14,11 +14,12 @@
 # `/icon.svg`, `/icon.png` and `/apple-touch-icon.png`).
 #
 # On the public wall's terms (`Cookieless`): an `ActionController::API`
-# carries no session, so the answer sets no cookie, and it may be kept by a
-# cache for a day.
+# carries no session, so the answer sets no cookie. Its address never
+# changes when the icon does, so a cache keeps it for the hour every
+# undigested file in public/ is kept for (`ContentSpiel::PublicFileCache`),
+# never longer.
 class SiteIconsController < ActionController::API
   DEFAULTS = Rails.root.join("public/icons")
-  KEPT_FOR = 1.day
 
   def favicon = send_icon("favicon.ico", "image/x-icon")
 
@@ -27,7 +28,7 @@ class SiteIconsController < ActionController::API
   private
 
   def send_icon(name, type)
-    expires_in KEPT_FOR, public: true
+    expires_in ContentSpiel::PublicFileCache::KEPT_FOR, public: true, stale_while_revalidate: ContentSpiel::PublicFileCache::STALE_FOR
     send_file(Theme.current.site_icon(name) || DEFAULTS.join(name), type: type, disposition: "inline")
   end
 end

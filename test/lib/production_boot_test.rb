@@ -46,6 +46,8 @@ class ProductionBootTest < ActiveSupport::TestCase
     puts "health check excluded: #{[ config.host_authorization[:exclude], config.ssl_options.dig(:redirect, :exclude) ].all? { |rule| rule.equal?(HostSettings::HEALTH_CHECK) }}"
     puts "theme: #{Theme.current.name} #{Theme.current.fingerprint}"
     puts "trusted proxies: #{config.action_dispatch.trusted_proxies&.map { |range| "#{range}/#{range.prefix}" }.inspect}"
+    stack = Rails.application.middleware.middlewares
+    puts "public files: #{config.public_file_server.headers.inspect}, digested a year before the static server: #{[ ContentSpiel::PublicFileCache, ActionDispatch::Static ].map { stack.index(it) }.then { |cache, static| cache && static && cache < static }.inspect}"
     assets = Rails.application.assets
     puts "js comment compiler: #{assets.compilers.registrations["text/javascript"].include?(ContentSpiel::JsCommentCompiler)}"
     puts "assets version: #{assets.config.version}"
@@ -78,6 +80,8 @@ class ProductionBootTest < ActiveSupport::TestCase
     # Rails' own list first, the variable's ranges after it.
     proxies = ActionDispatch::RemoteIp::TRUSTED_PROXIES.map { |range| "#{range}/#{range.prefix}" } + [ "173.245.48.0/20", "2400:cb00::/32" ]
     assert_includes lines, "trusted proxies: #{proxies.inspect}"
+    # A file in public/ an hour, never Rails' year (lib/content_spiel/public_file_cache.rb).
+    assert_includes lines, "public files: #{ContentSpiel::PublicFileCache.headers.inspect}, digested a year before the static server: true"
     # The image's `assets:precompile` runs this production configuration:
     # the app's own scripts are served without their comment lines, every
     # line break kept, under a version that names the stripper's revision.

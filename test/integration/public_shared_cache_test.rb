@@ -151,9 +151,9 @@ class PublicSharedCacheTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the site's icons keep their own day" do
+  test "the site's icons keep their own hour, a shared cache's seconds or not" do
     shared { get "/favicon.ico" }
     assert_response :success
-    assert_equal "max-age=86400, public", response.headers["Cache-Control"]
+    assert_equal ContentSpiel::PublicFileCache::SHORT, response.headers["Cache-Control"]
   end
 end

@@ -15,8 +15,10 @@ Rails.application.configure do
   # loading is working properly before deploying your code.
   config.eager_load = ENV["CI"].present?
 
-  # Configure public file server for tests with cache-control for performance.
-  config.public_file_server.headers = { "cache-control" => "public, max-age=3600" }
+  # The public file server says what production's says (an hour, and a year
+  # for a digested asset: lib/content_spiel/public_file_cache.rb), so the
+  # integration tests read production's headers.
+  config.public_file_server.headers = ContentSpiel::PublicFileCache.headers
 
   # Show full error reports.
   config.consider_all_requests_local = true
