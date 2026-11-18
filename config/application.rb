@@ -54,6 +54,10 @@ require_relative "../lib/content_spiel/suggest_gate"
 # `sql.active_record` subscriber for the life of the process.
 require_relative "../lib/content_spiel/lock_order"
 
+# And this one because config/initializers/assets.rb hands its compiler to
+# Propshaft, which keeps it for the life of the process (production only).
+require_relative "../lib/content_spiel/js_comment_compiler"
+
 module ContentSpiel
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
