@@ -181,6 +181,29 @@ jobs:
       - name: Pull the commit's image
         run: docker pull "$CMS"
 
+      # The static test (test/lib/backup_image_test.rb) holds the Dockerfile;
+      # this holds what Debian actually installed: restic at least 0.16 and a
+      # pg_dump no older than the Postgres the site template runs, which the
+      # step reads from the image's own copy of lib/site_template (the job has
+      # no checkout).
+      - name: The image's backup tools
+        run: |
+          want_pg="$(docker run --rm --entrypoint cat "$CMS" /rails/lib/site_template/config/deploy.yml.tt \
+            | sed -n 's/.*image: postgres:\([0-9][0-9]*\).*/\1/p' | head -n 1)"
+          out="$(docker run --rm --entrypoint sh "$CMS" -c 'restic version && pg_dump --version')"
+          echo "$out"
+          restic="$(printf '%s\n' "$out" | sed -n 's/^restic \([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n 1)"
+          pg="$(printf '%s\n' "$out" | sed -n 's/^pg_dump (PostgreSQL) \([0-9][0-9]*\).*/\1/p' | head -n 1)"
+          if [ -z "$want_pg" ] || [ -z "$restic" ] || [ -z "$pg" ]; then
+            echo "::error::could not read the tools' versions"; exit 1
+          fi
+          if [ "$(printf '%s\n0.16\n' "$restic" | sort -V | head -n 1)" != "0.16" ]; then
+            echo "::error::restic $restic is older than 0.16"; exit 1
+          fi
+          if [ "$pg" -lt "$want_pg" ]; then
+            echo "::error::pg_dump $pg is older than the template's Postgres $want_pg"; exit 1
+          fi
+
       # Every command exactly as install/contentspiel runs it:
       #
       #   docker run --rm -i --user "$(id -u):$(id -g)" \

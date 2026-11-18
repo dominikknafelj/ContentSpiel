@@ -14,9 +14,12 @@ FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 # Rails app lives here
 WORKDIR /rails
 
-# Install base packages
+# Install base packages. restic sends the backups (bin/backup), and the
+# Postgres client's major must be at least the server's (the site template runs
+# Postgres 17), which test/lib/backup_image_test.rb holds; the base image is
+# Debian 13 (trixie), whose packages are restic 0.18 and Postgres 17.
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libjemalloc2 libvips libheif-plugin-aomenc postgresql-client && \
+    apt-get install --no-install-recommends -y curl libjemalloc2 libvips libheif-plugin-aomenc postgresql-client-17 restic && \
     ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
