@@ -42,6 +42,11 @@ class ContentSpiel::Backup::FailureTest < ActiveSupport::TestCase
     end
   end
 
+  test "stderr that is not clean UTF-8 text is still classified" do
+    assert_equal "disk_full", classify(:restic, 1, "\xFF No space left on device".b.force_encoding("UTF-8"))
+    assert_equal "other", classify(:restic, 1, nil)
+  end
+
   test "an unknown message is other" do
     assert_equal "other", classify(:restic, 1, "something strange")
     assert_equal "other", classify(:pg_dump, 1, "something strange")

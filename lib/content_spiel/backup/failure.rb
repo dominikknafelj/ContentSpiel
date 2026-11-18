@@ -21,6 +21,7 @@ module ContentSpiel
 
       # tool is :restic or :pg_dump.
       def self.classify(tool:, exit_status:, stderr:)
+        stderr = stderr.to_s.scrub
         return "disk_full" if stderr.match?(DISK_FULL)
 
         case tool

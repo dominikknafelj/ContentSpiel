@@ -27,10 +27,9 @@ module ContentSpiel
       # nil: no file. A file that is not this JSON, or names an unknown
       # outcome or reason, is unreadable.
       def self.read(path)
-        path = Pathname(path)
-        return nil unless path.exist?
-
-        parse(JSON.parse(path.read))
+        parse(JSON.parse(Pathname(path).read))
+      rescue Errno::ENOENT
+        nil
       rescue JSON::ParserError, SystemCallError, ArgumentError, TypeError, EncodingError
         unreadable
       end
@@ -44,9 +43,18 @@ module ContentSpiel
         return unreadable unless values[:last_check_outcome].nil? || self::CHECK_OUTCOMES.include?(values[:last_check_outcome])
         return unreadable unless [ values[:error], values[:check_error] ].all? { |r| r.nil? || Failure::REASONS.include?(r) }
 
+        return unreadable unless typed?(values)
+
         new(**values)
       end
       private_class_method :parse
+
+      def self.typed?(values)
+        [ :snapshot, :cms_version ].all? { |m| values[m].nil? || values[m].is_a?(String) } &&
+          [ :database_bytes, :files_bytes ].all? { |m| values[m].nil? || values[m].is_a?(Integer) } &&
+          (values[:duration_seconds].nil? || values[:duration_seconds].is_a?(Numeric))
+      end
+      private_class_method :typed?
 
       # mkdir -p, a temp file beside the file, a rename: whole or absent.
       def write(path)

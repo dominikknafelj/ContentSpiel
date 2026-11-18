@@ -40,7 +40,7 @@ class ContentSpiel::Backup::StatusTest < ActiveSupport::TestCase
     path = Status.path(@root)
     assert_nil Status.read(path)
     FileUtils.mkdir_p(path.dirname)
-    [ "{", "[]", '{"outcome":"maybe"}', '{"outcome":"failed","error":"boom"}' ].each do |text|
+    [ "{", "[]", '{"outcome":"ok","database_bytes":[1]}', '{"outcome":"ok","snapshot":5}', '{"outcome":"ok","duration_seconds":"x"}', '{"outcome":"maybe"}', '{"outcome":"failed","error":"boom"}' ].each do |text|
       path.write(text)
       status = Status.read(path)
       assert_predicate status, :unreadable?, text
