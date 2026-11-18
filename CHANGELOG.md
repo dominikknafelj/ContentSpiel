@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.10.1 (2026-11-17)
+
 ### Changed
 
 - Every docked right rail stands at one place, the frame's right end, on every screen (Design System 1794973507-1201, FoundationLayout "The rail's place and the editor's column"): the Dashboard's, the Posts list's and the Tags screen's, the page and post editors', Settings' At a glance and the Media screen's image panel, with the page tree shown, folded or absent (at a 2000px window the rail's left edge is x 1584 on all of them; the page editor's was 1601 and Settings' 1250). The page tree's column now stands inside the frame's width: `--admin-frame-max`, `--cs-content-max` less the tree's track on a screen with a tree from 1024px, caps the page frame, its heading row, the editor's header row and every docked grid, so the frame's left edge follows the tree and its right end does not. Settings keeps its nav and its 760px column at the frame's left, and past 1346px of its area the spare room opens between the column and the rail instead of after the rail. Settings' At a glance docks from 1120px of the Settings area (it was 1140px), so a 1440px window docks it with a classic 15px scrollbar too (its area is 1137px). `--admin-tree-held` (the chosen tree width between its limits) is new beside `--admin-tree-column`.
