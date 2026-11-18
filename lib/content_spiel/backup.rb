@@ -155,9 +155,13 @@ module ContentSpiel
     def schedule(runs: Float::INFINITY)
       hour = backup_hour or return 1
       done = 0
+      last_run = nil
       until @stopping || done >= runs
         if @repository
-          next_run = self.class.next_run_at(@clock.call, hour)
+          # From the later of now and the last run's hour: a wall clock set
+          # back after a run cannot give a second run that day.
+          next_run = self.class.next_run_at([ @clock.call, last_run ].compact.max, hour)
+          last_run = next_run
           @out.puts("[backup] next run at #{next_run.strftime("%Y-%m-%d %H:%M")} UTC")
           @sleeper.call(next_run - @clock.call)
           break if @stopping
@@ -286,18 +290,23 @@ module ContentSpiel
     # any) and answers that size. Anything a step raises that is not a
     # StepFailed (a tool that cannot be started) is the reason "other", named
     # on err by its class alone.
+    #
+    # After stop!, a step that has not started does not start, and one that
+    # was running fails as "other", whatever its tool answered: a tool killed
+    # by TERM can print anything, and its words are no reason.
     def step(name)
+      raise StepFailed.new(name, "other") if @stopping
+
       @out.puts("[backup] #{name} started")
       began = @clock.call
       size = begin
         yield
-      rescue StepFailed
-        raise
+      rescue StepFailed => failure
+        raise(@stopping ? StepFailed.new(name, "other") : failure)
       rescue StandardError => error
         @err.puts("[backup] #{name} stopped by #{error.class}")
         raise StepFailed.new(name, "other")
       end
-      # stop! during the step: the run ends here, whatever the tool answered.
       raise StepFailed.new(name, "other") if @stopping
 
       @out.puts("[backup] #{name} finished in #{(@clock.call - began).round}s#{", #{self.class.human_size(size)}" if size}")

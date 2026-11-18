@@ -137,9 +137,10 @@ jobs:
       SITE_IMAGE: contentspiel-site-template:${{ github.sha }}
       BOOT: contentspiel-site-template-boot
       # The backup step's restic repository and files volume, named volumes
-      # removed by the clean-up.
-      BACKUP_REPO: contentspiel-site-template-backup-repo
-      BACKUP_FILES: contentspiel-site-template-backup-files
+      # removed by the clean-up, named by the run so two runs on one
+      # self-hosted runner never share one.
+      BACKUP_REPO: contentspiel-site-template-backup-repo-${{ github.run_id }}
+      BACKUP_FILES: contentspiel-site-template-backup-files-${{ github.run_id }}
       # The port /up is asked on, on the runner. Production is served on 80
       # inside the container (Thruster, the CMS image's CMD).
       SITE_PORT: "3000"
@@ -431,6 +432,7 @@ jobs:
           # stderr beside it, both searched for the password, then printed.
           said=""
           errors="$(mktemp)"
+          trap 'rm -f "$errors"' EXIT
           backup() {
             local name="$1" entrypoint="$2" code=0 err
             shift 2

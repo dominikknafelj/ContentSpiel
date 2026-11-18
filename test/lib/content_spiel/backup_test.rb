@@ -476,6 +476,20 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert_equal [ 3_630 ], sleeps
   end
 
+  test "a wall clock set back after a run does not give a second run that day" do
+    times = [ Time.utc(2026, 11, 18, 2, 0) ]
+    sleeps = []
+    sleeper = ->(seconds) { sleeps << seconds; times << times.last + seconds }
+    # During the 03:00 run the clock is set back to 02:30.
+    runner = FakeBackupRunner.new("forget" => lambda do |*|
+      times << Time.utc(2026, 11, 18, 2, 30)
+      Outcome.new(exit_status: 0, stdout: "", stderr: "")
+    end)
+    backup(clock: -> { times.last }, sleeper: sleeper, runner: runner).schedule(runs: 2)
+    assert_equal [ 3_600, 88_200 ], sleeps
+    assert_includes @out.string, "[backup] next run at 2026-11-19 03:00 UTC"
+  end
+
   test "schedule refuses a BACKUP_HOUR that is not 0 to 23 and exits 1" do
     [ "24", "-1", "3am", "", " ", "3.0" ].each do |value|
       @err = StringIO.new
@@ -523,6 +537,26 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert_equal %w[pg_dump backup forget], runner.steps
     assert_equal [ "failed", "other", "1a2b3c4d", NOW ], [ status.outcome, status.error, status.snapshot, status.last_ok_at ]
 
+    # A stopped tool's words are no reason, and no step starts after a stop.
+    runner = FakeBackupRunner.new("backup" => lambda do |*|
+      command.stop!
+      Outcome.new(exit_status: 1, stdout: "", stderr: "dial tcp: i/o timeout")
+    end)
+    command = backup(runner: runner, sleeper: ->(_) { })
+    assert_equal 143, command.schedule
+    assert_equal %w[pg_dump backup], runner.steps
+    assert_equal "other", status.error
+
+    runner = FakeBackupRunner.new("pg_dump" => lambda do |argv, _env|
+      command.stop!
+      File.binwrite(argv[argv.index("--file") + 1], "x")
+      Outcome.new(exit_status: 0, stdout: "", stderr: "")
+    end)
+    command = backup(runner: runner, sleeper: ->(_) { })
+    assert_equal 143, command.schedule
+    assert_equal %w[pg_dump], runner.steps
+    assert_equal "[backup] failed at dump: other", @out.string.lines(chomp: true).last
+
     # A check that the stop ended is no failed check: it stays due.
     previous_ok(last_check_at: Time.utc(2026, 10, 1, 3)).write(Status.path(@root))
     runner = FakeBackupRunner.new("check" => lambda do |*|
@@ -540,8 +574,11 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     %w[TERM INT].each do |signal|
       IO.popen({ "BACKUP_REPOSITORY" => nil }, [ RbConfig.ruby, Rails.root.join("bin/backup").to_s, "schedule" ],
         err: File::NULL) do |io|
+        within = ->(what) { IO.select([ io ], nil, nil, 10) or flunk("#{signal}: no #{what} within 10 seconds") }
+        within.call("first line")
         assert_equal Backup::NOT_CONFIGURED, io.gets&.chomp, signal
         Process.kill(signal, io.pid)
+        within.call("end")
         assert_nil io.gets, signal
       end
       assert_equal 0, $?.exitstatus, signal
