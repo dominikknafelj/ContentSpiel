@@ -60,7 +60,7 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
       NICE + %W[pg_dump --format=custom --no-password --file #{dump_file} --dbname content_spiel_production],
       NICE + %W[restic backup --json --host #{SITE} --tag site=#{SITE} --tag cms=#{ContentSpiel::VERSION}
                 --exclude #{@root.join("storage", "backup")} #{@dump_dir} #{storage}],
-      NICE + %W[restic forget --host #{SITE} --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune]
+      NICE + %W[restic forget --host #{SITE} --keep-within-hourly 24h --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune]
     ]
   end
 
@@ -84,7 +84,9 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert_equal "/tmp/content_spiel_backup", Backup::DUMP_DIR
     assert_equal "database.dump", Backup::DUMP_FILE
     assert_equal ".lock", Backup::LOCK_SUFFIX
-    assert_equal %w[--keep-daily 7 --keep-weekly 4 --keep-monthly 6], Backup::RETENTION
+    assert_equal %w[--keep-within-hourly 24h --keep-daily 7 --keep-weekly 4 --keep-monthly 6], Backup::RETENTION
+    assert_equal [ 1, 2, 3, 4, 6, 8, 12, 24 ], Backup::EVERY_HOURS
+    assert_equal 24, Backup::DEFAULT_EVERY
     assert_equal 12, Backup::CHECK_PARTS
   end
 
@@ -450,6 +452,29 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert_equal [ 3, "", "no" ], [ failed.exit_status, failed.stdout, failed.stderr ]
   end
 
+  test "a run's tools start under nice and ionice, and without an ionice in the PATH under nice alone" do
+    backup.run
+    @runner.calls.each { |argv, _| assert_equal NICE, argv.first(NICE.size), argv.inspect }
+    assert_equal %w[nice -n 19 ionice -c 3 -t], Backup::NICE
+
+    Dir.mktmpdir do |with|
+      Dir.mktmpdir do |without|
+        File.write(File.join(with, "ionice"), "#!/bin/sh\n")
+        File.chmod(0o755, File.join(with, "ionice"))
+        argv = NICE + %w[restic snapshots]
+        assert_equal argv, Runner.without_ionice(argv, "#{without}:#{with}")
+        assert_equal %w[nice -n 19 restic snapshots], Runner.without_ionice(argv, without)
+        assert_equal %w[restic snapshots], Runner.without_ionice(%w[restic snapshots], without)
+      end
+    end
+
+    # The real runner, with or without an ionice on this host: the tool runs,
+    # with only its own variables and an empty stdin.
+    script = "print ENV.keys.grep_v(/\\A__CF_/).sort.join(','), ' ', $stdin.read.inspect"
+    outcome = Runner.new.call(NICE + [ RbConfig.ruby, "-e", script ], env: { "PATH" => Backup::PATH })
+    assert_equal [ 0, "PATH \"\"", "" ], [ outcome.exit_status, outcome.stdout, outcome.stderr ]
+  end
+
   test "the runner's interrupt sends TERM to the running child, and is harmless with none" do
     runner = Runner.new
     runner.interrupt
@@ -527,7 +552,8 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert_equal ContentSpiel::VERSION, seen.cms_version
     assert_equal Time.utc(2026, 11, 18, 2, 59, 30), seen.started_at
     text = RunningVersion.path(@root).read
-    assert_equal %w[cms_version started_at], JSON.parse(text).keys.sort
+    assert_equal %w[cms_version every_hours started_at], JSON.parse(text).keys.sort
+    assert_equal 24, seen.every_hours
     HIDDEN.each { |value| refute_includes text, value }
     refute_includes text, SITE
     assert_equal "100644", format("%o", RunningVersion.path(@root).stat.mode)
@@ -555,6 +581,71 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     backup(clock: -> { times.last }, sleeper: sleeper, runner: runner).schedule(runs: 2)
     assert_equal [ 3_600, 88_200 ], sleeps
     assert_includes @out.string, "[backup] next run at 2026-11-19 03:00 UTC"
+  end
+
+  test "next_run_at at a cadence is the next of the UTC hours BACKUP_HOUR + k * every, strictly after now" do
+    # Every hour from 3: each hour on the hour.
+    assert_equal Time.utc(2026, 11, 18, 4), Backup.next_run_at(Time.utc(2026, 11, 18, 3, 0, 0), 3, 1)
+    assert_equal Time.utc(2026, 11, 18, 0), Backup.next_run_at(Time.utc(2026, 11, 17, 23, 30), 3, 1)
+    # Every 6 hours from 3: 03, 09, 15 and 21.
+    assert_equal Time.utc(2026, 11, 18, 3), Backup.next_run_at(Time.utc(2026, 11, 18, 0, 10), 3, 6)
+    assert_equal Time.utc(2026, 11, 18, 9), Backup.next_run_at(Time.utc(2026, 11, 18, 3, 0, 0), 3, 6)
+    assert_equal Time.utc(2026, 11, 18, 21), Backup.next_run_at(Time.utc(2026, 11, 18, 15, 1), 3, 6)
+    assert_equal Time.utc(2026, 11, 19, 3), Backup.next_run_at(Time.utc(2026, 11, 18, 21, 0, 0), 3, 6)
+    # Every 6 hours from 23: 05, 11, 17 and 23.
+    assert_equal Time.utc(2026, 11, 18, 5), Backup.next_run_at(Time.utc(2026, 11, 18, 0, 0), 23, 6)
+    # Every 24 hours is once a day at the hour, as without a cadence.
+    assert_equal Time.utc(2026, 11, 19, 3), Backup.next_run_at(Time.utc(2026, 11, 18, 3, 0, 0), 3, 24)
+    assert_equal Time.utc(2026, 11, 18, 3), Backup.next_run_at(Time.utc(2026, 11, 18, 2, 59), 3, 24)
+  end
+
+  test "schedule runs at every slot of BACKUP_EVERY and writes the cadence into the accessory's file" do
+    { "1" => [ 1_800, 3_600, 3_600 ], "6" => [ 1_800, 21_600, 21_600 ], "24" => [ 1_800, 86_400, 86_400 ],
+      " " => [ 1_800, 86_400, 86_400 ] }.each do |value, expected|
+      @out = StringIO.new
+      @root.join("storage", "backup").rmtree if @root.join("storage", "backup").exist?
+      clock, sleeper, sleeps = fake_time(Time.utc(2026, 11, 18, 2, 30))
+      runner = FakeBackupRunner.new
+      assert_equal 0, backup(env: @env.merge("BACKUP_EVERY" => value), clock: clock, sleeper: sleeper, runner: runner).schedule(runs: 3)
+      assert_equal expected, sleeps, value.inspect
+      assert_equal 3, runner.steps.count("pg_dump"), value.inspect
+      assert_equal value.strip.empty? ? 24 : value.to_i, RunningVersion.read(RunningVersion.path(@root)).every_hours, value.inspect
+    end
+    assert_includes @out.string, "[backup] next run at 2026-11-18 03:00 UTC"
+  end
+
+  test "schedule refuses a BACKUP_EVERY that is not one of the divisors of a day, names it and exits 1" do
+    [ "5", "7", "0", "48", "-6", "6h", "6.0", "x" ].each do |value|
+      @err = StringIO.new
+      assert_equal 1, backup(env: @env.merge("BACKUP_EVERY" => value)).call([ "schedule" ]), value.inspect
+      assert_includes @err.string, "BACKUP_EVERY", value.inspect
+      assert_includes @err.string, "1, 2, 3, 4, 6, 8, 12, 24", value.inspect
+    end
+    assert_empty @runner.calls
+    assert_not RunningVersion.path(@root).exist?
+  end
+
+  test "at a cadence of hours a failed run is not retried before the next slot" do
+    clock, sleeper, sleeps = fake_time(Time.utc(2026, 11, 18, 2, 30))
+    runner = FakeBackupRunner.new("pg_dump" => Outcome.new(exit_status: 1, stdout: "", stderr: "could not connect"))
+    backup(env: @env.merge("BACKUP_EVERY" => "6"), clock: clock, sleeper: sleeper, runner: runner).schedule(runs: 2)
+    assert_equal [ 1_800, 21_600 ], sleeps
+    assert_equal 2, runner.steps.count("pg_dump")
+    assert_includes @out.string, "[backup] next run at 2026-11-18 09:00 UTC"
+  end
+
+  test "at a cadence of hours a wall clock set back after a run gives no second run in that slot" do
+    times = [ Time.utc(2026, 11, 18, 2, 0) ]
+    sleeps = []
+    sleeper = ->(seconds) { sleeps << seconds; times << times.last + seconds }
+    # During the 03:00 run the clock is set back to 02:30.
+    runner = FakeBackupRunner.new("forget" => lambda do |*|
+      times << Time.utc(2026, 11, 18, 2, 30)
+      Outcome.new(exit_status: 0, stdout: "", stderr: "")
+    end)
+    backup(env: @env.merge("BACKUP_EVERY" => "6"), clock: -> { times.last }, sleeper: sleeper, runner: runner).schedule(runs: 2)
+    assert_equal [ 3_600, 23_400 ], sleeps
+    assert_includes @out.string, "[backup] next run at 2026-11-18 09:00 UTC"
   end
 
   test "schedule refuses a BACKUP_HOUR that is not 0 to 23 and exits 1" do

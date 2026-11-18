@@ -132,6 +132,8 @@ class SiteGeneratorTest < ActiveSupport::TestCase
       assert_equal "s3:https://<endpoint>/<bucket>/my-site", backup.dig("env", "clear", "BACKUP_REPOSITORY")
       assert_equal "auto", backup.dig("env", "clear", "AWS_DEFAULT_REGION")
       assert_equal({ "cpus" => 1 }, backup["options"])
+      assert_includes deploy, "# BACKUP_EVERY: 24"
+      assert_nil backup.dig("env", "clear", "BACKUP_EVERY"), "the cadence stays commented, a day"
       assert_equal config.dig("accessories", "db"), kamal_config(site).dig("accessories", "db"), "uncommenting touches nothing else"
 
       # The block is the one `contentspiel upgrade` prints, from one source.

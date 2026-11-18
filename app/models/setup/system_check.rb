@@ -59,9 +59,11 @@ module Setup
     # builds the index in the foreground. A fixed string.
     SEARCH_REINDEX_COMMAND = "bin/rails search:reindex".freeze
 
-    # How old the newest good backup may be before the Backups row warns: a
-    # day plus slack for a slow run.
-    FRESH_BACKUP = 26.hours
+    # How old the newest good backup may be before the Backups row warns:
+    # the accessory's hours between runs (`RunningVersion#every_hours`, a day
+    # without its file) plus this slack for a slow run, so 26 hours at the
+    # default cadence.
+    FRESH_SLACK = 2.hours
 
     # Where the "No backup has run on this site" warning sends the reader, at the
     # tag of the running version.
@@ -153,7 +155,8 @@ module Setup
     # `search`; a test passes any value that is not a `Status` (`:none`) for
     # "no file". `running_version` is the accessory's own version file
     # (`ContentSpiel::Backup::RunningVersion.read`), read the same way; any
-    # value that is not one (`:none`) is "no readable file".
+    # value that is not one (`:none`) is "no readable file". `backups_off`
+    # is `ContentSpiel::Backup.off?` (BACKUPS=off), which a test says.
     #
     # `theme` is the theme that draws the site (`Theme.current`), handed in so
     # a test can say it. `stylesheet_probe` answers whether the public
@@ -171,7 +174,7 @@ module Setup
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil, remote_ip: nil, cf_connecting_ip: nil,
       mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false,
       sso_provider: SignIn::Sso::Provider.current, sso_required: SignIn::Sso.required?,
-      search: nil, backup_status: nil, running_version: nil)
+      search: nil, backup_status: nil, running_version: nil, backups_off: ContentSpiel::Backup.off?)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -186,6 +189,7 @@ module Setup
       @search = search
       @backup_status = backup_status
       @running_version = running_version
+      @backups_off = backups_off
       @address = address
       @admin_address = admin_address
       @request_ssl = request_ssl
@@ -519,12 +523,13 @@ module Setup
         end
       end
 
-      # Backups, from the status file the backup accessory writes. No file is
-      # "not configured": the web container cannot tell a site without the
+      # Backups. Off, whatever the files say, on a site that keeps none on
+      # purpose (BACKUPS=off). Otherwise from the status file the backup
+      # accessory writes. No file is "not configured": the web container cannot tell a site without the
       # accessory from one whose accessory never ran. An unreadable file is a
       # warning of its own. Otherwise the warnings that apply, in order and
       # joined by a space: the last run failed, the newest good backup is
-      # older than FRESH_BACKUP (a day plus slack for a slow run) or there is
+      # older than the accessory's cadence plus FRESH_SLACK or there is
       # none, the monthly check failed, the accessory runs another version
       # than the site (the version the accessory wrote when it started, or,
       # without that file, the one that made the last run). None is OK with
@@ -535,19 +540,22 @@ module Setup
       def backups
         t = ->(key, **values) { I18n.t("admin.system_status.backups.#{key}", **values) }
         label = t.call(:label)
+        return Result.new(label:, status: :off, message: t.call(:off), docs: BACKUPS_DOCS) if @backups_off
+
         status = @backup_status || ContentSpiel::Backup::Status.read(ContentSpiel::Backup::Status.path(Rails.root))
         return Result.new(label:, status: :warning, message: t.call(:not_configured), docs: BACKUPS_DOCS) unless status.is_a?(ContentSpiel::Backup::Status)
         return Result.new(label:, status: :warning, message: t.call(:unreadable)) if status.unreadable?
 
         reason = ->(code) { t.call("reasons.#{ContentSpiel::Backup::Failure::REASONS.include?(code) ? code : :other}") }
+        running = @running_version || ContentSpiel::Backup::RunningVersion.read(ContentSpiel::Backup::RunningVersion.path(Rails.root))
+        fresh = ContentSpiel::Backup::RunningVersion.every_hours_of(running).hours + FRESH_SLACK
         age = status.good_backup_age(Time.current)
         sentences = []
         sentences << t.call(:failed, reason: reason.call(status.error)) unless status.ok?
         if age.nil? then sentences << t.call(:never)
-        elsif age >= FRESH_BACKUP then sentences << t.call(:stale, age: backup_age(age))
+        elsif age >= fresh then sentences << t.call(:stale, age: backup_age(age))
         end
         sentences << t.call(:check_failed, reason: reason.call(status.check_error)) if status.check_failed?
-        running = @running_version || ContentSpiel::Backup::RunningVersion.read(ContentSpiel::Backup::RunningVersion.path(Rails.root))
         version = running.is_a?(ContentSpiel::Backup::RunningVersion) ? running.cms_version : status.cms_version
         other_version = version.present? && version != ContentSpiel::VERSION
         sentences << t.call(:version, backup: version, site: ContentSpiel::VERSION) if other_version

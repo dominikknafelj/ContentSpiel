@@ -37,7 +37,9 @@ end
 # provider would otherwise sign every test's page with a button.
 # SEARCH_BACKEND goes too: a developer's outside engine would otherwise stop
 # the test boot, which registers the built-in alone.
-%w[PUBLIC_HOST ADMIN_HOST THEME_PATH
+# BACKUPS goes too: a developer's BACKUPS=off would turn every Backups row
+# and backup alert off.
+%w[PUBLIC_HOST ADMIN_HOST THEME_PATH BACKUPS
    MAIL_SMTP_SERVER MAIL_SMTP_PORT MAIL_SMTP_SECURITY MAIL_SMTP_USERNAME MAIL_SMTP_PASSWORD
    MAIL_SENDER_NAME MAIL_SENDER_ADDRESS
    TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY LEAKED_PASSWORD_CHECK

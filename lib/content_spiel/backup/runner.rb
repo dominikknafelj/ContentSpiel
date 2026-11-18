@@ -11,8 +11,26 @@ module ContentSpiel
     # command line). Its stdout and stderr are read to the end, in two threads
     # so a full pipe on one side never stalls the child; what they hold is the
     # caller's to classify, never to print. Plain Ruby, standard library only.
+    #
+    # A run's tools come with Backup::NICE in front (nice -n 19, ionice's idle
+    # class), so a backup yields the CPU and the disk to the website. ionice
+    # is util-linux's, Essential in Debian and named in the Dockerfile; on a
+    # host where it is not in the child's PATH (a hand-built image, macOS) the
+    # runner drops it from the argv and the tool runs under nice alone,
+    # rather than a run failing for want of a priority (`without_ionice`).
     class Runner
       Outcome = Data.define(:exit_status, :stdout, :stderr)
+      IONICE = %w[ionice -c 3 -t].freeze
+
+      # argv without IONICE when it starts with nice and no folder of `path`
+      # (the children's fixed PATH, Backup::PATH) holds an executable ionice.
+      def self.without_ionice(argv, path)
+        at = argv.each_cons(IONICE.size).find_index { |part| part == IONICE }
+        return argv unless at && argv.first == "nice"
+        return argv if path.to_s.split(File::PATH_SEPARATOR).any? { |dir| File.executable?(File.join(dir, "ionice")) }
+
+        argv[0, at] + argv[(at + IONICE.size)..]
+      end
 
       # The running child's pid, read by #interrupt: a plain variable and no
       # Mutex, because #interrupt is called from a signal trap, where a Mutex
@@ -22,6 +40,7 @@ module ContentSpiel
       end
 
       def call(argv, env:)
+        argv = self.class.without_ionice(argv, PATH)
         out_read, out_write = IO.pipe
         err_read, err_write = IO.pipe
         # in: File::NULL and not :close: whether a tool sees a closed stdin

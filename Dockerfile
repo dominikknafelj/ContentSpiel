@@ -18,8 +18,10 @@ WORKDIR /rails
 # Postgres client's major must be at least the server's (the site template runs
 # Postgres 17), which test/lib/backup_image_test.rb holds; the base image is
 # Debian 13 (trixie), whose packages are restic 0.18 and Postgres 17.
+# util-linux (Essential, so already there) is named for ionice, which with
+# coreutils' nice starts a backup's tools at low CPU and disk priority.
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libjemalloc2 libvips libheif-plugin-aomenc postgresql-client-17 restic && \
+    apt-get install --no-install-recommends -y curl libjemalloc2 libvips libheif-plugin-aomenc postgresql-client-17 restic util-linux && \
     ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 

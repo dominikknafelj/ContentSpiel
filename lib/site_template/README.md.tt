@@ -140,7 +140,9 @@ If a deploy fails, read the site's log with `kamal app logs`.
 
 ### 4.4 Backups
 
-Once a day, the backup accessory copies the database and the uploaded files, encrypted with a password only you hold, to a bucket at a storage provider of your choice, and keeps 7 daily, 4 weekly and 6 monthly copies. Choose a provider other than your server's, so one account's trouble cannot take both.
+Once a day (or more often, `BACKUP_EVERY` below), the backup accessory copies the database and the uploaded files, encrypted with a password only you hold, to a bucket at a storage provider of your choice, and keeps every copy of the last day, then 7 daily, 4 weekly and 6 monthly ones. Choose a provider other than your server's, so one account's trouble cannot take both.
+
+A site that keeps no backups on purpose (all its content comes from git) skips this step and sets `BACKUPS: off` under the web's `env: clear:` in `config/deploy.yml`: System status then shows its Backups row as off instead of warning, and no backup alert is sent.
 
 First make the bucket and a key that may read and write it. Each provider gives you an endpoint (the address `BACKUP_REPOSITORY` starts with), the key's two halves (an access key ID and a secret access key) and, where it asks for one, a region:
 
@@ -154,7 +156,7 @@ Then turn the accessory on in `config/deploy.yml`, at the end of `accessories:`:
 
 1. Take `# ` out of every line between `# The backup accessory` and `# End of the backup accessory` (not the two marks themselves), so `backup:` stands under `db:` at the same depth. In most editors: select the lines between the two marks and toggle the line comment (often Cmd-/ or Ctrl-/), which takes out `# ` and leaves the indentation.
 2. In `BACKUP_REPOSITORY`, replace `<endpoint>` with the endpoint without `https://` and `<bucket>` with the bucket's name: `s3:https://fsn1.your-objectstorage.com/my-bucket/<%= name %>`. The last part is the folder in the bucket, so one bucket can hold several sites.
-3. Set `AWS_DEFAULT_REGION` as your provider's paragraph says. To run at another hour than 03:00 UTC, uncomment `BACKUP_HOUR` and set it (0 to 23, UTC).
+3. Set `AWS_DEFAULT_REGION` as your provider's paragraph says. To run at another hour than 03:00 UTC, uncomment `BACKUP_HOUR` and set it (0 to 23, UTC). To run more often than once a day, uncomment `BACKUP_EVERY` and set the hours between runs (1, 2, 3, 4, 6, 8, 12 or 24): the runs fall at `BACKUP_HOUR` and every that many hours after it, busy hours included.
 
 And the three secrets, in `.kamal/secrets` (copied from `.kamal/secrets.example` in step 4.1, which says how to make each): uncomment the lines of `RESTIC_PASSWORD`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` and give each its value, as for the other secrets. Make the restic password once and keep it in your password manager: **losing it loses every backup**, and nobody can recover it.
 

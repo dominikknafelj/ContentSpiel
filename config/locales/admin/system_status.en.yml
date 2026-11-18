@@ -73,6 +73,8 @@ en:
         label: "Backups"
         ok: "Last backup %{age}, %{size}."
         not_configured: "No backup has run on this site. The backups reference says how to set them up."
+        # Quoted: a bare off is YAML's false.
+        "off": "Switched off with BACKUPS=off: this site keeps no backups."
         unreadable: "The backup status file can't be read, so the state of the backups is unknown."
         failed: "The last backup failed: %{reason}."
         stale: "The last good backup was %{age}."

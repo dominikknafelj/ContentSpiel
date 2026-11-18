@@ -23,11 +23,12 @@ module ContentSpiel
   #   run that finds it held says so and ends with 1, writing no status, so a
   #   person's `kamal accessory exec backup --reuse "bin/backup run"` and the
   #   schedule's never share the dump or the status.
-  # - schedule: run once a day at BACKUP_HOUR, the accessory's long-running
-  #   command. Configured, it first writes its version (RunningVersion), which
-  #   System status compares with the site's. It sleeps until the hour, runs,
-  #   and sleeps until the next day's:
-  #   a failed run is not retried, so a broken destination fails once a day,
+  # - schedule: run every BACKUP_EVERY hours (default 24) at the fixed UTC
+  #   hours BACKUP_HOUR + k * BACKUP_EVERY, its slots, the accessory's
+  #   long-running command. Configured, it first writes its version and its
+  #   cadence (RunningVersion), which System status and the alert read. It
+  #   sleeps until the next slot, runs, and sleeps until the one after:
+  #   a failed run is not retried, so a broken destination fails once a slot,
   #   never in a loop. Unconfigured, it says so once a day and runs nothing.
   #   stop! (bin/backup traps TERM and INT with it: as the container's PID 1,
   #   Ruby would otherwise ignore TERM and Kamal's stop would wait and kill)
@@ -35,7 +36,7 @@ module ContentSpiel
   #   running tool, which ends the run as failed ("other") and the schedule
   #   with 143. A status file that cannot be written (a full disk) raises out
   #   of the schedule; the accessory's restart policy (Kamal's default,
-  #   unless-stopped) starts it again, sleeping until the next day's hour.
+  #   unless-stopped) starts it again, sleeping until the next slot.
   # - list: restic's snapshots. init: a new repository. restore: a snapshot's
   #   dump and files into an empty folder, as database.dump and files/; it
   #   touches no database and no live volume.
@@ -65,7 +66,10 @@ module ContentSpiel
     # The run lock's file, beside the dump folder and never in it (restic
     # backs that folder up) nor in the files volume.
     LOCK_SUFFIX = ".lock"
-    RETENTION = %w[--keep-daily 7 --keep-weekly 4 --keep-monthly 6].freeze
+    # Every snapshot of the last day (restic 0.14 and later; the image's is
+    # Debian's 0.18), then one a day, a week and a month: at a cadence of a
+    # day the first rule keeps nothing the second would not.
+    RETENTION = %w[--keep-within-hourly 24h --keep-daily 7 --keep-weekly 4 --keep-monthly 6].freeze
     CHECK_PARTS = 12
     NICE = %w[nice -n 19 ionice -c 3 -t].freeze
     # The children's PATH, fixed: the image's tools are all here, and the
@@ -78,7 +82,7 @@ module ContentSpiel
     USAGE = <<~TEXT
       Usage: bin/backup COMMAND
         run                    one backup now
-        schedule               a backup every day at BACKUP_HOUR (UTC, default 3)
+        schedule               a backup every BACKUP_EVERY hours (default 24) from BACKUP_HOUR (UTC, default 3)
         list                   the snapshots
         restore SNAPSHOT DIR   a snapshot (or latest) into an empty folder DIR, as database.dump and files/
         init                   a new repository at BACKUP_REPOSITORY, once per site
@@ -86,6 +90,12 @@ module ContentSpiel
     UNITS = %w[B KB MB GB TB].freeze
     DEFAULT_HOUR = 3
     DAY = 86_400
+    HOUR = 3_600
+    # The hours BACKUP_EVERY may name: the divisors of a day, so the slots
+    # fall at the same UTC hours every day. RunningVersion holds the list, so
+    # the web container reads a cadence by the same one.
+    EVERY_HOURS = RunningVersion::EVERY_HOURS
+    DEFAULT_EVERY = RunningVersion::DEFAULT_EVERY
     # The exit code of a schedule stopped during a run: 128 + TERM.
     STOPPED = 143
 
@@ -100,11 +110,23 @@ module ContentSpiel
       end
     end
 
-    # The next hour:00:00 UTC strictly after now.
-    def self.next_run_at(now, hour)
+    # The next slot strictly after now: the first of the UTC hours
+    # hour + k * every (mod 24), on the hour. `every` divides 24, so the
+    # slots repeat each day and counting from the day's first is enough.
+    def self.next_run_at(now, hour, every = DEFAULT_EVERY)
       now = now.getutc
-      today = Time.utc(now.year, now.month, now.day, hour)
-      today > now ? today : today + DAY
+      first = Time.utc(now.year, now.month, now.day, hour % every)
+      return first if first > now
+
+      first + (((now - first) / (every * HOUR)).floor + 1) * every * HOUR
+    end
+
+    # Whether the web container is told the site keeps no backups on purpose
+    # (BACKUPS=off, any case): System status shows the row as off and the
+    # alert stays quiet. Any other value, or none, expects backups, so a
+    # misspelt switch keeps the warning. The one reader of the variable.
+    def self.off?(env = ENV)
+      env["BACKUPS"].to_s.strip.casecmp?("off")
     end
 
     def self.human_size(bytes)
@@ -146,6 +168,7 @@ module ContentSpiel
       @postgres_password = present(@env["POSTGRES_PASSWORD"])
       @home = present(@env["HOME"])
       @backup_hour = @env["BACKUP_HOUR"]&.strip
+      @backup_every = @env["BACKUP_EVERY"]&.strip
     end
 
     # The exit code: 0, 1 for a failure, 2 for a command line it does not know.
@@ -163,18 +186,20 @@ module ContentSpiel
       end
     end
 
-    # Runs `runs` days (tests give a number), and answers 0, or STOPPED when
-    # stop! came during a run, or 1 for a BACKUP_HOUR that is not an hour.
+    # Runs `runs` slots (tests give a number), and answers 0, or STOPPED when
+    # stop! came during a run, or 1 for a BACKUP_HOUR or BACKUP_EVERY it
+    # refuses.
     def schedule(runs: Float::INFINITY)
       hour = backup_hour or return 1
-      write_running_version if @repository
+      every = backup_every or return 1
+      write_running_version(every) if @repository
       done = 0
       last_run = nil
       until @stopping || done >= runs
         if @repository
-          # From the later of now and the last run's hour: a wall clock set
-          # back after a run cannot give a second run that day.
-          next_run = self.class.next_run_at([ @clock.call, last_run ].compact.max, hour)
+          # From the later of now and the last run's slot: a wall clock set
+          # back after a run cannot give a second run in that slot.
+          next_run = self.class.next_run_at([ @clock.call, last_run ].compact.max, hour, every)
           last_run = next_run
           @out.puts("[backup] next run at #{next_run.strftime("%Y-%m-%d %H:%M")} UTC")
           @sleeper.call(next_run - @clock.call)
@@ -251,8 +276,9 @@ module ContentSpiel
     # The version marker is a hint for System status, so a write that fails
     # is named by its class and the schedule goes on: System status then
     # compares the status file's version.
-    def write_running_version
-      RunningVersion.new(cms_version: ContentSpiel::VERSION, started_at: @clock.call).write(RunningVersion.path(@root))
+    def write_running_version(every)
+      RunningVersion.new(cms_version: ContentSpiel::VERSION, started_at: @clock.call, every_hours: every)
+        .write(RunningVersion.path(@root))
     rescue SystemCallError => error
       @err.puts("[backup] could not write the accessory's version: #{error.class}")
     end
@@ -272,6 +298,16 @@ module ContentSpiel
       return @backup_hour.to_i if @backup_hour.match?(/\A\d{1,2}\z/) && @backup_hour.to_i <= 23
 
       @err.puts("Cannot schedule: BACKUP_HOUR must be a whole hour from 0 to 23 (UTC), or unset for #{DEFAULT_HOUR}.")
+      nil
+    end
+
+    # BACKUP_EVERY as an Integer (DEFAULT_EVERY when unset or blank), or nil
+    # with the sentence said.
+    def backup_every
+      return DEFAULT_EVERY if @backup_every.nil? || @backup_every.empty?
+      return @backup_every.to_i if @backup_every.match?(/\A\d{1,2}\z/) && EVERY_HOURS.include?(@backup_every.to_i)
+
+      @err.puts("Cannot schedule: BACKUP_EVERY must be one of #{EVERY_HOURS.join(", ")} (hours), or unset for #{DEFAULT_EVERY}.")
       nil
     end
 

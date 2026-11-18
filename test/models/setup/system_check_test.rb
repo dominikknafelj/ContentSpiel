@@ -822,13 +822,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
   test "Backups: the accessory's own version wins over the status's, so a reboot clears the warning before the next run" do
     travel_to Time.utc(2026, 11, 18, 12) do
-      rebooted = ContentSpiel::Backup::RunningVersion.new(cms_version: ContentSpiel::VERSION, started_at: 10.minutes.ago)
+      rebooted = ContentSpiel::Backup::RunningVersion.new(cms_version: ContentSpiel::VERSION, started_at: 10.minutes.ago, every_hours: 24)
       row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago, cms_version: "0.0.1"), running_version: rebooted))
 
       assert_predicate row, :ok?
       assert_nil row.command
 
-      behind = ContentSpiel::Backup::RunningVersion.new(cms_version: "0.0.2", started_at: 10.minutes.ago)
+      behind = ContentSpiel::Backup::RunningVersion.new(cms_version: "0.0.2", started_at: 10.minutes.ago, every_hours: 24)
       row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago), running_version: behind))
 
       assert_equal "The backup accessory runs ContentSpiel 0.0.2 and the site #{ContentSpiel::VERSION}. Reboot it to move it to the site\'s version:", row.message
@@ -841,6 +841,47 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       row = result("Backups", run_check(backup_status: backup_status(last_ok_at: 1.hour.ago, cms_version: "0.0.1"), running_version: :none))
 
       assert_equal "The backup accessory runs ContentSpiel 0.0.1 and the site #{ContentSpiel::VERSION}. Reboot it to move it to the site\'s version:", row.message
+    end
+  end
+
+  test "Backups: BACKUPS=off is an off row with the reference's link, with a status file or without" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      [ :none, backup_status(outcome: "failed", error: "other", last_ok_at: 90.hours.ago), backup_status(last_ok_at: 1.hour.ago) ].each do |status|
+        row = result("Backups", run_check(backup_status: status, backups_off: true))
+
+        assert_equal :off, row.status
+        assert_predicate row, :off?
+        assert_equal "Switched off with BACKUPS=off: this site keeps no backups.", row.message
+        assert_equal Setup::SystemCheck::BACKUPS_DOCS, row.docs
+        assert_nil row.command
+      end
+    end
+  end
+
+  test "Backups: BACKUPS is off for off in any case, stripped, and a misspelt value keeps the warning" do
+    [ "off", "OFF", " Off\n" ].each { |value| assert ContentSpiel::Backup.off?({ "BACKUPS" => value }), value.inspect }
+    [ nil, "", "of", "no", "false", "0", "disabled", "off please" ].each do |value|
+      assert_not ContentSpiel::Backup.off?({ "BACKUPS" => value }), value.inspect
+    end
+
+    row = result("Backups", run_check(backup_status: :none, backups_off: ContentSpiel::Backup.off?({ "BACKUPS" => "of" })))
+    assert_equal :warning, row.status
+    assert_equal "No backup has run on this site. The backups reference says how to set them up.", row.message
+  end
+
+  test "Backups: the row warns at the accessory's cadence plus 2 hours, and at 26 hours with a day's or no file" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      every6 = ContentSpiel::Backup::RunningVersion.new(cms_version: ContentSpiel::VERSION, started_at: 3.days.ago, every_hours: 6)
+      assert_predicate result("Backups", run_check(backup_status: backup_status(last_ok_at: (8.hours - 1.minute).ago), running_version: every6)), :ok?
+      at8 = result("Backups", run_check(backup_status: backup_status(last_ok_at: 8.hours.ago), running_version: every6))
+      assert_equal :warning, at8.status
+      assert_equal "The last good backup was 8 hours ago.", at8.message
+
+      daily = ContentSpiel::Backup::RunningVersion.new(cms_version: ContentSpiel::VERSION, started_at: 3.days.ago, every_hours: 24)
+      [ daily, :none ].each do |running|
+        assert_predicate result("Backups", run_check(backup_status: backup_status(last_ok_at: (26.hours - 1.minute).ago), running_version: running)), :ok?
+        assert_equal :warning, result("Backups", run_check(backup_status: backup_status(last_ok_at: 26.hours.ago), running_version: running)).status
+      end
     end
   end
 
@@ -886,7 +927,8 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
       defaults = {
         search: search_status,
         storage_probe: -> { true }, image_probe: -> { true }, worker_alive_probe: -> { true },
-        queue_adapter: "async", address: SiteAddress.parse("https://cms.example.org"), stylesheet_probe: -> { true }
+        queue_adapter: "async", address: SiteAddress.parse("https://cms.example.org"), stylesheet_probe: -> { true },
+        backups_off: false
       }
       Setup::SystemCheck.run(**defaults.merge(overrides))
     end

@@ -42,6 +42,7 @@ module ContentSpiel
           image: #{cms_image}:<%= pin %>
           host: <%= server_ip %>
           cmd: bin/backup schedule
+          # One CPU at most, so a backup can never take the whole server.
           options:
             cpus: 1
           env:
@@ -51,6 +52,8 @@ module ContentSpiel
               BACKUP_REPOSITORY: s3:https://<endpoint>/<bucket>/#{service}
               AWS_DEFAULT_REGION: auto
               # BACKUP_HOUR: 3
+              # Hours between runs from BACKUP_HOUR: 1, 2, 3, 4, 6, 8, 12 or 24.
+              # BACKUP_EVERY: 24
             secret:
               - POSTGRES_PASSWORD
               - RESTIC_PASSWORD
