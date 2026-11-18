@@ -145,6 +145,13 @@ Everything here is Must. Three sub-projects; none is scheduled against the list 
 
 ### Performance and caching
 
+**The performance block, after backups (#175)** (owner, 2026-11-18, after asking whether the CMS is mature in performance). A visitor's page is fast on a small site behind a CDN (the guide: phone LCP 0.82–0.97 s, CLS 0.00, `docs/reference/hosting.md`, and contentspiel-docs' "How ContentSpiel compares"), but nothing has been measured under load, with a large site or without a CDN in front. In this order, each measured before and after:
+
+1. **A load test and a large data set.** A seed with thousands of pages, posts and library images (item 5 of "Next, in order" names the data set), then a load test of the production image on a short-lived Hetzner server of the guide's size (owner, 2026-11-18; made and removed for the test, never the guide's own server), so like the smallest real host (2 shared cores, 4 GB, Postgres on the same machine, Solid Cache, Queue and Cable in it): public pages with and without a CDN in front, the search, and several editors autosaving at once. It decides the order of the next three, and whether Solid Cache's reads are a bottleneck at all (Redis is not added without that measurement: it would be one more service every site runs and backs up).
+2. **Step 1 below (the whole-page cache) and the content version in one statement** (#121).
+3. **Purge on publish** (C4 below), so the edge may keep a page for hours instead of `PUBLIC_SHARED_CACHE_SECONDS`' minute.
+4. **CS Studio:** controllers loaded when used and the public import map (#124), the post lists (#122), and the page editor profiled (its slowest screen, about 270 ms median).
+
 In this order; each step needs the one before. The two steps they build on shipped with the technical cleanup: URLs are synced only when they can have changed, and the content version is one counter row that moves only on published changes.
 
 | Step | Ref |
