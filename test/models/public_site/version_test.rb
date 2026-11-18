@@ -718,6 +718,30 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_equal before + 1, counter
     assert_includes out, (before + 1).to_s
   end
+
+  test "jump_past! moves a small counter to the floor and a larger one by one" do
+    PublicSite::Version.upsert({ id: PublicSite::Version::ROW_ID, counter: 5 }, unique_by: :id)
+
+    assert_equal 1_000, PublicSite::Version.jump_past!(1_000)
+    assert_equal 1_000, counter
+    assert_equal 1_001, PublicSite::Version.jump_past!(10)
+    assert_equal 1_001, counter
+  end
+
+  test "jump_past! creates the row when there is none" do
+    PublicSite::Version.delete_all
+
+    assert_equal 42, PublicSite::Version.jump_past!(42)
+    assert_equal 42, counter
+  end
+
+  test "jump_past! deletes a stray row of another id" do
+    PublicSite::Version.insert({ id: 99, counter: 3 })
+
+    PublicSite::Version.jump_past!(10)
+
+    assert_equal [ PublicSite::Version::ROW_ID ], PublicSite::Version.pluck(:id)
+  end
 end
 
 # The increment is `counter = counter + 1` in the database, so two writers
