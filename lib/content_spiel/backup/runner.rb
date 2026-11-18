@@ -3,8 +3,10 @@ module ContentSpiel
     # Runs one tool (pg_dump, restic) for bin/backup and hands back what it
     # said. The child gets exactly the environment it is handed
     # (unsetenv_others: nothing of the accessory's own variables leaks into a
-    # tool that does not need them), a closed stdin (a tool that would prompt
-    # for a password fails at once instead of waiting forever), and is started
+    # tool that does not need them), its stdin from /dev/null (an immediate
+    # end of input on Linux and macOS alike: a tool that would prompt for a
+    # password fails at once instead of waiting forever, and a closed fd 0 is
+    # never left for the child's first open() to take), and is started
     # from its argv, never through a shell (a value is never parsed as a
     # command line). Its stdout and stderr are read to the end, in two threads
     # so a full pipe on one side never stalls the child; what they hold is the
@@ -22,8 +24,15 @@ module ContentSpiel
       def call(argv, env:)
         out_read, out_write = IO.pipe
         err_read, err_write = IO.pipe
+        # in: File::NULL and not :close: whether a tool sees a closed stdin
+        # depends on the tool's own runtime. GNU and BSD cat read the closed
+        # fd 0 and fail with EBADF, while a Rust tool (uutils coreutils, the
+        # default on ubuntu-26.04) reopens any closed fd 0-2 on /dev/null at
+        # start and reads an empty input. A closed fd 0 is also free for the
+        # child's first open() to take. /dev/null gives every tool the same
+        # immediate EOF.
         pid = Process.spawn(env, [ argv.first, argv.first ], *argv.drop(1),
-          unsetenv_others: true, in: :close, out: out_write, err: err_write)
+          unsetenv_others: true, in: File::NULL, out: out_write, err: err_write)
         @pid = pid
         [ out_write, err_write ].each(&:close)
         readers = [ out_read, err_read ].map { |io| Thread.new { io.read.force_encoding(Encoding::UTF_8) } }

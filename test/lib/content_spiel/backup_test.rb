@@ -1,6 +1,7 @@
 require "test_helper"
 require "tmpdir"
 require "stringio"
+require "timeout"
 require_relative "../../support/fake_backup_runner"
 
 class ContentSpiel::BackupTest < ActiveSupport::TestCase
@@ -421,16 +422,29 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
   end
 
   # macOS's CoreFoundation sets __CF_USER_TEXT_ENCODING inside every process.
-  test "the runner hands the child only the given environment and a closed stdin, never through a shell" do
+  test "the runner hands the child only the given environment and its stdin from /dev/null, never through a shell" do
     script = "print ENV.keys.grep_v(/\\A__CF_/).sort.join(','), ' ', ARGV.inspect"
     outcome = Runner.new.call([ RbConfig.ruby, "-e", script, "$HOME; echo x" ], env: { "ONLY" => "1" })
     assert_equal 0, outcome.exit_status
     assert_equal "ONLY [\"$HOME; echo x\"]", outcome.stdout
     assert_empty outcome.stderr
 
-    closed = Runner.new.call(%w[cat], env: { "PATH" => Backup::PATH })
-    refute_equal 0, closed.exit_status
-    assert_match(/Bad file descriptor/, closed.stderr)
+    # cat reads stdin to its end: with /dev/null that is an immediate EOF, so
+    # it returns at once, quietly, on Linux and macOS; the parent's stdin (or a
+    # closed one) would hang or fail.
+    # The parent's own stdin is a pipe that holds data, so a child that
+    # inherited it would print it.
+    feed_read, feed_write = IO.pipe
+    feed_write.write("from the parent")
+    saved = $stdin.dup
+    $stdin.reopen(feed_read)
+    begin
+      empty = Timeout.timeout(10) { Runner.new.call(%w[cat], env: { "PATH" => Backup::PATH }) }
+    ensure
+      $stdin.reopen(saved)
+      [ saved, feed_read, feed_write ].each(&:close)
+    end
+    assert_equal [ 0, "", "" ], [ empty.exit_status, empty.stdout, empty.stderr ]
 
     failed = Runner.new.call([ RbConfig.ruby, "-e", "$stderr.print 'no'; exit 3" ], env: {})
     assert_equal [ 3, "", "no" ], [ failed.exit_status, failed.stdout, failed.stderr ]

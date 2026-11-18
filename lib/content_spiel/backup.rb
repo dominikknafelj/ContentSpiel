@@ -56,7 +56,7 @@ module ContentSpiel
   # through with every secret and the repository replaced by HIDDEN, and drop
   # its stderr. A missing secret is named (its name, never a value) before any
   # tool starts, since a tool without its password would prompt on a stdin
-  # that is not there.
+  # that is /dev/null.
   class Backup
     COMMANDS = %w[run schedule list restore init].freeze
     DATABASE = "content_spiel_production"
