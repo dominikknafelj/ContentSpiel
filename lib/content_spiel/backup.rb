@@ -15,8 +15,17 @@ module ContentSpiel
   #   RETENTION, and once a month (the first run of a month, or the run after
   #   a failed check) restic check of one twelfth of the data, the month's.
   #   Then the status file, ok or failed, which is the one thing it writes in
-  #   the files volume.
-  # - schedule: run once a day at BACKUP_HOUR.
+  #   the files volume. A run whose snapshot was taken and whose forget then
+  #   failed is failed, but records that snapshot as the newest good backup.
+  # - schedule: run once a day at BACKUP_HOUR, the accessory's long-running
+  #   command. It sleeps until the hour, runs, and sleeps until the next day's:
+  #   a failed run is not retried, so a broken destination fails once a day,
+  #   never in a loop. Unconfigured, it says so once a day and runs nothing.
+  #   stop! (bin/backup traps TERM and INT with it: as the container's PID 1,
+  #   Ruby would otherwise ignore TERM and Kamal's stop would wait and kill)
+  #   wakes a sleep, which ends the schedule with 0, or sends TERM to the
+  #   running tool, which ends the run as failed ("other") and the schedule
+  #   with 143.
   # - list: restic's snapshots. init: a new repository. restore: a snapshot's
   #   dump and files into an empty folder, as database.dump and files/; it
   #   touches no database and no live volume.
@@ -62,6 +71,10 @@ module ContentSpiel
         init                   a new repository at BACKUP_REPOSITORY, once per site
     TEXT
     UNITS = %w[B KB MB GB TB].freeze
+    DEFAULT_HOUR = 3
+    DAY = 86_400
+    # The exit code of a schedule stopped during a run: 128 + TERM.
+    STOPPED = 143
 
     # A step that failed, with its reason (one of Failure::REASONS).
     class StepFailed < StandardError
@@ -74,6 +87,13 @@ module ContentSpiel
       end
     end
 
+    # The next hour:00:00 UTC strictly after now.
+    def self.next_run_at(now, hour)
+      now = now.getutc
+      today = Time.utc(now.year, now.month, now.day, hour)
+      today > now ? today : today + DAY
+    end
+
     def self.human_size(bytes)
       size = bytes.to_f
       unit = 0
@@ -84,27 +104,35 @@ module ContentSpiel
       unit.zero? ? "#{bytes} B" : format("%.1f %s", size, UNITS[unit])
     end
 
+    # sleeper: nil sleeps until the seconds pass or stop! is called.
     def initialize(env:, out:, err:, root:, runner: Runner.new, clock: -> { Time.now.utc },
-      sleeper: ->(seconds) { sleep(seconds) }, dump_dir: DUMP_DIR)
+      sleeper: nil, dump_dir: DUMP_DIR)
       @env = env
       @out = out
       @err = err
       @root = File.expand_path(root)
       @runner = runner
       @clock = clock
-      @sleeper = sleeper
+      @sleeper = sleeper || method(:wait)
       @dump_dir = File.expand_path(dump_dir)
+      # A pipe and not a Queue: stop! runs in a signal trap on the thread
+      # that sleeps, and Queue#pop(timeout:) does not wake for a push made
+      # there (Ruby 3.4) until its timeout, where IO.select does.
+      @wake_read, @wake_write = IO.pipe
+      @stopping = false
 
-      @repository = present(@env["BACKUP_REPOSITORY"])
-      @site = present(@env["BACKUP_SITE"]) || DEFAULT_SITE
+      # A value that is not secret is read stripped; a secret is used as given.
+      @repository = plain(@env["BACKUP_REPOSITORY"])
+      @site = plain(@env["BACKUP_SITE"]) || DEFAULT_SITE
       @restic_password = present(@env["RESTIC_PASSWORD"])
       @aws_access_key_id = present(@env["AWS_ACCESS_KEY_ID"])
       @aws_secret_access_key = present(@env["AWS_SECRET_ACCESS_KEY"])
-      @aws_default_region = present(@env["AWS_DEFAULT_REGION"])
-      @pghost = present(@env["PGHOST"])
-      @pguser = present(@env["PGUSER"]) || DEFAULT_PGUSER
+      @aws_default_region = plain(@env["AWS_DEFAULT_REGION"])
+      @pghost = plain(@env["PGHOST"])
+      @pguser = plain(@env["PGUSER"]) || DEFAULT_PGUSER
       @postgres_password = present(@env["POSTGRES_PASSWORD"])
       @home = present(@env["HOME"])
+      @backup_hour = @env["BACKUP_HOUR"]&.strip
     end
 
     # The exit code: 0, 1 for a failure, 2 for a command line it does not know.
@@ -122,6 +150,37 @@ module ContentSpiel
       end
     end
 
+    # Runs `runs` days (tests give a number), and answers 0, or STOPPED when
+    # stop! came during a run, or 1 for a BACKUP_HOUR that is not an hour.
+    def schedule(runs: Float::INFINITY)
+      hour = backup_hour or return 1
+      done = 0
+      until @stopping || done >= runs
+        if @repository
+          next_run = self.class.next_run_at(@clock.call, hour)
+          @out.puts("[backup] next run at #{next_run.strftime("%Y-%m-%d %H:%M")} UTC")
+          @sleeper.call(next_run - @clock.call)
+          break if @stopping
+
+          run
+          return STOPPED if @stopping
+        else
+          @out.puts(NOT_CONFIGURED)
+          @sleeper.call(DAY) if done + 1 < runs
+        end
+        done += 1
+      end
+      0
+    end
+
+    # From a signal trap: no Mutex, nothing that waits. Wakes the sleep, and
+    # sends TERM to a running tool (the runner does nothing with none).
+    def stop!
+      @stopping = true
+      @wake_write.write_nonblock(".", exception: false)
+      @runner.interrupt
+    end
+
     def run
       unless @repository
         @out.puts(NOT_CONFIGURED)
@@ -135,11 +194,12 @@ module ContentSpiel
       missing = missing_variables("run")
       return failed(previous, started, missing.first.last) unless missing.empty?
 
+      taken = {}
       begin
-        taken = take(previous)
+        take(previous, taken)
       rescue StepFailed => failure
         @out.puts("[backup] failed at #{failure.step}: #{failure.reason}")
-        return failed(previous, started, failure.reason)
+        return failed(previous, started, failure.reason, taken)
       end
 
       finished = @clock.call
@@ -153,6 +213,22 @@ module ContentSpiel
     private
 
     def present(value) = value.to_s.strip.empty? ? nil : value
+
+    def plain(value) = present(value)&.strip
+
+    def wait(seconds)
+      IO.select([ @wake_read ], nil, nil, [ seconds, 0 ].max)
+    end
+
+    # BACKUP_HOUR as an Integer (DEFAULT_HOUR when unset), or nil with the
+    # sentence said.
+    def backup_hour
+      return DEFAULT_HOUR if @backup_hour.nil?
+      return @backup_hour.to_i if @backup_hour.match?(/\A\d{1,2}\z/) && @backup_hour.to_i <= 23
+
+      @err.puts("Cannot schedule: BACKUP_HOUR must be a whole hour from 0 to 23 (UTC), or unset for #{DEFAULT_HOUR}.")
+      nil
+    end
 
     def s3? = @repository.to_s.start_with?("s3:")
 
@@ -185,21 +261,23 @@ module ContentSpiel
     end
 
     # The steps of a run, each raising StepFailed; the dump is removed
-    # whatever happens. Answers the status's fields the run measured.
-    def take(previous)
+    # whatever happens. Fills `taken` with the status's fields the run
+    # measured: the snapshot and its sizes once the backup step succeeded,
+    # so a later failure still records them.
+    def take(previous, taken)
       dump_path = File.join(@dump_dir, DUMP_FILE)
       database_bytes = step("dump") { dump(dump_path) }
-      snapshot = processed = nil
       step("backup") do
         snapshot, processed = send_snapshot
+        taken.merge!(snapshot: snapshot[0, 8], database_bytes: database_bytes,
+          files_bytes: [ processed - database_bytes, 0 ].max)
         processed
       end
       step("forget") do
         restic("forget", NICE + %W[restic forget --host #{@site}] + RETENTION + %w[--prune])
         nil
       end
-      { snapshot: snapshot[0, 8], database_bytes: database_bytes,
-        files_bytes: [ processed - database_bytes, 0 ].max, **check(previous) }
+      taken.merge!(check(previous))
     ensure
       FileUtils.rm_f(dump_path)
     end
@@ -219,6 +297,9 @@ module ContentSpiel
         @err.puts("[backup] #{name} stopped by #{error.class}")
         raise StepFailed.new(name, "other")
       end
+      # stop! during the step: the run ends here, whatever the tool answered.
+      raise StepFailed.new(name, "other") if @stopping
+
       @out.puts("[backup] #{name} finished in #{(@clock.call - began).round}s#{", #{self.class.human_size(size)}" if size}")
       size
     end
@@ -253,7 +334,9 @@ module ContentSpiel
     end
 
     # The month's check when due, its fields carried from the previous status
-    # when not. A failed check leaves the backup ok.
+    # when not. A failed check leaves the backup ok; a check that stop! ended
+    # is no verdict on the data, so it ends the run as a stop does and the
+    # check stays due.
     def check(previous)
       now = @clock.call
       unless check_due?(previous, now)
@@ -268,6 +351,8 @@ module ContentSpiel
         end
         { last_check_at: now, last_check_outcome: "ok", check_error: nil }
       rescue StepFailed => failure
+        raise if @stopping
+
         @out.puts("[backup] check failed: #{failure.reason}")
         { last_check_at: now, last_check_outcome: "failed", check_error: failure.reason }
       end
@@ -292,14 +377,20 @@ module ContentSpiel
     end
 
     # A failed run's status: the newest good backup's time, snapshot and
-    # sizes kept from the previous status, so a failure never hides how old
-    # the newest good backup is.
-    def failed(previous, started, reason)
+    # sizes, so a failure never hides how old the newest good backup is.
+    # That is this run's snapshot when it was taken before the failure
+    # (`taken`), and the previous status's otherwise.
+    def failed(previous, started, reason, taken = {})
       finished = @clock.call
-      Status.new(finished_at: finished, outcome: "failed", snapshot: previous&.snapshot,
-        database_bytes: previous&.database_bytes, files_bytes: previous&.files_bytes,
+      newest = if taken[:snapshot]
+        taken.slice(:snapshot, :database_bytes, :files_bytes).merge(last_ok_at: finished)
+      else
+        { snapshot: previous&.snapshot, database_bytes: previous&.database_bytes,
+          files_bytes: previous&.files_bytes, last_ok_at: previous&.last_ok_at }
+      end
+      Status.new(finished_at: finished, outcome: "failed", **newest,
         duration_seconds: (finished - started).round, first_run_at: previous&.first_run_at || finished,
-        last_ok_at: previous&.last_ok_at, last_check_at: previous&.last_check_at,
+        last_check_at: previous&.last_check_at,
         last_check_outcome: previous&.last_check_outcome, check_error: previous&.check_error,
         error: reason, cms_version: ContentSpiel::VERSION).write(Status.path(@root))
       1
@@ -322,7 +413,8 @@ module ContentSpiel
     end
 
     def hide(text)
-      secrets = [ @restic_password, @aws_access_key_id, @aws_secret_access_key, @postgres_password, @repository ]
+      secrets = [ @restic_password, @aws_access_key_id, @aws_secret_access_key, @postgres_password,
+        @repository, @repository&.sub(%r{/+\z}, "") ]
         .compact.uniq.sort_by { |value| -value.size }
       secrets.reduce(text.scrub) { |shown, secret| shown.gsub(secret, HIDDEN) }
     end

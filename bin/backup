@@ -5,4 +5,7 @@ require_relative "../lib/content_spiel/backup"
 
 $stdout.sync = true
 backup = ContentSpiel::Backup.new(env: ENV, out: $stdout, err: $stderr, root: File.expand_path("..", __dir__))
+# As the container's PID 1, Ruby ignores TERM without a handler, and Kamal's
+# stop would wait out its timeout and kill the container mid-upload.
+%w[TERM INT].each { |signal| Signal.trap(signal) { backup.stop! } }
 exit backup.call(ARGV)

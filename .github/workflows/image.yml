@@ -136,6 +136,10 @@ jobs:
       CMS: ${{ needs.build.outputs.image }}:${{ github.sha }}
       SITE_IMAGE: contentspiel-site-template:${{ github.sha }}
       BOOT: contentspiel-site-template-boot
+      # The backup step's restic repository and files volume, named volumes
+      # removed by the clean-up.
+      BACKUP_REPO: contentspiel-site-template-backup-repo
+      BACKUP_FILES: contentspiel-site-template-backup-files
       # The port /up is asked on, on the runner. Production is served on 80
       # inside the container (Thruster, the CMS image's CMD).
       SITE_PORT: "3000"
@@ -388,6 +392,81 @@ jobs:
           grep -qF "[ContentSpiel] Serving http://localhost:$SITE_PORT." <<< "$log" \
             || { echo "::error::the boot did not say it serves http://localhost:$SITE_PORT (PUBLIC_HOST)"; exit 1; }
 
+      # bin/backup against the booted site's database, with the CMS image and
+      # the variables the template's backup accessory is given: this is where
+      # restic and pg_dump run for real (the unit suite,
+      # test/lib/content_spiel/backup_test.rb, drives a fake runner, since
+      # neither tool is on a laptop or a CI runner), so a change to bin/backup
+      # is tried on its branch with `gh workflow run Image --ref <branch>`.
+      # The repository is a `local:` one in a named volume, the files volume a
+      # named volume holding one probe file. init, run, list and restore must
+      # each exit 0; the status file must say ok, with the first run's
+      # monthly check ok; the restore must give back the probe's line and a
+      # dump that lists audit_events. RESTIC_PASSWORD is made up here, masked
+      # in the log, handed to the container by name (never on a command
+      # line), and must be in nothing a command says nor in the status file:
+      # each output is searched for it before it is printed.
+      - name: Back up and restore the booted site
+        env:
+          POSTGRES_NETWORK: ${{ job.services.postgres.network }}
+        run: |
+          set -euo pipefail
+          RESTIC_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$RESTIC_PASSWORD"
+          export RESTIC_PASSWORD
+          probe="probe $(openssl rand -hex 16)"
+
+          docker volume create "$BACKUP_REPO" > /dev/null
+          docker volume create "$BACKUP_FILES" > /dev/null
+          # A new volume mounted where the image has no folder is root's: the
+          # repository's is handed to the image's user. The files volume is
+          # mounted on the image's /rails/storage, so it takes that folder's
+          # owner, as a site's does.
+          docker run --rm --user 0 -v "$BACKUP_REPO:/repo" --entrypoint chown "$CMS" rails:rails /repo
+          docker run --rm -v "$BACKUP_FILES:/rails/storage" -e PROBE="$probe" --entrypoint sh "$CMS" \
+            -c 'printf "%s\n" "$PROBE" > /rails/storage/probe.txt'
+
+          # backup NAME ENTRYPOINT ARGS...: one run of the image as the
+          # accessory, its stdout in $said (the checks below read it) and its
+          # stderr beside it, both searched for the password, then printed.
+          said=""
+          errors="$(mktemp)"
+          backup() {
+            local name="$1" entrypoint="$2" code=0 err
+            shift 2
+            said="$(docker run --rm --network "$POSTGRES_NETWORK" \
+              -e PGHOST=postgres -e PGUSER=content_spiel -e POSTGRES_PASSWORD=site-template-ci \
+              -e BACKUP_SITE=ci -e BACKUP_REPOSITORY=local:/repo -e RESTIC_PASSWORD \
+              -v "$BACKUP_REPO:/repo" -v "$BACKUP_FILES:/rails/storage" \
+              --entrypoint "$entrypoint" "$CMS" "$@" 2> "$errors")" || code=$?
+            err="$(cat "$errors")"
+            if grep -qF "$RESTIC_PASSWORD" <<< "$said$err"; then
+              echo "::error::$name printed RESTIC_PASSWORD"; exit 1
+            fi
+            echo "== $name"
+            printf '%s\n' "$said"
+            [ -z "$err" ] || printf '%s\n' "$err" >&2
+            [ "$code" -eq 0 ] || { echo "::error::$name exited $code (its output is above)"; exit 1; }
+          }
+
+          backup init /rails/bin/backup init
+          backup run /rails/bin/backup run
+          backup status cat /rails/storage/backup/status.json
+          status="$said"
+          [ "$(jq -r .outcome <<< "$status")" = ok ] || { echo "::error::the status file does not say ok"; exit 1; }
+          [ "$(jq -r .last_check_outcome <<< "$status")" = ok ] \
+            || { echo "::error::the first run's check is not ok"; exit 1; }
+          snapshot="$(jq -r .snapshot <<< "$status")"
+
+          backup list /rails/bin/backup list
+          grep -qF "$snapshot" <<< "$said" || { echo "::error::list does not show the snapshot $snapshot"; exit 1; }
+
+          backup restore sh -c \
+            'bin/backup restore latest /tmp/r && cat /tmp/r/files/probe.txt && pg_restore --list /tmp/r/database.dump'
+          grep -qxF "$probe" <<< "$said" || { echo "::error::the restore did not give back the probe file's line"; exit 1; }
+          grep -qE 'TABLE public audit_events ' <<< "$said" \
+            || { echo "::error::the restored dump does not list audit_events"; exit 1; }
+
       # Whatever happened above. The runner is thrown away after the job, but
       # a self-hosted one would not be, and a container left running would
       # hold the port for the next run. The CMS image stays: it is the
@@ -397,6 +476,7 @@ jobs:
         run: |
           docker rm -f "$BOOT" 2> /dev/null || true
           docker rmi -f "$SITE_IMAGE" 2> /dev/null || true
+          docker volume rm -f "$BACKUP_REPO" "$BACKUP_FILES" 2> /dev/null || true
           # `|| true`: a cleanup that fails (a file left by a container as
           # another user) must not hide the failure that came before it.
           rm -rf "$RUNNER_TEMP/site-template" || true

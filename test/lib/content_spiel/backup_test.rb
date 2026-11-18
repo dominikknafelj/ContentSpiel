@@ -34,9 +34,16 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     FileUtils.remove_entry(@dump_dir) if @dump_dir.exist?
   end
 
-  def backup(env: @env, clock: -> { NOW }, runner: @runner)
+  def backup(env: @env, clock: -> { NOW }, runner: @runner, sleeper: ->(_) { flunk "nothing sleeps here" })
     Backup.new(env: env, out: @out, err: @err, root: @root.to_s, runner: runner, clock: clock,
-      sleeper: ->(_) { flunk "nothing sleeps in these commands" }, dump_dir: @dump_dir.to_s)
+      sleeper: sleeper, dump_dir: @dump_dir.to_s)
+  end
+
+  # A clock that each sleep moves on, and the sleeps it was asked for.
+  def fake_time(start)
+    now = start
+    sleeps = []
+    [ -> { now }, ->(seconds) { sleeps << seconds; now += seconds }, sleeps ]
   end
 
   def status = Status.read(Status.path(@root))
@@ -192,7 +199,7 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     assert_includes @out.string, "[backup] check failed: destination_unreachable"
   end
 
-  test "a failure at each step writes a failed status with its reason, keeps the last good time, and exits 1" do
+  test "a failure at each step writes a failed status with its reason, and exits 1" do
     {
       "pg_dump" => [ "dump", Outcome.new(exit_status: 1, stdout: "", stderr: "could not connect to server"), "database_unreachable" ],
       "backup" => [ "backup", Outcome.new(exit_status: 12, stdout: "", stderr: "anything"), "wrong_password" ],
@@ -207,13 +214,19 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
       assert_equal "failed", written.outcome, step
       assert_equal reason, written.error, step
       assert_equal NOW, written.finished_at, step
-      assert_equal Time.utc(2026, 11, 17, 3), written.last_ok_at, step
       assert_equal Time.utc(2026, 10, 1, 3), written.first_run_at, step
-      assert_equal "99887766", written.snapshot, step
       assert_equal "ok", written.last_check_outcome, step
       assert_equal "[backup] failed at #{step}: #{reason}", @out.string.lines(chomp: true).last, step
       assert_equal key, runner.steps.last, "nothing runs after a failed #{step}"
       assert_empty Dir.children(@dump_dir), step
+      if step == "forget"
+        # The snapshot was taken and is good: it is the newest good backup.
+        assert_equal [ "1a2b3c4d", 1_234, 100_000, NOW ],
+          [ written.snapshot, written.database_bytes, written.files_bytes, written.last_ok_at ], step
+      else
+        assert_equal [ "99887766", 500, 7_000, Time.utc(2026, 11, 17, 3) ],
+          [ written.snapshot, written.database_bytes, written.files_bytes, written.last_ok_at ], step
+      end
     end
   end
 
@@ -402,10 +415,137 @@ class ContentSpiel::BackupTest < ActiveSupport::TestCase
     runner = Runner.new
     runner.interrupt
     thread = Thread.new { runner.call([ RbConfig.ruby, "-e", "sleep 30" ], env: {}) }
-    sleep 0.05 until runner.running?
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
+    until runner.running?
+      flunk "the child never started (thread alive: #{thread.alive?})" if !thread.alive? || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      sleep 0.01
+    end
     runner.interrupt
     outcome = thread.value
     refute_equal 0, outcome.exit_status
+  end
+
+  test "list and init hide the repository with or without its trailing slash" do
+    env = @env.merge("BACKUP_REPOSITORY" => "#{REPOSITORY}/")
+    runner = FakeBackupRunner.new("snapshots" => Outcome.new(exit_status: 0, stdout: "at #{REPOSITORY}/ and #{REPOSITORY}\n", stderr: ""))
+    assert_equal 0, backup(env: env, runner: runner).call([ "list" ])
+    assert_equal "at [hidden] and [hidden]\n", @out.string
+  end
+
+  test "values that are not secret are read stripped, secrets as given" do
+    env = @env.merge("BACKUP_REPOSITORY" => " #{REPOSITORY} ", "BACKUP_SITE" => " #{SITE}\n", "PGHOST" => " db ",
+      "PGUSER" => " content_spiel ", "AWS_DEFAULT_REGION" => " auto ", "RESTIC_PASSWORD" => " spaced secret ")
+    backup(env: env).call([ "run" ])
+    pg_env = @runner.call_for("pg_dump").last
+    assert_equal [ "db", "content_spiel" ], pg_env.values_at("PGHOST", "PGUSER")
+    argv, restic_env = @runner.call_for("backup")
+    assert_equal [ REPOSITORY, "auto", " spaced secret " ], restic_env.values_at("RESTIC_REPOSITORY", "AWS_DEFAULT_REGION", "RESTIC_PASSWORD")
+    bare = FakeBackupRunner.bare(argv)
+    assert_equal [ "--host", SITE ], bare[bare.index("--host"), 2]
+  end
+
+  test "next_run_at is the hour's next occurrence in UTC, strictly after now" do
+    assert_equal Time.utc(2026, 11, 18, 3), Backup.next_run_at(Time.utc(2026, 11, 18, 2, 59), 3)
+    assert_equal Time.utc(2026, 11, 19, 3), Backup.next_run_at(Time.utc(2026, 11, 18, 3, 0, 0), 3)
+    assert_equal Time.utc(2026, 11, 19, 0), Backup.next_run_at(Time.utc(2026, 11, 18, 23, 30), 0)
+    assert_equal Time.utc(2027, 1, 1, 0), Backup.next_run_at(Time.utc(2026, 12, 31, 23, 30), 0)
+    assert_equal Time.utc(2026, 11, 18, 3), Backup.next_run_at(Time.new(2026, 11, 18, 3, 59, 0, "+02:00"), 3)
+  end
+
+  test "schedule sleeps until the hour, runs once a day, and does not retry a failure" do
+    clock, sleeper, sleeps = fake_time(Time.utc(2026, 11, 18, 2, 59, 30))
+    dumps = 0
+    runner = FakeBackupRunner.new("pg_dump" => lambda do |argv, _env|
+      dumps += 1
+      next Outcome.new(exit_status: 1, stdout: "", stderr: "could not connect") if dumps == 1
+
+      File.binwrite(argv[argv.index("--file") + 1], "x")
+      Outcome.new(exit_status: 0, stdout: "", stderr: "")
+    end)
+
+    assert_equal 0, backup(clock: clock, sleeper: sleeper, runner: runner).schedule(runs: 2)
+    assert_equal [ 30, 86_400 ], sleeps
+    assert_equal 2, runner.steps.count("pg_dump")
+    assert_equal "ok", status.outcome
+    assert_equal Time.utc(2026, 11, 19, 3), status.finished_at
+    assert_includes @out.string, "[backup] next run at 2026-11-18 03:00 UTC"
+    assert_includes @out.string, "[backup] failed at dump: database_unreachable"
+
+    clock, sleeper, sleeps = fake_time(Time.utc(2026, 11, 18, 2, 59, 30))
+    backup(env: @env.merge("BACKUP_HOUR" => " 04 "), clock: clock, sleeper: sleeper, runner: FakeBackupRunner.new).schedule(runs: 1)
+    assert_equal [ 3_630 ], sleeps
+  end
+
+  test "schedule refuses a BACKUP_HOUR that is not 0 to 23 and exits 1" do
+    [ "24", "-1", "3am", "", " ", "3.0" ].each do |value|
+      @err = StringIO.new
+      assert_equal 1, backup(env: @env.merge("BACKUP_HOUR" => value)).call([ "schedule" ]), value.inspect
+      assert_includes @err.string, "BACKUP_HOUR", value.inspect
+      assert_includes @err.string, "0 to 23", value.inspect
+    end
+    assert_empty @runner.calls
+  end
+
+  test "unconfigured, schedule says so once a day and runs nothing" do
+    clock, sleeper, sleeps = fake_time(NOW)
+    assert_equal 0, backup(env: @env.except("BACKUP_REPOSITORY"), clock: clock, sleeper: sleeper).schedule(runs: 2)
+    assert_equal [ Backup::NOT_CONFIGURED ] * 2, @out.string.lines(chomp: true)
+    assert_equal [ 86_400 ], sleeps
+    assert_empty @runner.calls
+    assert_nil status
+  end
+
+  test "stop! while sleeping ends the schedule with 0; during a run it interrupts the tool and records the run as failed" do
+    command = nil
+    command = backup(sleeper: ->(_) { command.stop! })
+    assert_equal 0, command.schedule
+    assert_empty @runner.calls
+
+    previous_ok.write(Status.path(@root))
+    runner = FakeBackupRunner.new("backup" => lambda do |*|
+      command.stop!
+      Outcome.new(exit_status: 143, stdout: "", stderr: "")
+    end)
+    command = backup(runner: runner, sleeper: ->(_) { })
+    assert_equal 143, command.schedule
+    assert_equal 1, runner.interrupts
+    assert_equal %w[pg_dump backup], runner.steps
+    assert_equal [ "failed", "other", Time.utc(2026, 11, 17, 3) ], [ status.outcome, status.error, status.last_ok_at ]
+    assert_empty Dir.children(@dump_dir)
+
+    # A tool that finishes despite the stop still ends the run there.
+    runner = FakeBackupRunner.new("forget" => lambda do |*|
+      command.stop!
+      Outcome.new(exit_status: 0, stdout: "", stderr: "")
+    end)
+    command = backup(runner: runner, sleeper: ->(_) { })
+    assert_equal 143, command.schedule
+    assert_equal %w[pg_dump backup forget], runner.steps
+    assert_equal [ "failed", "other", "1a2b3c4d", NOW ], [ status.outcome, status.error, status.snapshot, status.last_ok_at ]
+
+    # A check that the stop ended is no failed check: it stays due.
+    previous_ok(last_check_at: Time.utc(2026, 10, 1, 3)).write(Status.path(@root))
+    runner = FakeBackupRunner.new("check" => lambda do |*|
+      command.stop!
+      Outcome.new(exit_status: 143, stdout: "", stderr: "")
+    end)
+    command = backup(runner: runner, sleeper: ->(_) { })
+    assert_equal 143, command.schedule
+    assert_equal %w[pg_dump backup forget check], runner.steps
+    assert_equal [ "failed", "other", "1a2b3c4d" ], [ status.outcome, status.error, status.snapshot ]
+    assert_equal [ Time.utc(2026, 10, 1, 3), "ok" ], [ status.last_check_at, status.last_check_outcome ]
+  end
+
+  test "bin/backup ends its schedule at TERM or INT while it sleeps, with 0" do
+    %w[TERM INT].each do |signal|
+      IO.popen({ "BACKUP_REPOSITORY" => nil }, [ RbConfig.ruby, Rails.root.join("bin/backup").to_s, "schedule" ],
+        err: File::NULL) do |io|
+        assert_equal Backup::NOT_CONFIGURED, io.gets&.chomp, signal
+        Process.kill(signal, io.pid)
+        assert_nil io.gets, signal
+      end
+      assert_equal 0, $?.exitstatus, signal
+    end
   end
 
   test "the command loads with plain Ruby, without Rails" do
