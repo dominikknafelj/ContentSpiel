@@ -136,7 +136,7 @@ Two states only, the ones every check has (decided by Claude, 2026-11-17; no new
 
 ### The guide (contentspiel-docs), a separate pull request
 
-The CMS work ships the command, the template and the docs. The guide's own setup is a pull request in contentspiel-docs after the release: the `backup` accessory in its `config/deploy.yml` (its own file, not the template's), the three secret names in its secrets example, the bucket in `tofu/` if the provider is managed there, and the first drill's record. **The owner creates the bucket, its key and the restic password** and puts them in 1Password; Claude never handles them. The guide's provider: the owner's choice (see the question).
+The CMS work ships the command, the template and the docs. The guide's own setup is a pull request in contentspiel-docs after the release: the `backup` accessory in its `config/deploy.yml` (its own file, not the template's), the three secret names in its secrets example, the bucket in `tofu/` if the provider is managed there, and the first drill's record. **The owner creates the bucket, its key and the restic password** and puts them in 1Password; Claude never handles them. The guide's provider: **Cloudflare R2** (the owner, 2026-11-17): a provider other than the server's (Hetzner), no fee for reading a restore back, and the domain is already at Cloudflare.
 
 ### Telemetry
 
