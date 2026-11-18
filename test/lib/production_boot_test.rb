@@ -46,6 +46,17 @@ class ProductionBootTest < ActiveSupport::TestCase
     puts "health check excluded: #{[ config.host_authorization[:exclude], config.ssl_options.dig(:redirect, :exclude) ].all? { |rule| rule.equal?(HostSettings::HEALTH_CHECK) }}"
     puts "theme: #{Theme.current.name} #{Theme.current.fingerprint}"
     puts "trusted proxies: #{config.action_dispatch.trusted_proxies&.map { |range| "#{range}/#{range.prefix}" }.inspect}"
+    assets = Rails.application.assets
+    puts "js comment compiler: #{assets.compilers.registrations["text/javascript"].include?(ContentSpiel::JsCommentCompiler)}"
+    puts "assets version: #{assets.config.version}"
+    %w[site.js controllers/hello_controller.js mermaid.js].each do |name|
+      next unless (asset = assets.load_path.find(name))
+
+      comments = ->(text) { text.lines.count { |line| line.lstrip.start_with?("// ") } }
+      served = asset.compiled_content
+      puts "served #{name}: #{comments.(served)} of #{comments.(asset.content)} comment lines, " \
+           "#{served.count("\n") == asset.content.count("\n") ? "every line kept" : "lines lost"}"
+    end
   RUBY
 
   test "production with an https address answers that host alone, forces HTTPS, mails the address and says so at boot" do
@@ -67,6 +78,17 @@ class ProductionBootTest < ActiveSupport::TestCase
     # Rails' own list first, the variable's ranges after it.
     proxies = ActionDispatch::RemoteIp::TRUSTED_PROXIES.map { |range| "#{range}/#{range.prefix}" } + [ "173.245.48.0/20", "2400:cb00::/32" ]
     assert_includes lines, "trusted proxies: #{proxies.inspect}"
+    # The image's `assets:precompile` runs this production configuration:
+    # the app's own scripts are served without their comment lines, every
+    # line break kept, under a version that names the stripper's revision.
+    assert_includes lines, "js comment compiler: true"
+    assert_includes lines, "assets version: 1.0-js#{ContentSpiel::JsCommentStripper::REVISION}"
+    site = lines.grep(/\Aserved site\.js: /).sole
+    assert_match(/\Aserved site\.js: 0 of [1-9]\d* comment lines, every line kept\z/, site)
+    # vendor/javascript is served as written.
+    vendored = lines.grep(/\Aserved mermaid\.js: /).sole
+    assert_match(/\Aserved mermaid\.js: (\d+) of \1 comment lines/, vendored)
+    assert_no_match(/\Aserved mermaid\.js: 0 /, vendored)
   end
 
   test "production with no address refuses and forces nothing, says so, and warns about a debug log level" do
@@ -114,6 +136,8 @@ class ProductionBootTest < ActiveSupport::TestCase
       assert status.success?, printed
       assert_includes lines, ThemeFolder.announcement(ThemeFolder.new(plain))
       assert_includes lines, "theme: plain #{ThemeFolder.new(plain).fingerprint}"
+      # A theme's own controllers are its site's own scripts, stripped too.
+      assert_includes lines, "served controllers/hello_controller.js: 0 of 2 comment lines, every line kept"
     end
   end
 

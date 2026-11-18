@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Production serves the app's own JavaScript without its comments: `assets:precompile` (production only) empties every line that is a `//` comment and every `/* … */` block that starts a line, keeping every line break, so a stack trace's line numbers are the source's and no source map is needed. The comments stay in the source, development and test serve the files as written, and `vendor/javascript` and any `.min.js` are untouched. A theme's own controllers are served the same way. A public page's own scripts go from 20.9 KB to 9.2 KB gzipped, all of `app/javascript` from 571 KB to 247 KB. Every asset's digest changes once with this release (`config.assets.version` names the stripper's revision in production; `docs/reference/hosting.md`, "The app's scripts without their comments").
+
 ## 0.10.0 (2026-11-17)
 
 ### Added
