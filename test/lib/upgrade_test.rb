@@ -226,6 +226,77 @@ class UpgradeTest < ActiveSupport::TestCase
     end
   end
 
+  test "a deploy.yml with no backup accessory gets the block and the three secrets to paste, after the steps" do
+    in_site("0.1.0", deploy: "service: demo\naccessories:\n  web_storage:\n    volumes:\n      - \"demo_files:/rails/storage\"\n") do |site|
+      text = upgrade(site).run.text
+      steps = text[text.index("Next steps")..]
+      block = ContentSpiel::BackupAccessory.block(service: "demo", volume: "demo_files", cms_image: ContentSpiel::IMAGE, commented: false)
+
+      assert_includes steps, block
+      assert_operator steps.index("docker volume rm"), :<, steps.index(block)
+      assert_includes steps, "config/deploy.yml"
+      assert_includes steps, ".kamal/secrets"
+      ContentSpiel::BackupAccessory::SECRETS.each { |name| assert_includes steps, name }
+      assert_includes steps, "never edits config/deploy.yml"
+      assert_not_includes steps, "4. Move the backup"
+      assert_includes steps, "pg_dumpall"
+    end
+  end
+
+  test "the volume falls back to the service's storage volume, and a missing deploy.yml still prints the block with the folder's name" do
+    in_site("0.1.0", deploy: "service: my-site\n") do |site|
+      assert_includes upgrade(site).run.text, "- my_site_storage:/rails/storage"
+    end
+    in_site("0.1.0", deploy: nil) do |site|
+      text = upgrade(site).run.text
+      assert_includes text, "BACKUP_SITE: demo"
+      assert_includes text, "- demo_storage:/rails/storage"
+    end
+  end
+
+  test "a commented block is not printed again" do
+    commented = ContentSpiel::BackupAccessory.block(service: "demo", volume: "demo_storage", cms_image: ContentSpiel::IMAGE, commented: true)
+    in_site("0.1.0", deploy: "service: demo\naccessories:\n#{commented}\n") do |site|
+      text = upgrade(site).run.text
+
+      assert_not_includes text, ContentSpiel::BackupAccessory::BEGIN_MARK
+      assert_not_includes text, "RESTIC_PASSWORD"
+      assert_not_includes text, "4. Move the backup"
+    end
+  end
+
+  test "with the accessory configured, the backup before deploying is bin/backup run, and the last step reboots the accessory" do
+    in_site("0.1.0", deploy: "service: demo\naccessories:\n  backup:\n    cmd: bin/backup schedule\n") do |site|
+      text = upgrade(site).run.text
+
+      assert_includes text, ContentSpiel::Upgrade::BACKUP_RUN
+      assert_equal 'kamal accessory exec backup --reuse "bin/backup run"', ContentSpiel::Upgrade::BACKUP_RUN
+      assert_not_includes text, "pg_dumpall"
+      assert_not_includes text, ContentSpiel::BackupAccessory::BEGIN_MARK
+      assert_includes text, "4. Move the backup accessory to the new version: kamal accessory reboot backup"
+      assert_equal "kamal accessory reboot backup", ContentSpiel::Upgrade::BACKUP_REBOOT
+      assert_operator text.index("3. Deploy"), :<, text.index("4. Move the backup")
+    end
+  end
+
+  test "without it, the migration sentence keeps the pg_dumpall command" do
+    in_site("0.1.0") do |site|
+      assert_includes upgrade(site).run.text, ContentSpiel::Upgrade::BACKUP
+    end
+  end
+
+  test "upgrade never writes deploy.yml" do
+    in_site("0.1.0") do |site|
+      file = File.join(site, "config/deploy.yml")
+      File.utime(Time.at(1_000_000), Time.at(1_000_000), file)
+      bytes = File.binread(file)
+      upgrade(site).run
+
+      assert_equal bytes, File.binread(file)
+      assert_equal Time.at(1_000_000), File.mtime(file)
+    end
+  end
+
   private
 
   def upgrade(site, changelog: CHANGELOG, check: NO_PROBLEMS, version: "0.3.0")
@@ -234,14 +305,14 @@ class UpgradeTest < ActiveSupport::TestCase
 
   def pin(site) = File.read(File.join(site, ".contentspiel-version"))
 
-  def in_site(pinned)
+  def in_site(pinned, deploy: "service: demo\n")
     Dir.mktmpdir do |dir|
       site = File.join(dir, "demo")
       FileUtils.mkdir_p File.join(site, "theme")
       File.write(File.join(site, ".contentspiel-version"), "#{pinned}\n")
       File.write(File.join(site, "config.yml"), "")
       FileUtils.mkdir_p File.join(site, "config")
-      File.write(File.join(site, "config/deploy.yml"), "service: demo\n")
+      File.write(File.join(site, "config/deploy.yml"), deploy) if deploy
       yield site
     end
   end

@@ -11,8 +11,10 @@ module Alerts
   class Alert < ApplicationRecord
     self.table_name = "alerts"
 
-    KINDS = %w[error sign_in_failures owner_changed token_issued access_denied_burst request_limited].freeze
-    SECURITY_KINDS = (KINDS - %w[error]).freeze
+    KINDS = %w[error sign_in_failures owner_changed token_issued access_denied_burst request_limited backup_stale].freeze
+    # A backup alert is neither an error nor a finding of the audit log: it has
+    # no events, so no link to the log.
+    SECURITY_KINDS = (KINDS - %w[error backup_stale]).freeze
 
     # The span a security finding is counted over.
     WINDOW = 15.minutes
@@ -40,7 +42,8 @@ module Alerts
       "owner_changed" => %w[subject_label actor_name now_owner],
       "token_issued" => %w[token_name group_name actor_name],
       "access_denied_burst" => %w[denied actors],
-      "request_limited" => %w[limited limits]
+      "request_limited" => %w[limited limits],
+      "backup_stale" => %w[hours]
     }.freeze
     # The kinds counted over WINDOW, whose sentences say its minutes.
     WINDOW_KINDS = %w[sign_in_failures access_denied_burst request_limited].freeze
@@ -82,6 +85,13 @@ module Alerts
 
     def security? = SECURITY_KINDS.include?(kind)
 
+    # The family a surface draws the kind as: its chip and its mail label.
+    def category
+      return "backups" if kind == "backup_stale"
+
+      security? ? "security" : "error"
+    end
+
     # THE AUDIT LOG'S FILTER FOR THIS ALERT'S EVENTS, as the params
     # `Audit::Filter` reads (the StudioAlerts card: "Show in audit log →"
     # opens the log narrowed to the alert, never the whole log): an owner
@@ -120,6 +130,7 @@ module Alerts
       case kind
       when "error" then values[:place] ? "error" : "error_nowhere"
       when "owner_changed" then "owner_#{values[:now_owner] ? "made" : "removed"}#{"_by" if values[:actor_name]}"
+      when "backup_stale" then "backup_#{details["reason"]}"
       when "token_issued" then values[:actor_name] ? "token_issued_by" : "token_issued"
       else kind
       end

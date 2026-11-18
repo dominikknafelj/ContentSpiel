@@ -50,13 +50,17 @@
 # whether it moves the counter; a new one belongs in it.
 #
 # NOT COVERED, by design: a write made around the models and the services
-# (the console's `update_columns`, raw SQL, a restored backup). `bin/rails
-# public_site:bump_version` is for those. A restored backup needs more than
-# the bump: it REWINDS the counter, so the values that follow were already
-# used, and a render or an ETag made under one of them before the restore
-# would be served for the restored content. Clear the cache too
-# (`Rails.cache.clear`); a browser's or a CDN's stored ETag can still match
-# until the counter has passed the value it had before the restore.
+# (the console's `update_columns`, raw SQL). `bin/rails
+# public_site:bump_version` is for those. A restored backup is the other
+# case: it REWINDS the counter, so the values that follow were already used,
+# and a render or an ETag made under one of them before the restore would be
+# served for the restored content. `bin/rails public_site:after_restore`
+# (`after_restore!`) jumps the counter to the wall clock in microseconds, or
+# one past its value if that is greater: every bump adds 1, so the counter is
+# then above every value it held before, as long as it never moved faster
+# than one bump a microsecond, which no site does. The public render cache
+# lives in `Rails.cache`, so the task empties that too; a CDN's stored pages
+# are not ours to empty, and the task says so.
 module PublicSite
   module_function
 
@@ -130,5 +134,16 @@ module PublicSite
       Current.content_version = nil
     end
     nil
+  end
+
+  # The restore's end: the counter past every value it held (see "NOT
+  # COVERED" above), the render cache emptied, and the request-scoped copy of
+  # the version dropped. Returns the counter. Not deferred to a commit: it
+  # runs from a task, outside any transaction.
+  def after_restore!(now: Time.current)
+    counter = PublicSite::Version.jump_past!((now.to_r * 1_000_000).to_i)
+    Rails.cache.clear
+    Current.content_version = nil
+    counter
   end
 end

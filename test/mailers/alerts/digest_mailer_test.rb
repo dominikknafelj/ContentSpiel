@@ -26,6 +26,18 @@ class Alerts::DigestMailerTest < ActionMailer::TestCase
 
   def bodies(mail) = [ mail.text_part, mail.html_part ].map { Nokogiri::HTML5(it.body.to_s).text.squeeze(" ") }
 
+  test "a backup alert is mailed as Backups with its sentence" do
+    stale = make("backup_stale", reason: "stale", hours: 51)
+    never = make("backup_stale", seen: SEEN - 1.hour, reason: "never", hours: 49)
+    failed = make("backup_stale", seen: SEEN - 2.hours, reason: "check_failed", hours: nil)
+
+    bodies(digest([ stale.id, never.id, failed.id ])).each do |body|
+      assert_includes body, "Backups: No good backup for 51 hours"
+      assert_includes body, "Backups: No backup has succeeded in the 49 hours since backups were set up"
+      assert_includes body, "Backups: The monthly check of the backups failed"
+    end
+  end
+
   test "two alerts: the subject, the intro, a line per alert with its kind, sentence and facts, the footer" do
     error = make("error", occurrences: 12, error_class: "NoMethodError", place: "app/models/page.rb:120")
     owner = make("owner_changed", seen: SEEN - 1.hour, subject_label: "Ana Example", actor_name: nil, now_owner: true)

@@ -58,6 +58,25 @@ class Alerts::CheckJobTest < ActiveJob::TestCase
     assert_not Alerts::Alert.exists?(@old.id)
   end
 
+  test "a failing backup step does not stop the digest or the prune" do
+    Alerts::Alert.create!(kind: "error", fingerprint: "due", details: { "error_class" => "RuntimeError", "place" => nil },
+                          first_seen_at: 1.minute.ago, last_seen_at: 1.minute.ago)
+    failing = Class.new { def apply = raise(RuntimeError, "backup failed") }.new
+
+    with_mail_state(:working) do
+      with_site_address(SITE) do
+        with_singleton_override(Alerts::BackupRule, :new, ->(**) { failing }) do
+          assert_error_reported(RuntimeError) do
+            assert_emails(User.owners.count) { Alerts::CheckJob.perform_now }
+          end
+        end
+      end
+    end
+
+    assert_not_nil Alerts::Alert.find_by(fingerprint: "due").mailed_at
+    assert_not Alerts::Alert.exists?(@old.id)
+  end
+
   test "a failing digest still lets the prune run" do
     with_singleton_override(Alerts::Mailing, :new, ->(**) { raise ActiveRecord::ConnectionNotEstablished }) do
       assert_error_reported(ActiveRecord::ConnectionNotEstablished) { Alerts::CheckJob.perform_now }
