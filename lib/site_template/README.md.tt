@@ -191,7 +191,7 @@ kamal deploy
 kamal accessory reboot backup
 ```
 
-The backup runs on the version the site ran until now, which is right: it copies the database as that version left it. `kamal accessory reboot backup` starts the accessory on the version `.contentspiel-version` now names; a deploy does not move it.
+The backup runs on the version the site ran until now, which is right: it copies the database as that version left it. `kamal accessory reboot backup` starts the accessory on the version `.contentspiel-version` now names; a deploy does not move it. Until you reboot it, System status warns that the backup runs another version than the site; the warning goes as soon as the rebooted accessory has started.
 
 If you did not do step 4.4, make the backup with `pg_dumpall` instead, and there is no accessory to reboot. It writes every database to the file `backup.sql` on this machine; keep it like a secret, it holds every page and every account:
 
