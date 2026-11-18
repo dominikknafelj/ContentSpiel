@@ -90,8 +90,8 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
   # Docked (the tree folded, so the editor area is the content's width), the
   # pair keeps its own threshold, 824px of the block form: at 1200px of
   # editor the blocks column is 812px and the pair stacks; at 1600px the
-  # form is past 824px and the halves share it, wider than the 560px they
-  # keep undocked.
+  # blocks column is the pair's 1144px, the form past 824px, and the halves
+  # share the field, which fills its card.
   test "docked, a block's pair sits side by side once its form is 824px wide" do
     page_record = create_page(title: "About")
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "rich_text" },
@@ -122,7 +122,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     assert_in_delta tops[0], tops[1], 4, "side by side, the field and its original share a row"
     field_box, original_box = boxes_of(field, original)
     assert_operator field_box[2], :<, original_box[0], "the field on the left, the original on the right"
-    assert_operator field_box[2] - field_box[0], :>, 561, "the halves are not capped at 560px"
+    assert_in_delta 1144, widths_of("[data-block-id='#{block.id}']").first, 1, "docked, the blocks column is the pair's column"
     assert_in_delta field_box[2] - field_box[0], original_box[2] - original_box[0], 1, "the two halves share the form"
   ensure
     page.execute_script("try { window.localStorage.removeItem('cs-tree-folded') } catch (error) {}")

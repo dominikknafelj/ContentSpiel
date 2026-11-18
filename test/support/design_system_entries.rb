@@ -9,7 +9,7 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794894016-5ccc".freeze
+  VERSION = "1794973507-1201".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
