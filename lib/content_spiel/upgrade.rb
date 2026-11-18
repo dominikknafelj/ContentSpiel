@@ -2,6 +2,7 @@ require "pathname"
 require_relative "version"
 require_relative "release"
 require_relative "dev_files"
+require_relative "backup_accessory"
 
 module ContentSpiel
   # `contentspiel upgrade` (bin/contentspiel), run by the NEWEST image: the
@@ -33,6 +34,13 @@ module ContentSpiel
   # carries the notes and the check's problems, since those are what is
   # asked for next.
   #
+  # THE BACKUP ACCESSORY: config/deploy.yml is read as text and never written.
+  # A site with the accessory (an uncommented `  backup:` under accessories)
+  # backs up with BACKUP_RUN before the deploy and reboots the accessory after
+  # it; a site whose deploy.yml has no `backup:` line, commented or not, is
+  # offered the block to paste, with the secrets; a commented block is the
+  # person's, and is not printed again.
+  #
   # Plain Ruby on the standard library, like Release and DevFiles.
   class Upgrade
     class Refused < StandardError; end
@@ -50,6 +58,11 @@ module ContentSpiel
     PIN = ".contentspiel-version".freeze
     # The backup command of the site's README (lib/site_template/README.md.tt).
     BACKUP = 'kamal accessory exec db --reuse --raw "pg_dumpall -U postgres" > backup.sql'.freeze
+    # A site with the backup accessory backs up with the accessory's own
+    # command, and moves the accessory to the new pin after a deploy.
+    BACKUP_RUN = 'kamal accessory exec backup --reuse "bin/backup run"'.freeze
+    BACKUP_REBOOT = "kamal accessory reboot backup".freeze
+    DEPLOY = "config/deploy.yml".freeze
 
     def initialize(site, changelog:, check:, version: ContentSpiel::VERSION)
       @site = Pathname(File.expand_path(site.to_s))
@@ -112,17 +125,38 @@ module ContentSpiel
     def theme_line = @site.join("theme").to_s
 
     def next_steps(pinned, sections)
+      deploy = read_deploy
+      configured = deploy.match?(/^  backup:\s*$/)
       steps = [ "Next steps", "contentspiel upgrade moved this site from #{pinned} to #{@version}; #{PIN} now holds #{@version}.",
                 "1. Review the release notes above.",
                 "2. Commit #{PIN} (and any change to theme/).",
                 "3. Deploy: kamal deploy" ]
+      steps << "4. Move the backup accessory to the new version: #{BACKUP_REBOOT}" if configured
       if sections.any? { |_, body| MIGRATIONS.any? { |heading| body.match?(/^### #{Regexp.escape(heading)}[ \t]*$/) } }
         steps << "A release between them changes the database. Going back to #{pinned} after deploying is not safe: " \
-                 "make a backup before step 3 (the README's command: #{BACKUP})."
+                 "make a backup before step 3 (#{configured ? "the accessory's command" : "the README's command"}: " \
+                 "#{configured ? BACKUP_RUN : BACKUP})."
       end
       volume = DevFiles.new(@site).builds_volume(pinned)
       steps << "If you run the site on this machine with contentspiel dev, remove the old stylesheet volume: docker volume rm #{volume}"
-      steps.join("\n")
+      steps = steps.join("\n")
+      deploy.match?(/^\s*#?\s*backup:\s*$/) ? steps : "#{steps}\n\n#{backup_offer(deploy)}"
+    end
+
+    def read_deploy
+      file = @site.join(DEPLOY)
+      file.file? ? file.read : ""
+    end
+
+    def backup_offer(deploy)
+      service = deploy[/^service:\s*(\S+)/, 1] || @site.basename.to_s
+      volume = deploy[/"?([^:"\s]+):\/rails\/storage"?/, 1] || "#{service.tr("-", "_")}_storage"
+      block = BackupAccessory.block(service: service, volume: volume, cms_image: ContentSpiel::IMAGE, commented: false)
+      "This site has no backup accessory. To back up the database and the files on a schedule, paste this block " \
+        "under accessories: in #{DEPLOY} and fill in <endpoint> and <bucket>:\n\n#{block}\n\n" \
+        "Then add the three secrets #{BackupAccessory::SECRETS.join(", ")} to .kamal/secrets (names only in " \
+        ".kamal/secrets.example) and run kamal accessory boot backup. contentspiel upgrade never edits #{DEPLOY} " \
+        "or .kamal/secrets."
     end
 
     # Temp file in the site's folder and a rename: the pin is whole or it is
