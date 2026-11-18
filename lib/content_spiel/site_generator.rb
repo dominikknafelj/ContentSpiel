@@ -2,6 +2,7 @@ require "fileutils"
 require "tmpdir"
 require "pathname"
 require_relative "version"
+require_relative "backup_accessory"
 
 module ContentSpiel
   # `contentspiel new NAME` (bin/contentspiel): a site folder that builds on a
@@ -65,6 +66,7 @@ module ContentSpiel
       "README.md" => "README.md.tt",
       "config/deploy.yml" => "config/deploy.yml.tt",
       "config/postgres/10-contentspiel-databases.sh" => "config/postgres/10-contentspiel-databases.sh.tt",
+      "docs/restore-drills/TEMPLATE.md" => "docs/restore-drills/TEMPLATE.md.tt",
       "seeds/README.md" => "seeds/README.md.tt"
     }.freeze
 
@@ -163,5 +165,12 @@ module ContentSpiel
     def version = ContentSpiel::VERSION
     def cms_image = ContentSpiel::IMAGE
     def theme_path = THEME_PATH
+
+    # The backup accessory, commented: README.md's step 4.4 uncomments it.
+    def backup_accessory
+      BackupAccessory.block(service: name, volume: "#{name.tr("-", "_")}_storage", cms_image: cms_image, commented: true)
+    end
+
+    def backup_secrets = BackupAccessory.secrets_example
   end
 end

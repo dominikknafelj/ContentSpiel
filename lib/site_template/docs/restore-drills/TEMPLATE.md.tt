@@ -1,0 +1,32 @@
+# Restore drill of <%= name %>: YYYY-MM-DD
+
+Copy this file to `docs/restore-drills/YYYY-MM-DD.md` (the day of the drill), fill it in and commit it. Once a quarter, the newest backup is restored into a scratch environment, never the live database, by following the restore runbook in the CMS's `docs/reference/backups.md`. This record is the evidence that a restore works and how long it takes.
+
+- Date:
+- Who:
+- Where it was restored: (a throwaway server, or a local stack)
+- CMS version of the backup:
+- CMS version restored with:
+- Snapshot: (its id, from `bin/backup list`, and the time it was taken)
+
+## Duration
+
+- Started: (the first step of the runbook)
+- Finished: (the site answers and every check below is done)
+- Duration:
+- Within the 2 hours the runbook is meant to take: yes / no. A drill over 2 hours is a finding: write below what took the time.
+
+## Checks
+
+| Check | Result (pass / fail) | Note |
+|---|---|---|
+| A page with an image renders | | |
+| A post's history opens | | |
+| An image's original downloads | | |
+| A note's file opens | | |
+| Sign-in works | | |
+| The audit log's newest entry is from the backup's day | | |
+
+## Findings
+
+What went wrong or was unclear, and what was changed because of it (in the runbook, the site or this folder). "None" if nothing.

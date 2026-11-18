@@ -222,6 +222,12 @@ accessories:
       # site's text is in it.
       - <%= name.tr("-", "_") %>_pgdata:/var/lib/postgresql/data
 
+  # Backups: README.md, step 4.4. Once a day an encrypted copy of the
+  # database and the files goes to a bucket of your own. To turn them on,
+  # fill in <endpoint> and <bucket> and take "# " out of every line between
+  # the two marks below (not of the marks themselves).
+<%= backup_accessory %>
+
 aliases:
   console: app exec --interactive --reuse "bin/rails console"
   shell: app exec --interactive --reuse "bash"

@@ -16,6 +16,7 @@ Follow the steps below in order. Each step says what to run and what you should 
 | `.dockerignore` | Lets only `theme/` into the image's build, so no secret file can reach it. |
 | `.kamal/secrets.example` | The names of the secrets the site needs, and how to make each. No value. |
 | `seeds/` | The place for starting content. Nothing reads it yet. |
+| `docs/restore-drills/` | The record of each restore drill (step 4.4), from `TEMPLATE.md`. |
 | `.gitignore` | Keeps `.kamal/secrets`, `.env*` and `.contentspiel/` out of git. |
 
 You need Docker and the `contentspiel` command on this machine. To deploy you also need Kamal (step 4).
@@ -137,6 +138,40 @@ You should see: `Finished all in ... seconds`. The old version keeps running unt
 
 If a deploy fails, read the site's log with `kamal app logs`.
 
+### 4.4 Backups
+
+Once a day, the backup accessory copies the database and the uploaded files, encrypted with a password only you hold, to a bucket at a storage provider of your choice, and keeps 7 daily, 4 weekly and 6 monthly copies. Choose a provider other than your server's, so one account's trouble cannot take both.
+
+First make the bucket and a key that may read and write it. Each provider gives you an endpoint (the address `BACKUP_REPOSITORY` starts with), the key's two halves (an access key ID and a secret access key) and, where it asks for one, a region:
+
+- **Hetzner Object Storage.** In the Hetzner Console, under Object Storage, create a bucket in a location (such as `fsn1`), and under the project's Security settings, S3 credentials, generate a key. The endpoint is `https://<location>.your-objectstorage.com`, for example `https://fsn1.your-objectstorage.com`; set `AWS_DEFAULT_REGION` to the location (`fsn1`). Object lock is offered when the bucket is created.
+- **Cloudflare R2.** In the Cloudflare dashboard, under R2, create a bucket, then under Manage API tokens create an API token with Object Read & Write permission for that bucket; it shows the access key ID and secret access key once. The endpoint is `https://<account-id>.r2.cloudflarestorage.com`, your account's id; `AWS_DEFAULT_REGION` stays `auto`. A bucket lock can be added in the bucket's settings.
+- **Amazon S3.** In the S3 console, create a bucket in a region (such as `eu-central-1`); in IAM, create a user whose policy allows `s3:ListBucket` on the bucket and `s3:GetObject`, `s3:PutObject` and `s3:DeleteObject` on its objects, and an access key for that user. The endpoint is `https://s3.<region>.amazonaws.com`, for example `https://s3.eu-central-1.amazonaws.com`; set `AWS_DEFAULT_REGION` to the bucket's region. Object Lock is offered when the bucket is created.
+
+Object lock keeps an object from being deleted for a set time, even with the key. The daily run removes the copies it no longer keeps, so read the CMS's `docs/reference/backups.md` before you turn a lock on.
+
+Then turn the accessory on in `config/deploy.yml`, at the end of `accessories:`:
+
+1. Take `# ` out of every line between `# The backup accessory` and `# End of the backup accessory` (not the two marks themselves), so `backup:` stands under `db:` at the same depth.
+2. In `BACKUP_REPOSITORY`, replace `<endpoint>` with the endpoint without `https://` and `<bucket>` with the bucket's name: `s3:https://fsn1.your-objectstorage.com/my-bucket/<%= name %>`. The last part is the folder in the bucket, so one bucket can hold several sites.
+3. Set `AWS_DEFAULT_REGION` as your provider's paragraph says. To run at another hour than 03:00 UTC, uncomment `BACKUP_HOUR` and set it (0 to 23, UTC).
+
+And the three secrets, in `.kamal/secrets` (copied from `.kamal/secrets.example` in step 4.1, which says how to make each): uncomment the lines of `RESTIC_PASSWORD`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` and give each its value, as for the other secrets. Make the restic password once and keep it in your password manager: **losing it loses every backup**, and nobody can recover it.
+
+Commit `config/deploy.yml`, then start the accessory, make the backup repository in the bucket (once per site) and make the first backup:
+
+```sh
+kamal accessory boot backup
+kamal accessory exec backup --reuse "bin/backup init"
+kamal accessory exec backup --reuse "bin/backup run"
+```
+
+You should see: after `init`, a line that starts with `created restic repository`; after `run`, a last line `[backup] finished in ...s: snapshot ...`. Then open System status in CS Studio: its Backups row says *Last backup less than an hour ago*, with the backup's size.
+
+To see the backups that exist: `kamal accessory exec backup --reuse "bin/backup list"`.
+
+How to restore a backup, and the drill that proves it works (once a quarter, into a scratch environment), are in the CMS's `docs/reference/backups.md`. Record each drill in `docs/restore-drills/`, as a copy of `docs/restore-drills/TEMPLATE.md` named after the day.
+
 ## Step 5. Upgrade the CMS
 
 ```sh
@@ -145,12 +180,21 @@ contentspiel upgrade
 
 This shows what changed in the CMS between this site's version and the newest release, breaking changes first, checks `theme/` against the new version, and only when the check passes, writes the new version into `.contentspiel-version`. If it lists problems, fix them in `theme/` and run it again; the version is not changed until the theme passes.
 
-Then make a backup of the database (it writes every database to the file `backup.sql` on this machine; keep it like a secret, it holds every page and every account), commit `.contentspiel-version`, and deploy:
+Then make a backup, commit `.contentspiel-version`, deploy, and move the backup accessory to the new version:
+
+```sh
+kamal accessory exec backup --reuse "bin/backup run"
+git commit -am "ContentSpiel $(cat .contentspiel-version)"
+kamal deploy
+kamal accessory reboot backup
+```
+
+The backup runs on the version the site ran until now, which is right: it copies the database as that version left it. `kamal accessory reboot backup` starts the accessory on the version `.contentspiel-version` now names; a deploy does not move it.
+
+Without the backup accessory (step 4.4), make the backup with this instead, and leave out the reboot. It writes every database to the file `backup.sql` on this machine; keep it like a secret, it holds every page and every account:
 
 ```sh
 kamal accessory exec db --reuse --raw "pg_dumpall -U postgres" > backup.sql
-git commit -am "ContentSpiel $(cat .contentspiel-version)"
-kamal deploy
 ```
 
 To go back, write the old version into `.contentspiel-version` and deploy again. That is safe only for a release with no migration: the release notes say which ones have one.
