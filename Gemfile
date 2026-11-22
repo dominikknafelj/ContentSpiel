@@ -136,7 +136,7 @@ gem "sitemap_generator", "~> 7.1"
 # it nothing is exported or printed (OTEL_CONSOLE=1 prints to the terminal).
 gem "opentelemetry-sdk", "~> 1.13"
 
-gem "opentelemetry-instrumentation-all", "~> 0.101"
+gem "opentelemetry-instrumentation-all", "~> 0.102"
 
 gem "opentelemetry-exporter-otlp", "~> 0.37"
 
