@@ -14,9 +14,19 @@ class Alerts::AlertTest < ActiveSupport::TestCase
   end
 
   test "security kinds are all but error" do
-    assert_equal Alerts::Alert::KINDS - %w[error], Alerts::Alert::SECURITY_KINDS
+    assert_equal Alerts::Alert::KINDS - %w[error backup_stale], Alerts::Alert::SECURITY_KINDS
     assert_not make(kind: "error").security?
     assert make(kind: "owner_changed").security?
+  end
+
+  test "a backup alert is no security alert and has no audit link" do
+    alert = make(kind: "backup_stale", reason: "stale", hours: 50)
+
+    assert_not alert.security?
+    assert_nil alert.audit_filter
+    assert_equal "backups", alert.category
+    assert_equal "error", make(kind: "error").category
+    assert_equal "security", make(kind: "owner_changed").category
   end
 
   test "a fingerprint is unique in the database" do

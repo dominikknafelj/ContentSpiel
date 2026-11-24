@@ -40,7 +40,7 @@ module Alerts
     # `port: nil` first, for the reason `PasswordsMailer#reset_url` gives.
     def system_status_url = admin_system_status_url(port: nil, **@url_options)
 
-    def alert_kind(alert) = t("mail.alerts_mailer.digest.kinds.#{alert.security? ? "security" : "error"}")
+    def alert_kind(alert) = t("mail.alerts_mailer.digest.kinds.#{alert.category}")
 
     def alert_sentence(alert)
       sentence = alert.sentence

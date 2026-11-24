@@ -47,7 +47,8 @@ module Admin
       def security? = alert.security?
 
       def chip
-        security? ? Admin::Ui::StateChipComponent.new(tone: :warn, label: t(".security")) : Admin::Ui::StateChipComponent.new(tone: :danger, label: t(".error"))
+        tone = alert.category == "error" ? :danger : :warn
+        Admin::Ui::StateChipComponent.new(tone: tone, label: t(".#{alert.category}"))
       end
 
       def error_sentence?

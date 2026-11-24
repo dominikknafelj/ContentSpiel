@@ -95,6 +95,7 @@ en:
         kinds:
           error: "Error"
           security: "Security"
+          backups: "Backups"
         sentences:
           error: "%{error_class} in %{place}"
           error_nowhere: "%{error_class}"
@@ -111,6 +112,9 @@ en:
           request_limited:
             one: "A limit on requests was reached once in %{minutes} minutes: %{limits}"
             other: "Limits on requests were reached %{count} times in %{minutes} minutes: %{limits}"
+          backup_stale: "No good backup for %{hours} hours"
+          backup_never: "No backup has succeeded in the %{hours} hours since backups were set up"
+          backup_check_failed: "The monthly check of the backups failed"
         facts:
           one: "Seen once · last %{time}"
           other: "Seen %{count} times · last %{time}"

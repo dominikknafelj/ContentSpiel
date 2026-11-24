@@ -1,6 +1,7 @@
 module Alerts
   # Every minute (`config/recurring.yml`): the scan of the audit log
-  # (`Alerts::Rules`), then the owners' digest (`Alerts::Mailing`, which sends
+  # (`Alerts::Rules`), the backups' age (`Alerts::BackupRule`, so a new day's
+  # alert goes in that minute's digest), then the owners' digest (`Alerts::Mailing`, which sends
   # it here and tries a failed send again on its own schedule), then the
   # prune of alerts past their keeping (`Alert.expired`).
   #
@@ -19,6 +20,7 @@ module Alerts
     def perform
       now = Time.current
       step(:rules) { Rules.new(now: now).apply }
+      step(:backups) { BackupRule.new(now: now).apply }
       step(:digest) { Mailing.new(now: now).deliver }
       step(:prune) { Alert.expired(now).delete_all } # version: none (alerts are no part of a page)
       nil

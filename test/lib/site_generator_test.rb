@@ -3,6 +3,7 @@ require "open3"
 require "tmpdir"
 require "fileutils"
 require Rails.root.join("lib/content_spiel/site_generator").to_s
+require Rails.root.join("lib/content_spiel/backup").to_s
 
 # `contentspiel new NAME` (bin/contentspiel), whose work is
 # `ContentSpiel::SiteGenerator`: a site folder that builds on a release.
@@ -22,6 +23,7 @@ class SiteGeneratorTest < ActiveSupport::TestCase
     README.md
     config/deploy.yml
     config/postgres/10-contentspiel-databases.sh
+    docs/restore-drills/TEMPLATE.md
     seeds/README.md
   ].freeze
 
@@ -92,11 +94,98 @@ class SiteGeneratorTest < ActiveSupport::TestCase
       assert_equal listed.map { |key| key.split(":").first }.uniq.sort, example_names(secrets).sort
       assert_includes example_names(secrets), "POSTGRES_PASSWORD"
 
+      # With the backup accessory uncommented, each of its secrets has its
+      # line in the example too: POSTGRES_PASSWORD as it stands, the three of
+      # the backup commented, to be uncommented with the accessory.
+      backup_secrets = kamal_config(site, backup: true).dig("accessories", "backup", "env", "secret")
+      assert_equal (%w[POSTGRES_PASSWORD] + ContentSpiel::BackupAccessory::SECRETS).sort, backup_secrets.sort
+      assert_equal ContentSpiel::BackupAccessory::SECRETS.sort, commented_example_names(secrets).sort
+      backup_secrets.each { |key| assert_includes example_names(secrets) + commented_example_names(secrets), key }
+
       placeholders = deploy.scan(/<your-[a-z-]+>/).uniq
       assert_operator placeholders.size, :>=, 3
       placeholders.each { |placeholder| assert_includes readme, "`#{placeholder}`" }
       %w[contentspiel\ dev contentspiel\ check kamal\ setup kamal\ deploy contentspiel\ upgrade].each do |command|
         assert_includes readme, command
+      end
+    end
+  end
+
+  test "deploy.yml carries the backup accessory commented, and uncommented it is valid Kamal configuration" do
+    in_tmp do |dir|
+      site = File.join(dir, "my-site")
+      ContentSpiel::SiteGenerator.new(site).write
+      deploy = File.read(File.join(site, "config/deploy.yml"))
+      assert_includes deploy, "Backups: README.md, step 4.4"
+      assert_includes deploy, "  #{ContentSpiel::BackupAccessory::BEGIN_MARK}"
+      assert_includes deploy, "  #{ContentSpiel::BackupAccessory::END_MARK}"
+      assert_nil kamal_config(site).dig("accessories", "backup"), "commented, the accessory is not configured"
+
+      config = kamal_config(site, backup: true)
+      backup = config.dig("accessories", "backup")
+      assert_equal "#{ContentSpiel::IMAGE}:#{ContentSpiel::VERSION}", backup["image"]
+      assert_equal "bin/backup schedule", backup["cmd"]
+      assert_equal "filled", backup["host"]
+      assert_equal config["volumes"], backup["volumes"], "the web's files volume, mounted where the web mounts it"
+      assert_equal config.dig("env", "clear", "PGHOST"), backup.dig("env", "clear", "PGHOST")
+      assert_equal "my-site", backup.dig("env", "clear", "BACKUP_SITE")
+      assert_equal "s3:https://<endpoint>/<bucket>/my-site", backup.dig("env", "clear", "BACKUP_REPOSITORY")
+      assert_equal "auto", backup.dig("env", "clear", "AWS_DEFAULT_REGION")
+      assert_equal({ "cpus" => 1 }, backup["options"])
+      assert_includes deploy, "# BACKUP_EVERY: 24"
+      assert_nil backup.dig("env", "clear", "BACKUP_EVERY"), "the cadence stays commented, a day"
+      assert_equal config.dig("accessories", "db"), kamal_config(site).dig("accessories", "db"), "uncommenting touches nothing else"
+
+      # The block is the one `contentspiel upgrade` prints, from one source.
+      block = ContentSpiel::BackupAccessory.block(service: "my-site", volume: "my_site_storage",
+                                                  cms_image: ContentSpiel::IMAGE, commented: true)
+      assert_includes deploy, block
+      uncommented = ContentSpiel::BackupAccessory.block(service: "my-site", volume: "my_site_storage",
+                                                        cms_image: ContentSpiel::IMAGE, commented: false)
+      assert_equal uncomment_backup(block), uncommented
+    end
+  end
+
+  test "the web container gets no backup variable" do
+    in_tmp do |dir|
+      site = File.join(dir, "my-site")
+      ContentSpiel::SiteGenerator.new(site).write
+      env = kamal_config(site, backup: true)["env"]
+      names = env["clear"].keys + env["secret"]
+      assert_empty names.grep(/\A(BACKUP_|RESTIC_|AWS_)/), names.inspect
+    end
+  end
+
+  test "the README's backup commands are bin/backup's subcommands" do
+    in_tmp do |dir|
+      site = File.join(dir, "my-site")
+      ContentSpiel::SiteGenerator.new(site).write
+      readme = File.read(File.join(site, "README.md"))
+
+      used = readme.scan(%r{bin/backup (\w+)}).flatten.uniq
+      assert_operator used.size, :>=, 2
+      used.each { |command| assert_includes ContentSpiel::Backup::COMMANDS, command }
+      assert_includes readme, "### 4.4 Backups"
+      assert_includes readme, "kamal accessory boot backup"
+      assert_includes readme, %(kamal accessory exec backup --reuse "bin/backup init")
+      assert_includes readme, %(kamal accessory exec backup --reuse "bin/backup run")
+      assert_includes readme, "kamal accessory reboot backup"
+      assert_includes readme, ContentSpiel::Upgrade::BACKUP, "the fallback without the accessory"
+      assert_includes readme, "docs/restore-drills/"
+      assert_not_includes readme, "public_site:after_restore", "the runbook's, in the CMS's docs/reference/backups.md"
+    end
+  end
+
+  test "the drill record names the snapshot, the duration against the two hours, and each check" do
+    in_tmp do |dir|
+      site = File.join(dir, "my-site")
+      ContentSpiel::SiteGenerator.new(site).write
+      record = File.read(File.join(site, "docs/restore-drills/TEMPLATE.md"))
+
+      [ "Snapshot:", "2 hours",
+        "A page with an image renders", "A post's history opens", "An image's original downloads",
+        "A note's file opens", "Sign-in works", "The audit log's newest entry is from the backup's day" ].each do |words|
+        assert_includes record, words
       end
     end
   end
@@ -346,10 +435,28 @@ class SiteGeneratorTest < ActiveSupport::TestCase
   # The non-comment names of a secrets example.
   def example_names(secrets) = secrets.lines.grep_v(/\A\s*(#|\z)/).map { |line| line[/\A([A-Z0-9_]+)=/, 1] }
 
+  # The secrets example's commented NAME=$NAME lines: the backup's three.
+  def commented_example_names(secrets) = secrets.scan(/^# ([A-Z0-9_]+)=\$\1$/).flatten
+
+  # deploy.yml with the backup accessory uncommented, as the README's step
+  # 4.4 says: "# " taken out of each line between the two marks.
+  def uncomment_backup(text)
+    inside = false
+    text.lines.map do |line|
+      if line.include?(ContentSpiel::BackupAccessory::BEGIN_MARK) then inside = true
+      elsif line.include?(ContentSpiel::BackupAccessory::END_MARK) then inside = false
+      elsif inside then line = line.sub(/\A  # ?/, "  ")
+      end
+      line
+    end.join
+  end
+
   # deploy.yml as Kamal reads it: its ERB rendered from the site's folder,
-  # with the placeholders filled.
-  def kamal_config(site)
+  # with the placeholders filled, and the backup accessory uncommented when
+  # asked.
+  def kamal_config(site, backup: false)
     text = File.read(File.join(site, "config/deploy.yml")).gsub(/<your-[a-z-]+>/, "filled")
+    text = uncomment_backup(text) if backup
     Dir.chdir(site) { YAML.safe_load(ERB.new(text).result, aliases: true) }
   end
 
